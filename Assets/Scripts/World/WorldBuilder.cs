@@ -55,7 +55,6 @@ namespace SpaceTaxi.World
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = StubSprites.Circle(data.Radius * 2f);
-            renderer.sharedMaterial = StubSprites.Material;
             if (data.Type == BodyType.Star)
             {
                 renderer.color = new Color(1f, 0.82f, 0.35f);
@@ -78,7 +77,6 @@ namespace SpaceTaxi.World
                 heatGo.transform.SetParent(go.transform, false);
                 var heatRenderer = heatGo.AddComponent<SpriteRenderer>();
                 heatRenderer.sprite = StubSprites.Circle(data.HeatRadius * 2f);
-                heatRenderer.sharedMaterial = StubSprites.Material;
                 heatRenderer.color = new Color(1f, 0.45f, 0.2f, 0.07f);
                 heatRenderer.sortingOrder = -1;
             }
@@ -95,7 +93,6 @@ namespace SpaceTaxi.World
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = StubSprites.ShipTriangle();
-            renderer.sharedMaterial = StubSprites.Material;
             renderer.color = Color.white;
             renderer.sortingOrder = 2;
 
