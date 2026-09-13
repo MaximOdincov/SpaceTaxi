@@ -1,0 +1,143 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbddb879316e44f79af95bf7881e7e51, type: 3}
+  m_Name: AudioCatalog
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Audio.AudioCatalog
+  entries:
+  - Id: 1
+    Clips:
+    - {fileID: 8300000, guid: 8ae279348ad2245ea99167420d26ff0d, type: 3}
+    Group: 0
+    Volume: 0.55
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 2
+    Clips:
+    - {fileID: 8300000, guid: ed562f75c5622403ab3517344897d16b, type: 3}
+    Group: 0
+    Volume: 0.5
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 3
+    Clips:
+    - {fileID: 8300000, guid: 8940fdfd48bf049f7aa2a6b6f69e3cd1, type: 3}
+    Group: 0
+    Volume: 0.35
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 4
+    Clips:
+    - {fileID: 8300000, guid: cf72de0ec76c94ad1b15ff646bc8c576, type: 3}
+    Group: 1
+    Volume: 0.45
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 5
+    Clips:
+    - {fileID: 8300000, guid: b3278893911864fb59750ea80af85bc9, type: 3}
+    - {fileID: 8300000, guid: 06ec5a116a71740a9bd6cc99af60288f, type: 3}
+    - {fileID: 8300000, guid: 1580e34aec0c14997b6cd4cae2fd8de3, type: 3}
+    Group: 1
+    Volume: 0.8
+    Pitch: 1
+    PitchJitter: 0.08
+    Loop: 0
+    Sequential: 1
+  - Id: 6
+    Clips:
+    - {fileID: 8300000, guid: 9f4d7c52961054efb83601e2a2073ef6, type: 3}
+    Group: 1
+    Volume: 0.7
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+  - Id: 7
+    Clips:
+    - {fileID: 8300000, guid: e2cb98dfc5c51414581231e77f3b7ac8, type: 3}
+    Group: 1
+    Volume: 0.65
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+  - Id: 8
+    Clips:
+    - {fileID: 8300000, guid: 8123c6cd775c641e8b05d781c170415f, type: 3}
+    Group: 1
+    Volume: 1
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+  - Id: 9
+    Clips:
+    - {fileID: 8300000, guid: 3f1c2d2ebf9954ca0a5f7cee50c75cfd, type: 3}
+    Group: 1
+    Volume: 0.6
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+  - Id: 10
+    Clips:
+    - {fileID: 8300000, guid: 78f7b7a074a504b779d941e8d3ba7702, type: 3}
+    Group: 2
+    Volume: 0.5
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 0
+    Sequential: 0
+  - Id: 11
+    Clips:
+    - {fileID: 8300000, guid: d62fa02e5c7ae4773838d17cce147e86, type: 3}
+    Group: 2
+    Volume: 0.55
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 0
+    Sequential: 0
+  - Id: 12
+    Clips:
+    - {fileID: 8300000, guid: 0c5903bda280c4207942e36671a2fbbe, type: 3}
+    Group: 3
+    Volume: 0.16
+    Pitch: 0.45
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 13
+    Clips:
+    - {fileID: 8300000, guid: c232f0222fe6a47de9528553746794ce, type: 3}
+    Group: 3
+    Volume: 0.5
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0
+  - Id: 14
+    Clips:
+    - {fileID: 8300000, guid: 3bb6388102b8048bfb6b24b2af50696c, type: 3}
+    Group: 3
+    Volume: 0.45
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 1
+    Sequential: 0

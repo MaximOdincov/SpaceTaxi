@@ -1,0 +1,384 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace SpaceTaxi.Audio
+{
+    // Центральный менеджер звука (05_AUDIO.md §3): один на игру, переживает смену сцен.
+    // Вызовы только через статический фасад Sound — из любого кода без ссылок.
+    [DisallowMultipleComponent]
+    public sealed class AudioManager : MonoBehaviour
+    {
+        [SerializeField] private AudioCatalog catalog;
+
+        public static AudioManager Instance { get; private set; }
+
+        // Кривые непрерывных звуков: интенсивность 0..1 → громкость/тон.
+        private const float LoopVolumeMin = 0.4f;   // на минимуме гул не пропадает полностью
+        private const float LoopPitchMin = 0.9f;
+        private const float LoopPitchRange = 0.22f;
+        private const float LoopFadeTime = 0.15f;   // нарастание/затухание лупа, без щелчков
+        private const float MusicFadeTime = 1.5f;   // кроссфейд треков
+        private const float DuckFactor = 0.2f;      // приглушение групп при взрыве
+        private const float DuckTime = 1.2f;
+        private const int MaxOneShotVoices = 12;
+
+        private readonly Dictionary<SoundId, LoopVoice> loops = new Dictionary<SoundId, LoopVoice>();
+        private readonly List<AudioSource> oneShotPool = new List<AudioSource>();
+        private readonly Dictionary<AudioGroup, float> groupVolumes = new Dictionary<AudioGroup, float>();
+        private readonly Dictionary<AudioGroup, float> groupDuck = new Dictionary<AudioGroup, float>();
+        private AudioSource musicA, musicB; // чередуем для кроссфейда
+        private SoundId currentMusic = SoundId.None;
+        private int musicFlip;
+        private Coroutine duckRoutine;
+
+        // Непрерывный звук: источник + параметры.
+        private sealed class LoopVoice
+        {
+            public AudioSource Source;
+            public SoundEntry Entry;
+            public float Intensity = 1f;
+            public float Pan;
+            public bool FadingOut;
+            public Coroutine Fade;
+        }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject); // дубль из второй сцены — менеджер уже живёт
+                return;
+            }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+
+            foreach (AudioGroup g in System.Enum.GetValues(typeof(AudioGroup)))
+            {
+                groupVolumes[g] = LoadVolume(g);
+                groupDuck[g] = 1f;
+            }
+            AudioListener.volume = LoadVolume("Master");
+
+            musicA = CreateVoice("MusicA");
+            musicB = CreateVoice("MusicB");
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
+        }
+
+        // --- Одноразовые звуки ---
+
+        public void PlayOneShot(SoundId id, float intensity = 1f)
+        {
+            SoundEntry entry = GetEntry(id);
+            if (entry == null || entry.Loop)
+                return;
+
+            AudioSource src = GetFreeOneShotVoice();
+            src.clip = ChooseClip(entry, intensity);
+            src.pitch = entry.Pitch * (1f + Random.Range(-entry.PitchJitter, entry.PitchJitter));
+            src.volume = entry.Volume * GroupFactor(entry.Group) * Mathf.Clamp01(intensity);
+            src.panStereo = 0f;
+            src.loop = false;
+            src.Play();
+
+            if (id == SoundId.Explosion)
+                DuckAll(); // взрыв «срезает» остальное
+        }
+
+        // --- Непрерывные звуки ---
+
+        public void SetLoopActive(SoundId id, bool active)
+        {
+            if (active)
+                StartLoop(id);
+            else
+                StopLoop(id);
+        }
+
+        public void StartLoop(SoundId id)
+        {
+            SoundEntry entry = GetEntry(id);
+            if (entry == null)
+                return;
+
+            if (loops.TryGetValue(id, out LoopVoice voice))
+            {
+                if (voice.FadingOut) // возвращаем из затухания
+                {
+                    if (voice.Fade != null) StopCoroutine(voice.Fade);
+                    voice.FadingOut = false;
+                    voice.Fade = StartCoroutine(FadeLoop(voice, 1f));
+                }
+                return;
+            }
+
+            voice = new LoopVoice { Entry = entry, Source = CreateVoice("Loop_" + id) };
+            voice.Source.clip = ChooseClip(entry, 1f);
+            voice.Source.loop = true;
+            voice.Source.volume = 0f;
+            voice.Source.pitch = entry.Pitch;
+            voice.Source.Play();
+            loops.Add(id, voice);
+            voice.Fade = StartCoroutine(FadeLoop(voice, 1f));
+        }
+
+        public void StopLoop(SoundId id)
+        {
+            if (!loops.TryGetValue(id, out LoopVoice voice))
+                return;
+            if (voice.Fade != null) StopCoroutine(voice.Fade);
+            voice.FadingOut = true;
+            voice.Fade = StartCoroutine(FadeLoop(voice, 0f, removeWhenDone: true));
+        }
+
+        public void SetLoopIntensity(SoundId id, float intensity)
+        {
+            if (!loops.TryGetValue(id, out LoopVoice voice) || voice.FadingOut)
+                return;
+            voice.Intensity = Mathf.Clamp01(intensity);
+            ApplyLoopParams(voice);
+        }
+
+        public void SetLoopPan(SoundId id, float pan)
+        {
+            if (!loops.TryGetValue(id, out LoopVoice voice))
+                return;
+            voice.Pan = Mathf.Clamp(pan, -1f, 1f);
+            voice.Source.panStereo = voice.Pan;
+        }
+
+        private void ApplyLoopParams(LoopVoice voice)
+        {
+            float i = voice.Intensity;
+            float vol = LoopVolumeMin + (1f - LoopVolumeMin) * i;
+            voice.Source.volume = voice.Entry.Volume * GroupFactor(voice.Entry.Group) * vol;
+            voice.Source.pitch = voice.Entry.Pitch * (LoopPitchMin + LoopPitchRange * i);
+        }
+
+        private IEnumerator FadeLoop(LoopVoice voice, float dir, bool removeWhenDone = false)
+        {
+            // dir: 1 — до рабочих параметров, 0 — до тишины
+            float from = voice.Source.volume;
+            float targetFull = FullLoopVolume(voice);
+            float target = dir > 0f ? targetFull : 0f;
+            for (float t = 0f; t < LoopFadeTime; t += Time.unscaledDeltaTime)
+            {
+                voice.Source.volume = Mathf.Lerp(from, target, t / LoopFadeTime);
+                yield return null;
+            }
+            voice.Source.volume = target;
+            voice.Fade = null;
+            if (removeWhenDone)
+            {
+                voice.Source.Stop();
+                Destroy(voice.Source.gameObject);
+                loops.Remove(voice.Entry.Id);
+            }
+        }
+
+        private float FullLoopVolume(LoopVoice voice)
+        {
+            float i = voice.Intensity;
+            float vol = LoopVolumeMin + (1f - LoopVolumeMin) * i;
+            return voice.Entry.Volume * GroupFactor(voice.Entry.Group) * vol;
+        }
+
+        // --- Музыка ---
+
+        public void PlayMusic(SoundId id)
+        {
+            if (id == currentMusic)
+                return;
+            SoundEntry entry = GetEntry(id);
+            if (entry == null)
+                return;
+
+            currentMusic = id;
+            AudioSource fadeIn = musicFlip % 2 == 0 ? musicA : musicB;
+            AudioSource fadeOut = musicFlip % 2 == 0 ? musicB : musicA;
+            musicFlip++;
+
+            fadeIn.clip = ChooseClip(entry, 1f);
+            fadeIn.loop = true;
+            fadeIn.pitch = entry.Pitch;
+            fadeIn.Play();
+            StartCoroutine(Crossfade(fadeIn, fadeOut, entry.Volume * GroupFactor(AudioGroup.Music)));
+        }
+
+        public void StopMusic()
+        {
+            currentMusic = SoundId.None;
+            if (musicA.isPlaying) StartCoroutine(Crossfade(null, musicA, 0f));
+            if (musicB.isPlaying) StartCoroutine(Crossfade(null, musicB, 0f));
+        }
+
+        private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
+        {
+            float t = 0f;
+            while (t < MusicFadeTime)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = t / MusicFadeTime;
+                if (fadeIn != null) fadeIn.volume = Mathf.Lerp(0f, targetVolume, k);
+                if (fadeOut != null) fadeOut.volume = Mathf.Lerp(fadeOut.volume, 0f, k);
+                yield return null;
+            }
+            if (fadeOut != null)
+            {
+                fadeOut.Stop();
+                fadeOut.clip = null;
+            }
+        }
+
+        // --- Громкости групп и настройки ---
+
+        public void SetGroupVolume(AudioGroup group, float linear01)
+        {
+            groupVolumes[group] = Mathf.Clamp01(linear01);
+            SaveVolume(group.ToString(), groupVolumes[group]);
+            RefreshLoops();
+        }
+
+        public float GetGroupVolume(AudioGroup group) => groupVolumes.TryGetValue(group, out float v) ? v : 1f;
+
+        // Общая громкость (ползунок настроек v0.1). Квадратичная кривая — субъективно ровная.
+        public void SetMasterVolume(float linear01)
+        {
+            float v = Mathf.Clamp01(linear01);
+            AudioListener.volume = v * v;
+            SaveVolume("Master", v);
+        }
+
+        public float GetMasterVolume() => Mathf.Sqrt(AudioListener.volume);
+
+        private void RefreshLoops()
+        {
+            foreach (LoopVoice voice in loops.Values)
+                if (!voice.FadingOut)
+                    ApplyLoopParams(voice);
+        }
+
+        // Приглушение двигателей и эффектов при взрыве, плавный возврат.
+        private void DuckAll()
+        {
+            if (duckRoutine != null) StopCoroutine(duckRoutine);
+            duckRoutine = StartCoroutine(DuckRoutine());
+        }
+
+        private IEnumerator DuckRoutine()
+        {
+            foreach (AudioGroup g in System.Enum.GetValues(typeof(AudioGroup)))
+                if (g != AudioGroup.Music && g != AudioGroup.Ui)
+                    groupDuck[g] = DuckFactor;
+            RefreshLoops();
+            float t = 0f;
+            while (t < DuckTime)
+            {
+                t += Time.unscaledDeltaTime;
+                float recover = Mathf.Clamp01(t / DuckTime);
+                foreach (AudioGroup g in System.Enum.GetValues(typeof(AudioGroup)))
+                    if (g != AudioGroup.Music && g != AudioGroup.Ui)
+                        groupDuck[g] = Mathf.Lerp(DuckFactor, 1f, recover);
+                RefreshLoops();
+                yield return null;
+            }
+        }
+
+        // --- Внутреннее ---
+
+        private float GroupFactor(AudioGroup group)
+        {
+            float vol = groupVolumes.TryGetValue(group, out float v) ? v : 1f;
+            float duck = groupDuck.TryGetValue(group, out float d) ? d : 1f;
+            return vol * duck;
+        }
+
+        private SoundEntry GetEntry(SoundId id)
+        {
+            if (catalog == null)
+                return null;
+            SoundEntry entry = catalog.Get(id);
+            if (entry == null || !entry.IsValid)
+                Debug.LogWarning($"[Audio] нет клипов для {id}");
+            return entry == null || !entry.IsValid ? null : entry;
+        }
+
+        // Выбор вариации: последовательная (по силе) или случайная.
+        private AudioClip ChooseClip(SoundEntry entry, float intensity)
+        {
+            AudioClip[] clips = entry.Clips;
+            if (clips.Length == 1)
+                return clips[0];
+            int index = entry.Sequential
+                ? Mathf.Clamp(Mathf.FloorToInt(Mathf.Clamp01(intensity) * clips.Length), 0, clips.Length - 1)
+                : Random.Range(0, clips.Length);
+            return clips[index];
+        }
+
+        private AudioSource CreateVoice(string name)
+        {
+            var go = new GameObject("Audio_" + name);
+            go.transform.SetParent(transform, false);
+            return go.AddComponent<AudioSource>();
+        }
+
+        private AudioSource GetFreeOneShotVoice()
+        {
+            foreach (AudioSource src in oneShotPool)
+                if (!src.isPlaying)
+                    return src;
+            if (oneShotPool.Count >= MaxOneShotVoices)
+                return oneShotPool[0]; // переполнение — перебиваем старейший занятый
+            AudioSource voice = CreateVoice("OneShot");
+            oneShotPool.Add(voice);
+            return voice;
+        }
+
+        private static float LoadVolume(AudioGroup g) => LoadVolume(g.ToString());
+
+        private static float LoadVolume(string key)
+        {
+            return PlayerPrefs.GetFloat("audio.vol." + key, 1f);
+        }
+
+        private static void SaveVolume(string key, float value)
+        {
+            PlayerPrefs.SetFloat("audio.vol." + key, value);
+            PlayerPrefs.Save();
+        }
+    }
+
+    // Статический фасад: Sound.Play(SoundId.Takeoff) из любого кода.
+    // Менеджера нет (сцена без AudioManager) — вызовы молча игнорируются.
+    public static class Sound
+    {
+        public static void Play(SoundId id, float intensity = 1f) =>
+            AudioManager.Instance?.PlayOneShot(id, intensity);
+
+        public static void SetLoop(SoundId id, bool active) =>
+            AudioManager.Instance?.SetLoopActive(id, active);
+
+        public static void StartLoop(SoundId id) =>
+            AudioManager.Instance?.StartLoop(id);
+
+        public static void StopLoop(SoundId id) =>
+            AudioManager.Instance?.StopLoop(id);
+
+        public static void SetLoopIntensity(SoundId id, float intensity) =>
+            AudioManager.Instance?.SetLoopIntensity(id, intensity);
+
+        public static void SetLoopPan(SoundId id, float pan) =>
+            AudioManager.Instance?.SetLoopPan(id, pan);
+
+        public static void PlayMusic(SoundId id) =>
+            AudioManager.Instance?.PlayMusic(id);
+
+        public static void StopMusic() =>
+            AudioManager.Instance?.StopMusic();
+    }
+}
