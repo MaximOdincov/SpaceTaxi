@@ -45,6 +45,8 @@ namespace SpaceTaxi.World
                 bodies.Add(CreateBody(level.Bodies[i], i));
 
             ship = CreateShip(bodies);
+
+            Debug.Log($"[World] {level.LevelName}: тел={bodies.Count}, корабль в {ship.transform.position}, состояние={ship.State}");
         }
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)

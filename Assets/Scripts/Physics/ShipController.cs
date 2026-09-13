@@ -31,7 +31,7 @@ namespace SpaceTaxi.Physics
         private void Awake()
         {
             ship = GetComponent<Ship>();
-            gravity = FindObjectOfType<GravityField>();
+            gravity = FindAnyObjectByType<GravityField>();
             landing = GetComponent<LandingSystem>();
         }
 
@@ -59,14 +59,7 @@ namespace SpaceTaxi.Physics
             if (config == null)
                 return;
 
-            // Стоим на планете — ждём ПРОБЕЛ, остальное не работает.
-            if (ship.State == ShipState.Landed)
-            {
-                if (takeoffAction != null && takeoffAction.WasPressedThisFrame())
-                    landing.Takeoff();
-                return;
-            }
-
+            // Стоим на планете — ввод обрабатывается в Update (взлёт).
             if (ship.State != ShipState.Flying)
                 return;
 
@@ -145,7 +138,18 @@ namespace SpaceTaxi.Physics
         // Нос доворачивается к скорости — чисто визуально.
         private void Update()
         {
-            if (ship == null || config == null)
+            if (ship == null)
+                return;
+
+            // Взлёт читаем здесь: WasPressedThisFrame в FixedUpdate пропускает нажатия.
+            if (ship.State == ShipState.Landed
+                && takeoffAction != null && takeoffAction.WasPressedThisFrame())
+            {
+                landing.Takeoff();
+                return;
+            }
+
+            if (config == null)
                 return;
             Vector2 v = ship.Body.linearVelocity;
             if (v.sqrMagnitude <= config.MinControlSpeed * config.MinControlSpeed)

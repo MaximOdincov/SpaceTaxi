@@ -13,7 +13,7 @@ namespace SpaceTaxi.Audio
         private void Awake()
         {
             ship = GetComponent<Ship>();
-            gravity = FindObjectOfType<GravityField>();
+            gravity = FindAnyObjectByType<GravityField>();
         }
 
         private void Update()

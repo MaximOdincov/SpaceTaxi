@@ -27,6 +27,7 @@ namespace SpaceTaxi.Physics
             ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
             ship.LandedOn = null;
             ship.State = ShipState.Flying;
+            Debug.Log($"[Landing] взлёт: v={ship.Body.linearVelocity.magnitude}");
         }
     }
 }
