@@ -8,6 +8,23 @@ namespace SpaceTaxi.Core
     {
         private static readonly Dictionary<int, Sprite> circles = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
+        private static Material spriteMaterial;
+
+        // Один материал на все заглушки — явный шейдер URP 2D, чтобы спрайты,
+        // созданные в рантайме, точно рендерились Renderer2D.
+        public static Material Material
+        {
+            get
+            {
+                if (spriteMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite");
+                    if (shader != null)
+                        spriteMaterial = new Material(shader);
+                }
+                return spriteMaterial;
+            }
+        }
 
         // Круг заданного диаметра в юнитах, кэш по целому диаметру.
         public static Sprite Circle(float diameter)

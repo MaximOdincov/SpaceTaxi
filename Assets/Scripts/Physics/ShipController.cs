@@ -133,9 +133,18 @@ namespace SpaceTaxi.Physics
             }
 
             ship.Body.linearVelocity = velocity;
+
+            // Нос доворачивается к скорости — через физику, чтобы не спорить
+            // с интерполяцией Rigidbody (иначе джиттер).
+            if (v > config.MinControlSpeed)
+            {
+                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg;
+                float current = ship.Body.rotation;
+                float delta = Mathf.DeltaAngle(current, target);
+                ship.Body.MoveRotation(current + delta * Mathf.Min(1f, config.HeadingTurnRate * dt));
+            }
         }
 
-        // Нос доворачивается к скорости — чисто визуально.
         private void Update()
         {
             if (ship == null)
@@ -146,18 +155,7 @@ namespace SpaceTaxi.Physics
                 && takeoffAction != null && takeoffAction.WasPressedThisFrame())
             {
                 landing.Takeoff();
-                return;
             }
-
-            if (config == null)
-                return;
-            Vector2 v = ship.Body.linearVelocity;
-            if (v.sqrMagnitude <= config.MinControlSpeed * config.MinControlSpeed)
-                return;
-            float target = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
-            float current = transform.eulerAngles.z;
-            float delta = Mathf.DeltaAngle(current, target);
-            transform.rotation = Quaternion.Euler(0f, 0f, current + delta * Mathf.Min(1f, config.HeadingTurnRate * Time.deltaTime));
         }
     }
 }
