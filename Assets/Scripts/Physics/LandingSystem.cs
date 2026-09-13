@@ -14,12 +14,19 @@ namespace SpaceTaxi.Physics
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
-            // TODO: посадка или урон+отскок, по скорости контакта
+            // TODO (посадка): v < LandSpeed -> сесть (State = Landed), иначе
+            // урон (v - LandSpeed) * 0.9 + отскок
         }
 
+        // Взлёт со стоянки: импульс TakeoffV от центра планеты (ПРОБЕЛ).
         public void Takeoff()
         {
-            // TODO: импульс TakeoffV от центра планеты
+            if (ship == null || ship.State != ShipState.Landed || ship.LandedOn == null)
+                return;
+            Vector2 dir = ((Vector2)ship.transform.position - (Vector2)ship.LandedOn.transform.position).normalized;
+            ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
+            ship.LandedOn = null;
+            ship.State = ShipState.Flying;
         }
     }
 }

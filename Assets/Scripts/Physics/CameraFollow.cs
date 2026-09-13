@@ -9,6 +9,11 @@ namespace SpaceTaxi.Physics
 
         private Camera cam;
 
+        public void SetTarget(Ship target)
+        {
+            ship = target;
+        }
+
         private void Awake()
         {
             cam = GetComponent<Camera>();

@@ -1,23 +1,30 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Core
 {
-    // Корень игровой сцены: конфиги и корабль, позже — сейв.
+    // Корень игровой сцены: собирает мир из LevelAsset, держит общие ссылки.
     public class GameSession : MonoBehaviour
     {
         [SerializeField] private LevelAsset level;
         [SerializeField] private PhysicsConfig physicsConfig;
-        [SerializeField] private Ship ship;
+        [SerializeField] private InputActionAsset input;
 
+        public Ship Ship { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
-        public Ship Ship => ship;
 
         private void Start()
         {
-            // TODO: собрать мир из level, заспавнить корабль в SpawnPoint
+            var builder = new WorldBuilder(level, physicsConfig, input);
+            builder.Build(out Ship ship, out _);
+            Ship = ship;
+
+            var follow = Camera.main.gameObject.AddComponent<CameraFollow>();
+            follow.SetTarget(Ship);
         }
     }
 }
+

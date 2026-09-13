@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9746210878ef941f5b1b5bdf24f402d1, type: 3}
+  m_Name: PhysicsConfig_Default
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
+  Thrust: 95
+  Retro: 115
+  StrafeAcc: 85
+  MaxV: 330
+  LandSpeed: 38
+  TakeoffV: 85
+  EngineMultiplier: 3.2
+  LandingRingOffset: 90
+  FuelMax: 100
+  FuelDrainPerSecond: 5.5
+  HpMax: 100
+  GravityParamK: 26000
+  GravityAccelClamp: 240
+  CaptureRingK: 3.3
+  CaptureRingBase: 30
+  HeadingTurnRate: 8
+  MinControlSpeed: 1
+  GravityBoost: 1.15

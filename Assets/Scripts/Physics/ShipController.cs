@@ -14,17 +14,25 @@ namespace SpaceTaxi.Physics
         private Ship ship;
         private GravityField gravity;
         private PhysicsConfig config;
+        private LandingSystem landing;
         private InputAction thrustAction;
         private InputAction brakeAction;
         private InputAction strafeAction;
+        private InputAction takeoffAction;
 
         // Качель: тела, внутри кольца которых мы уже находились.
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
+
+        public void SetInput(InputActionAsset asset)
+        {
+            input = asset;
+        }
 
         private void Awake()
         {
             ship = GetComponent<Ship>();
             gravity = FindObjectOfType<GravityField>();
+            landing = GetComponent<LandingSystem>();
         }
 
         private void OnEnable()
@@ -35,6 +43,7 @@ namespace SpaceTaxi.Physics
             thrustAction = map.FindAction("Thrust");
             brakeAction = map.FindAction("Brake");
             strafeAction = map.FindAction("Strafe");
+            takeoffAction = map.FindAction("Takeoff");
             map.Enable();
         }
 
@@ -47,7 +56,18 @@ namespace SpaceTaxi.Physics
         private void FixedUpdate()
         {
             config = ship != null ? ship.Config : null;
-            if (config == null || ship.State != ShipState.Flying)
+            if (config == null)
+                return;
+
+            // Стоим на планете — ждём ПРОБЕЛ, остальное не работает.
+            if (ship.State == ShipState.Landed)
+            {
+                if (takeoffAction != null && takeoffAction.WasPressedThisFrame())
+                    landing.Takeoff();
+                return;
+            }
+
+            if (ship.State != ShipState.Flying)
                 return;
 
             Vector2 velocity = ship.Body.linearVelocity;

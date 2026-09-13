@@ -10,6 +10,11 @@ namespace SpaceTaxi.Audio
     {
         [SerializeField] private InputActionAsset input; // тот же ассет, что у ShipController
 
+        public void SetInput(InputActionAsset asset)
+        {
+            input = asset;
+        }
+
         private Ship ship;
         private InputAction thrustAction;
         private InputAction brakeAction;

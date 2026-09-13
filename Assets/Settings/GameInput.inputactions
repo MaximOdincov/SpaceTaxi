@@ -31,6 +31,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Takeoff",
+                    "type": "Button",
+                    "id": "c1e8a5b3-6d94-4e72-b0f8-3a2c7e5d1b49",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -143,6 +152,17 @@
                     "action": "Strafe",
                     "isComposite": false,
                     "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "5f3b8c07-d2a9-4e61-b7c4-8f0d6a2e9b31",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Takeoff",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         }
