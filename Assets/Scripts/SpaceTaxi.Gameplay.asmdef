@@ -1,7 +1,9 @@
 {
     "name": "SpaceTaxi.Gameplay",
     "rootNamespace": "SpaceTaxi",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

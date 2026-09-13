@@ -4,10 +4,12 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Единая точка расчёта притяжения: сумма a = G*M/r^2 по всем телам.
+    // Реестр тел + суммарное притяжение: a = min(g/d², кламп), g = K·r·масса.
     public class GravityField : MonoBehaviour
     {
         private readonly List<CelestialBody> bodies = new List<CelestialBody>();
+
+        public IReadOnlyList<CelestialBody> Bodies => bodies;
 
         public void Register(CelestialBody body)
         {
@@ -20,15 +22,20 @@ namespace SpaceTaxi.Physics
             bodies.Remove(body);
         }
 
-        public Vector2 GetAccelerationAt(Vector2 position)
+        public Vector2 GetAccelerationAt(Vector2 position, PhysicsConfig config)
         {
-            // TODO: a += dir * G * Mass / r^2 по каждому телу
-            return Vector2.zero;
-        }
-
-        private void FixedUpdate()
-        {
-            // TODO: применять ускорение к кораблю каждый шаг физики
+            Vector2 accel = Vector2.zero;
+            foreach (CelestialBody body in bodies)
+            {
+                Vector2 delta = (Vector2)body.transform.position - position;
+                float d2 = delta.sqrMagnitude;
+                if (d2 < 0.0001f)
+                    continue; // прямо в центре тела — пропускаем
+                float d = Mathf.Sqrt(d2);
+                float a = Mathf.Min(config.GravParamOf(body) / d2, config.GravityAccelClamp);
+                accel += delta / d * a;
+            }
+            return accel;
         }
     }
 }
