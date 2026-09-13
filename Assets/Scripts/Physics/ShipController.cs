@@ -127,7 +127,9 @@ namespace SpaceTaxi.Physics
                 }
                 if (Mathf.Abs(strafe) > 0f)
                 {
-                    Vector2 perp = new Vector2(-dir.y, dir.x);
+                    // В прототипе Y экрана вниз, в Unity вверх — знак перпендикуляра
+                    // противоположный: D (+1) изгибает траекторию вправо.
+                    Vector2 perp = new Vector2(dir.y, -dir.x);
                     velocity += perp * (strafe * config.StrafeAcc * engMul * dt);
                 }
             }
