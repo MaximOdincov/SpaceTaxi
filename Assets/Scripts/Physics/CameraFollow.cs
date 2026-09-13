@@ -2,9 +2,13 @@ using UnityEngine;
 
 namespace SpaceTaxi.Physics
 {
-    // Следование за кораблём: лерп позиции 3.5/с, зум 3/с (как в прототипе).
+    // Следование за кораблём: лерп позиции 3.5/с (как в прототипе).
     public class CameraFollow : MonoBehaviour
     {
+        // Видимая высота экрана в юнитах. В ~3 раза ближе прототипа (760/zoom),
+        // чтобы объекты не казались мелкими — решение координатора 2026-09-13.
+        private const float ViewHeight = 320f;
+
         [SerializeField] private Ship ship;
 
         private Camera cam;
@@ -33,9 +37,7 @@ namespace SpaceTaxi.Physics
             pos.y += (target.y - pos.y) * Mathf.Min(1f, 3.5f * dt);
             transform.position = pos;
 
-            // По короткой стороне экрана видно 760/zoom юнитов.
-            float zoom = Mathf.Clamp(Mathf.Min(Screen.width, Screen.height) / 760f, 0.65f, 1.15f);
-            float targetSize = Screen.height / zoom * 0.5f;
+            float targetSize = ViewHeight * 0.5f;
             cam.orthographicSize += (targetSize - cam.orthographicSize) * Mathf.Min(1f, 3f * dt);
         }
     }
