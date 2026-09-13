@@ -32,10 +32,9 @@ namespace SpaceTaxi.Physics
         public float CaptureRingK = 3.3f;     // ring = r * K + Base
         public float CaptureRingBase = 30f;
 
-        [Header("Автопилот и нос")]
-        public float AutopilotRate = 8f;      // лерп скорости к круговой, 1/с
+        [Header("Нос")]
         public float HeadingTurnRate = 8f;    // доворот носа к скорости, 1/с
-        public float MinControlSpeed = 1f;    // ниже — управление и автопилот не работают
+        public float MinControlSpeed = 1f;    // ниже — управление не работает
 
         [Header("Качель")]
         public float GravityBoost = 1.15f;    // буст на входе в кольцо при v > vEsc

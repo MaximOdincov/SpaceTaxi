@@ -6,7 +6,7 @@ using SpaceTaxi.World;
 namespace SpaceTaxi.Physics
 {
     // Управление как в прототипе: тяга вдоль вектора скорости, нос доворачивается сам.
-    // Здесь же гравитация, автопилот циркуляции и качель — одна точка полёта.
+    // Здесь же гравитация и качель — одна точка полёта.
     public class ShipController : MonoBehaviour
     {
         [SerializeField] private InputActionAsset input;
@@ -60,7 +60,7 @@ namespace SpaceTaxi.Physics
 
             float v = velocity.magnitude;
 
-            // Качель + ближайшая планета (для посадочного режима и автопилота).
+            // Качель + ближайшая планета (для посадочного режима).
             Planet planet = null;
             float planetDist = float.MaxValue;
             if (gravity != null)
@@ -100,29 +100,8 @@ namespace SpaceTaxi.Physics
             bool thrustOn = thrustAction != null && thrustAction.IsPressed();
             bool brakeOn = brakeAction != null && brakeAction.IsPressed();
             float strafe = strafeAction != null ? strafeAction.ReadValue<float>() : 0f;
-            bool manual = thrustOn || brakeOn || Mathf.Abs(strafe) > 0f;
-
-            // Автопилот: в кольце захвата, без ручного управления — плавная циркуляция.
-            if (!manual && planet != null && v > config.MinControlSpeed)
-            {
-                float ring = config.OrbitRingOf(planet);
-                if (planetDist > planet.Radius + 80f && planetDist < ring)
-                {
-                    float g = config.GravParamOf(planet);
-                    if (v < PhysicsConfig.EscapeVelocity(g, planetDist))
-                    {
-                        Vector2 radial = (pos - (Vector2)planet.transform.position).normalized;
-                        float sign = radial.x * velocity.y - radial.y * velocity.x;
-                        Vector2 tangent = new Vector2(-radial.y, radial.x) * (sign >= 0f ? 1f : -1f);
-                        float vc = PhysicsConfig.CircularVelocity(g, planetDist);
-                        float k = Mathf.Min(1f, config.AutopilotRate * dt);
-                        velocity += (tangent * vc - velocity) * k;
-                    }
-                }
-            }
 
             // Ручное управление — все ускорения к вектору скорости.
-            v = velocity.magnitude;
             if (v > config.MinControlSpeed)
             {
                 Vector2 dir = velocity / v;
