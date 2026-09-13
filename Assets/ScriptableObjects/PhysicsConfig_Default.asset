@@ -27,6 +27,6 @@ MonoBehaviour:
   GravityAccelClamp: 240
   CaptureRingK: 3.3
   CaptureRingBase: 30
-  HeadingTurnRate: 8
+  HeadingTurnRate: 4
   MinControlSpeed: 1
   GravityBoost: 1.15

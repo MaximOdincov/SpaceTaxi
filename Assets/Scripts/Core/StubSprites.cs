@@ -10,10 +10,12 @@ namespace SpaceTaxi.Core
         private static Sprite shipTriangle;
 
         // Круг с тёмной обводкой по краю — заметнее на тёмном фоне.
+        // Null-check обязателен: кэш может содержать спрайты, уничтоженные
+        // при выходе из Play Mode (domain reload выключен в проекте).
         public static Sprite Circle(float diameter)
         {
             int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
-            if (!circles.TryGetValue(key, out Sprite sprite))
+            if (!circles.TryGetValue(key, out Sprite sprite) || sprite == null)
             {
                 sprite = Create(key, InCircle);
                 circles[key] = sprite;

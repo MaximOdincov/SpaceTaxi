@@ -33,7 +33,7 @@ namespace SpaceTaxi.Physics
         public float CaptureRingBase = 30f;
 
         [Header("Нос")]
-        public float HeadingTurnRate = 8f;    // доворот носа к скорости, 1/с
+        public float HeadingTurnRate = 4f;    // доворот носа к скорости, 1/с (8 в прототипе — резче)
         public float MinControlSpeed = 1f;    // ниже — управление не работает
 
         [Header("Качель")]
