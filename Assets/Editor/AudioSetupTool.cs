@@ -80,7 +80,7 @@ namespace SpaceTaxi.Audio.Tools
                 // Фон: эмбиент — очень тихий низкий слой под музыкой
                 Entry(SoundId.AmbientSpace, AudioGroup.Music,  0.16f, pitch: 0.45f, loop: true,  clips: "ambient_space_loop"),
                 Entry(SoundId.MusicMenu, AudioGroup.Music,  0.50f, loop: true,  clips: "music_menu"),
-                Entry(SoundId.MusicFlight, AudioGroup.Music,  0.45f, loop: true,  clips: "music_flight_loop"),
+                Entry(SoundId.MusicFlight, AudioGroup.Music, 0.55f, loop: true, clips: "Candidates/theme_01_magic_space"),
             };
 
             SerializedObject so = new SerializedObject(catalog);
@@ -188,13 +188,16 @@ namespace SpaceTaxi.Audio.Tools
             return entry;
         }
 
+        // Поиск клипа по имени (без расширения) в папках аудио; подпапки — через "Candidates/имя".
         private static string FindClipPath(string file)
         {
-            string ui = $"Assets/Audio/UI/{file}.ogg";
-            if (File.Exists(ui)) return ui;
-            string music = $"Assets/Audio/Music/{file}.ogg";
-            if (File.Exists(music)) return music;
-            return $"Assets/Audio/SFX/{file}.ogg";
+            string[] roots = { "Assets/Audio/SFX/", "Assets/Audio/UI/", "Assets/Audio/Music/" };
+            string[] exts = { ".ogg", ".mp3", ".wav" };
+            foreach (string root in roots)
+                foreach (string ext in exts)
+                    if (File.Exists(root + file + ext))
+                        return root + file + ext;
+            return "Assets/Audio/SFX/" + file + ".ogg";
         }
     }
 }

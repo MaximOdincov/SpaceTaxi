@@ -18,22 +18,25 @@ namespace SpaceTaxi.Physics
         [Tooltip("Насколько тускнеет линия к концу: 0 — не тускнеет, 1 — исчезает")]
         [SerializeField, Range(0f, 1f)] private float endFade = 0.6f;
 
+        [Header("Привязка")]
+        [Tooltip("Отступ старта линии от центра корабля — из носа, чуть под корпусом")]
+        [SerializeField] private float noseOffset = 6f;
+
         [Header("Симуляция")]
         [SerializeField] private float horizonSeconds = 4f;
         [SerializeField] private float step = 1f / 120f;
         [SerializeField] private int maxDashes = 64;
-        [Tooltip("Скорость доворота линии за носом корабля, 1/с. 0 — мгновенно по скорости")]
-        [SerializeField, Range(0f, 16f)] private float turnSmoothing = 4f;
 
         private Ship ship;
+        private ShipController controller;
         private GravityField gravity;
-        private Vector2 smoothedVelocity;
         private readonly List<Transform> dashes = new List<Transform>();
         private readonly List<SpriteRenderer> renderers = new List<SpriteRenderer>();
 
         private void Awake()
         {
             ship = GetComponent<Ship>();
+            controller = GetComponent<ShipController>();
             gravity = FindAnyObjectByType<GravityField>();
 
             for (int i = 0; i < maxDashes; i++)
@@ -62,33 +65,28 @@ namespace SpaceTaxi.Physics
             Simulate();
         }
 
-        // Стартовая скорость прогноза: фактическая, но доворачивается плавно —
-        // линия «идёт» за носом корабля, а не прыгает.
-        private Vector2 StartVelocity(float dt)
+        // Линия «приклеена» к носу: стартует из носа и направлена по носу
+        // (нос сам плавно доворачивается к скорости), величина — фактическая скорость.
+        private Vector2 StartVelocity(out Vector2 startPos)
         {
-            Vector2 vel = ship.Body.linearVelocity;
-            if (turnSmoothing <= 0f)
-                return vel;
-            if (smoothedVelocity.sqrMagnitude < 0.0001f)
-            {
-                smoothedVelocity = vel;
-                return vel;
-            }
-            Vector2 dir = smoothedVelocity.normalized;
-            Vector2 targetDir = vel.normalized;
-            float maxAngle = turnSmoothing * dt * Mathf.Rad2Deg;
-            float angle = Mathf.Clamp(Vector2.SignedAngle(dir, targetDir), -maxAngle, maxAngle);
-            dir = Quaternion.Euler(0f, 0f, angle) * dir;
-            smoothedVelocity = dir * vel.magnitude;
-            return smoothedVelocity;
+            float speed = ship.Body.linearVelocity.magnitude;
+            float noseAngle = (ship.transform.eulerAngles.z
+                + (controller != null ? controller.SpriteNoseAngle : 0f)) * Mathf.Deg2Rad;
+            Vector2 dir = new Vector2(Mathf.Cos(noseAngle), Mathf.Sin(noseAngle));
+            startPos = (Vector2)ship.transform.position + dir * noseOffset;
+            return dir * speed;
         }
 
         // Свободный полёт той же формулой, что в ShipController, без тяги.
         private void Simulate()
         {
-            Vector2 pos = ship.transform.position;
-            Vector2 vel = StartVelocity(Time.deltaTime);
+            Vector2 pos;
+            Vector2 vel = StartVelocity(out pos);
             var config = ship.Config;
+
+            // Шаг пунктира растёт, если линии не хватает на весь горизонт
+            // (иначе длина упирается в пул чёрточек).
+            float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / maxDashes);
 
             float travelled = 0f; // путь с последней чёрточки
             float total = 0f;     // путь от корабля (для затухания)
@@ -113,9 +111,9 @@ namespace SpaceTaxi.Physics
                     }
                 }
 
-                if (travelled >= spacing && dashIndex < maxDashes)
+                if (travelled >= spacingNow && dashIndex < maxDashes)
                 {
-                    PlaceDash(dashIndex++, next, vel, total);
+                    PlaceDash(dashIndex++, next, vel, total, spacingNow);
                     travelled = 0f;
                 }
 
@@ -126,7 +124,7 @@ namespace SpaceTaxi.Physics
                 dashes[i].gameObject.SetActive(false);
         }
 
-        private void PlaceDash(int index, Vector2 pos, Vector2 vel, float total)
+        private void PlaceDash(int index, Vector2 pos, Vector2 vel, float total, float spacingNow)
         {
             Transform t = dashes[index];
             t.gameObject.SetActive(true);
@@ -134,7 +132,7 @@ namespace SpaceTaxi.Physics
                 Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg));
 
             // Плавное затухание к концу линии.
-            float k = Mathf.Clamp01(total / (spacing * maxDashes));
+            float k = Mathf.Clamp01(total / (spacingNow * maxDashes));
             Color c = dashColor;
             c.a *= Mathf.Lerp(1f, 1f - endFade, k);
             renderers[index].color = c;
