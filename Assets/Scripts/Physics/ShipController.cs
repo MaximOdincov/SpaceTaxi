@@ -12,6 +12,10 @@ namespace SpaceTaxi.Physics
     {
         [SerializeField] private InputActionAsset input;
         [SerializeField] private Sprite lineSprite; // полоска вектора скорости (префаб)
+        [Tooltip("Куда смотрит нос спрайта при нулевом повороте: 0 = вправо, 90 = вверх")]
+        [SerializeField] private float spriteNoseAngle = 0f;
+
+        public float SpriteNoseAngle => spriteNoseAngle;
 
         private Ship ship;
         private GravityField gravity;
@@ -156,7 +160,7 @@ namespace SpaceTaxi.Physics
             // с интерполяцией Rigidbody (иначе джиттер).
             if (v > config.MinControlSpeed)
             {
-                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg;
+                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - spriteNoseAngle;
                 float current = ship.Body.rotation;
                 float delta = Mathf.DeltaAngle(current, target);
                 ship.Body.MoveRotation(current + delta * Mathf.Min(1f, config.HeadingTurnRate * dt));

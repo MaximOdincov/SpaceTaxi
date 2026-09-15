@@ -134,7 +134,8 @@ namespace SpaceTaxi.World
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
             go.transform.position = start.Position + dir * (start.Radius + ShipOffset);
-            go.transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg);
+            float nose = controller != null ? controller.SpriteNoseAngle : 0f;
+            go.transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
 
             ship.Init(config);
             ship.State = ShipState.Landed;
