@@ -90,7 +90,7 @@ namespace SpaceTaxi.Physics
 
             // Шаг пунктира растёт, если линии не хватает на весь горизонт
             // (иначе длина упирается в пул чёрточек).
-            float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / maxDashes);
+            float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / dashes.Count);
 
             float travelled = spacingNow - 2f; // первая чёрточка — через 2 юнита от носа
             float total = 0f;     // путь от корабля (для затухания)
@@ -115,7 +115,7 @@ namespace SpaceTaxi.Physics
                     }
                 }
 
-                if (travelled >= spacingNow && dashIndex < maxDashes)
+                if (travelled >= spacingNow && dashIndex < dashes.Count)
                 {
                     PlaceDash(dashIndex++, next, vel, total, spacingNow);
                     travelled = 0f;
@@ -136,7 +136,7 @@ namespace SpaceTaxi.Physics
                 Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg));
 
             // Плавное затухание к концу линии.
-            float k = Mathf.Clamp01(total / (spacingNow * maxDashes));
+            float k = Mathf.Clamp01(total / (spacingNow * dashes.Count));
             Color c = dashColor;
             c.a *= Mathf.Lerp(1f, 1f - endFade, k);
             renderers[index].color = c;
