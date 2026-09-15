@@ -45,6 +45,10 @@ namespace SpaceTaxi.World
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
         public BodyVisuals Visuals = new BodyVisuals();
+
+        [Header("Кольца (0 = считать по формуле)")]
+        [Min(0f)] public float LandingRingRadius; // посадочное: 0 = r + 90
+        [Min(0f)] public float CaptureRingRadius; // качели: 0 = r * 3.3 + 30
     }
 
     // Данные уровня: тела и старт. Мир собирает WorldBuilder, редактор уровня

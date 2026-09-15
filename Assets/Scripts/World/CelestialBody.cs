@@ -14,6 +14,17 @@ namespace SpaceTaxi.World
 
         private Physics.GravityField gravityField;
         private float spinSpeed;
+        private float landingRingOverride;
+        private float captureRingOverride;
+
+        // Радиус посадочного кольца (override из данных или формула r + offset).
+        public float LandingRing =>
+            landingRingOverride > 0f ? landingRingOverride : Radius + (config != null ? config.LandingRingOffset : 90f);
+
+        // Радиус кольца качели (override или формула r * K + Base).
+        public float CaptureRing =>
+            captureRingOverride > 0f ? captureRingOverride
+                : Radius * (config != null ? config.CaptureRingK : 3.3f) + (config != null ? config.CaptureRingBase : 30f);
 
         // Вызывается WorldBuilder'ом при сборке сцены.
         // Визуал (спрайт, цвет) — целиком из префаба, здесь только подгон
@@ -25,6 +36,8 @@ namespace SpaceTaxi.World
             Radius = data.Radius;
             Mass = data.MassMultiplier;
             spinSpeed = data.Visuals != null ? data.Visuals.SpinSpeed : 0f;
+            landingRingOverride = data.LandingRingRadius;
+            captureRingOverride = data.CaptureRingRadius;
 
             transform.position = data.Position;
 

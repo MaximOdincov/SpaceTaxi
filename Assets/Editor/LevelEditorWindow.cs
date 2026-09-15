@@ -183,6 +183,13 @@ namespace SpaceTaxi.Tools
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HeatRadius"));
 
             EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Кольца", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(element.FindPropertyRelative("LandingRingRadius"),
+                new GUIContent("Посадочное (0 = r + 90)"));
+            EditorGUILayout.PropertyField(element.FindPropertyRelative("CaptureRingRadius"),
+                new GUIContent("Качели (0 = r * 3.3 + 30)"));
+
+            EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField("Внешний вид", EditorStyles.boldLabel);
             var visuals = element.FindPropertyRelative("Visuals");
             EditorGUILayout.PropertyField(visuals.FindPropertyRelative("Sprite"));

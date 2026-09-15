@@ -59,7 +59,43 @@ namespace SpaceTaxi.Tools
             if (window.ShowTrajectory)
                 DrawSpawnTrajectory(level);
 
+            DrawGravityProbe(level);
             HandleDrag(window, level);
+        }
+
+        // Зонд: с зажатым Ctrl в точке курсора — стрелка суммарного притяжения
+        // и его величина. Показывает, куда «повезёт» корабль в этой точке.
+        private static void DrawGravityProbe(LevelAsset level)
+        {
+            Event ev = Event.current;
+            if (ev == null || !ev.control)
+                return;
+
+            var config = FindConfig();
+            float k = config != null ? config.GravityParamK : 26000f;
+            float clamp = config != null ? config.GravityAccelClamp : 240f;
+
+            Vector2 world = MouseWorld(ev.mousePosition);
+            Vector2 accel = GravityAt(level, world, k, clamp);
+            float magnitude = accel.magnitude;
+            if (magnitude < 0.5f)
+                return;
+
+            Vector2 dir = accel / magnitude;
+            float length = Mathf.Min(60f, 10f + magnitude * 0.2f);
+            Vector3 from = world;
+            Vector3 to = world + dir * length;
+
+            float t = Mathf.Clamp01(magnitude / clamp);
+            Handles.color = Color.Lerp(GravityWeak, GravityStrong, t);
+            Handles.DrawLine(from, to);
+            Vector3 side = new Vector3(-dir.y, dir.x) * length * 0.25f;
+            Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f - side);
+            Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f + side);
+            Handles.Label(to + (Vector3)dir * 10f,
+                magnitude.ToString("0") + " ед/с²",
+                new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Handles.color } });
+            SceneView.RepaintAll();
         }
 
         private static void DrawBody(CelestialBodyData body, bool selected)
@@ -67,19 +103,47 @@ namespace SpaceTaxi.Tools
             Vector3 center = body.Position;
             bool star = body.Type == BodyType.Star;
 
+            // Превью внешнего вида: спрайт и цвет из данных уровня.
+            var visuals = body.Visuals;
+            if (visuals != null && visuals.Sprite != null && Event.current.type == EventType.Repaint)
+            {
+                Vector2 guiCenter = HandleUtility.WorldToGUIPoint(center);
+                Vector2 guiEdge = HandleUtility.WorldToGUIPoint(center + Vector3.right * body.Radius);
+                float guiRadius = Vector2.Distance(guiCenter, guiEdge);
+                Color tint = visuals.UseColor ? visuals.Color : Color.white;
+                Rect rect = new Rect(guiCenter.x - guiRadius, guiCenter.y - guiRadius, guiRadius * 2f, guiRadius * 2f);
+                Color prevColor = GUI.color;
+                GUI.color = tint;
+                Rect tr = visuals.Sprite.textureRect;
+                Gizmos.DrawGUITexture(rect, visuals.Sprite.texture,
+                    (int)tr.x, (int)tr.y, (int)tr.width, (int)tr.height);
+                GUI.color = prevColor;
+            }
+
             // Заливка + контур + имя.
             Handles.color = star ? StarFill : PlanetFill;
-            Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
+            if (visuals == null || visuals.Sprite == null)
+                Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
             Handles.color = selected ? Color.white : (star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f));
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName);
 
-            // Посадочное кольцо r+90 — зелёный пунктир (только планеты).
-            if (!star)
-                DottedCircle(center, body.Radius + 90f, LandingRing, 4f);
+            // Кольца: override из данных или формула (константы из PhysicsConfig).
+            var config = FindConfig();
+            float landingOffset = config != null ? config.LandingRingOffset : 90f;
+            float captureK = config != null ? config.CaptureRingK : 3.3f;
+            float captureBase = config != null ? config.CaptureRingBase : 30f;
 
-            // Кольцо качели r*3.3+30 — голубой точечный, мельче.
-            DottedCircle(center, body.Radius * 3.3f + 30f, CaptureRing, 2f);
+            // Посадочное кольцо — зелёный пунктир (только планеты).
+            if (!star)
+            {
+                float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + landingOffset;
+                DottedCircle(center, landing, LandingRing, 4f);
+            }
+
+            // Кольцо качели — голубой точечный, мельче.
+            float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * captureK + captureBase;
+            DottedCircle(center, capture, CaptureRing, 2f);
 
             // Жаровая зона — оранжевый пунктир + слабая заливка.
             if (star && body.HeatRadius > 0f)

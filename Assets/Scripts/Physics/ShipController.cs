@@ -90,7 +90,7 @@ namespace SpaceTaxi.Physics
                 foreach (CelestialBody body in gravity.Bodies)
                 {
                     float d = Vector2.Distance(body.transform.position, pos);
-                    float ring = config.OrbitRingOf(body);
+                    float ring = body.CaptureRing;
                     bool wasInside = insideRing.Contains(body);
                     if (d < ring)
                     {
@@ -116,7 +116,7 @@ namespace SpaceTaxi.Physics
 
             // Посадочный режим — тяга точнее у поверхности планеты.
             float engMul = 1f;
-            if (planet != null && planetDist < planet.Radius + config.LandingRingOffset)
+            if (planet != null && planetDist < planet.LandingRing)
                 engMul = config.EngineMultiplier;
 
             bool thrustOn = thrustAction != null && thrustAction.IsPressed();
