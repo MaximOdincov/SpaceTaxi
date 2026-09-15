@@ -136,6 +136,10 @@ namespace SpaceTaxi.Tools
                 PasteBody(bodies);
             }
             GUI.enabled = true;
+            if (GUILayout.Button("Показать всё"))
+            {
+                FrameAll();
+            }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(2f);
@@ -177,6 +181,16 @@ namespace SpaceTaxi.Tools
             EditorGUILayout.PropertyField(element.FindPropertyRelative("MassMultiplier"));
             if (type == BodyType.Star)
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HeatRadius"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Внешний вид", EditorStyles.boldLabel);
+            var visuals = element.FindPropertyRelative("Visuals");
+            EditorGUILayout.PropertyField(visuals.FindPropertyRelative("Sprite"));
+            EditorGUILayout.PropertyField(visuals.FindPropertyRelative("Material"));
+            EditorGUILayout.PropertyField(visuals.FindPropertyRelative("UseColor"), new GUIContent("Красить цветом"));
+            if (visuals.FindPropertyRelative("UseColor").boolValue)
+                EditorGUILayout.PropertyField(visuals.FindPropertyRelative("Color"), new GUIContent("Цвет"));
+            EditorGUILayout.PropertyField(visuals.FindPropertyRelative("SpinSpeed"), new GUIContent("Вращение, град/с"));
         }
 
         private void DrawSpawnBlock(SerializedObject so)
@@ -326,6 +340,20 @@ namespace SpaceTaxi.Tools
             var view = SceneView.lastActiveSceneView;
             if (view != null)
                 view.Frame(new Bounds(body.Position, Vector3.one * (body.Radius * 6f + 300f)), false);
+        }
+
+        // Камера Scene View — весь уровень целиком.
+        private void FrameAll()
+        {
+            if (level.Bodies.Count == 0)
+                return;
+            var bounds = new Bounds(level.Bodies[0].Position, Vector3.zero);
+            foreach (var body in level.Bodies)
+                bounds.Encapsulate(new Bounds(body.Position, Vector3.one * body.Radius * 2f));
+            bounds.Expand(400f);
+            var view = SceneView.lastActiveSceneView;
+            if (view != null)
+                view.Frame(bounds, false);
         }
 
         // Живая валидация (§1.5): предупреждения, не запрет.

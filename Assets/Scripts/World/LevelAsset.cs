@@ -22,6 +22,20 @@ namespace SpaceTaxi.World
     }
 
     [Serializable]
+    public sealed class BodyVisuals
+    {
+        [Tooltip("Спрайт этого тела; пусто — из префаба Planet/Star")]
+        public Sprite Sprite;
+        [Tooltip("Материал; пусто — из префаба")]
+        public Material Material;
+        [Tooltip("Красить спрайт этим цветом")]
+        public bool UseColor;
+        public Color Color = Color.white;
+        [Tooltip("Вращение спрайта, град/с — для планет с деталями")]
+        public float SpinSpeed;
+    }
+
+    [Serializable]
     public sealed class CelestialBodyData
     {
         public string DisplayName = "Body";
@@ -30,6 +44,7 @@ namespace SpaceTaxi.World
         [Min(5f)] public float Radius = 50f;
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
+        public BodyVisuals Visuals = new BodyVisuals();
     }
 
     // Данные уровня: тела и старт. Мир собирает WorldBuilder, редактор уровня

@@ -13,6 +13,7 @@ namespace SpaceTaxi.World
         protected Physics.PhysicsConfig config;
 
         private Physics.GravityField gravityField;
+        private float spinSpeed;
 
         // Вызывается WorldBuilder'ом при сборке сцены.
         // Визуал (спрайт, цвет) — целиком из префаба, здесь только подгон
@@ -23,6 +24,7 @@ namespace SpaceTaxi.World
             Type = data.Type;
             Radius = data.Radius;
             Mass = data.MassMultiplier;
+            spinSpeed = data.Visuals != null ? data.Visuals.SpinSpeed : 0f;
 
             transform.position = data.Position;
 
@@ -57,6 +59,14 @@ namespace SpaceTaxi.World
         {
             if (gravityField != null)
                 gravityField.Unregister(this);
+        }
+
+        private void Update()
+        {
+            // Медленное вращение — для спрайтов с деталями. Коллайдер круглой
+            // формы от вращения не меняется.
+            if (!Mathf.Approximately(spinSpeed, 0f))
+                transform.Rotate(0f, 0f, spinSpeed * Time.deltaTime);
         }
     }
 }

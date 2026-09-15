@@ -45,8 +45,8 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
-            // Планета — из префаба (спрайт/цвет задаёт префаб, код не трогает).
-            // Звезда — кодом, со спрайтом-заглушкой.
+            // Планета — из префаба (спрайт/цвет задаёт префаб), звезда — кодом.
+            // Визуальные override-ы из данных применяются поверх.
             GameObject go;
             if (data.Type != BodyType.Star && planetPrefab != null)
             {
@@ -63,6 +63,11 @@ namespace SpaceTaxi.World
                 starRenderer.color = new Color(1f, 0.82f, 0.35f);
                 starRenderer.sortingOrder = 1;
             }
+
+            var renderer = go.GetComponent<SpriteRenderer>();
+            if (renderer == null)
+                renderer = go.AddComponent<SpriteRenderer>();
+            ApplyVisuals(renderer, data.Visuals);
 
             CelestialBody body;
             if (data.Type == BodyType.Star)
@@ -89,6 +94,19 @@ namespace SpaceTaxi.World
             }
 
             return body;
+        }
+
+        // Визуальные override-ы тела: спрайт/материал/цвет. Пусто — как в префабе.
+        private static void ApplyVisuals(SpriteRenderer renderer, BodyVisuals visuals)
+        {
+            if (renderer == null || visuals == null)
+                return;
+            if (visuals.Sprite != null)
+                renderer.sprite = visuals.Sprite;
+            if (visuals.Material != null)
+                renderer.sharedMaterial = visuals.Material;
+            if (visuals.UseColor)
+                renderer.color = visuals.Color;
         }
 
         private Ship CreateShip(List<CelestialBody> bodies)
