@@ -11,6 +11,7 @@ namespace SpaceTaxi.Physics
     public class ShipController : MonoBehaviour
     {
         [SerializeField] private InputActionAsset input;
+        [SerializeField] private Sprite lineSprite; // полоска вектора скорости (префаб)
 
         private Ship ship;
         private GravityField gravity;
@@ -39,7 +40,7 @@ namespace SpaceTaxi.Physics
             // Полоска перед кораблём — показывает вектор скорости.
             velocityIndicator = new GameObject("VelocityIndicator");
             var indicatorRenderer = velocityIndicator.AddComponent<SpriteRenderer>();
-            indicatorRenderer.sprite = StubSprites.Line();
+            indicatorRenderer.sprite = lineSprite != null ? lineSprite : StubSprites.Line();
             indicatorRenderer.color = new Color(1f, 0.92f, 0.4f, 0.55f);
             indicatorRenderer.sortingOrder = 1;
             velocityIndicator.SetActive(false);

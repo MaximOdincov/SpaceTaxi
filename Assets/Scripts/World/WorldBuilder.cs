@@ -13,17 +13,6 @@ namespace SpaceTaxi.World
         // Отступ корабля от поверхности при спавне (09_LEVEL_DESIGN §5, вопрос 3).
         private const float ShipOffset = 7f;
 
-        // Цвета планет-заглушек, по кругу.
-        private static readonly Color[] PlanetColors =
-        {
-            new Color(0.55f, 0.62f, 0.72f),
-            new Color(0.60f, 0.55f, 0.70f),
-            new Color(0.50f, 0.68f, 0.60f),
-            new Color(0.70f, 0.62f, 0.50f),
-            new Color(0.62f, 0.62f, 0.62f),
-            new Color(0.55f, 0.70f, 0.68f),
-        };
-
         private readonly LevelAsset level;
         private readonly PhysicsConfig config;
         private readonly InputActionAsset input;
@@ -56,7 +45,8 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
-            // Планета — из префаба (если задан), звезда — кодом.
+            // Планета — из префаба (спрайт/цвет задаёт префаб, код не трогает).
+            // Звезда — кодом, со спрайтом-заглушкой.
             GameObject go;
             if (data.Type != BodyType.Star && planetPrefab != null)
             {
@@ -67,23 +57,11 @@ namespace SpaceTaxi.World
             {
                 go = new GameObject(data.DisplayName);
                 go.transform.position = data.Position;
-            }
 
-            var renderer = go.GetComponent<SpriteRenderer>();
-            if (renderer == null)
-                renderer = go.AddComponent<SpriteRenderer>();
-            if (renderer.sprite == null) // у префаба может быть свой спрайт
-            {
-                renderer.sprite = StubSprites.Circle(data.Radius * 2f);
-                if (data.Type == BodyType.Star)
-                {
-                    renderer.color = new Color(1f, 0.82f, 0.35f);
-                    renderer.sortingOrder = 1;
-                }
-                else
-                {
-                    renderer.color = PlanetColors[index % PlanetColors.Length];
-                }
+                var starRenderer = go.AddComponent<SpriteRenderer>();
+                starRenderer.sprite = StubSprites.Circle(data.Radius * 2f);
+                starRenderer.color = new Color(1f, 0.82f, 0.35f);
+                starRenderer.sortingOrder = 1;
             }
 
             CelestialBody body;

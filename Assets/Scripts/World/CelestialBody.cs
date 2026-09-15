@@ -15,15 +15,32 @@ namespace SpaceTaxi.World
         private Physics.GravityField gravityField;
 
         // Вызывается WorldBuilder'ом при сборке сцены.
+        // Визуал (спрайт, цвет) — целиком из префаба, здесь только подгон
+        // масштаба под радиус и настройка коллайдера.
         public virtual void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig)
         {
             DisplayName = data.DisplayName;
             Type = data.Type;
             Radius = data.Radius;
-            Mass = data.MassMultiplier; // множитель массы: планета 1, звезда 4.5
+            Mass = data.MassMultiplier;
 
             transform.position = data.Position;
-            GetComponent<CircleCollider2D>().radius = Radius;
+
+            var renderer = GetComponent<SpriteRenderer>();
+            if (renderer != null && renderer.sprite != null)
+            {
+                float d = Mathf.Max(renderer.sprite.bounds.size.x, renderer.sprite.bounds.size.y);
+                if (d > 0.0001f)
+                {
+                    // Визуальный диаметр = 2 * Radius, каким бы ни был спрайт.
+                    float s = Radius * 2f / d;
+                    transform.localScale = new Vector3(s, s, 1f);
+                }
+            }
+
+            // Коллайдер живёт в локальных единицах — делим на масштаб.
+            float scale = Mathf.Max(Mathf.Abs(transform.localScale.x), Mathf.Abs(transform.localScale.y), 0.0001f);
+            GetComponent<CircleCollider2D>().radius = Radius / scale;
 
             config = physicsConfig;
         }
