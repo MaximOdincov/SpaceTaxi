@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Core;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
@@ -18,7 +19,7 @@ namespace SpaceTaxi.Physics
         private InputAction thrustAction;
         private InputAction brakeAction;
         private InputAction strafeAction;
-        private InputAction takeoffAction;
+        private GameObject velocityIndicator;
 
         // Качель: тела, внутри кольца которых мы уже находились.
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
@@ -33,6 +34,14 @@ namespace SpaceTaxi.Physics
             ship = GetComponent<Ship>();
             gravity = FindAnyObjectByType<GravityField>();
             landing = GetComponent<LandingSystem>();
+
+            // Полоска перед кораблём — показывает вектор скорости.
+            velocityIndicator = new GameObject("VelocityIndicator");
+            var indicatorRenderer = velocityIndicator.AddComponent<SpriteRenderer>();
+            indicatorRenderer.sprite = StubSprites.Line();
+            indicatorRenderer.color = new Color(1f, 0.92f, 0.4f, 0.55f);
+            indicatorRenderer.sortingOrder = 1;
+            velocityIndicator.SetActive(false);
         }
 
         private void OnEnable()
@@ -43,7 +52,6 @@ namespace SpaceTaxi.Physics
             thrustAction = map.FindAction("Thrust");
             brakeAction = map.FindAction("Brake");
             strafeAction = map.FindAction("Strafe");
-            takeoffAction = map.FindAction("Takeoff");
             map.Enable();
         }
 
@@ -152,12 +160,33 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
-            // Взлёт читаем здесь: WasPressedThisFrame в FixedUpdate пропускает нажатия.
+            // Взлёт: W или ПРОБЕЛ (обе — тяга). Читаем здесь: WasPressedThisFrame
+            // в FixedUpdate пропускает нажатия.
             if (ship.State == ShipState.Landed
-                && takeoffAction != null && takeoffAction.WasPressedThisFrame())
+                && thrustAction != null && thrustAction.WasPressedThisFrame())
             {
                 landing.Takeoff();
             }
+
+            UpdateVelocityIndicator();
+        }
+
+        // Полоска перед кораблём — куда движемся.
+        private void UpdateVelocityIndicator()
+        {
+            if (velocityIndicator == null || ship.Body == null)
+                return;
+            Vector2 v = ship.Body.linearVelocity;
+            if (ship.State != ShipState.Flying || v.sqrMagnitude < 4f)
+            {
+                velocityIndicator.SetActive(false);
+                return;
+            }
+            velocityIndicator.SetActive(true);
+            Vector2 dir = v.normalized;
+            Vector2 pos = (Vector2)ship.transform.position + dir * 14f;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            velocityIndicator.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, 0f, angle));
         }
     }
 }

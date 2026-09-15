@@ -97,7 +97,7 @@ namespace SpaceTaxi.World
             renderer.sortingOrder = 2;
 
             var collider = go.AddComponent<CircleCollider2D>();
-            collider.radius = 3f;
+            collider.radius = 4f;
 
             var ship = go.AddComponent<Ship>();
             var controller = go.AddComponent<ShipController>();

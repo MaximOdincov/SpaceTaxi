@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
   Thrust: 95
   Retro: 115
-  StrafeAcc: 85
+  StrafeAcc: 130
   MaxV: 330
   LandSpeed: 38
   TakeoffV: 85
