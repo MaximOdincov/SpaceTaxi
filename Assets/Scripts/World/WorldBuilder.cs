@@ -164,6 +164,11 @@ namespace SpaceTaxi.World
                 controller.SetInput(input);
             if (shipAudio != null)
                 shipAudio.SetInput(input);
+            var hull = go.GetComponent<HullSystem>();
+            if (hull != null)
+                hull.Init(level);
+            else
+                go.AddComponent<HullSystem>().Init(level);
 
             go.SetActive(true);
             return ship;
