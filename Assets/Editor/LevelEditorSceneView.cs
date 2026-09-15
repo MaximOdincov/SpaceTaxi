@@ -24,9 +24,13 @@ namespace SpaceTaxi.Tools
         private static readonly Color GridColor = new Color(1f, 1f, 1f, 0.06f);
         private static readonly Color DangerColor = new Color(1f, 0.4f, 0.3f, 0.9f);
         private static readonly Color DistanceColor = new Color(1f, 1f, 1f, 0.35f);
+        private static readonly Color TrajectoryColor = new Color(0.8f, 0.5f, 1f, 0.8f);
+        private static readonly Color GravityWeak = new Color(0.4f, 0.7f, 1f, 0.5f);
+        private static readonly Color GravityStrong = new Color(1f, 0.4f, 0.2f, 0.8f);
 
         private static bool dragging;
         private static Vector2 dragOffset;
+        private static Vector2 dragPosition;
 
         static LevelEditorSceneView()
         {
@@ -43,12 +47,17 @@ namespace SpaceTaxi.Tools
             if (window.ShowGrid)
                 DrawGrid(level);
 
+            if (window.ShowGravityField)
+                DrawGravityField(level);
+
             for (int i = 0; i < level.Bodies.Count; i++)
                 DrawBody(level.Bodies[i], i == window.SelectedIndex);
 
             DrawSelectionDistances(level, window.SelectedIndex);
             DrawSpawn(level);
             DrawCameraFrame(level);
+            if (window.ShowTrajectory)
+                DrawSpawnTrajectory(level);
 
             HandleDrag(window, level);
         }
@@ -182,6 +191,7 @@ namespace SpaceTaxi.Tools
                     if (window.SnapEnabled && !ev.shift)
                         pos = new Vector2(Mathf.Round(pos.x / 10f) * 10f, Mathf.Round(pos.y / 10f) * 10f);
                     level.Bodies[index].Position = pos;
+                    dragPosition = pos;
                     EditorUtility.SetDirty(level);
                     ev.Use();
                 }
@@ -190,6 +200,13 @@ namespace SpaceTaxi.Tools
             {
                 dragging = false;
                 ev.Use();
+            }
+            else if (ev.type == EventType.Repaint && dragging)
+            {
+                // Координаты при перетаскивании — рядом с телом.
+                Handles.color = Color.white;
+                Handles.Label(dragPosition + Vector2.up * 30f,
+                    "(" + dragPosition.x.ToString("0") + ", " + dragPosition.y.ToString("0") + ")");
             }
         }
 
@@ -218,6 +235,107 @@ namespace SpaceTaxi.Tools
                 Vector3 next = center + new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius);
                 Handles.DrawDottedLine(prev, next, dotSize);
                 prev = next;
+            }
+        }
+
+        // Ускорение суммарной гравитации в точке (формула игры, без MB).
+        private static Vector2 GravityAt(LevelAsset level, Vector2 pos, float k, float clamp)
+        {
+            Vector2 accel = Vector2.zero;
+            foreach (var body in level.Bodies)
+            {
+                Vector2 delta = body.Position - pos;
+                float d2 = delta.sqrMagnitude;
+                if (d2 < 0.0001f)
+                    continue;
+                float d = Mathf.Sqrt(d2);
+                float a = Mathf.Min(k * body.Radius * body.MassMultiplier / d2, clamp);
+                accel += delta / d * a;
+            }
+            return accel;
+        }
+
+        // Первый PhysicsConfig проекта — константы для превью.
+        private static SpaceTaxi.Physics.PhysicsConfig FindConfig()
+        {
+            string[] guids = AssetDatabase.FindAssets("t:PhysicsConfig");
+            return guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<SpaceTaxi.Physics.PhysicsConfig>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
+        }
+
+        // Прогноз свободного полёта из спавна после взлёта (импульс TakeoffV).
+        private static void DrawSpawnTrajectory(LevelAsset level)
+        {
+            var config = FindConfig();
+            float takeoffV = config != null ? config.TakeoffV : 85f;
+            float k = config != null ? config.GravityParamK : 26000f;
+            float clamp = config != null ? config.GravityAccelClamp : 240f;
+
+            if (level.StartPlanetIndex < 0 || level.StartPlanetIndex >= level.Bodies.Count)
+                return;
+            var start = level.Bodies[level.StartPlanetIndex];
+            float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
+            Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+            Vector2 pos = start.Position + dir * (start.Radius + 7f);
+            Vector2 vel = dir * takeoffV;
+
+            const float h = 1f / 60f;
+            const int steps = 6 * 60; // 6 секунд
+            Handles.color = TrajectoryColor;
+            Vector3 prev = pos;
+            for (int i = 0; i < steps; i++)
+            {
+                vel += GravityAt(level, pos, k, clamp) * h;
+                pos += vel * h;
+
+                foreach (var body in level.Bodies)
+                    if (Vector2.Distance(body.Position, pos) < body.Radius + 7f)
+                        return; // врезались — прогноз закончен
+
+                if (i % 10 == 0) // точка каждые ~10 шагов
+                {
+                    Handles.DrawDottedLine(prev, pos, 3f);
+                    prev = pos;
+                }
+            }
+        }
+
+        // Стрелки гравиполя: направление и сила (цвет от синего к красному).
+        private static void DrawGravityField(LevelAsset level)
+        {
+            var config = FindConfig();
+            float k = config != null ? config.GravityParamK : 26000f;
+            float clamp = config != null ? config.GravityAccelClamp : 240f;
+
+            if (level.Bodies.Count == 0)
+                return;
+            float minX = level.Bodies.Min(b => b.Position.x) - 600f;
+            float maxX = level.Bodies.Max(b => b.Position.x) + 600f;
+            float minY = level.Bodies.Min(b => b.Position.y) - 600f;
+            float maxY = level.Bodies.Max(b => b.Position.y) + 600f;
+            const float step = 150f;
+
+            for (float x = minX; x <= maxX; x += step)
+            {
+                for (float y = minY; y <= maxY; y += step)
+                {
+                    Vector2 pos = new Vector2(x, y);
+                    Vector2 accel = GravityAt(level, pos, k, clamp);
+                    float magnitude = accel.magnitude;
+                    if (magnitude < 2f)
+                        continue; // пустота — не рисуем
+
+                    Vector2 dir = accel / magnitude;
+                    float length = Mathf.Min(40f, 6f + magnitude * 0.12f);
+                    Vector3 from = pos;
+                    Vector3 to = pos + dir * length;
+
+                    float t = Mathf.Clamp01(magnitude / clamp);
+                    Handles.color = Color.Lerp(GravityWeak, GravityStrong, t);
+                    Handles.DrawLine(from, to);
+                    Vector3 side = new Vector3(-dir.y, dir.x) * length * 0.25f;
+                    Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f - side);
+                    Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f + side);
+                }
             }
         }
     }

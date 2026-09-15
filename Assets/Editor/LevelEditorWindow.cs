@@ -14,6 +14,11 @@ namespace SpaceTaxi.Tools
         [SerializeField] private int selectedIndex = -1;
         [SerializeField] private bool snapEnabled = true;
         [SerializeField] private bool showGrid = true;
+        [SerializeField] private bool showTrajectory = false;
+        [SerializeField] private bool showGravityField = false;
+
+        // Буфер для копирования тел между уровнями.
+        private static string bodyClipboard;
 
         private Vector2 listScroll;
         private static LevelEditorWindow open;
@@ -22,6 +27,8 @@ namespace SpaceTaxi.Tools
         public int SelectedIndex => selectedIndex;
         public bool SnapEnabled => snapEnabled;
         public bool ShowGrid => showGrid;
+        public bool ShowTrajectory => showTrajectory;
+        public bool ShowGravityField => showGravityField;
 
         // Выбор тела из Scene View (клик/drag).
         public void SetSelected(int index)
@@ -113,6 +120,24 @@ namespace SpaceTaxi.Tools
             GUI.enabled = true;
             EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.BeginHorizontal();
+            GUI.enabled = selectedIndex >= 0 && selectedIndex < bodies.arraySize;
+            if (GUILayout.Button("Копировать") && selectedIndex >= 0)
+            {
+                bodyClipboard = EditorJsonUtility.ToJson(level.Bodies[selectedIndex]);
+            }
+            if (GUILayout.Button("Фокус") && selectedIndex >= 0)
+            {
+                FocusSelected();
+            }
+            GUI.enabled = bodyClipboard != null;
+            if (GUILayout.Button("Вставить") && bodyClipboard != null)
+            {
+                PasteBody(bodies);
+            }
+            GUI.enabled = true;
+            EditorGUILayout.EndHorizontal();
+
             EditorGUILayout.Space(2f);
             listScroll = EditorGUILayout.BeginScrollView(listScroll, GUILayout.Height(150f));
             for (int i = 0; i < bodies.arraySize; i++)
@@ -191,6 +216,12 @@ namespace SpaceTaxi.Tools
             snapEnabled = GUILayout.Toggle(snapEnabled, "Snap 10");
             showGrid = GUILayout.Toggle(showGrid, "Сетка 100");
             EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            showTrajectory = GUILayout.Toggle(showTrajectory, "Траектория");
+            showGravityField = GUILayout.Toggle(showGravityField, "Гравиполе");
+            EditorGUILayout.EndHorizontal();
+            if (showTrajectory || showGravityField)
+                SceneView.RepaintAll();
         }
 
         private void DrawValidation()
@@ -266,6 +297,35 @@ namespace SpaceTaxi.Tools
             var element = bodies.GetArrayElementAtIndex(index);
             var nameProp = element.FindPropertyRelative("DisplayName");
             nameProp.stringValue = nameProp.stringValue + " копия";
+        }
+
+        // Вставка тела из буфера (работает и в другой уровень).
+        private void PasteBody(SerializedProperty bodies)
+        {
+            var data = new CelestialBodyData();
+            EditorJsonUtility.FromJsonOverwrite(bodyClipboard, data);
+            data.DisplayName += " копия";
+
+            int index = bodies.arraySize;
+            bodies.InsertArrayElementAtIndex(index);
+            var element = bodies.GetArrayElementAtIndex(index);
+            element.FindPropertyRelative("DisplayName").stringValue = data.DisplayName;
+            element.FindPropertyRelative("Type").intValue = (int)data.Type;
+            element.FindPropertyRelative("Position").vector2Value = FindFreeSpot(bodies, index);
+            element.FindPropertyRelative("Radius").floatValue = data.Radius;
+            element.FindPropertyRelative("MassMultiplier").floatValue = data.MassMultiplier;
+            element.FindPropertyRelative("HeatRadius").floatValue = data.HeatRadius;
+            selectedIndex = index;
+            SceneView.RepaintAll();
+        }
+
+        // Навести камеру Scene View на выбранное тело.
+        private void FocusSelected()
+        {
+            var body = level.Bodies[selectedIndex];
+            var view = SceneView.lastActiveSceneView;
+            if (view != null)
+                view.Frame(new Bounds(body.Position, Vector3.one * (body.Radius * 6f + 300f)), false);
         }
 
         // Живая валидация (§1.5): предупреждения, не запрет.
