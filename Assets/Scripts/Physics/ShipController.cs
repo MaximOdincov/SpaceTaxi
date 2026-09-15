@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using SpaceTaxi.Core;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
@@ -11,7 +10,6 @@ namespace SpaceTaxi.Physics
     public class ShipController : MonoBehaviour
     {
         [SerializeField] private InputActionAsset input;
-        [SerializeField] private Sprite lineSprite; // полоска вектора скорости (префаб)
         [Tooltip("Куда смотрит нос спрайта при нулевом повороте: 0 = вправо, 90 = вверх")]
         [SerializeField] private float spriteNoseAngle = 0f;
 
@@ -24,7 +22,6 @@ namespace SpaceTaxi.Physics
         private InputAction thrustAction;
         private InputAction brakeAction;
         private InputAction strafeAction;
-        private GameObject velocityIndicator;
 
         // Качель: тела, внутри кольца которых мы уже находились.
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
@@ -40,14 +37,6 @@ namespace SpaceTaxi.Physics
             ship = GetComponent<Ship>();
             gravity = FindAnyObjectByType<GravityField>();
             landing = GetComponent<LandingSystem>();
-
-            // Полоска перед кораблём — показывает вектор скорости.
-            velocityIndicator = new GameObject("VelocityIndicator");
-            var indicatorRenderer = velocityIndicator.AddComponent<SpriteRenderer>();
-            indicatorRenderer.sprite = lineSprite != null ? lineSprite : StubSprites.Line();
-            indicatorRenderer.color = new Color(1f, 0.92f, 0.4f, 0.55f);
-            indicatorRenderer.sortingOrder = 1;
-            velocityIndicator.SetActive(false);
         }
 
         private void OnEnable()
@@ -179,26 +168,6 @@ namespace SpaceTaxi.Physics
             {
                 landing.Takeoff();
             }
-
-            UpdateVelocityIndicator();
-        }
-
-        // Полоска перед кораблём — куда движемся.
-        private void UpdateVelocityIndicator()
-        {
-            if (velocityIndicator == null || ship.Body == null)
-                return;
-            Vector2 v = ship.Body.linearVelocity;
-            if (ship.State != ShipState.Flying || v.sqrMagnitude < 4f)
-            {
-                velocityIndicator.SetActive(false);
-                return;
-            }
-            velocityIndicator.SetActive(true);
-            Vector2 dir = v.normalized;
-            Vector2 pos = (Vector2)ship.transform.position + dir * 14f;
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            velocityIndicator.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, 0f, angle));
         }
     }
 }

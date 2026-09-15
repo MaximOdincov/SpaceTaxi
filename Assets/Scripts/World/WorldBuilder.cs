@@ -120,6 +120,7 @@ namespace SpaceTaxi.World
                 shipAudio = go.AddComponent<ShipAudio>();
                 go.AddComponent<LandingSystem>();
                 go.AddComponent<HeatAudio>();
+                go.AddComponent<TrajectoryPredictor>();
 
                 var rb = ship.GetComponent<Rigidbody2D>();
                 rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;

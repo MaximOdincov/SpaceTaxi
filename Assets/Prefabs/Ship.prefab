@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 1659483374788024485}
   - component: {fileID: 1653682064295099654}
   - component: {fileID: 5665265923553860837}
+  - component: {fileID: 7507364104415751175}
   m_Layer: 0
   m_Name: Ship
   m_TagString: Untagged
@@ -154,7 +155,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.ShipController
   input: {fileID: 0}
-  lineSprite: {fileID: 21300000, guid: ad0c31678bd324a18a2f3ff602ce5700, type: 3}
   spriteNoseAngle: 90
 --- !u!114 &620049724338220685
 MonoBehaviour:
@@ -239,3 +239,23 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 0.90848434, y: 1.4324238}
   m_EdgeRadius: 0
+--- !u!114 &7507364104415751175
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7991234973459213076}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfb74a9c8b47449e3b239b9b0b79ed48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.TrajectoryPredictor
+  dashSprite: {fileID: 21300000, guid: ad0c31678bd324a18a2f3ff602ce5700, type: 3}
+  dashColor: {r: 1, g: 1, b: 1, a: 0.6}
+  dashScale: 0.25
+  spacing: 10
+  endFade: 0.6
+  horizonSeconds: 4
+  step: 0.008333334
+  maxDashes: 64
