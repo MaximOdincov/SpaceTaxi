@@ -13,8 +13,10 @@ namespace SpaceTaxi.Physics
         [Header("Вид пунктира")]
         [SerializeField] private Sprite dashSprite; // чёрточка (пусто = заглушка)
         [SerializeField] private Color dashColor = new Color(1f, 1f, 1f, 0.6f);
-        [SerializeField] private float dashScale = 0.25f; // чёрточка ~4 x 0.5 юнита
-        [SerializeField] private float spacing = 10f;     // юнитов между чёрточками
+        [SerializeField] private float dashScale = 0.4f; // длина чёрточки (~6 юнитов)
+        [Tooltip("Множитель ширины чёрточки: 1 = как в спрайте, меньше = тоньше")]
+        [SerializeField, Range(0.1f, 2f)] private float dashWidth = 0.6f;
+        [SerializeField] private float spacing = 12f;    // юнитов между чёрточками
         [Tooltip("Насколько тускнеет линия к концу: 0 — не тускнеет, 1 — исчезает")]
         [SerializeField, Range(0f, 1f)] private float endFade = 0.6f;
 
@@ -48,7 +50,7 @@ namespace SpaceTaxi.Physics
                 r.sprite = dashSprite != null ? dashSprite : StubSprites.Line();
                 r.color = dashColor;
                 r.sortingOrder = 1;
-                go.transform.localScale = new Vector3(dashScale, dashScale, 1f);
+                go.transform.localScale = new Vector3(dashScale, dashScale * dashWidth, 1f);
                 go.SetActive(false);
                 dashes.Add(go.transform);
                 renderers.Add(r);
@@ -59,7 +61,7 @@ namespace SpaceTaxi.Physics
         {
             if (ship == null || ship.Config == null || gravity == null
                 || ship.State != ShipState.Flying
-                || ship.Body.linearVelocity.sqrMagnitude < 1f)
+                || ship.Body.linearVelocity.sqrMagnitude < 0.25f) // < 0.5 ед/с
             {
                 HideAll();
                 return;
@@ -90,7 +92,7 @@ namespace SpaceTaxi.Physics
             // (иначе длина упирается в пул чёрточек).
             float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / maxDashes);
 
-            float travelled = 0f; // путь с последней чёрточки
+            float travelled = spacingNow - 2f; // первая чёрточка — через 2 юнита от носа
             float total = 0f;     // путь от корабля (для затухания)
             int dashIndex = 0;
             bool crashed = false;

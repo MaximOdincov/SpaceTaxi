@@ -254,7 +254,8 @@ MonoBehaviour:
   dashSprite: {fileID: 21300000, guid: ad0c31678bd324a18a2f3ff602ce5700, type: 3}
   dashColor: {r: 1, g: 1, b: 1, a: 0.6}
   dashScale: 0.4
-  spacing: 7
+  dashWidth: 0.6
+  spacing: 12
   endFade: 0.5
   noseOffset: 6
   horizonSeconds: 2.5
