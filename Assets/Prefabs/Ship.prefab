@@ -256,6 +256,7 @@ MonoBehaviour:
   dashScale: 0.25
   spacing: 10
   endFade: 0.6
-  horizonSeconds: 4
+  horizonSeconds: 2
   step: 0.008333334
-  maxDashes: 64
+  maxDashes: 1
+  turnSmoothing: 4

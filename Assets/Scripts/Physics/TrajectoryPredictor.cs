@@ -22,9 +22,12 @@ namespace SpaceTaxi.Physics
         [SerializeField] private float horizonSeconds = 4f;
         [SerializeField] private float step = 1f / 120f;
         [SerializeField] private int maxDashes = 64;
+        [Tooltip("Скорость доворота линии за носом корабля, 1/с. 0 — мгновенно по скорости")]
+        [SerializeField, Range(0f, 16f)] private float turnSmoothing = 4f;
 
         private Ship ship;
         private GravityField gravity;
+        private Vector2 smoothedVelocity;
         private readonly List<Transform> dashes = new List<Transform>();
         private readonly List<SpriteRenderer> renderers = new List<SpriteRenderer>();
 
@@ -59,11 +62,32 @@ namespace SpaceTaxi.Physics
             Simulate();
         }
 
+        // Стартовая скорость прогноза: фактическая, но доворачивается плавно —
+        // линия «идёт» за носом корабля, а не прыгает.
+        private Vector2 StartVelocity(float dt)
+        {
+            Vector2 vel = ship.Body.linearVelocity;
+            if (turnSmoothing <= 0f)
+                return vel;
+            if (smoothedVelocity.sqrMagnitude < 0.0001f)
+            {
+                smoothedVelocity = vel;
+                return vel;
+            }
+            Vector2 dir = smoothedVelocity.normalized;
+            Vector2 targetDir = vel.normalized;
+            float maxAngle = turnSmoothing * dt * Mathf.Rad2Deg;
+            float angle = Mathf.Clamp(Vector2.SignedAngle(dir, targetDir), -maxAngle, maxAngle);
+            dir = Quaternion.Euler(0f, 0f, angle) * dir;
+            smoothedVelocity = dir * vel.magnitude;
+            return smoothedVelocity;
+        }
+
         // Свободный полёт той же формулой, что в ShipController, без тяги.
         private void Simulate()
         {
             Vector2 pos = ship.transform.position;
-            Vector2 vel = ship.Body.linearVelocity;
+            Vector2 vel = StartVelocity(Time.deltaTime);
             var config = ship.Config;
 
             float travelled = 0f; // путь с последней чёрточки
