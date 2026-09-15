@@ -13,6 +13,7 @@ namespace SpaceTaxi.Audio
         public void SetInput(InputActionAsset asset)
         {
             input = asset;
+            BindActions();
         }
 
         private Ship ship;
@@ -30,6 +31,12 @@ namespace SpaceTaxi.Audio
         }
 
         private void OnEnable()
+        {
+            BindActions();
+        }
+
+        // Привязка действий: из OnEnable и из SetInput — кто раньше.
+        private void BindActions()
         {
             InputActionMap map = input != null ? input.FindActionMap("Ship") : null;
             if (map == null)

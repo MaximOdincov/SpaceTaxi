@@ -197,6 +197,8 @@ MonoBehaviour:
   level: {fileID: 11400000, guid: 7923ffdd572ca489e82088199ea9914f, type: 2}
   physicsConfig: {fileID: 11400000, guid: d53a2829ee5db4d8c8d769c4143ccc2f, type: 2}
   input: {fileID: -944628639613478452, guid: 86792feff53f243559d24205031e30c7, type: 3}
+  planetPrefab: {fileID: 2891329847720808436, guid: f8e42076b28024cb0b58f31b68da8985, type: 3}
+  shipPrefab: {fileID: 1015456564851465904, guid: d74639cd4b3f24148a5443bfb08e6c0f, type: 3}
 --- !u!4 &304062477
 Transform:
   m_ObjectHideFlags: 0

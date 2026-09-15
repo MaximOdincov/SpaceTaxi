@@ -27,12 +27,17 @@ namespace SpaceTaxi.World
         private readonly LevelAsset level;
         private readonly PhysicsConfig config;
         private readonly InputActionAsset input;
+        private readonly Planet planetPrefab; // пусто — собрать кодом
+        private readonly Ship shipPrefab;     // пусто — собрать кодом
 
-        public WorldBuilder(LevelAsset level, PhysicsConfig config, InputActionAsset input)
+        public WorldBuilder(LevelAsset level, PhysicsConfig config, InputActionAsset input,
+            Planet planetPrefab = null, Ship shipPrefab = null)
         {
             this.level = level;
             this.config = config;
             this.input = input;
+            this.planetPrefab = planetPrefab;
+            this.shipPrefab = shipPrefab;
         }
 
         public void Build(out Ship ship, out GravityField gravity)
@@ -51,23 +56,47 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
-            var go = new GameObject(data.DisplayName);
-
-            var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = StubSprites.Circle(data.Radius * 2f);
-            if (data.Type == BodyType.Star)
+            // Планета — из префаба (если задан), звезда — кодом.
+            GameObject go;
+            if (data.Type != BodyType.Star && planetPrefab != null)
             {
-                renderer.color = new Color(1f, 0.82f, 0.35f);
-                renderer.sortingOrder = 1;
+                go = Object.Instantiate(planetPrefab.gameObject, data.Position, Quaternion.identity);
+                go.name = data.DisplayName;
             }
             else
             {
-                renderer.color = PlanetColors[index % PlanetColors.Length];
+                go = new GameObject(data.DisplayName);
+                go.transform.position = data.Position;
             }
 
-            CelestialBody body = data.Type == BodyType.Star
-                ? (CelestialBody)go.AddComponent<Star>()
-                : go.AddComponent<Planet>();
+            var renderer = go.GetComponent<SpriteRenderer>();
+            if (renderer == null)
+                renderer = go.AddComponent<SpriteRenderer>();
+            if (renderer.sprite == null) // у префаба может быть свой спрайт
+            {
+                renderer.sprite = StubSprites.Circle(data.Radius * 2f);
+                if (data.Type == BodyType.Star)
+                {
+                    renderer.color = new Color(1f, 0.82f, 0.35f);
+                    renderer.sortingOrder = 1;
+                }
+                else
+                {
+                    renderer.color = PlanetColors[index % PlanetColors.Length];
+                }
+            }
+
+            CelestialBody body;
+            if (data.Type == BodyType.Star)
+            {
+                body = go.AddComponent<Star>();
+            }
+            else
+            {
+                body = go.GetComponent<Planet>();
+                if (body == null)
+                    body = go.AddComponent<Planet>();
+            }
             body.Init(data, config);
 
             // Заглушка индикации жаровой зоны.
@@ -88,26 +117,40 @@ namespace SpaceTaxi.World
         {
             CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
 
-            var go = new GameObject("Ship");
-            go.SetActive(false); // включим после настройки ввода
+            GameObject go;
+            Ship ship;
+            ShipController controller;
+            ShipAudio shipAudio;
+            if (shipPrefab != null)
+            {
+                go = Object.Instantiate(shipPrefab.gameObject);
+                ship = go.GetComponent<Ship>();
+                controller = go.GetComponent<ShipController>();
+                shipAudio = go.GetComponent<ShipAudio>();
+            }
+            else
+            {
+                go = new GameObject("Ship");
+                go.SetActive(false); // включим после настройки ввода
 
-            var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = StubSprites.ShipTriangle();
-            renderer.color = Color.white;
-            renderer.sortingOrder = 2;
+                var spriteRenderer = go.AddComponent<SpriteRenderer>();
+                spriteRenderer.sortingOrder = 2;
+                var collider = go.AddComponent<CircleCollider2D>();
+                collider.radius = 4f;
+                ship = go.AddComponent<Ship>();
+                controller = go.AddComponent<ShipController>();
+                shipAudio = go.AddComponent<ShipAudio>();
+                go.AddComponent<LandingSystem>();
+                go.AddComponent<HeatAudio>();
 
-            var collider = go.AddComponent<CircleCollider2D>();
-            collider.radius = 4f;
+                var rb = ship.GetComponent<Rigidbody2D>();
+                rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+                rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            }
 
-            var ship = go.AddComponent<Ship>();
-            var controller = go.AddComponent<ShipController>();
-            var shipAudio = go.AddComponent<ShipAudio>();
-            go.AddComponent<LandingSystem>();
-            go.AddComponent<HeatAudio>();
-
-            var rb = ship.GetComponent<Rigidbody2D>();
-            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            var renderer = go.GetComponent<SpriteRenderer>();
+            if (renderer != null && renderer.sprite == null)
+                renderer.sprite = StubSprites.ShipTriangle();
 
             // Позиция на поверхности планеты старта, нос от центра.
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
@@ -119,8 +162,10 @@ namespace SpaceTaxi.World
             ship.State = ShipState.Landed;
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet;
 
-            controller.SetInput(input);
-            shipAudio.SetInput(input);
+            if (controller != null)
+                controller.SetInput(input);
+            if (shipAudio != null)
+                shipAudio.SetInput(input);
 
             go.SetActive(true);
             return ship;
