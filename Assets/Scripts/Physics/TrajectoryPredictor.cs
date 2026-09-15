@@ -39,6 +39,8 @@ namespace SpaceTaxi.Physics
             controller = GetComponent<ShipController>();
             gravity = FindAnyObjectByType<GravityField>();
 
+            maxDashes = Mathf.Max(4, maxDashes); // защита от курьёзов в инспекторе
+
             for (int i = 0; i < maxDashes; i++)
             {
                 var go = new GameObject("Dash");
