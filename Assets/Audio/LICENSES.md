@@ -18,22 +18,24 @@
 | Файл | Оригинал | Автор |
 |---|---|---|
 | music_menu.ogg | Out There (242 с) | yd — https://opengameart.org/content/space-music-out-there |
-| music_flight_loop.ogg | My Very Own Dead Ship (226 с) | yd — https://opengameart.org/content/background-space-track |
 
-## Кандидаты полётной темы (Music/Candidates/, всё CC0) — задел под плеер
+## Плейлист-кандидаты (Music/Candidates/, всё CC0) — задел под внутриигровой плеер
 
-| Файл | Оригинал | Автор |
+theme_01 — основная тема полёта (MusicFlight); theme_11 — бывшая основная («дополнительные»).
+
+| Файл | Оригинал | Автор / страница |
 |---|---|---|
-| theme_01_magic_space.mp3 | Magic Space (55 с) | CodeManu — https://opengameart.org/content/magic-space |
-| theme_02_happy_adventure.mp3 | Happy Adventure Loop (47 с) | TinyWorlds — https://opengameart.org/content/happy-adventure-loop |
-| theme_03_chip_stage1.ogg | Chiptune Adventures, Stage 1 (41 с) | Juhani Junkala (SubspaceAudio) — https://opengameart.org/content/4-chiptunes-adventure |
-| theme_04_chip_stage2.ogg | Chiptune Adventures, Stage 2 (56 с) | Juhani Junkala — там же |
-| theme_05_sunny_side_up.wav | Sunny Side Up Electronic (112 с) | Pro Sensory (Alex McCulloch) — https://opengameart.org/content/sunny-side-up-electronic (атрибуция желательна, не обязательна) |
-| theme_06_bouncy_tune.mp3 | Bouncy Tune (57 с) | Ado — https://opengameart.org/content/bouncy-tune |
-| theme_07_spacyloop.ogg | SpacyLoop (17 с) | ElectronicFreaker — https://opengameart.org/content/spacyloop |
-| theme_08_vape_in_space.ogg | Vape In Space (40 с) | zq — https://opengameart.org/content/vape-in-space |
-| theme_09_space_ace.mp3 | Space Ace / Logisector Intro (72 с) | Sudocolon — https://opengameart.org/content/space-ace |
-| theme_10_cat_in_space.mp3 | Cat in Space (64 с) | mutantleg — https://opengameart.org/content/cat-in-space |
+| theme_01_magic_space.mp3 | Magic Space (55 с) — светлая sci-fi-тема | CodeManu — opengameart.org/content/magic-space |
+| theme_02_happy_adventure.mp3 | Happy Adventure Loop (47 с) | TinyWorlds — opengameart.org/content/happy-adventure-loop |
+| theme_03_bossa_8bit.mp3 | 8bit Bossa (60 с) | Joth — opengameart.org/content/bossa-nova |
+| theme_04_elevator_lounge.wav | Elevator Music (96 с) | Pro Sensory (Alex McCulloch) — opengameart.org/content/elevator-music (атрибуция желательна) |
+| theme_05_retro_soundtrack.ogg | Retro Soundtrack (157 с), сб. Retro Wave | Holizna — opengameart.org/content/retro-wave-collection |
+| theme_06_space_ace.mp3 | Space Ace / Logisector Intro (72 с) | Sudocolon — opengameart.org/content/space-ace |
+| theme_07_short_theme_metal.wav | Short Theme [Rock/Metal] (56 с) | nene — opengameart.org/content/short-theme-rockmetal |
+| theme_08_bach_jig_8bit.ogg | Bach — Fugue BWV 577 «The Jig», 8-bit (170 с) | TheOuterLinux — opengameart.org/content/bach-fugue-bwv-577-the-jig |
+| theme_09_cat_in_space.mp3 | Cat in Space (64 с) | mutantleg — opengameart.org/content/cat-in-space |
+| theme_10_vape_in_space.ogg | Vape In Space (40 с) | zq — opengameart.org/content/vape-in-space |
+| theme_11_dead_ship.ogg | My Very Own Dead Ship (226 с) | yd — opengameart.org/content/background-space-track |
 
 ## Примечания
 

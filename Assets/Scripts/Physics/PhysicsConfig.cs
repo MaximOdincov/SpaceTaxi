@@ -11,6 +11,8 @@ namespace SpaceTaxi.Physics
         public float Thrust = 95f;            // W или ПРОБЕЛ — разгон вдоль вектора скорости
         public float Retro = 115f;            // S — торможение
         public float StrafeAcc = 130f;        // A/D — боковая тяга (85 в прототипе — слабо)
+        [Tooltip("Предел угловой скорости разворота: медленный корабль не крутится как юла")]
+        public float StrafeMaxTurnRate = 60f; // град/с
         public float MaxV = 330f;             // выше — тяга не работает (не жёсткий кламп)
 
         [Header("Посадка")]

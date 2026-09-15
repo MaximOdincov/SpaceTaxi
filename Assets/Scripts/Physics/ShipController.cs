@@ -138,8 +138,12 @@ namespace SpaceTaxi.Physics
                 {
                     // В прототипе Y экрана вниз, в Unity вверх — знак перпендикуляра
                     // противоположный: D (+1) изгибает траекторию вправо.
+                    // Ускорение ограничено пределом угловой скорости: у медленного
+                    // корабля разворот не быстрее StrafeMaxTurnRate (иначе юла).
                     Vector2 perp = new Vector2(dir.y, -dir.x);
-                    velocity += perp * (strafe * config.StrafeAcc * engMul * dt);
+                    float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad;
+                    float strafeAcc = Mathf.Min(config.StrafeAcc, v * maxTurn);
+                    velocity += perp * (strafe * strafeAcc * engMul * dt);
                 }
             }
 

@@ -15,6 +15,7 @@ MonoBehaviour:
   Thrust: 95
   Retro: 115
   StrafeAcc: 130
+  StrafeMaxTurnRate: 60
   MaxV: 330
   LandSpeed: 38
   TakeoffV: 85
