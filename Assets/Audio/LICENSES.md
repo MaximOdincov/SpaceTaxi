@@ -6,12 +6,26 @@
 
 | Пак | Файлы в проекте |
 |---|---|
-| Sci-Fi Sounds | sfx_engine_main_loop, sfx_engine_strafe_loop, sfx_engine_retro_loop, sfx_heat_loop, sfx_takeoff, sfx_explosion, ambient_space_loop (spaceEngineLow) |
-| Impact Sounds | sfx_collision_1..3 (impactPlate light/medium/heavy), sfx_landing (impactSoft) |
-| Digital Audio | sfx_respawn (powerUp2), ui_computer_ping (lowThreeTone) |
+| Sci-Fi Sounds | sfx_engine_strafe_loop (spaceEngineSmall), sfx_collision_1..2 (impactMetal), sfx_collision_3 (lowFrequency_explosion), ambient_space_loop (spaceEngineLow) |
+| Impact Sounds | sfx_landing (impactSoft_heavy) |
+| Digital Audio | ui_computer_ping (lowThreeTone) |
 | Interface Sounds | ui_click (click_004) |
 
-Источник: https://kenney.nl/assets (Sci-Fi Sounds, Impact Sounds, Digital Audio, Interface Sounds)
+Источник: https://kenney.nl/assets (Sci-Fi Sounds, Impact Sounds)
+
+## OpenGameArt — rubberduck, паки CC0
+
+| Пак | Файлы в проекте |
+|---|---|
+| 50 CC0 Sci-Fi SFX (opengameart.org/content/50-cc0-sci-fi-sfx) | sfx_explosion (explosion_01), sfx_takeoff (rocket_01), sfx_respawn (teleport_02) |
+| 30 CC0 SFX Loops (opengameart.org/content/30-cc0-sfx-loops) | sfx_heat_loop (alarm_01 — корабельная тревога) |
+
+## Авторский синтез (сгенерировано для проекта, без ограничений)
+
+| Файл | Что это |
+|---|---|
+| sfx_engine_main_loop.wav | глубокий гул основного двигателя: суббас 55/110 Гц + коричневый шум, дыхание 0.5 Гц, бесшовный луп 4 с |
+| sfx_engine_retro_loop.wav | тормозное шипение ретро-сопел: полосной шум с «выдохами», подложка 90 Гц, бесшовный луп 3 с |
 
 ## OpenGameArt — треки CC0
 

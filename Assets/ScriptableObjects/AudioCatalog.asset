@@ -15,18 +15,18 @@ MonoBehaviour:
   entries:
   - Id: 1
     Clips:
-    - {fileID: 8300000, guid: 8ae279348ad2245ea99167420d26ff0d, type: 3}
+    - {fileID: 8300000, guid: 408268bc09ef7412c90ee334d89d4066, type: 3}
     Group: 0
-    Volume: 0.55
+    Volume: 0.6
     Pitch: 1
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
   - Id: 2
     Clips:
-    - {fileID: 8300000, guid: ed562f75c5622403ab3517344897d16b, type: 3}
+    - {fileID: 8300000, guid: 33ce4bcf6539941449c45f008085cd22, type: 3}
     Group: 0
-    Volume: 0.5
+    Volume: 0.45
     Pitch: 1
     PitchJitter: 0.04
     Loop: 1
@@ -44,7 +44,7 @@ MonoBehaviour:
     Clips:
     - {fileID: 8300000, guid: cf72de0ec76c94ad1b15ff646bc8c576, type: 3}
     Group: 1
-    Volume: 0.45
+    Volume: 0.4
     Pitch: 1
     PitchJitter: 0.04
     Loop: 1
@@ -55,7 +55,7 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 06ec5a116a71740a9bd6cc99af60288f, type: 3}
     - {fileID: 8300000, guid: 1580e34aec0c14997b6cd4cae2fd8de3, type: 3}
     Group: 1
-    Volume: 0.8
+    Volume: 0.75
     Pitch: 1
     PitchJitter: 0.08
     Loop: 0
@@ -64,7 +64,7 @@ MonoBehaviour:
     Clips:
     - {fileID: 8300000, guid: 9f4d7c52961054efb83601e2a2073ef6, type: 3}
     Group: 1
-    Volume: 0.7
+    Volume: 0.95
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0
@@ -73,7 +73,7 @@ MonoBehaviour:
     Clips:
     - {fileID: 8300000, guid: e2cb98dfc5c51414581231e77f3b7ac8, type: 3}
     Group: 1
-    Volume: 0.65
+    Volume: 0.7
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0
@@ -91,7 +91,7 @@ MonoBehaviour:
     Clips:
     - {fileID: 8300000, guid: 3f1c2d2ebf9954ca0a5f7cee50c75cfd, type: 3}
     Group: 1
-    Volume: 0.6
+    Volume: 0.65
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0

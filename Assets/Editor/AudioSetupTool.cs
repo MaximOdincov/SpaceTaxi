@@ -28,6 +28,16 @@ namespace SpaceTaxi.Audio.Tools
             Debug.Log("[AudioSetup] настройка аудио завершена");
         }
 
+        // Только каталог и импорт-настройки, сцены не трогает.
+        [MenuItem("Space Taxi/Audio Rebuild Catalog")]
+        public static void RebuildCatalog()
+        {
+            ConfigureImport();
+            BuildCatalog();
+            AssetDatabase.SaveAssets();
+            Debug.Log("[AudioSetup] каталог пересобран");
+        }
+
         // Короткие SFX — Decompress On Load; музыка/эмбиент — Compress In Memory (Vorbis).
         private static void ConfigureImport()
         {
@@ -59,19 +69,21 @@ namespace SpaceTaxi.Audio.Tools
 
             var entries = new List<SoundEntry>
             {
-                // Двигатели — тихий фон, не истребитель
-                Entry(SoundId.EngineMain, AudioGroup.Engine, 0.55f, loop: true,  clips: "sfx_engine_main_loop"),
-                Entry(SoundId.EngineRetro, AudioGroup.Engine, 0.50f, loop: true,  clips: "sfx_engine_retro_loop"),
+                // Двигатели — тихий фон, не истребитель (лупы — авторский синтез, wav)
+                Entry(SoundId.EngineMain, AudioGroup.Engine, 0.60f, loop: true,  clips: "sfx_engine_main_loop"),
+                Entry(SoundId.EngineRetro, AudioGroup.Engine, 0.45f, loop: true,  clips: "sfx_engine_retro_loop"),
                 Entry(SoundId.EngineStrafe, AudioGroup.Engine, 0.35f, loop: true,  clips: "sfx_engine_strafe_loop"),
-                Entry(SoundId.HeatZone, AudioGroup.Sfx, 0.45f, loop: true, clips: "sfx_heat_loop"),
 
-                // Корпус
-                Entry(SoundId.Collision, AudioGroup.Sfx, 0.80f, jitter: 0.08f, sequential: true,
+                // Жар — корабельная пожарная тревога (мигалка)
+                Entry(SoundId.HeatZone, AudioGroup.Sfx, 0.40f, loop: true, clips: "sfx_heat_loop"),
+
+                // Корпус: слабый/средний — металл, сильный — низкочастотный треск
+                Entry(SoundId.Collision, AudioGroup.Sfx, 0.75f, jitter: 0.08f, sequential: true,
                       clips: new[] { "sfx_collision_1", "sfx_collision_2", "sfx_collision_3" }),
-                Entry(SoundId.LandingTouch, AudioGroup.Sfx,    0.70f, clips: "sfx_landing"),
-                Entry(SoundId.Takeoff, AudioGroup.Sfx,    0.65f, clips: "sfx_takeoff"),
-                Entry(SoundId.Explosion, AudioGroup.Sfx,    1.00f, clips: "sfx_explosion"),
-                Entry(SoundId.Respawn, AudioGroup.Sfx,    0.60f, clips: "sfx_respawn"),
+                Entry(SoundId.LandingTouch, AudioGroup.Sfx, 0.95f, clips: "sfx_landing"),
+                Entry(SoundId.Takeoff, AudioGroup.Sfx, 0.70f, clips: "sfx_takeoff"),
+                Entry(SoundId.Explosion, AudioGroup.Sfx, 1.00f, clips: "sfx_explosion"),
+                Entry(SoundId.Respawn, AudioGroup.Sfx, 0.65f, clips: "sfx_respawn"),
 
                 // Интерфейс
                 Entry(SoundId.UiClick, AudioGroup.Ui,     0.50f, jitter: 0f, clips: "ui_click"),
