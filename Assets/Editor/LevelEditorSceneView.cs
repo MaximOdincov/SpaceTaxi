@@ -112,11 +112,13 @@ namespace SpaceTaxi.Tools
                 float guiRadius = Vector2.Distance(guiCenter, guiEdge);
                 Color tint = visuals.UseColor ? visuals.Color : Color.white;
                 Rect rect = new Rect(guiCenter.x - guiRadius, guiCenter.y - guiRadius, guiRadius * 2f, guiRadius * 2f);
+
+                Texture tex = visuals.Sprite.texture;
+                Rect tr = visuals.Sprite.textureRect;
+                Rect uv = new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height);
                 Color prevColor = GUI.color;
                 GUI.color = tint;
-                Rect tr = visuals.Sprite.textureRect;
-                Gizmos.DrawGUITexture(rect, visuals.Sprite.texture,
-                    (int)tr.x, (int)tr.y, (int)tr.width, (int)tr.height);
+                GUI.DrawTextureWithTexCoords(rect, tex, uv, true);
                 GUI.color = prevColor;
             }
 
