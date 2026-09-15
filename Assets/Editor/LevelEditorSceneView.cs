@@ -31,6 +31,9 @@ namespace SpaceTaxi.Tools
         private static bool dragging;
         private static Vector2 dragOffset;
         private static Vector2 dragPosition;
+        private static SpaceTaxi.Physics.PhysicsConfig cachedConfig;
+        private static double configCacheTime;
+        private static GUIStyle distanceLabelStyle;
 
         static LevelEditorSceneView()
         {
@@ -92,10 +95,10 @@ namespace SpaceTaxi.Tools
             Vector3 side = new Vector3(-dir.y, dir.x) * length * 0.25f;
             Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f - side);
             Handles.DrawLine(to, to - (Vector3)dir * length * 0.35f + side);
-            Handles.Label(to + (Vector3)dir * 10f,
-                magnitude.ToString("0") + " ед/с²",
-                new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Handles.color } });
-            SceneView.RepaintAll();
+            if (distanceLabelStyle == null)
+                distanceLabelStyle = new GUIStyle(EditorStyles.miniLabel);
+            distanceLabelStyle.normal.textColor = Handles.color;
+            Handles.Label(to + (Vector3)dir * 10f, magnitude.ToString("0") + " ед/с²", distanceLabelStyle);
         }
 
         private static void DrawBody(CelestialBodyData body, bool selected)
@@ -162,6 +165,8 @@ namespace SpaceTaxi.Tools
             if (selectedIndex < 0 || selectedIndex >= level.Bodies.Count)
                 return;
             var from = level.Bodies[selectedIndex];
+            if (distanceLabelStyle == null)
+                distanceLabelStyle = new GUIStyle(EditorStyles.miniLabel);
 
             foreach (var other in level.Bodies)
             {
@@ -171,9 +176,10 @@ namespace SpaceTaxi.Tools
                 bool close = d < 300f;
                 Handles.color = close ? DangerColor : DistanceColor;
                 Handles.DrawLine(from.Position, other.Position);
+                distanceLabelStyle.normal.textColor = close ? DangerColor : Color.gray;
                 Handles.Label(
                     Vector3.Lerp(from.Position, other.Position, 0.5f),
-                    d.ToString("0"), new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = close ? DangerColor : Color.gray } });
+                    d.ToString("0"), distanceLabelStyle);
             }
         }
 
@@ -321,11 +327,18 @@ namespace SpaceTaxi.Tools
             return accel;
         }
 
-        // Первый PhysicsConfig проекта — константы для превью.
+        // Первый PhysicsConfig проекта — константы для превью. Кэш обязателен:
+        // FindAssets тяжёлый, а зовётся из отрисовки каждого тела.
         private static SpaceTaxi.Physics.PhysicsConfig FindConfig()
         {
+            if (cachedConfig != null && EditorApplication.timeSinceStartup - configCacheTime < 5.0)
+                return cachedConfig;
             string[] guids = AssetDatabase.FindAssets("t:PhysicsConfig");
-            return guids.Length > 0 ? AssetDatabase.LoadAssetAtPath<SpaceTaxi.Physics.PhysicsConfig>(AssetDatabase.GUIDToAssetPath(guids[0])) : null;
+            cachedConfig = guids.Length > 0
+                ? AssetDatabase.LoadAssetAtPath<SpaceTaxi.Physics.PhysicsConfig>(AssetDatabase.GUIDToAssetPath(guids[0]))
+                : null;
+            configCacheTime = EditorApplication.timeSinceStartup;
+            return cachedConfig;
         }
 
         // Прогноз свободного полёта из спавна после взлёта (импульс TakeoffV).
