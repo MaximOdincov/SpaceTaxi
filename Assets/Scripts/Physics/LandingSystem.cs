@@ -10,6 +10,9 @@ namespace SpaceTaxi.Physics
         private Ship ship;
         private HullSystem hull;
 
+        // Лениво: HullSystem может быть добавлен позже Awake (WorldBuilder).
+        private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
+
         private void Awake()
         {
             ship = GetComponent<Ship>();
@@ -28,7 +31,7 @@ namespace SpaceTaxi.Physics
             if (star != null)
             {
                 // Касание звезды смертельно (как в прототипе).
-                hull.ApplyDamage(ship.Hp);
+                Hull.ApplyDamage(ship.Hp);
                 return;
             }
 
@@ -84,7 +87,7 @@ namespace SpaceTaxi.Physics
 
             // Урон: max(5, (v - LandSpeed) * 0.9).
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
-            hull.ApplyDamage(damage);
+            Hull.ApplyDamage(damage);
 
             // Отскок: отражение нормальной составляющей (коэф. 1.7) и гашение до 45%.
             Vector2 velocity = ship.Body.linearVelocity;

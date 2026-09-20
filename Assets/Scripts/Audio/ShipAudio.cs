@@ -56,31 +56,34 @@ namespace SpaceTaxi.Audio
             bool brakeOn = flying && brakeAction != null && brakeAction.IsPressed();
             bool strafeOn = flying && strafeAction != null && Mathf.Abs(strafeAction.ReadValue<float>()) > 0f;
 
-            Sound.SetLoop(SoundId.EngineMain, thrustOn);
-            Sound.SetLoop(SoundId.EngineRetro, brakeOn);
-            Sound.SetLoop(SoundId.EngineStrafe, strafeOn);
+            // ЗВУК ВЫКЛ (2026-09-20): эффекты корабля отключены, оставлена только музыка.
+            // Вернуть к аудио-итерации — см. 05_AUDIO.md.
+            Sound.SetLoop(SoundId.EngineMain, false);
+            //Sound.SetLoop(SoundId.EngineMain, thrustOn);
+            //Sound.SetLoop(SoundId.EngineRetro, brakeOn);
+            //Sound.SetLoop(SoundId.EngineStrafe, strafeOn);
 
-            if (strafeOn)
-                Sound.SetLoopPan(SoundId.EngineStrafe, strafeAction.ReadValue<float>());
+            //if (strafeOn)
+            //    Sound.SetLoopPan(SoundId.EngineStrafe, strafeAction.ReadValue<float>());
 
             // Тон основного двигателя слегка растёт со скоростью.
-            if (thrustOn && ship.Config != null)
-            {
-                float v = ship.Body != null ? ship.Body.linearVelocity.magnitude : 0f;
-                Sound.SetLoopIntensity(SoundId.EngineMain, Mathf.Clamp01(v / ship.Config.MaxV));
-            }
+            //if (thrustOn && ship.Config != null)
+            //{
+            //    float v = ship.Body != null ? ship.Body.linearVelocity.magnitude : 0f;
+            //    Sound.SetLoopIntensity(SoundId.EngineMain, Mathf.Clamp01(v / ship.Config.MaxV));
+            //}
 
             // Взлёт: стоянка → полёт.
-            if (lastState == ShipState.Landed && flying)
-                Sound.Play(SoundId.Takeoff);
+            //if (lastState == ShipState.Landed && flying)
+            //    Sound.Play(SoundId.Takeoff);
 
             // Гибель: Hp упал до нуля.
-            if (lastHp > 0f && ship.Hp <= 0f)
-                Sound.Play(SoundId.Explosion);
+            //if (lastHp > 0f && ship.Hp <= 0f)
+            //    Sound.Play(SoundId.Explosion);
 
             // Респавн завершён: снова цел и летит.
-            if (lastState == ShipState.Respawning && flying && ship.Hp > 0f)
-                Sound.Play(SoundId.Respawn);
+            //if (lastState == ShipState.Respawning && flying && ship.Hp > 0f)
+            //    Sound.Play(SoundId.Respawn);
 
             lastHp = ship.Hp;
             lastState = ship.State;
@@ -89,6 +92,8 @@ namespace SpaceTaxi.Audio
         // Приходит вместе с LandingSystem — звук по жёсткости контакта.
         private void OnCollisionEnter2D(Collision2D collision)
         {
+            // ЗВУК ВЫКЛ (2026-09-20): посадка/коллизии молчат.
+            /*
             if (ship == null || ship.Config == null)
                 return;
             float v = collision.relativeVelocity.magnitude;
@@ -102,6 +107,7 @@ namespace SpaceTaxi.Audio
                 float power = Mathf.Clamp01((v - ship.Config.LandSpeed) / ship.Config.LandSpeed);
                 Sound.Play(SoundId.Collision, power);
             }
+            */
         }
     }
 }

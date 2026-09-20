@@ -14,16 +14,18 @@ namespace SpaceTaxi.Audio
         private void Start()
         {
             Sound.PlayMusic(music);
-            if (ambient)
-                Sound.StartLoop(SoundId.AmbientSpace);
-            started = ambient;
+            // ЗВУК ВЫКЛ (2026-09-20): эмбиент отключён, оставлена только музыка. Вернуть к аудио-итерации.
+            //if (ambient)
+            //    Sound.StartLoop(SoundId.AmbientSpace);
+            //started = ambient;
         }
 
         // Смена сцены — эмбиент прошлой сцены гасим (менеджер переживает сцену).
         private void OnDestroy()
         {
-            if (started)
-                Sound.StopLoop(SoundId.AmbientSpace);
+            // ЗВУК ВЫКЛ: вместе с эмбиентом.
+            //if (started)
+            //    Sound.StopLoop(SoundId.AmbientSpace);
         }
     }
 }

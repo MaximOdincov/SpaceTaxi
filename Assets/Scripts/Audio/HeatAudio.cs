@@ -18,6 +18,8 @@ namespace SpaceTaxi.Audio
 
         private void Update()
         {
+            // ЗВУК ВЫКЛ (2026-09-20): жар молчит, оставлена только музыка. Вернуть к аудио-итерации.
+            /*
             if (ship == null)
                 return;
 
@@ -48,6 +50,7 @@ namespace SpaceTaxi.Audio
                 float closeness = 1f - Mathf.Clamp01(nearestDist / nearest.HeatRadius);
                 Sound.SetLoopIntensity(SoundId.HeatZone, closeness);
             }
+            */
         }
     }
 }

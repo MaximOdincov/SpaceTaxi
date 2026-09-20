@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 1653682064295099654}
   - component: {fileID: 5665265923553860837}
   - component: {fileID: 7507364104415751175}
+  - component: {fileID: 3993292597523096005}
   m_Layer: 0
   m_Name: Ship
   m_TagString: Untagged
@@ -261,3 +262,15 @@ MonoBehaviour:
   horizonSeconds: 2.5
   step: 0.008333334
   maxDashes: 64
+--- !u!114 &3993292597523096005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7991234973459213076}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9deee6b541dc146b3837892f8d3bcb48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.HullSystem
