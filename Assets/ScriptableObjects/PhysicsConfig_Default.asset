@@ -24,7 +24,7 @@ MonoBehaviour:
   FuelMax: 100
   FuelDrainPerSecond: 5.5
   HpMax: 100
-  GravityParamK: 26000
+  GravityParamK: 52000
   GravityAccelClamp: 240
   CaptureRingK: 3.3
   CaptureRingBase: 30

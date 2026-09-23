@@ -27,7 +27,8 @@ namespace SpaceTaxi.Physics
         public float HpMax = 100f;
 
         [Header("Гравитация")]
-        public float GravityParamK = 26000f;  // гравитационный параметр: g = K * r * масса
+        public float GravityParamK = 52000f;  // гравитационный параметр: g = K * r * масса
+                                              // (26000 в прототипе; x2 с 2026-09-16 — планеты сильнее влияют)
         public float GravityAccelClamp = 240f;// предел ускорения от одного тела
 
         [Header("Кольцо захвата")]
