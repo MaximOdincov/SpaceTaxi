@@ -5,8 +5,6 @@ namespace SpaceTaxi.Physics
     // Следование за кораблём: лерп позиции 3.5/с (как в прототипе).
     public class CameraFollow : MonoBehaviour
     {
-        // Видимая высота экрана в юнитах. В ~3 раза ближе прототипа (760/zoom),
-        // чтобы объекты не казались мелкими — решение координатора 2026-09-13.
         private const float ViewHeight = 320f;
 
         [SerializeField] private Ship ship;

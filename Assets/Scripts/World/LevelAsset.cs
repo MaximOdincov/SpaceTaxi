@@ -8,8 +8,6 @@ namespace SpaceTaxi.World
     {
         Planet = 0,
         Star = 1,
-
-        // На будущее (03_WORLD_MAP.md).
         BlackHole = 10,
         AsteroidBelt = 11,
         Comet = 12,
@@ -51,8 +49,6 @@ namespace SpaceTaxi.World
         [Min(0f)] public float CaptureRingRadius; // качели: 0 = r * 3.3 + 30
     }
 
-    // Данные уровня: тела и старт. Мир собирает WorldBuilder, редактор уровня
-    // пишет сюда же.
     [CreateAssetMenu(fileName = "Level", menuName = "Space Taxi/Level Asset")]
     public sealed class LevelAsset : ScriptableObject
     {

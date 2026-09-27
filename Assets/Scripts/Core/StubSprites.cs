@@ -3,18 +3,11 @@ using UnityEngine;
 
 namespace SpaceTaxi.Core
 {
-    // Рантайм-заглушки (звёзды, жар-зоны, фолбэки без префаба).
-    // Формы планет и корабля задаются спрайтами в префабах; PNG-заглушки
-    // для них печёт StubSpriteBaker (Editor) в Assets/Sprites/.
     public static class StubSprites
     {
         private static readonly Dictionary<int, Sprite> circles = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
         private static Sprite line;
-
-        // Круг с тёмной обводкой по краю.
-        // Null-check обязателен: кэш может содержать спрайты, уничтоженные
-        // при выходе из Play Mode (domain reload выключен в проекте).
         public static Sprite Circle(float diameter)
         {
             int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
@@ -27,7 +20,6 @@ namespace SpaceTaxi.Core
             return sprite;
         }
 
-        // Корабль: треугольник длиной 14 юнитов, остриём вправо (фолбэк).
         public static Sprite ShipTriangle()
         {
             if (shipTriangle == null)
@@ -35,7 +27,6 @@ namespace SpaceTaxi.Core
             return shipTriangle;
         }
 
-        // Полоска-указатель вектора скорости: капсула 16 x 2 юнита (фолбэк).
         public static Sprite Line()
         {
             if (line == null)
@@ -43,7 +34,6 @@ namespace SpaceTaxi.Core
             return line;
         }
 
-        // Вершины: нос (1, 0), верх (-0.7, 0.7), низ (-0.7, -0.7).
         public static bool InTriangle(float x, float y)
         {
             float s1 = (-1.7f) * y - 0.7f * (x - 1f);
@@ -52,14 +42,12 @@ namespace SpaceTaxi.Core
             return (s1 >= 0f && s2 >= 0f && s3 >= 0f) || (s1 <= 0f && s2 <= 0f && s3 <= 0f);
         }
 
-        // Капсула: цилиндр длиной 14 (от -7 до 7 по X) радиусом 1.
         public static bool InCapsule(float x, float y)
         {
             float dx = Mathf.Max(Mathf.Abs(x) - 7f, 0f);
             return dx * dx + y * y <= 1f;
         }
 
-        // Круглая текстура с обводкой и мягким краем (антиалиасинг).
         public static Texture2D CreateCircleTexture(int size, float outlineWidth)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
@@ -85,7 +73,6 @@ namespace SpaceTaxi.Core
             return tex;
         }
 
-        // Текстура по маске (треугольник/капсула) — белая на прозрачном.
         public static Texture2D CreateMaskTexture(int size, System.Func<float, float, bool> inside)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };

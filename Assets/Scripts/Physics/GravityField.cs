@@ -4,7 +4,6 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Реестр тел + суммарное притяжение: a = min(g/d², кламп), g = K·r·масса.
     public class GravityField : MonoBehaviour
     {
         private readonly List<CelestialBody> bodies = new List<CelestialBody>();
@@ -30,7 +29,7 @@ namespace SpaceTaxi.Physics
                 Vector2 delta = (Vector2)body.transform.position - position;
                 float d2 = delta.sqrMagnitude;
                 if (d2 < 0.0001f)
-                    continue; // прямо в центре тела — пропускаем
+                    continue;
                 float d = Mathf.Sqrt(d2);
                 float a = Mathf.Min(config.GravParamOf(body) / d2, config.GravityAccelClamp);
                 accel += delta / d * a;

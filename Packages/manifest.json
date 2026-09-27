@@ -17,6 +17,7 @@
     "com.unity.learn.iet-framework": "6.0.7",
     "com.unity.pipeline": "0.7.0-exp.1",
     "com.unity.render-pipelines.universal": "17.6.0",
+    "com.unity.services.cloud-build": "2.1.0",
     "com.unity.test-framework": "1.8.0",
     "com.unity.timeline": "6.6.0",
     "com.unity.ugui": "2.6.0",

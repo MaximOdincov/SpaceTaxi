@@ -5,15 +5,12 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
-    // Пунктирный прогноз траектории: свободный полёт под гравитацией всех тел.
-    // Длина зависит от скорости (горизонт в секундах), линия изгибается и
-    // обрывается на столкновении. Вид полностью настраивается в инспекторе.
     public class TrajectoryPredictor : MonoBehaviour
     {
         [Header("Вид пунктира")]
-        [SerializeField] private Sprite dashSprite; // чёрточка (пусто = заглушка)
+        [SerializeField] private Sprite dashSprite;
         [SerializeField] private Color dashColor = new Color(1f, 1f, 1f, 0.6f);
-        [SerializeField] private float dashScale = 0.4f; // длина чёрточки (~6 юнитов)
+        [SerializeField] private float dashScale = 0.4f;
         [Tooltip("Множитель ширины чёрточки: 1 = как в спрайте, меньше = тоньше")]
         [SerializeField, Range(0.1f, 2f)] private float dashWidth = 0.6f;
         [SerializeField] private float spacing = 12f;    // юнитов между чёрточками
@@ -41,7 +38,7 @@ namespace SpaceTaxi.Physics
             controller = GetComponent<ShipController>();
             gravity = FindAnyObjectByType<GravityField>();
 
-            maxDashes = Mathf.Max(4, maxDashes); // защита от курьёзов в инспекторе
+            maxDashes = Mathf.Max(4, maxDashes);
 
             for (int i = 0; i < maxDashes; i++)
             {
@@ -69,8 +66,6 @@ namespace SpaceTaxi.Physics
             Simulate();
         }
 
-        // Линия «приклеена» к носу: стартует из носа и направлена по носу
-        // (нос сам плавно доворачивается к скорости), величина — фактическая скорость.
         private Vector2 StartVelocity(out Vector2 startPos)
         {
             float speed = ship.Body.linearVelocity.magnitude;
@@ -81,19 +76,16 @@ namespace SpaceTaxi.Physics
             return dir * speed;
         }
 
-        // Свободный полёт той же формулой, что в ShipController, без тяги.
         private void Simulate()
         {
             Vector2 pos;
             Vector2 vel = StartVelocity(out pos);
             var config = ship.Config;
 
-            // Шаг пунктира растёт, если линии не хватает на весь горизонт
-            // (иначе длина упирается в пул чёрточек).
             float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / dashes.Count);
 
-            float travelled = spacingNow - 2f; // первая чёрточка — через 2 юнита от носа
-            float total = 0f;     // путь от корабля (для затухания)
+            float travelled = spacingNow - 2f; 
+            float total = 0f;     
             int dashIndex = 0;
             bool crashed = false;
 

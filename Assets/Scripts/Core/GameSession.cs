@@ -5,14 +5,12 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Core
 {
-    // Корень игровой сцены: собирает мир из LevelAsset, держит общие ссылки.
     public class GameSession : MonoBehaviour
     {
         [SerializeField] private LevelAsset level;
         [SerializeField] private PhysicsConfig physicsConfig;
         [SerializeField] private InputActionAsset input;
 
-        [Header("Префабы (пусто = собрать кодом)")]
         [SerializeField] private Planet planetPrefab;
         [SerializeField] private Ship shipPrefab;
 

@@ -3,21 +3,16 @@ using UnityEngine.InputSystem;
 
 namespace SpaceTaxi.UI
 {
-    // Карта (M): открыть/закрыть. Сама по себе НЕ ставит паузу (решение 2026-09-20).
-    // Открытие/закрытие — вместе с борт.компом. Если карта открыта из паузы —
-    // пауза сохраняется, закрытие карты возвращает меню паузы.
-    // ESC в карте закрывает её (не в паузу), если карта была открыта не из паузы.
     public class MapScreenController : MonoBehaviour
     {
-        [SerializeField] private GameObject mapScreen;            // сам экран карты
-        [SerializeField] private OnboardComputerPanel onboard;   // панель борт.компа
-        [SerializeField] private PauseScreenController pause;    // пауза (карта из паузы её не снимает)
+        [SerializeField] private GameObject mapScreen;           
+        [SerializeField] private OnboardComputerPanel onboard;   
+        [SerializeField] private PauseScreenController pause;    
 
         private bool opened;
 
         public bool IsOpened => opened;
 
-        // ESC только что закрыл карту (кадр-guard, чтобы пауза не открылась тем же нажатием).
         public bool EscJustClosed { get; private set; }
 
         private void Start()
@@ -43,7 +38,6 @@ namespace SpaceTaxi.UI
             EscJustClosed = false;
         }
 
-        // Для кнопки «КАРТА» в меню паузы: открыть карту, паузу не трогая.
         public void Open()
         {
             SetOpened(true);

@@ -7,17 +7,15 @@ using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.World
 {
-    // Строит мир из LevelAsset: тела, жар-зоны, корабль. Вызывается GameSession-ом.
     public sealed class WorldBuilder
     {
-        // Отступ корабля от поверхности при спавне (09_LEVEL_DESIGN §5, вопрос 3).
         private const float ShipOffset = 7f;
 
         private readonly LevelAsset level;
         private readonly PhysicsConfig config;
         private readonly InputActionAsset input;
-        private readonly Planet planetPrefab; // пусто — собрать кодом
-        private readonly Ship shipPrefab;     // пусто — собрать кодом
+        private readonly Planet planetPrefab;
+        private readonly Ship shipPrefab;     
 
         public WorldBuilder(LevelAsset level, PhysicsConfig config, InputActionAsset input,
             Planet planetPrefab = null, Ship shipPrefab = null)
@@ -31,7 +29,6 @@ namespace SpaceTaxi.World
 
         public void Build(out Ship ship, out GravityField gravity)
         {
-            // Гравитация первой — тела регистрируются в ней при включении.
             gravity = new GameObject("GravityField").AddComponent<GravityField>();
 
             var bodies = new List<CelestialBody>();
@@ -45,8 +42,6 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
-            // Планета — из префаба (спрайт/цвет задаёт префаб), звезда — кодом.
-            // Визуальные override-ы из данных применяются поверх.
             GameObject go;
             if (data.Type != BodyType.Star && planetPrefab != null)
             {
@@ -82,7 +77,6 @@ namespace SpaceTaxi.World
             }
             body.Init(data, config);
 
-            // Заглушка индикации жаровой зоны.
             if (data.Type == BodyType.Star && data.HeatRadius > 0f)
             {
                 var heatGo = new GameObject("HeatZone");
@@ -96,7 +90,6 @@ namespace SpaceTaxi.World
             return body;
         }
 
-        // Визуальные override-ы тела: спрайт/материал/цвет. Пусто — как в префабе.
         private static void ApplyVisuals(SpriteRenderer renderer, BodyVisuals visuals)
         {
             if (renderer == null || visuals == null)
@@ -127,7 +120,7 @@ namespace SpaceTaxi.World
             else
             {
                 go = new GameObject("Ship");
-                go.SetActive(false); // включим после настройки ввода
+                go.SetActive(false);
 
                 var spriteRenderer = go.AddComponent<SpriteRenderer>();
                 spriteRenderer.sortingOrder = 2;
@@ -149,7 +142,7 @@ namespace SpaceTaxi.World
             if (renderer != null && renderer.sprite == null)
                 renderer.sprite = StubSprites.ShipTriangle();
 
-            // Позиция на поверхности планеты старта, нос от центра.
+
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
             go.transform.position = start.Position + dir * (start.Radius + ShipOffset);

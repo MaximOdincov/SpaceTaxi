@@ -3,13 +3,11 @@ using UnityEngine.SceneManagement;
 
 namespace SpaceTaxi.UI
 {
-    // Переходы между сценами и выход — мишени для onClick кнопок меню/паузы.
-    // В редакторе «выход» останавливает Play Mode, в билде закрывает приложение.
     public class SceneFlowButtons : MonoBehaviour
     {
         public void StartNewGame() => Load("GameScene");
 
-        public void ContinueGame() => Load("GameScene"); // v0.1: сейва ещё нет, тот же вход
+        public void ContinueGame() => Load("GameScene");
 
         public void LoadMainMenu() => Load("MainMenu");
 

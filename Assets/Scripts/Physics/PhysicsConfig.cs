@@ -3,17 +3,16 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Значения по умолчанию — из HTML-прототипа v3 (01_MECHANICS.md §1).
     [CreateAssetMenu(fileName = "PhysicsConfig", menuName = "Space Taxi/Physics Config")]
     public sealed class PhysicsConfig : ScriptableObject
     {
         [Header("Тяга")]
-        public float Thrust = 95f;            // W или ПРОБЕЛ — разгон вдоль вектора скорости
-        public float Retro = 115f;            // S — торможение
-        public float StrafeAcc = 130f;        // A/D — боковая тяга (85 в прототипе — слабо)
-        [Tooltip("Предел угловой скорости разворота: медленный корабль не крутится как юла")]
+        public float Thrust = 95f;            // разгон вдоль вектора скорости
+        public float Retro = 115f;            // торможение
+        public float StrafeAcc = 130f;        // боковая тяга
+        [Tooltip("Предел угловой скорости разворота")]
         public float StrafeMaxTurnRate = 60f; // град/с
-        public float MaxV = 330f;             // выше — тяга не работает (не жёсткий кламп)
+        public float MaxV = 330f;             // максимальная тяга
 
         [Header("Посадка")]
         public float LandSpeed = 38f;         // безопасная скорость касания

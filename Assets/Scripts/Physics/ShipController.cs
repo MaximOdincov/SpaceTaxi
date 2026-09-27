@@ -5,8 +5,6 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Управление как в прототипе: тяга вдоль вектора скорости, нос доворачивается сам.
-    // Здесь же гравитация и качель — одна точка полёта.
     public class ShipController : MonoBehaviour
     {
         [SerializeField] private InputActionAsset input;
@@ -23,7 +21,6 @@ namespace SpaceTaxi.Physics
         private InputAction brakeAction;
         private InputAction strafeAction;
 
-        // Качель: тела, внутри кольца которых мы уже находились.
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
 
         public void SetInput(InputActionAsset asset)
@@ -68,7 +65,6 @@ namespace SpaceTaxi.Physics
             if (config == null)
                 return;
 
-            // Стоим на планете — ввод обрабатывается в Update (взлёт).
             if (ship.State != ShipState.Flying)
                 return;
 
@@ -114,7 +110,7 @@ namespace SpaceTaxi.Physics
                 }
             }
 
-            // Посадочный режим — тяга точнее у поверхности планеты.
+            // Посадочный режим
             float engMul = 1f;
             if (planet != null && planetDist < planet.LandingRing)
                 engMul = config.EngineMultiplier;
@@ -136,10 +132,6 @@ namespace SpaceTaxi.Physics
                 }
                 if (Mathf.Abs(strafe) > 0f)
                 {
-                    // В прототипе Y экрана вниз, в Unity вверх — знак перпендикуляра
-                    // противоположный: D (+1) изгибает траекторию вправо.
-                    // Ускорение ограничено пределом угловой скорости: у медленного
-                    // корабля разворот не быстрее StrafeMaxTurnRate (иначе юла).
                     Vector2 perp = new Vector2(dir.y, -dir.x);
                     float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad;
                     float strafeAcc = Mathf.Min(config.StrafeAcc, v * maxTurn);
@@ -149,8 +141,6 @@ namespace SpaceTaxi.Physics
 
             ship.Body.linearVelocity = velocity;
 
-            // Нос доворачивается к скорости — через физику, чтобы не спорить
-            // с интерполяцией Rigidbody (иначе джиттер).
             if (v > config.MinControlSpeed)
             {
                 float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - spriteNoseAngle;
@@ -165,8 +155,6 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
-            // Взлёт: W или ПРОБЕЛ (обе — тяга). Читаем здесь: WasPressedThisFrame
-            // в FixedUpdate пропускает нажатия.
             if (ship.State == ShipState.Landed
                 && thrustAction != null && thrustAction.WasPressedThisFrame())
             {

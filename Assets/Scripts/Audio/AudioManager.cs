@@ -4,8 +4,6 @@ using UnityEngine;
 
 namespace SpaceTaxi.Audio
 {
-    // Центральный менеджер звука (05_AUDIO.md §3): один на игру, переживает смену сцен.
-    // Вызовы только через статический фасад Sound — из любого кода без ссылок.
     [DisallowMultipleComponent]
     public sealed class AudioManager : MonoBehaviour
     {
@@ -13,7 +11,6 @@ namespace SpaceTaxi.Audio
 
         public static AudioManager Instance { get; private set; }
 
-        // Кривые непрерывных звуков: интенсивность 0..1 → громкость/тон.
         private const float LoopVolumeMin = 0.4f;   // на минимуме гул не пропадает полностью
         private const float LoopPitchMin = 0.9f;
         private const float LoopPitchRange = 0.22f;
@@ -47,7 +44,7 @@ namespace SpaceTaxi.Audio
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject); // дубль из второй сцены — менеджер уже живёт
+                Destroy(gameObject); 
                 return;
             }
             Instance = this;

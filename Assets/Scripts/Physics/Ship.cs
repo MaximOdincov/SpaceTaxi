@@ -14,7 +14,7 @@ namespace SpaceTaxi.Physics
     {
         public ShipState State = ShipState.Flying;
         public float Hp = 100f;
-        public float Fuel = 100f; // в v0.1 не тратится
+        public float Fuel = 100f;
 
         public PhysicsConfig Config { get; private set; }
         public Rigidbody2D Body { get; private set; }
