@@ -27,7 +27,7 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasStation: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u041C\u0438\u0448\u0435\u043D\u044C"
