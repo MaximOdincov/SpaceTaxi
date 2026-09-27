@@ -43,6 +43,8 @@ namespace SpaceTaxi.World
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
         public BodyVisuals Visuals = new BodyVisuals();
+        [Tooltip("На планете станция: посадка = заправка и ремонт (12 par.3.2)")]
+        public bool HasStation;
 
         [Header("Кольца (0 = считать по формуле)")]
         [Min(0f)] public float LandingRingRadius; // посадочное: 0 = r + 90

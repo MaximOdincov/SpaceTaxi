@@ -150,10 +150,12 @@ namespace SpaceTaxi.Tools
                 string name = element.FindPropertyRelative("DisplayName").stringValue;
                 var type = (BodyType)element.FindPropertyRelative("Type").intValue;
                 float radius = element.FindPropertyRelative("Radius").floatValue;
+                bool station = element.FindPropertyRelative("HasStation").boolValue;
                 bool selected = i == selectedIndex;
 
+                string icon = (type == BodyType.Star ? "★" : "●") + (station ? "⛽" : "");
                 GUIStyle style = selected ? EditorStyles.helpBox : EditorStyles.label;
-                if (GUILayout.Button($"{(type == BodyType.Star ? "★" : "●")}  {name}  (r={radius:0})", style))
+                if (GUILayout.Button($"{icon}  {name}  (r={radius:0})", style))
                 {
                     selectedIndex = i;
                     SceneView.RepaintAll();
@@ -181,6 +183,9 @@ namespace SpaceTaxi.Tools
             EditorGUILayout.PropertyField(element.FindPropertyRelative("MassMultiplier"));
             if (type == BodyType.Star)
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HeatRadius"));
+            if (type == BodyType.Planet)
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("HasStation"),
+                    new GUIContent("Станция (заправка+ремонт)"));
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField("Кольца", EditorStyles.boldLabel);

@@ -10,6 +10,9 @@ namespace SpaceTaxi.World
         public float Radius = 50f;
         public float Mass = 1f;
 
+        /// <summary>На планете станция: посадка = заправка и ремонт.</summary>
+        public bool HasStation { get; private set; }
+
         protected Physics.PhysicsConfig config;
 
         private Physics.GravityField gravityField;
@@ -30,6 +33,7 @@ namespace SpaceTaxi.World
             Type = data.Type;
             Radius = data.Radius;
             Mass = data.MassMultiplier;
+            HasStation = data.HasStation;
             spinSpeed = data.Visuals != null ? data.Visuals.SpinSpeed : 0f;
             landingRingOverride = data.LandingRingRadius;
             captureRingOverride = data.CaptureRingRadius;

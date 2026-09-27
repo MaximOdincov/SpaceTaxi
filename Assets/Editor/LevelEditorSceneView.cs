@@ -144,6 +144,12 @@ namespace SpaceTaxi.Tools
             Handles.color = selected ? Color.white : (star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f));
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName);
+            if (body.HasStation)
+            {
+                Handles.color = new Color(1f, 0.84f, 0.3f); // accent/taxi
+                Handles.Label(center + Vector3.up * (body.Radius + 34f), "станция",
+                    new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = new Color(1f, 0.84f, 0.3f) } });
+            }
 
             // Кольца: override из данных или формула (константы из PhysicsConfig).
             var config = FindConfig();

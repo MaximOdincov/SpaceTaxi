@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using SpaceTaxi.World;
 
@@ -76,8 +77,23 @@ namespace SpaceTaxi.Physics
 
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
-            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»");
+
+            // Станция на планете: мгновенная заправка и ремонт (12 par.3.2).
+            if (planet.HasStation)
+            {
+                bool healed = ship.Hp < ship.Config.HpMax;
+                bool refueled = ship.Fuel < ship.Config.FuelMax;
+                ship.Hp = ship.Config.HpMax;
+                ship.Fuel = ship.Config.FuelMax;
+                if (healed || refueled)
+                    StationServiced?.Invoke(planet.DisplayName);
+            }
+
+            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: бак/корпус полные)" : ""));
         }
+
+        /// <summary>Посадка на планету со станцией восполнила бак/корпус. Для тоста.</summary>
+        public event Action<string> StationServiced;
 
         private void Crash(Planet planet, Collision2D collision, float v)
         {
