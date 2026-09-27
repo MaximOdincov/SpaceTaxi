@@ -46,8 +46,8 @@ namespace SpaceTaxi.UI
             if (!built)
             {
                 var gravity = FindAnyObjectByType<Physics.GravityField>();
-                if (gravity == null || gravity.Bodies.Count == 0)
-                    return;
+                if (gravity == null || gravity.Bodies.Count == 0 || bodiesRoot.rect.width < 50f)
+                    return; // ждём мир и рассчитанный layout
                 bodies.AddRange(gravity.Bodies);
                 pxPerUnit = bodiesRoot.rect.width * 0.5f / worldRange;
                 foreach (CelestialBody body in bodies)

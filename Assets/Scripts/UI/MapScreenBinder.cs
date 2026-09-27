@@ -18,6 +18,7 @@ namespace SpaceTaxi.UI
         private TMP_FontAsset font;
         private RectTransform playerMarker;
         private RectTransform targetRing;
+        private bool built;
         private readonly Dictionary<CelestialBodyData, RectTransform> markers = new Dictionary<CelestialBodyData, RectTransform>();
         private Vector2 worldCenter;
         private float scale;
@@ -48,7 +49,17 @@ namespace SpaceTaxi.UI
                 if (session == null || session.Level == null)
                     return;
                 level = session.Level;
+            }
+
+            // Карта строится только когда layout рассчитан: у неактивного
+            // (или только что открытого) RectTransform rect ещё нулевой,
+            // и масштаб выходит мусорным — все тела слипаются.
+            if (!built)
+            {
+                if (mapRect.rect.width < 100f)
+                    return;
                 BuildMap();
+                built = true;
             }
 
             var ship = FindAnyObjectByType<Physics.Ship>();
