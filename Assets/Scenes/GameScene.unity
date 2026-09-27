@@ -5011,6 +5011,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 852702029}
+  - component: {fileID: 852702030}
   m_Layer: 0
   m_Name: Minimap
   m_TagString: Untagged
@@ -5041,6 +5042,20 @@ RectTransform:
   m_AnchoredPosition: {x: -172, y: -172}
   m_SizeDelta: {x: 280, y: 280}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &852702030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 852702028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 190e0caf879de493caad6a37b7ba3c37, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MinimapBinder
+  worldRange: 1000
+  circleSprite: {fileID: 21300000, guid: 862192c030e2e40448ca0a7e1ceb0296, type: 3}
 --- !u!1 &855128038
 GameObject:
   m_ObjectHideFlags: 0
@@ -11716,6 +11731,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1911970759}
+  - component: {fileID: 1911970760}
   m_Layer: 0
   m_Name: Backing
   m_TagString: Untagged
@@ -11766,6 +11782,19 @@ RectTransform:
   m_AnchoredPosition: {x: 240, y: 0}
   m_SizeDelta: {x: -480, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1911970760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1911970758}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8257660fae8464174b968ebf99119b5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapScreenBinder
+  circleSprite: {fileID: 21300000, guid: 862192c030e2e40448ca0a7e1ceb0296, type: 3}
 --- !u!1 &1912225535
 GameObject:
   m_ObjectHideFlags: 0
