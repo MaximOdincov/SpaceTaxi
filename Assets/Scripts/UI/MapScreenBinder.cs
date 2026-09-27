@@ -3,7 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
-using SpaceTaxi.Orders;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
@@ -17,7 +16,6 @@ namespace SpaceTaxi.UI
         private RectTransform mapRect;
         private TMP_FontAsset font;
         private RectTransform playerMarker;
-        private RectTransform targetRing;
         private bool built;
         private readonly Dictionary<CelestialBodyData, RectTransform> markers = new Dictionary<CelestialBodyData, RectTransform>();
         private Vector2 worldCenter;
@@ -66,7 +64,6 @@ namespace SpaceTaxi.UI
             if (ship != null && playerMarker != null)
                 playerMarker.anchoredPosition = WorldToMap(ship.transform.position);
 
-            UpdateTargetRing();
         }
 
         private void BuildMap()
@@ -130,32 +127,6 @@ namespace SpaceTaxi.UI
             ((RectTransform)labelGo.transform).anchoredPosition = WorldToMap(body.Position) + Vector2.up * (size * 0.5f + 18f);
         }
 
-        // Кольцо цели: планета А (за пассажиром) или Б (на борту).
-        private void UpdateTargetRing()
-        {
-            var session = FindAnyObjectByType<GameSession>();
-            var orders = session != null ? session.Orders : null;
-            OrderOffer active = orders != null ? orders.Active : null;
-
-            if (active == null)
-            {
-                if (targetRing != null)
-                    targetRing.gameObject.SetActive(false);
-                return;
-            }
-
-            int index = active.State == OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
-            if (index < 0 || index >= level.Bodies.Count)
-                return;
-            if (targetRing == null)
-                targetRing = CreateRing("TargetRing", 40f, TaxiColor);
-
-            CelestialBodyData body = level.Bodies[index];
-            targetRing.gameObject.SetActive(true);
-            targetRing.anchoredPosition = WorldToMap(body.Position);
-            float pulse = 1f + 0.15f * Mathf.Sin(Time.unscaledTime * 3f);
-            targetRing.sizeDelta = Vector2.one * (Mathf.Max(40f, body.Radius * 2f * scale) + 22f) * pulse;
-        }
 
         private Vector2 WorldToMap(Vector2 world)
         {

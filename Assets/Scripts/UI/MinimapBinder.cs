@@ -3,7 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
-using SpaceTaxi.Orders;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
@@ -20,7 +19,6 @@ namespace SpaceTaxi.UI
 
         private RectTransform bodiesRoot;
         private RectTransform playerArrow;
-        private RectTransform targetMark;
         private readonly List<RectTransform> bodyDots = new List<RectTransform>();
         private readonly List<CelestialBody> bodies = new List<CelestialBody>();
 
@@ -29,7 +27,6 @@ namespace SpaceTaxi.UI
 
         private static readonly Color DotColor = new Color(0.85f, 1f, 0.9f);
         private static readonly Color StarColor = new Color(1f, 0.82f, 0.35f);
-        private static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);
 
         private void Awake()
         {
@@ -52,7 +49,6 @@ namespace SpaceTaxi.UI
                 pxPerUnit = bodiesRoot.rect.width * 0.5f / worldRange;
                 foreach (CelestialBody body in bodies)
                     CreateDot(body);
-                CreateTargetMark();
                 built = true;
             }
 
@@ -71,50 +67,8 @@ namespace SpaceTaxi.UI
                 float angle = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg;
                 playerArrow.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
             }
-
-            UpdateTarget(center);
         }
 
-        // Цель: планета А (за пассажиром) или Б (на борту), жёлтым.
-        private void UpdateTarget(Vector2 center)
-        {
-            var session = FindAnyObjectByType<GameSession>();
-            var orders = session != null ? session.Orders : null;
-            OrderOffer active = orders != null ? orders.Active : null;
-            if (active == null)
-            {
-                targetMark.gameObject.SetActive(false);
-                return;
-            }
-            int index = active.State == OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
-            var gravity = FindAnyObjectByType<Physics.GravityField>();
-            if (index < 0 || gravity == null)
-                return;
-            // Индексы заказа — по LevelAsset.Bodies; мир ищем по имени.
-            CelestialBody target = null;
-            foreach (CelestialBody body in bodies)
-                if (body.name == session.Level.Bodies[index].DisplayName)
-                    target = body;
-            if (target == null)
-                return;
-            targetMark.gameObject.SetActive(true);
-            targetMark.anchoredPosition = (Vector2)target.transform.position - center;
-            float pulse = 1f + 0.12f * Mathf.Sin(Time.unscaledTime * 4f); // живой прицел
-            targetMark.sizeDelta = Vector2.one * 26f * pulse;
-        }
-
-        // Маркер цели заказа: полупрозрачное жёлтое кольцо с точкой —
-        // прицел на планете назначения, не «точка на корабле».
-        private void CreateTargetMark()
-        {
-            targetMark = CreateDot("TargetMark", 26f);
-            targetMark.GetComponent<Image>().color = new Color(TaxiColor.r, TaxiColor.g, TaxiColor.b, 0.3f);
-            var dot = CreateDot("TargetMarkDot", 8f);
-            dot.SetParent(targetMark, false);
-            dot.anchoredPosition = Vector2.zero;
-            dot.GetComponent<Image>().color = TaxiColor;
-            targetMark.gameObject.SetActive(false);
-        }
 
         private RectTransform CreateDot(CelestialBody body)
         {
