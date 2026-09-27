@@ -77,8 +77,10 @@ namespace SpaceTaxi.UI
             float size = Mathf.Max(9f, body.Radius * 2f * pxPerUnit * 1.5f);
             if (star)
             {
-                RectTransform halo = CreateDot(body.name + "Halo", size * 2f);
-                halo.GetComponent<Image>().color = new Color(StarColor.r, StarColor.g, StarColor.b, 0.25f);
+                // Компактный ореол: звезда не заливает пол-радара.
+                size = Mathf.Min(size, 22f);
+                RectTransform halo = CreateDot(body.name + "Halo", size * 1.5f);
+                halo.GetComponent<Image>().color = new Color(StarColor.r, StarColor.g, StarColor.b, 0.18f);
             }
             RectTransform dot = CreateDot(body.name, size);
             dot.GetComponent<Image>().color = star ? StarColor : DotColor;
