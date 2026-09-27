@@ -2,7 +2,8 @@
     "name": "SpaceTaxi.Gameplay",
     "rootNamespace": "SpaceTaxi",
     "references": [
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

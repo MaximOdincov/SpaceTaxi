@@ -1859,6 +1859,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 245227945}
   m_CullTransparentMesh: 1
+--- !u!1 &252167310
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 252167311}
+  - component: {fileID: 252167312}
+  m_Layer: 0
+  m_Name: Toast
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &252167311
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 252167310}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1789493502}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -96}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 1}
+--- !u!114 &252167312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 252167310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22210220a13974e2cb70e37eeccbd910, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.ToastNotifier
+  duration: 3.5
 --- !u!1 &280468974
 GameObject:
   m_ObjectHideFlags: 0
@@ -10328,6 +10377,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1593932585}
   - component: {fileID: 1593932586}
+  - component: {fileID: 1593932587}
   m_Layer: 0
   m_Name: OnboardComputer
   m_TagString: Untagged
@@ -10401,6 +10451,18 @@ MonoBehaviour:
   hiddenX: -510
   shownX: 0
   duration: 0.25
+--- !u!114 &1593932587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1593932584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63743167aa4c54f2096316ac1da39f96, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.OnboardBinder
 --- !u!1 &1604678584
 GameObject:
   m_ObjectHideFlags: 0
@@ -11083,6 +11145,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1789493502}
+  - component: {fileID: 1789493503}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -11110,6 +11173,8 @@ RectTransform:
   - {fileID: 852702029}
   - {fileID: 1969638523}
   - {fileID: 1946733260}
+  - {fileID: 2063597538}
+  - {fileID: 252167311}
   m_Father: {fileID: 788519946}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -11117,6 +11182,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -16}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1789493503
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1789493501}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1010346481104642bf64151c51ac7c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.HudBinder
 --- !u!1 &1790138538
 GameObject:
   m_ObjectHideFlags: 0
@@ -13039,6 +13116,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2063124155}
   m_CullTransparentMesh: 1
+--- !u!1 &2063597537
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2063597538}
+  - component: {fileID: 2063597539}
+  m_Layer: 0
+  m_Name: Toast
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2063597538
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2063597537}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1789493502}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -96}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 1}
+--- !u!114 &2063597539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2063597537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22210220a13974e2cb70e37eeccbd910, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.ToastNotifier
+  duration: 3.5
 --- !u!1 &2067690669
 GameObject:
   m_ObjectHideFlags: 0
