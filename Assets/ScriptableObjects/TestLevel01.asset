@@ -13,43 +13,98 @@ MonoBehaviour:
   m_Name: TestLevel01
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.World.LevelAsset
   LevelName: TestLevel01
+  WorldRadius: 2500
   Bodies:
   - DisplayName: "\u0413\u0430\u0432\u0430\u043D\u044C"
     Type: 0
-    Position: {x: 0, y: 0}
-    Radius: 26
+    Position: {x: -0, y: -0}
+    Radius: 72
     MassMultiplier: 1
     HeatRadius: 0
+    Visuals:
+      Sprite: {fileID: 21300000, guid: 156fb5b0b9a864aa7af22c41e98a4ca7, type: 3}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 0
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   - DisplayName: "\u041C\u0438\u0448\u0435\u043D\u044C"
     Type: 0
     Position: {x: 330, y: 40}
     Radius: 20
     MassMultiplier: 1
     HeatRadius: 0
+    Visuals:
+      Sprite: {fileID: -2384855849663803363, guid: fd285ee0415134943ab9f7ebad9fda1b, type: 3}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 1
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   - DisplayName: "\u0412\u0435\u0440\u0441\u0442\u0430\u043A"
     Type: 0
     Position: {x: -350, y: 180}
     Radius: 34
     MassMultiplier: 1
     HeatRadius: 0
+    Visuals:
+      Sprite: {fileID: 0}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 0
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   - DisplayName: "\u041C\u0430\u044F\u043A"
     Type: 0
     Position: {x: 120, y: -520}
     Radius: 24
     MassMultiplier: 1
     HeatRadius: 0
+    Visuals:
+      Sprite: {fileID: 0}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 0
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   - DisplayName: "\u041A\u0440\u043E\u043C\u043A\u0430"
     Type: 0
     Position: {x: 760, y: -260}
     Radius: 30
     MassMultiplier: 1
     HeatRadius: 0
+    Visuals:
+      Sprite: {fileID: 0}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 0
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   - DisplayName: "\u041F\u0435\u0447\u044C"
     Type: 1
     Position: {x: 250, y: 950}
     Radius: 50
     MassMultiplier: 4.5
     HeatRadius: 180
+    Visuals:
+      Sprite: {fileID: 0}
+      Material: {fileID: 0}
+      UseColor: 0
+      Color: {r: 1, g: 1, b: 1, a: 1}
+      SpinSpeed: 0
+    HasStation: 0
+    LandingRingRadius: 0
+    CaptureRingRadius: 0
   SpawnMode: 0
   StartPlanetIndex: 0
   SpawnAngleDeg: 90

@@ -77,6 +77,7 @@ namespace SpaceTaxi.Physics
 
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
+            ShipLanded?.Invoke(planet);
 
             // Станция на планете: мгновенная заправка и ремонт (12 par.3.2).
             if (planet.HasStation)
@@ -94,6 +95,9 @@ namespace SpaceTaxi.Physics
 
         /// <summary>Посадка на планету со станцией восполнила бак/корпус. Для тоста.</summary>
         public event Action<string> StationServiced;
+
+        /// <summary>Мягкая посадка состоялась. Единственная точка взятия/сдачи пассажира.</summary>
+        public event Action<World.Planet> ShipLanded;
 
         private void Crash(Planet planet, Collision2D collision, float v)
         {

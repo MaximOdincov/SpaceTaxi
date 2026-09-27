@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
 
@@ -10,11 +11,13 @@ namespace SpaceTaxi.Core
         [SerializeField] private LevelAsset level;
         [SerializeField] private PhysicsConfig physicsConfig;
         [SerializeField] private InputActionAsset input;
+        [SerializeField] private PassengerCatalog passengerCatalog;
 
         [SerializeField] private Planet planetPrefab;
         [SerializeField] private Ship shipPrefab;
 
         public Ship Ship { get; private set; }
+        public OrderService Orders { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
 
@@ -26,6 +29,9 @@ namespace SpaceTaxi.Core
 
             var follow = Camera.main.gameObject.AddComponent<CameraFollow>();
             follow.SetTarget(Ship);
+
+            Orders = gameObject.AddComponent<OrderService>();
+            Orders.Init(level, passengerCatalog, Ship);
         }
     }
 }
