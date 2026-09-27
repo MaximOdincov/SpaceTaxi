@@ -1719,6 +1719,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3984178175724166692}
   - component: {fileID: 5004615482274374525}
+  - component: {fileID: 4447424950688670263}
   m_Layer: 0
   m_Name: SettingsUI
   m_TagString: Untagged
@@ -1758,6 +1759,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dab4a4eae46640dabab4cc41e7ed955, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.SettingsScreenController
+--- !u!114 &4447424950688670263
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2900053679274930738}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 858ceb730b26f46088d66bcaf3fcde8b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.SettingsBinder
 --- !u!1 &2929622384597185199
 GameObject:
   m_ObjectHideFlags: 0
