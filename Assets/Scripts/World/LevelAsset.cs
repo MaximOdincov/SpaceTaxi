@@ -53,6 +53,10 @@ namespace SpaceTaxi.World
     public sealed class LevelAsset : ScriptableObject
     {
         public string LevelName = "NewLevel";
+
+        [Tooltip("Граница системы: дальше — потеря связи (12_ALPHA_PLAN §3.1)")]
+        public float WorldRadius = 2500f;
+
         public List<CelestialBodyData> Bodies = new List<CelestialBodyData>();
 
         [Header("Старт игрока")]

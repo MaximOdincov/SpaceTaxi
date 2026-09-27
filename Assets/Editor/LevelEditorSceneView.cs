@@ -59,11 +59,23 @@ namespace SpaceTaxi.Tools
             DrawSelectionDistances(level, window.SelectedIndex);
             DrawSpawn(level);
             DrawCameraFrame(level);
+            DrawWorldRadius(level);
             if (window.ShowTrajectory)
                 DrawSpawnTrajectory(level);
 
             DrawGravityProbe(level);
             HandleDrag(window, level);
+        }
+
+        // Граница системы: дальше — потеря связи.
+        private static void DrawWorldRadius(LevelAsset level)
+        {
+            if (level.WorldRadius <= 0f)
+                return;
+            DottedCircle(Vector3.zero, level.WorldRadius, new Color(1f, 0.4f, 0.3f, 0.35f), 6f);
+            Handles.color = new Color(1f, 0.4f, 0.3f, 0.5f);
+            Handles.Label(new Vector3(0f, level.WorldRadius + 40f, 0f),
+                "граница системы · " + level.WorldRadius.ToString("0"));
         }
 
         // Зонд: с зажатым Ctrl в точке курсора — стрелка суммарного притяжения

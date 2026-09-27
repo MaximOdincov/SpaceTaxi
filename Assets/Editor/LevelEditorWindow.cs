@@ -231,6 +231,8 @@ namespace SpaceTaxi.Tools
                 indexProp.intValue = indices[picked];
             }
             EditorGUILayout.PropertyField(so.FindProperty("SpawnAngleDeg"));
+            EditorGUILayout.PropertyField(so.FindProperty("WorldRadius"),
+                new GUIContent("Граница системы"));
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();

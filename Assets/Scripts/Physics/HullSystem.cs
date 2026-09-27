@@ -18,6 +18,9 @@ namespace SpaceTaxi.Physics
         /// <summary>Корабль погиб (взрыв).</summary>
         public event Action Died;
 
+        /// <summary>Корабль потерян без взрыва (пустой бак, выход за границу). Причина — для тоста.</summary>
+        public event Action<string> ShipLost;
+
         /// <summary>Респавн завершён.</summary>
         public event Action Respawned;
 
@@ -36,6 +39,28 @@ namespace SpaceTaxi.Physics
                 if (session != null && session.Level != null)
                     level = session.Level;
             }
+        }
+
+        private void Update()
+        {
+            // Потеря связи: корабль покинул систему (граница из данных уровня).
+            if (ship == null || ship.State != ShipState.Flying)
+                return;
+            float worldRadius = level != null ? level.WorldRadius : 2500f;
+            if (ship.transform.position.magnitude > worldRadius)
+                Abandon("ПОТЕРЯНА СВЯЗЬ");
+        }
+
+        // Потеря корабля: респавн без взрыва. Причина — «ОТКЛЮЧИТЬ КОРАБЛЬ»
+        // с бортового компьютера или граница системы.
+        public void Abandon(string reason)
+        {
+            if (ship == null || ship.State == ShipState.Respawning)
+                return;
+            ShipLost?.Invoke(reason);
+            ship.State = ShipState.Respawning;
+            ship.Body.linearVelocity = Vector2.zero;
+            StartCoroutine(RespawnAfter(0.6f));
         }
 
         private void FixedUpdate()
@@ -99,6 +124,7 @@ namespace SpaceTaxi.Physics
 
             ship.Body.linearVelocity = Vector2.zero;
             ship.Hp = ship.Config.HpMax;
+            ship.Fuel = ship.Config.FuelMax; // бак полный (12_ALPHA_PLAN §3.4)
             ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();

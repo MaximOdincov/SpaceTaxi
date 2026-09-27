@@ -119,6 +119,16 @@ namespace SpaceTaxi.Physics
             bool brakeOn = brakeAction != null && brakeAction.IsPressed();
             float strafe = strafeAction != null ? strafeAction.ReadValue<float>() : 0f;
 
+            // Топливо: расход на любую тягу; пустой бак — двигатели молчат.
+            if (thrustOn || brakeOn || Mathf.Abs(strafe) > 0f)
+                ship.Fuel -= config.FuelDrainPerSecond * dt;
+            if (ship.Fuel <= 0f)
+            {
+                thrustOn = false;
+                brakeOn = false;
+                strafe = 0f;
+            }
+
             // Ручное управление — все ускорения к вектору скорости.
             if (v > config.MinControlSpeed)
             {
@@ -155,7 +165,8 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
-            if (ship.State == ShipState.Landed
+            // Взлёт требует топлива: с пустым баком стоим (выход — «Отключить корабль»).
+            if (ship.State == ShipState.Landed && ship.Fuel > 0f
                 && thrustAction != null && thrustAction.WasPressedThisFrame())
             {
                 landing.Takeoff();

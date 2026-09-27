@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace SpaceTaxi.Physics
@@ -14,11 +15,28 @@ namespace SpaceTaxi.Physics
     {
         public ShipState State = ShipState.Flying;
         public float Hp = 100f;
-        public float Fuel = 100f;
 
         public PhysicsConfig Config { get; private set; }
         public Rigidbody2D Body { get; private set; }
         public World.Planet LandedOn { get; set; }
+
+        private float fuel = 100f;
+
+        /// <summary>Топливо 0..FuelMax. Событие — для HUD.</summary>
+        public float Fuel
+        {
+            get => fuel;
+            set
+            {
+                float clamped = Mathf.Clamp(value, 0f, Config != null ? Config.FuelMax : 100f);
+                if (Mathf.Approximately(clamped, fuel))
+                    return;
+                fuel = clamped;
+                FuelChanged?.Invoke();
+            }
+        }
+
+        public event Action FuelChanged;
 
         public void Init(PhysicsConfig config)
         {
