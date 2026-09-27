@@ -75,17 +75,29 @@ namespace SpaceTaxi.UI
             bool star = body is Star;
             // Точки крупнее честного масштаба — заметнее движение относительно стрелки.
             float size = Mathf.Max(9f, body.Radius * 2f * pxPerUnit * 1.5f);
+
+            RectTransform root;
             if (star)
             {
-                // Компактный ореол: звезда не заливает пол-радара.
+                // Компактный ореол, ядро — ребёнком поверх него; двигаем root,
+                // ореол больше не прилипает к центру радара.
                 size = Mathf.Min(size, 22f);
-                RectTransform halo = CreateDot(body.name + "Halo", size * 1.5f);
-                halo.GetComponent<Image>().color = new Color(StarColor.r, StarColor.g, StarColor.b, 0.18f);
+                root = CreateDot(body.name + "Halo", size * 1.5f);
+                root.GetComponent<Image>().color = new Color(StarColor.r, StarColor.g, StarColor.b, 0.18f);
+
+                RectTransform core = CreateDot(body.name, size);
+                core.SetParent(root, false);
+                core.anchoredPosition = Vector2.zero;
+                core.GetComponent<Image>().color = StarColor;
             }
-            RectTransform dot = CreateDot(body.name, size);
-            dot.GetComponent<Image>().color = star ? StarColor : DotColor;
-            bodyDots.Add(dot);
-            return dot;
+            else
+            {
+                root = CreateDot(body.name, size);
+                root.GetComponent<Image>().color = DotColor;
+            }
+
+            bodyDots.Add(root);
+            return root;
         }
 
         private RectTransform CreateDot(string name, float size)

@@ -100,7 +100,10 @@ namespace SpaceTaxi.UI
             float size = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : 1.9f));
 
             if (star)
-                CreateCircle(body.DisplayName + "Halo", size * 1.4f, new Color(1f, 0.8f, 0.3f, 0.14f));
+            {
+                RectTransform halo = CreateCircle(body.DisplayName + "Halo", size * 1.4f, new Color(1f, 0.8f, 0.3f, 0.14f));
+                halo.anchoredPosition = WorldToMap(body.Position); // иначе прилипнет к центру
+            }
 
             RectTransform circle = CreateCircle(body.DisplayName, size,
                 star ? new Color(1f, 0.82f, 0.35f)
