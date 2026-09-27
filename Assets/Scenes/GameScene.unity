@@ -5054,7 +5054,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 190e0caf879de493caad6a37b7ba3c37, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MinimapBinder
-  worldRange: 1000
+  worldRange: 350
   circleSprite: {fileID: 21300000, guid: 862192c030e2e40448ca0a7e1ceb0296, type: 3}
 --- !u!1 &855128038
 GameObject:
