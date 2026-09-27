@@ -12,8 +12,8 @@ namespace SpaceTaxi.UI
     // скорости, цель заказа жёлтым. Вешается на HUD/Minimap.
     public class MinimapBinder : MonoBehaviour
     {
-        [Tooltip("Радиус охвата минимапа в юнитах мира")]
-        public float worldRange = 550f;
+        [Tooltip("Радиус охвата минимапа в юнитах мира (примерно половина видимой области камеры)")]
+        public float worldRange = 350f;
 
         [SerializeField] private Sprite circleSprite;
 
@@ -73,16 +73,14 @@ namespace SpaceTaxi.UI
         private RectTransform CreateDot(CelestialBody body)
         {
             bool star = body is Star;
-            // Точки крупнее честного масштаба — заметнее движение относительно стрелки.
-            float size = Mathf.Max(9f, body.Radius * 2f * pxPerUnit * 1.5f);
+            // Честный масштаб: на экране планета — значит и на радаре; посадка
+            // на планету оставляет её круг вплотную к стрелке корабля.
+            float size = Mathf.Max(7f, body.Radius * 2f * pxPerUnit);
 
             RectTransform root;
             if (star)
             {
-                // Компактный ореол, ядро — ребёнком поверх него; двигаем root,
-                // ореол больше не прилипает к центру радара.
-                size = Mathf.Min(size, 22f);
-                root = CreateDot(body.name + "Halo", size * 1.5f);
+                root = CreateDot(body.name + "Halo", size * 1.3f);
                 root.GetComponent<Image>().color = new Color(StarColor.r, StarColor.g, StarColor.b, 0.18f);
 
                 RectTransform core = CreateDot(body.name, size);
