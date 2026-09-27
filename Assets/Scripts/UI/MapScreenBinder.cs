@@ -98,7 +98,9 @@ namespace SpaceTaxi.UI
         private void CreateBody(CelestialBodyData body)
         {
             bool star = body.Type == BodyType.Star;
-            float size = Mathf.Max(10f, body.Radius * 2f * scale);
+            // Планеты рисуются крупнее честного масштаба — карта не должна
+            // быть пустой, читаемость важнее точных пропорций.
+            float size = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : 1.9f));
 
             if (star)
                 CreateCircle(body.DisplayName + "Halo", size * 2.1f, new Color(1f, 0.8f, 0.3f, 0.22f));

@@ -14,7 +14,7 @@ namespace SpaceTaxi.UI
     public class MinimapBinder : MonoBehaviour
     {
         [Tooltip("Радиус охвата минимапа в юнитах мира")]
-        public float worldRange = 1000f;
+        public float worldRange = 550f;
 
         [SerializeField] private Sprite circleSprite;
 
@@ -106,7 +106,8 @@ namespace SpaceTaxi.UI
         private RectTransform CreateDot(CelestialBody body)
         {
             bool star = body is Star;
-            float size = Mathf.Max(6f, body.Radius * 2f * pxPerUnit);
+            // Точки крупнее честного масштаба — заметнее движение относительно стрелки.
+            float size = Mathf.Max(9f, body.Radius * 2f * pxPerUnit * 1.5f);
             if (star)
             {
                 RectTransform halo = CreateDot(body.name + "Halo", size * 2f);
