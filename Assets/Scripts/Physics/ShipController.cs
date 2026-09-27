@@ -23,6 +23,10 @@ namespace SpaceTaxi.Physics
 
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
 
+        // Пороги топлива: лог один раз (в задаче 4 заменит баннер).
+        private bool lowFuelLogged;
+        private bool emptyFuelLogged;
+
         public void SetInput(InputActionAsset asset)
         {
             input = asset;
@@ -127,6 +131,23 @@ namespace SpaceTaxi.Physics
                 thrustOn = false;
                 brakeOn = false;
                 strafe = 0f;
+            }
+
+            // Пороги для проверки (в задаче 4 заменит баннер).
+            if (ship.Fuel > config.FuelMax * 0.1f)
+            {
+                lowFuelLogged = false;
+                emptyFuelLogged = false;
+            }
+            else if (!lowFuelLogged)
+            {
+                lowFuelLogged = true;
+                Debug.Log("[Fuel] меньше 10% — ТОПЛИВО КОНЧАЕТСЯ");
+            }
+            if (ship.Fuel <= 0f && !emptyFuelLogged)
+            {
+                emptyFuelLogged = true;
+                Debug.Log("[Fuel] бак пуст — двигатели не работают");
             }
 
             // Ручное управление — все ускорения к вектору скорости.
