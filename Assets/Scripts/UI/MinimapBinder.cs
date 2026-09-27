@@ -52,9 +52,7 @@ namespace SpaceTaxi.UI
                 pxPerUnit = bodiesRoot.rect.width * 0.5f / worldRange;
                 foreach (CelestialBody body in bodies)
                     CreateDot(body);
-                targetMark = CreateDot("TargetMark", 14f);
-                targetMark.GetComponent<Image>().color = TaxiColor;
-                targetMark.gameObject.SetActive(false);
+                CreateTargetMark();
                 built = true;
             }
 
@@ -101,6 +99,21 @@ namespace SpaceTaxi.UI
                 return;
             targetMark.gameObject.SetActive(true);
             targetMark.anchoredPosition = (Vector2)target.transform.position - center;
+            float pulse = 1f + 0.12f * Mathf.Sin(Time.unscaledTime * 4f); // живой прицел
+            targetMark.sizeDelta = Vector2.one * 26f * pulse;
+        }
+
+        // Маркер цели заказа: полупрозрачное жёлтое кольцо с точкой —
+        // прицел на планете назначения, не «точка на корабле».
+        private void CreateTargetMark()
+        {
+            targetMark = CreateDot("TargetMark", 26f);
+            targetMark.GetComponent<Image>().color = new Color(TaxiColor.r, TaxiColor.g, TaxiColor.b, 0.3f);
+            var dot = CreateDot("TargetMarkDot", 8f);
+            dot.SetParent(targetMark, false);
+            dot.anchoredPosition = Vector2.zero;
+            dot.GetComponent<Image>().color = TaxiColor;
+            targetMark.gameObject.SetActive(false);
         }
 
         private RectTransform CreateDot(CelestialBody body)
