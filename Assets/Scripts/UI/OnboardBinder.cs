@@ -194,15 +194,17 @@ namespace SpaceTaxi.UI
                 return; // активный заказ — карточки не показываем
 
             TMP_FontAsset font = orderName.font;
-            float topY = orderTitle.rectTransform.anchoredPosition.y - 150f;
-            int maxFit = Mathf.Max(1, (int)((topY + divAir.anchoredPosition.y) / 132f));
+            // Зона карточек: от заголовка вниз до разделителя (координаты top-якорные).
+            float topY = orderTitle.rectTransform.anchoredPosition.y - 56f;
+            float available = topY - divAir.anchoredPosition.y; // оба отрицательные, сверху вниз
+            int maxFit = Mathf.Max(1, (int)(available / 114f));
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
                 if (index >= maxFit)
                     break;
                 GameObject card = CreateCard(offer, font);
-                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, topY - index * 132f);
+                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, topY - index * 114f);
                 cards.Add(card);
                 index++;
             }
@@ -212,6 +214,11 @@ namespace SpaceTaxi.UI
         {
             incomingRoot = new GameObject("Incoming", typeof(RectTransform)).GetComponent<RectTransform>();
             incomingRoot.SetParent(transform, false);
+            // Растянуть на всю панель — дети с top-якорями считают от её верха.
+            incomingRoot.anchorMin = Vector2.zero;
+            incomingRoot.anchorMax = Vector2.one;
+            incomingRoot.offsetMin = Vector2.zero;
+            incomingRoot.offsetMax = Vector2.zero;
         }
 
         // Карточка входящего заказа: имя/архетип, маршрут, пожелание, [ПРИНЯТЬ].
@@ -220,30 +227,34 @@ namespace SpaceTaxi.UI
             var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
             card.transform.SetParent(incomingRoot, false);
             var rect = (RectTransform)card.transform;
-            rect.sizeDelta = new Vector2(432f, 124f);
+            // Якоря сверху: позиция задаётся вниз от верха панели.
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = new Vector2(432f, 108f);
             card.GetComponent<Image>().color = PanelColor;
 
             TMP_Text name = MakeText(card.transform, font, 22f, BrightColor);
             name.text = offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype;
-            Place(name.rectTransform, new Vector2(-16f, -8f), new Vector2(-116f, -36f));
+            Place(name.rectTransform, new Vector2(-116f, -6f), new Vector2(-10f, -34f));
 
             TMP_Text route = MakeText(card.transform, font, 18f, LabelColor);
             route.text = orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper();
-            Place(route.rectTransform, new Vector2(-16f, -40f), new Vector2(-116f, -62f));
+            Place(route.rectTransform, new Vector2(-116f, -38f), new Vector2(-10f, -64f));
 
             TMP_Text wish = MakeText(card.transform, font, 15f, LabelColor);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             wish.text = string.IsNullOrEmpty(wishPhrase) ? "" : "«" + wishPhrase + "»";
-            Place(wish.rectTransform, new Vector2(-16f, -66f), new Vector2(-116f, -118f));
+            Place(wish.rectTransform, new Vector2(-116f, -68f), new Vector2(-10f, -104f));
 
             // Кнопка [ПРИНЯТЬ].
             var buttonGo = new GameObject("Accept", typeof(RectTransform), typeof(Image), typeof(Button));
             buttonGo.transform.SetParent(card.transform, false);
             var buttonRect = (RectTransform)buttonGo.transform;
-            buttonRect.sizeDelta = new Vector2(100f, 36f);
-            buttonRect.anchorMin = new Vector2(1f, 0.5f);
-            buttonRect.anchorMax = new Vector2(1f, 0.5f);
-            buttonRect.anchoredPosition = new Vector2(-10f, 0f);
+            buttonRect.sizeDelta = new Vector2(104f, 40f);
+            buttonRect.anchorMin = new Vector2(1f, 1f);
+            buttonRect.anchorMax = new Vector2(1f, 1f);
+            buttonRect.anchoredPosition = new Vector2(-10f, -8f);
             buttonGo.GetComponent<Image>().color = TaxiColor;
 
             TMP_Text buttonText = MakeText(buttonGo.transform, font, 18f, new Color(0.043f, 0.055f, 0.1f));
