@@ -56,35 +56,42 @@ namespace SpaceTaxi.Physics
 
         private void Update()
         {
+            // Скрываем: не в полёте, посадочные режимы (ретро/финал — дэш там
+            // только мешает и лезет из «задней» точки), околонулевая скорость.
             if (ship == null || ship.Config == null || gravity == null
                 || ship.State != ShipState.Flying
-                || ship.Body.linearVelocity.sqrMagnitude < 0.25f) // < 0.5 ед/с
+                || (controller != null && controller.LandingRetro)
+                || ship.Body.linearVelocity.sqrMagnitude < 900f) // < 30 ед/с
             {
                 HideAll();
+                smoothDir = Vector2.zero;
+                smoothSpacing = 0f;
                 return;
             }
             Simulate();
         }
 
+        private Vector2 smoothDir;
+        private float smoothSpacing;
+
+        // Направление прогноза: быстро сглаженное к вектору скорости — линия
+        // стабильна и не дёргается от доворотов носа; старт — от носа корабля.
         private Vector2 StartVelocity(out Vector2 startPos)
         {
             Vector2 velocity = ship.Body.linearVelocity;
             float speed = velocity.magnitude;
 
-            // Ретро-режим посадки: нос смотрит против скорости — прогноз
-            // всё равно строим по вектору скорости (куда реально полетим).
-            if (controller != null && controller.LandingRetro && speed > 1f)
-            {
-                Vector2 dir = velocity / speed;
-                startPos = (Vector2)ship.transform.position + dir * noseOffset;
-                return velocity;
-            }
+            float rate = Mathf.Min(1f, 10f * Time.deltaTime); // сглаживание 10/с
+            Vector2 target = velocity / Mathf.Max(speed, 0.001f);
+            if (smoothDir == Vector2.zero)
+                smoothDir = target;
+            smoothDir = Vector2.Slerp(smoothDir, target, rate).normalized;
 
             float noseAngle = (ship.transform.eulerAngles.z
                 + (controller != null ? controller.SpriteNoseAngle : 0f)) * Mathf.Deg2Rad;
             Vector2 noseDir = new Vector2(Mathf.Cos(noseAngle), Mathf.Sin(noseAngle));
             startPos = (Vector2)ship.transform.position + noseDir * noseOffset;
-            return noseDir * speed;
+            return smoothDir * speed;
         }
 
         private void Simulate()
@@ -93,7 +100,11 @@ namespace SpaceTaxi.Physics
             Vector2 vel = StartVelocity(out pos);
             var config = ship.Config;
 
-            float spacingNow = Mathf.Max(spacing, vel.magnitude * horizonSeconds / dashes.Count);
+            float targetSpacing = Mathf.Max(spacing, vel.magnitude * horizonSeconds / dashes.Count);
+            if (smoothSpacing <= 0f)
+                smoothSpacing = targetSpacing;
+            smoothSpacing = Mathf.Lerp(smoothSpacing, targetSpacing, Mathf.Min(1f, 6f * Time.deltaTime));
+            float spacingNow = smoothSpacing;
 
             float travelled = spacingNow - 2f; 
             float total = 0f;     
@@ -139,7 +150,7 @@ namespace SpaceTaxi.Physics
                 Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg));
 
             // Плавное затухание к концу линии.
-            float k = Mathf.Clamp01(total / (spacingNow * dashes.Count));
+            float k = index / (float)dashes.Count; // по индексу — стабильно, без миганий
             Color c = dashColor;
             c.a *= Mathf.Lerp(1f, 1f - endFade, k);
             renderers[index].color = c;

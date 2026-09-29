@@ -184,13 +184,17 @@ namespace SpaceTaxi.Physics
         // 3) у поверхности при малой скорости — вертикально, носом от планеты.
         private void UpdateHeading(Vector2 velocity, float v, Planet planet, float planetDist)
         {
-            if (v <= config.MinControlSpeed)
-                return;
-
+            // Финальное выравнивание работает и на малой скорости.
             bool inLandingRing = planet != null && planetDist < planet.LandingRing;
             bool finalApproach = inLandingRing
                 && planetDist < planet.Radius + 40f
                 && v < 50f;
+
+            // Около нулевой скорости вектор скорости «шумит» — не крутим нос
+            // куда попало, держим текущую ориентацию.
+            if (!finalApproach && v < 15f)
+                return;
+
             LandingRetro = inLandingRing && !finalApproach && ship.Fuel > 0f
                 && brakeAction != null && brakeAction.IsPressed();
 
