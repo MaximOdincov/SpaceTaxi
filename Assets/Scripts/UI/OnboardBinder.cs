@@ -24,6 +24,7 @@ namespace SpaceTaxi.UI
 
         private RectTransform orderArea;      // контейнер зоны заказа (переключается)
         private GameObject econSection;
+        private TMP_Text econCounters;
         private TMP_Text orderPay;
         private Button cancelButton;
 
@@ -66,8 +67,8 @@ namespace SpaceTaxi.UI
             root.transform.SetParent(transform, false);
             Stretch((RectTransform)root.transform);
             var rootLayout = root.AddComponent<VerticalLayoutGroup>();
-            rootLayout.padding = new RectOffset(24, 24, 20, 16);
-            rootLayout.spacing = 10;
+            rootLayout.padding = new RectOffset(24, 24, 8, 12);
+            rootLayout.spacing = 8;
             rootLayout.childControlWidth = true;
             rootLayout.childControlHeight = true;
             rootLayout.childForceExpandWidth = true;
@@ -76,7 +77,7 @@ namespace SpaceTaxi.UI
 
             // Шапка: связь + название + часы.
             var header = H("Header", root.transform);
-            var dot = Text(header, "●", 18f, LabelColor);
+            var dot = Text(header, "<voffset=0.35em>●</voffset>", 18f, LabelColor);
             dot.alignment = TextAlignmentOptions.Left;
             FixedWidth(dot.gameObject, 24f);
             var title = Text(header, "БОРТОВОЙ КОМПЬЮТЕР", 24f, BrightColor);
@@ -117,19 +118,21 @@ namespace SpaceTaxi.UI
             // Экономика (видна не всегда).
             econSection = Section(root.transform, "// СМЕНА", "EconSection");
             var econRow = H("EconRow", econSection.transform);
-            var money = Text(econRow, "0 доставок", 22f, BrightColor);
-            FixedHeight(money.gameObject, 28f);
-            var rating = Text(econRow, "0 провалов", 22f, LabelColor);
-            FixedHeight(rating.gameObject, 28f);
+            var money = Text(econRow, "● 0", 24f, TaxiColor);
+            FixedWidth(money.gameObject, 110f);
+            var rating = Text(econRow, "★ 0.0", 24f, TaxiColor);
+            FixedWidth(rating.gameObject, 120f);
+            econCounters = Text(econRow, "0 доставок · 0 провалов", 18f, LabelColor);
+            econCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             // Плеер — внизу стека.
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
             var playerRow = H("PlayerRow", player.transform);
             PlayerButton(playerRow.transform, "|<");
-            PlayerButton(playerRow.transform, "▶");
-            PlayerButton(playerRow.transform, ">|");
-            var station = Text(playerRow, "MTO RADIO", 26f, BrightColor);
+            var station = Text(playerRow, "MTO RADIO", 22f, BrightColor);
+            station.alignment = TextAlignmentOptions.Center;
             station.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            PlayerButton(playerRow.transform, ">|");
             var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
             progress.transform.SetParent(player.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
@@ -214,6 +217,7 @@ namespace SpaceTaxi.UI
             var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
             photo.transform.SetParent(row.transform, false);
             var photoImage = photo.GetComponent<Image>();
+            photoImage.preserveAspect = true;
             photoImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.3f);
             if (offer.Passenger.Portrait != null)
                 photoImage.sprite = offer.Passenger.Portrait;
@@ -369,6 +373,7 @@ namespace SpaceTaxi.UI
             var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
             avatar.transform.SetParent(card.transform, false);
             var avatarImage = avatar.GetComponent<Image>();
+            avatarImage.preserveAspect = true;
             if (offer.Passenger.Portrait != null)
             {
                 avatarImage.sprite = offer.Passenger.Portrait;
@@ -395,11 +400,9 @@ namespace SpaceTaxi.UI
             columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
 
             TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, BrightColor);
-            FixedHeight(name.gameObject, 26f);
             TMP_Text route = Text(column,
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
                 + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн", 17f, LabelColor);
-            FixedHeight(route.gameObject, 22f);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             if (!string.IsNullOrEmpty(wishPhrase))
             {
@@ -407,22 +410,22 @@ namespace SpaceTaxi.UI
                 wish.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             }
 
-            // Кнопки в своей колонке — из карточки не вылезают.
+            // Кнопки-иконки в ряд: ✓ принять, ✕ отклонить — компактно, без пустого низа.
             var buttons = new GameObject("Buttons", typeof(RectTransform));
             buttons.transform.SetParent(card.transform, false);
-            var buttonsLayout = buttons.AddComponent<VerticalLayoutGroup>();
-            buttonsLayout.spacing = 4;
+            var buttonsLayout = buttons.AddComponent<HorizontalLayoutGroup>();
+            buttonsLayout.spacing = 6;
             buttonsLayout.childControlWidth = true;
             buttonsLayout.childControlHeight = true;
-            buttonsLayout.childForceExpandWidth = true;
+            buttonsLayout.childForceExpandWidth = false;
             buttonsLayout.childForceExpandHeight = false;
             OrderOffer captured = offer;
-            var accept = Button(buttons.transform, "ПРИНЯТЬ", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 16f);
-            FixedSize(accept, 110f, 36f);
+            var accept = Button(buttons.transform, "✓", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 26f);
+            FixedSize(accept, 44f, 44f);
             accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
-            var decline = Button(buttons.transform, "ОТКЛОНИТЬ",
-                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 14f);
-            FixedSize(decline, 110f, 28f);
+            var decline = Button(buttons.transform, "✕",
+                new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 26f);
+            FixedSize(decline, 44f, 44f);
             decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
 
             return card;
@@ -468,6 +471,7 @@ namespace SpaceTaxi.UI
             sysState2.text = Col("Ближний объект:", name + " (" + dist.ToString("0") + " юн)");
             sysState3.text = heat ? "⚠ жаровая зона" : "";
 
+            econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов";
             abandonButton.gameObject.SetActive(ship.Fuel <= 0f);
             if (cancelButton != null && orders.Active != null)
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
@@ -527,8 +531,8 @@ namespace SpaceTaxi.UI
 
         private GameObject PlayerButton(Transform parent, string glyph)
         {
-            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 30f);
-            FixedSize(go, 52f, 52f);
+            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 20f);
+            FixedSize(go, 34f, 34f);
             return go;
         }
 
