@@ -74,6 +74,14 @@ namespace SpaceTaxi.Physics
         private Vector2 smoothDir;
         private float smoothSpacing;
 
+        private static Vector2 Rotate(Vector2 v, float degrees)
+        {
+            float rad = degrees * Mathf.Deg2Rad;
+            float cos = Mathf.Cos(rad);
+            float sin = Mathf.Sin(rad);
+            return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
+        }
+
         // Направление прогноза: быстро сглаженное к вектору скорости — линия
         // стабильна и не дёргается от доворотов носа; старт — от носа корабля.
         private Vector2 StartVelocity(out Vector2 startPos)
@@ -85,7 +93,8 @@ namespace SpaceTaxi.Physics
             Vector2 target = velocity / Mathf.Max(speed, 0.001f);
             if (smoothDir == Vector2.zero)
                 smoothDir = target;
-            smoothDir = Vector2.Slerp(smoothDir, target, rate).normalized;
+            float turn = Mathf.Clamp(Vector2.SignedAngle(smoothDir, target), -720f * rate, 720f * rate);
+            smoothDir = Rotate(smoothDir, turn).normalized;
 
             float noseAngle = (ship.transform.eulerAngles.z
                 + (controller != null ? controller.SpriteNoseAngle : 0f)) * Mathf.Deg2Rad;
