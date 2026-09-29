@@ -172,13 +172,49 @@ namespace SpaceTaxi.Physics
 
             ship.Body.linearVelocity = velocity;
 
-            if (v > config.MinControlSpeed)
+            UpdateHeading(velocity, v, planet, planetDist);
+        }
+
+        // Ретро-режим посадки: тормозим в кольце — нос против скорости.
+        public bool LandingRetro { get; private set; }
+
+        // Ориентация носа — как в жизни при посадке (Falcon):
+        // 1) обычно — по вектору скорости;
+        // 2) S в посадочном кольце — разворот на 180°: двигателями вперёд;
+        // 3) у поверхности при малой скорости — вертикально, носом от планеты.
+        private void UpdateHeading(Vector2 velocity, float v, Planet planet, float planetDist)
+        {
+            if (v <= config.MinControlSpeed)
+                return;
+
+            bool inLandingRing = planet != null && planetDist < planet.LandingRing;
+            bool finalApproach = inLandingRing
+                && planetDist < planet.Radius + 40f
+                && v < 50f;
+            LandingRetro = inLandingRing && !finalApproach && ship.Fuel > 0f
+                && brakeAction != null && brakeAction.IsPressed();
+
+            float velocityAngle = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg;
+            float targetWorld;
+            if (finalApproach && planet != null)
             {
-                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - spriteNoseAngle;
-                float current = ship.Body.rotation;
-                float delta = Mathf.DeltaAngle(current, target);
-                ship.Body.MoveRotation(current + delta * Mathf.Min(1f, config.HeadingTurnRate * dt));
+                // Вертикаль: нос от центра планеты.
+                Vector2 away = (Vector2)ship.transform.position - (Vector2)planet.transform.position;
+                targetWorld = Mathf.Atan2(away.y, away.x) * Mathf.Rad2Deg;
             }
+            else if (LandingRetro)
+            {
+                targetWorld = velocityAngle + 180f; // двигателями вперёд по движению
+            }
+            else
+            {
+                targetWorld = velocityAngle;
+            }
+
+            float target = targetWorld - spriteNoseAngle;
+            float current = ship.Body.rotation;
+            float delta = Mathf.DeltaAngle(current, target);
+            ship.Body.MoveRotation(current + delta * Mathf.Min(1f, config.HeadingTurnRate * Time.fixedDeltaTime));
         }
 
         private void Update()

@@ -68,12 +68,23 @@ namespace SpaceTaxi.Physics
 
         private Vector2 StartVelocity(out Vector2 startPos)
         {
-            float speed = ship.Body.linearVelocity.magnitude;
+            Vector2 velocity = ship.Body.linearVelocity;
+            float speed = velocity.magnitude;
+
+            // Ретро-режим посадки: нос смотрит против скорости — прогноз
+            // всё равно строим по вектору скорости (куда реально полетим).
+            if (controller != null && controller.LandingRetro && speed > 1f)
+            {
+                Vector2 dir = velocity / speed;
+                startPos = (Vector2)ship.transform.position + dir * noseOffset;
+                return velocity;
+            }
+
             float noseAngle = (ship.transform.eulerAngles.z
                 + (controller != null ? controller.SpriteNoseAngle : 0f)) * Mathf.Deg2Rad;
-            Vector2 dir = new Vector2(Mathf.Cos(noseAngle), Mathf.Sin(noseAngle));
-            startPos = (Vector2)ship.transform.position + dir * noseOffset;
-            return dir * speed;
+            Vector2 noseDir = new Vector2(Mathf.Cos(noseAngle), Mathf.Sin(noseAngle));
+            startPos = (Vector2)ship.transform.position + noseDir * noseOffset;
+            return noseDir * speed;
         }
 
         private void Simulate()
