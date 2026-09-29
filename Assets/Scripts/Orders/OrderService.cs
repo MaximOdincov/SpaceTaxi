@@ -165,6 +165,8 @@ namespace SpaceTaxi.Orders
             };
             offers.Add(offer);
             OffersChanged?.Invoke();
+            Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
+                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
         }
 
         // Полный рандом по планетам уровня (решение 2026-09-27); exclude — не эта.

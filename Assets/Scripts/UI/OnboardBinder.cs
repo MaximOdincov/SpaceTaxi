@@ -195,9 +195,13 @@ namespace SpaceTaxi.UI
 
             TMP_FontAsset font = orderName.font;
             float topY = orderTitle.rectTransform.anchoredPosition.y - 150f;
+            float bottomY = -divAir.rectTransform.anchoredPosition.y + 40f; // не ниже разделителя
+            int maxFit = Mathf.Max(1, (int)((topY + divAir.rectTransform.anchoredPosition.y) / 132f));
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
+                if (index >= maxFit)
+                    break;
                 GameObject card = CreateCard(offer, font);
                 ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, topY - index * 132f);
                 cards.Add(card);
