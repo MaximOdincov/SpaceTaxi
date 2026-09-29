@@ -125,10 +125,12 @@ namespace SpaceTaxi.UI
 
             // Плеер — внизу стека.
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
-            var track = Text(player, "⏮   ▶   ⏭   ТРЕК: «Дальний рейс»", 24f, BrightColor);
-            FixedHeight(track.gameObject, 34f);
-            var sub = Text(player, "музыка смены · MTO radio", 17f, LabelColor);
-            FixedHeight(sub.gameObject, 22f);
+            var playerRow = H("PlayerRow", player.transform);
+            PlayerButton(playerRow.transform, "|<");
+            PlayerButton(playerRow.transform, "▶");
+            PlayerButton(playerRow.transform, ">|");
+            var station = Text(playerRow, "MTO RADIO", 26f, BrightColor);
+            station.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
             progress.transform.SetParent(player.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
@@ -229,7 +231,8 @@ namespace SpaceTaxi.UI
             columnLayout.childForceExpandHeight = false;
             var columnLe = column.AddComponent<LayoutElement>();
             columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 160f;
+            columnLe.minWidth = 100f;
+            columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
 
             TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 24f, BrightColor);
             FixedHeight(name.gameObject, 30f);
@@ -384,7 +387,8 @@ namespace SpaceTaxi.UI
             columnLayout.childForceExpandHeight = false;
             var columnLe = column.AddComponent<LayoutElement>();
             columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 150f;
+            columnLe.minWidth = 100f;
+            columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
 
             TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, BrightColor);
             FixedHeight(name.gameObject, 26f);
@@ -514,6 +518,13 @@ namespace SpaceTaxi.UI
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = true;
             layout.childAlignment = TextAnchor.MiddleLeft;
+            return go;
+        }
+
+        private GameObject PlayerButton(Transform parent, string glyph)
+        {
+            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 30f);
+            FixedSize(go, 52f, 52f);
             return go;
         }
 
