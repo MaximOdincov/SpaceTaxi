@@ -9,66 +9,374 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Бортовой компьютер: живое СОСТОЯНИЕ, текущий заказ, входящие карточки
-    // с кнопками [ПРИНЯТЬ] и кнопка «ОТКЛЮЧИТЬ КОРАБЛЬ» при пустом баке.
-    // Вешается на OnboardComputer, элементы находит по именам из сцены.
+    // Бортовой компьютер: панель строится кодом на автоматических layout-группах
+    // (VerticalLayoutGroup/HorizontalLayoutGroup + LayoutElement). Дети живут
+    // только внутри родителей — ничего не налезает, новые секции добавляются
+    // в стек и всё сдвигается само. Вешается на OnboardComputer.
     public class OnboardBinder : MonoBehaviour
     {
+        private TMP_FontAsset font;
+
         private TMP_Text clock;
         private TMP_Text shipState1, shipState2, shipState3;
-        private TMP_Text sysState2, sysState2Dist, sysState3;
-        private TMP_Text orderTitle, orderName, orderRoute, orderTimer, orderPay;
-        private RectTransform wishFrame;
-        private TMP_Text wishText;
-        private RectTransform clientPhoto;
-        private Image clientPhotoImage;
-        private TMP_Text clientPhotoLabel;
-        private RectTransform divAir;
+        private TMP_Text sysState2, sysState3;
+        private Button abandonButton;
+
+        private RectTransform orderArea;      // контейнер зоны заказа (переключается)
+        private GameObject econSection;
+        private TMP_Text orderPay;
+        private Button cancelButton;
 
         private Ship ship;
         private GravityField gravity;
         private OrderService orders;
         private HullSystem hull;
-        private GameObject abandonButton;
-        private GameObject cancelButton;
-        private RectTransform divPlayer;
         private float nextSlowUpdate;
-        private readonly List<GameObject> cards = new List<GameObject>();
+        private bool bound;
+        private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
         private static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);      // #A8FFCB
         private static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);        // #FFD44D
         private static readonly Color PanelColor = new Color(0.031f, 0.078f, 0.047f, 0.92f);
+        private static readonly Color DangerColor = new Color(1f, 0.478f, 0.361f);
 
         private void Awake()
         {
-            Transform t = transform;
-            clock = t.Find("Clock").GetComponent<TMP_Text>();
-            shipState1 = t.Find("ShipState1").GetComponent<TMP_Text>();
-            shipState2 = t.Find("ShipState2").GetComponent<TMP_Text>();
-            shipState3 = t.Find("ShipState3").GetComponent<TMP_Text>();
-            sysState2 = t.Find("SysState2").GetComponent<TMP_Text>();
-            sysState2Dist = t.Find("SysState2Dist").GetComponent<TMP_Text>();
-            sysState3 = t.Find("SysState3").GetComponent<TMP_Text>();
-            orderTitle = t.Find("OrderTitle").GetComponent<TMP_Text>();
-            orderName = t.Find("OrderName").GetComponent<TMP_Text>();
-            orderRoute = t.Find("OrderRoute").GetComponent<TMP_Text>();
-            orderTimer = t.Find("OrderTimer").GetComponent<TMP_Text>();
-            orderPay = t.Find("OrderPay").GetComponent<TMP_Text>();
-            wishFrame = t.Find("WishFrame").GetComponent<RectTransform>();
-            wishText = wishFrame.Find("Text").GetComponent<TMP_Text>();
-            clientPhoto = t.Find("ClientPhoto").GetComponent<RectTransform>();
-            clientPhotoImage = t.Find("ClientPhoto/Bg").GetComponent<Image>();
-            clientPhotoLabel = t.Find("ClientPhoto/Label").GetComponent<TMP_Text>();
-            divAir = t.Find("DivAir").GetComponent<RectTransform>();
-            var divPlayerTransform = t.Find("DivPlayer");
-            if (divPlayerTransform != null)
-                divPlayer = (RectTransform)divPlayerTransform;
+            // Шрифт забираем у старого мокапа до сноса.
+            var oldTitle = transform.Find("Title");
+            font = oldTitle != null ? oldTitle.GetComponent<TMP_Text>().font : TMP_Settings.defaultFontAsset;
+
+            // Мокап сносим: панель пересобираем на layout-ах.
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                string n = transform.GetChild(i).name;
+                if (n != "Frame" && n != "Background")
+                    Destroy(transform.GetChild(i).gameObject);
+            }
+
+            BuildSkeleton();
         }
+
+        // --- Каркас панели: вертикальный стек секций ---
+
+        private void BuildSkeleton()
+        {
+            var root = new GameObject("Stack", typeof(RectTransform));
+            root.transform.SetParent(transform, false);
+            Stretch((RectTransform)root.transform);
+            var rootLayout = root.AddComponent<VerticalLayoutGroup>();
+            rootLayout.padding = new RectOffset(24, 24, 20, 16);
+            rootLayout.spacing = 10;
+            rootLayout.childControlWidth = true;
+            rootLayout.childControlHeight = true;
+            rootLayout.childForceExpandWidth = true;
+            rootLayout.childForceExpandHeight = false;
+            root.AddComponent<LayoutElement>().flexibleHeight = 0f;
+
+            // Шапка: связь + название + часы.
+            var header = H("Header", root.transform);
+            var dot = new GameObject("LinkDot", typeof(RectTransform), typeof(Image));
+            dot.transform.SetParent(header.transform, false);
+            dot.GetComponent<Image>().color = LabelColor;
+            FixedSize(dot, 14f, 14f);
+            var title = Text(header, "БОРТОВОЙ КОМПЬЮТЕР", 24f, BrightColor);
+            Flexible(title.gameObject);
+            clock = Text(header, "14:02", 30f, BrightColor);
+            FixedWidth(clock.gameObject, 96f);
+
+            // Секция состояния.
+            var state = Section(root.transform, "// СОСТОЯНИЕ", "StateSection");
+            shipState1 = Row(state, "—");
+            shipState2 = Row(state, "—");
+            shipState3 = Row(state, "—");
+            sysState2 = Row(state, "—");
+            sysState3 = Row(state, "");
+            Abandon(state.transform);
+
+            // Секция заказа: контейнер переключается (текущий / входящие).
+            var orderSection = Section(root.transform, "// ЗАКАЗ", "OrderSection");
+            var orderSectionLayout = orderSection.AddComponent<LayoutElement>();
+            orderSectionLayout.minHeight = 280f;
+            orderSectionLayout.flexibleHeight = 1f;
+            var orderContainer = new GameObject("OrderArea", typeof(RectTransform));
+            orderContainer.transform.SetParent(orderSection.transform, false);
+            orderArea = (RectTransform)orderContainer.transform;
+            orderArea.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            orderPay = Text(orderSection, "", 19f, LabelColor);
+            FixedHeight(orderPay.gameObject, 24f);
+
+            // Экономика (видна не всегда).
+            econSection = Section(root.transform, "// СМЕНА", "EconSection");
+            var econRow = H("EconRow", econSection.transform);
+            var money = Text(econRow, "0 доставок", 22f, BrightColor);
+            FixedHeight(money.gameObject, 28f);
+            var rating = Text(econRow, "0 провалов", 22f, LabelColor);
+            FixedHeight(rating.gameObject, 28f);
+
+            // Плеер — внизу стека.
+            var player = Section(root.transform, "// ЭФИР", "PlayerSection");
+            var track = Text(player, "⏮  ▶  ⏭   ТРЕК: «Дальний рейс»", 17f, LabelColor);
+            FixedHeight(track.gameObject, 24f);
+            var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
+            progress.transform.SetParent(player.transform, false);
+            progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
+            FixedHeight(progress, 4f);
+        }
+
+        private GameObject Section(Transform parent, string title, string name)
+        {
+            var section = new GameObject(name, typeof(RectTransform));
+            section.transform.SetParent(parent, false);
+            var layout = section.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 4;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            section.AddComponent<LayoutElement>().minHeight = 40f;
+
+            var heading = Text(section, title, 21f, LabelColor);
+            FixedHeight(heading.gameObject, 26f);
+            var line = new GameObject("Line", typeof(RectTransform), typeof(Image));
+            line.transform.SetParent(section.transform, false);
+            line.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.4f);
+            FixedHeight(line, 2f);
+            return section;
+        }
+
+        private void Abandon(Transform parent)
+        {
+            var go = Button(parent, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
+                new Color(0.05f, 0.02f, 0.03f), 20f);
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = 38f;
+            le.flexibleWidth = 1f;
+            abandonButton = go.GetComponent<Button>();
+            abandonButton.onClick.AddListener(() => hull.Abandon("КОРАБЛЬ ОТКЛЮЧЁН"));
+            go.SetActive(false);
+        }
+
+        private TMP_Text Row(GameObject parent, string content)
+        {
+            var text = Text(parent, content, 20f, BrightColor);
+            FixedHeight(text.gameObject, 26f);
+            return text;
+        }
+
+        // --- Зона заказа: активный или список входящих ---
+
+        private void RefreshOrder()
+        {
+            foreach (GameObject child in orderAreaChildren)
+                Destroy(child);
+            orderAreaChildren.Clear();
+
+            bool hasActive = orders.Active != null;
+            orderPay.gameObject.SetActive(hasActive);
+            econSection.SetActive(hasActive);
+            cancelButton = null;
+
+            if (hasActive)
+                BuildActiveOrder();
+            else
+                BuildIncoming();
+        }
+
+        private void BuildActiveOrder()
+        {
+            OrderOffer offer = orders.Active;
+
+            var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));
+            row.transform.SetParent(orderArea, false);
+            orderAreaChildren.Add(row);
+            row.GetComponent<Image>().color = PanelColor;
+            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.padding = new RectOffset(10, 10, 10, 10);
+            rowLayout.spacing = 10;
+            rowLayout.childControlWidth = true;
+            rowLayout.childControlHeight = true;
+            rowLayout.childForceExpandWidth = false;
+            rowLayout.childForceExpandHeight = true;
+
+            // Фото пассажира в рамке.
+            var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
+            photo.transform.SetParent(row.transform, false);
+            var photoImage = photo.GetComponent<Image>();
+            photoImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.3f);
+            if (offer.Passenger.Portrait != null)
+                photoImage.sprite = offer.Passenger.Portrait;
+            FixedSize(photo, 96f, 96f);
+
+            // Тексты заказа.
+            var column = new GameObject("Info", typeof(RectTransform));
+            column.transform.SetParent(row.transform, false);
+            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
+            columnLayout.spacing = 2;
+            columnLayout.childControlWidth = true;
+            columnLayout.childControlHeight = true;
+            columnLayout.childForceExpandWidth = true;
+            columnLayout.childForceExpandHeight = false;
+            var columnLe = column.AddComponent<LayoutElement>();
+            columnLe.flexibleWidth = 1f;
+            columnLe.minWidth = 160f;
+
+            TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 24f, BrightColor);
+            FixedHeight(name.gameObject, 30f);
+            TMP_Text route = Text(column,
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper(),
+                22f, TaxiColor);
+            FixedHeight(route.gameObject, 28f);
+            var status = Text(column, "...", 19f, LabelColor);
+            FixedHeight(status.gameObject, 24f);
+            status.name = "OrderStatus";
+
+            string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            if (!string.IsNullOrEmpty(wish))
+            {
+                var wishText = Text(column, "«" + wish + "»", 17f, LabelColor);
+                wishText.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            }
+
+            // Отказ: без пассажира — всегда, с пассажиром — только на планете.
+            var cancel = Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
+                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 17f);
+            var cancelLe = cancel.AddComponent<LayoutElement>();
+            cancelLe.minHeight = 32f;
+            cancelLe.flexibleWidth = 1f;
+            cancelButton = cancel.GetComponent<Button>();
+            cancelButton.onClick.AddListener(() => orders.CancelActive());
+            orderAreaChildren.Add(cancel);
+
+            orderPay.text = Col("Счёт:", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
+        }
+
+        private void BuildIncoming()
+        {
+            // Скролл: viewport + content на VerticalLayoutGroup + ContentSizeFitter.
+            var scrollGo = new GameObject("IncomingScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
+            scrollGo.transform.SetParent(orderArea, false);
+            orderAreaChildren.Add(scrollGo);
+            scrollGo.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+            var scroll = scrollGo.GetComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.scrollSensitivity = 30f;
+            scrollGo.GetComponent<Image>().color = new Color(0, 0, 0, 0);
+
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            Stretch((RectTransform)viewportGo.transform);
+            viewportGo.GetComponent<Image>().color = Color.white;
+            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
+            scroll.viewport = (RectTransform)viewportGo.transform;
+
+            var contentGo = new GameObject("Content", typeof(RectTransform));
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            var content = (RectTransform)contentGo.transform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 10;
+            contentLayout.childControlWidth = true;
+            contentLayout.childControlHeight = true;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            var fitter = contentGo.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.content = content;
+
+            foreach (OrderOffer offer in orders.Offers)
+            {
+                GameObject card = BuildCard(offer);
+                card.transform.SetParent(content, false);
+            }
+        }
+
+        // Карточка: [аватар] [имя/маршрут/условие] [кнопки] — всё внутри контейнеров.
+        private GameObject BuildCard(OrderOffer offer)
+        {
+            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
+            var layout = card.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.spacing = 10;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+            card.GetComponent<Image>().color = PanelColor;
+            card.AddComponent<LayoutElement>().minHeight = 108f;
+
+            // Аватар в рамке.
+            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
+            avatar.transform.SetParent(card.transform, false);
+            var avatarImage = avatar.GetComponent<Image>();
+            if (offer.Passenger.Portrait != null)
+            {
+                avatarImage.sprite = offer.Passenger.Portrait;
+                avatarImage.color = offer.Passenger.PortraitTint;
+            }
+            else
+            {
+                avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+            }
+            FixedSize(avatar, 64f, 64f);
+
+            // Тексты.
+            var column = new GameObject("Info", typeof(RectTransform));
+            column.transform.SetParent(card.transform, false);
+            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
+            columnLayout.spacing = 2;
+            columnLayout.childControlWidth = true;
+            columnLayout.childControlHeight = true;
+            columnLayout.childForceExpandWidth = true;
+            columnLayout.childForceExpandHeight = false;
+            var columnLe = column.AddComponent<LayoutElement>();
+            columnLe.flexibleWidth = 1f;
+            columnLe.minWidth = 150f;
+
+            TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, BrightColor);
+            FixedHeight(name.gameObject, 26f);
+            TMP_Text route = Text(column,
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн", 17f, LabelColor);
+            FixedHeight(route.gameObject, 22f);
+            string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            if (!string.IsNullOrEmpty(wishPhrase))
+            {
+                var wish = Text(column, "доп.: «" + wishPhrase + "»", 15f, LabelColor);
+                wish.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            }
+
+            // Кнопки в своей колонке — из карточки не вылезают.
+            var buttons = new GameObject("Buttons", typeof(RectTransform));
+            buttons.transform.SetParent(card.transform, false);
+            var buttonsLayout = buttons.AddComponent<VerticalLayoutGroup>();
+            buttonsLayout.spacing = 4;
+            buttonsLayout.childControlWidth = true;
+            buttonsLayout.childControlHeight = true;
+            buttonsLayout.childForceExpandWidth = true;
+            buttonsLayout.childForceExpandHeight = false;
+            OrderOffer captured = offer;
+            var accept = Button(buttons.transform, "ПРИНЯТЬ", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 16f);
+            FixedSize(accept, 110f, 36f);
+            accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            var decline = Button(buttons.transform, "ОТКЛОНИТЬ",
+                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 14f);
+            FixedSize(decline, 110f, 28f);
+            decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
+
+            return card;
+        }
+
+        // --- Живые данные ---
 
         private void Update()
         {
-            if (orders == null)
+            if (!bound)
             {
                 var session = FindAnyObjectByType<GameSession>();
                 ship = FindAnyObjectByType<Ship>();
@@ -77,18 +385,10 @@ namespace SpaceTaxi.UI
                     return;
                 orders = session.Orders;
                 hull = ship.GetComponent<HullSystem>();
-                orders.OffersChanged += RebuildIncoming;
-                // Смена активного заказа обновляет и карточки (после сдачи/отмены
-                // входящие должны вернуться сразу, а не со следующим предложением).
-                orders.ActiveOrderChanged += () =>
-                {
-                    RefreshOrder();
-                    RebuildIncoming();
-                };
-                RebuildIncoming();
+                orders.OffersChanged += RefreshOrder;
+                orders.ActiveOrderChanged += RefreshOrder;
                 RefreshOrder();
-                CreateAbandonButton();
-                CreateCancelButton();
+                bound = true;
             }
 
             if (Time.unscaledTime >= nextSlowUpdate)
@@ -98,44 +398,30 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Медленные обновления: часы, статусы, ближайший объект.
         private void SlowUpdate()
         {
-            int seconds = (int)Time.time; // время смены с 14:02
-            int minutes = 14 * 60 + 2 + seconds / 3; // 1 реальная секунда = 3 игровых
+            int minutes = 14 * 60 + 2 + (int)Time.time / 3;
             clock.text = minutes / 60 + ":" + (minutes % 60).ToString("00");
 
-            shipState1.text = Col("Целостность корпуса:", Mathf.RoundToInt(ship.HpFraction * 100f) + "%");
-            shipState2.text = Col("Запас топлива:", Mathf.RoundToInt(ship.FuelFraction * 100f) + "%");
-
-            string status = ship.State == ShipState.Landed ? "посадка"
-                : ship.Fuel <= 0f ? "дрейф без топлива"
-                : "полёт";
-            shipState3.text = Col("Статус:", status);
+            shipState1.text = Col("Корпус:", Mathf.RoundToInt(ship.HpFraction * 100f) + "%");
+            shipState2.text = Col("Топливо:", Mathf.RoundToInt(ship.FuelFraction * 100f) + "%");
+            shipState3.text = Col("Статус:", ship.State == ShipState.Landed ? "посадка"
+                : ship.Fuel <= 0f ? "дрейф без топлива" : "полёт");
 
             NearestBody(out string name, out float dist, out bool heat);
-            sysState2.text = Col("Ближайший объект:", name);
-            sysState2Dist.text = "(" + dist.ToString("0") + " юн)";
+            sysState2.text = Col("Ближний объект:", name + " (" + dist.ToString("0") + " юн)");
             sysState3.text = heat ? "⚠ жаровая зона" : "";
 
-            if (abandonButton != null)
-                abandonButton.SetActive(ship.Fuel <= 0f);
-            UpdateCancelButton();
-        }
+            abandonButton.gameObject.SetActive(ship.Fuel <= 0f);
+            if (cancelButton != null && orders.Active != null)
+                cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
+                    || ship.State == ShipState.Landed);
 
-        // Отказ от активного заказа: без пассажира — всегда, с пассажиром — только на планете.
-        private void UpdateCancelButton()
-        {
-            if (cancelButton == null)
-                return;
-            bool visible = orders.Active != null
-                && (orders.Active.State == OrderState.Active || ship.State == ShipState.Landed);
-            cancelButton.SetActive(visible);
-        }
-
-        private static string Col(string label, string value)
-        {
-            return $"<color=#{ColorUtility.ToHtmlStringRGB(LabelColor)}>{label}:</color> {value}";
+            var statusText = FindText(orderArea, "OrderStatus");
+            if (orders.Active != null && statusText != null)
+                statusText.text = orders.Active.State == OrderState.Aboard
+                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper())
+                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper());
         }
 
         private void NearestBody(out string name, out float dist, out bool heat)
@@ -159,243 +445,92 @@ namespace SpaceTaxi.UI
             dist = Mathf.Max(0f, best);
         }
 
-        // --- Активный заказ / входящие ---
+        // --- Помощники построения ---
 
-        private void RefreshOrder()
+        private static string Col(string label, string value)
         {
-            bool hasActive = orders.Active != null;
-            orderTitle.text = hasActive ? "// ТЕКУЩИЙ ЗАКАЗ" : "// ВХОДЯЩИЕ ЗАКАЗЫ";
-
-            orderName.gameObject.SetActive(hasActive);
-            orderRoute.gameObject.SetActive(hasActive);
-            wishFrame.gameObject.SetActive(hasActive);
-            orderTimer.gameObject.SetActive(hasActive);
-            orderPay.gameObject.SetActive(hasActive);
-            clientPhoto.gameObject.SetActive(hasActive);
-
-            if (!hasActive)
-            {
-                orderPay.gameObject.SetActive(true); // счётчик под заголовком входящих
-                orderPay.text = Col("Доставлено:", orders.Deliveries + " · " + Col("Провалы:", orders.Failures.ToString()));
-                return;
-            }
-
-            OrderOffer offer = orders.Active;
-            orderName.text = offer.Passenger.DisplayName;
-            orderRoute.text = orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper();
-            string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            wishText.text = string.IsNullOrEmpty(wish) ? "" : "Сообщение от клиента: «" + wish + "»";
-            orderTimer.text = Col("Статус:", offer.State == OrderState.Aboard
-                ? "пассажир НА БОРТУ → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                : "пассажир ОЖИДАЕТ на " + orders.PlanetName(offer.PickupIndex).ToUpper());
-            orderPay.text = Col("Счёт:", orders.Deliveries + " доставлено · " + orders.Failures + " провалов");
-
-            // Портрет: спрайт профиля с оттенком или заглушка «ФОТО».
-            if (offer.Passenger.Portrait != null)
-            {
-                clientPhotoImage.sprite = offer.Passenger.Portrait;
-                clientPhotoImage.color = offer.Passenger.PortraitTint;
-                clientPhotoLabel.text = "";
-            }
-            else
-            {
-                clientPhotoImage.sprite = null;
-                clientPhotoImage.color = new Color(0.03f, 0.07f, 0.05f, 1f);
-                clientPhotoLabel.text = "ФОТО";
-            }
+            return $"<color=#{ColorUtility.ToHtmlStringRGB(LabelColor)}>{label}:</color> {value}";
         }
 
-        private void RebuildIncoming()
+        private GameObject H(string name, Transform parent)
         {
-            foreach (GameObject card in cards)
-                Destroy(card);
-            cards.Clear();
-
-            bool showList = orders.Active == null;
-
-            // Список входящих занимает зону экономики — прячем её на это время.
-            SetSectionVisible("Money", !showList);
-            SetSectionVisible("Rating", !showList);
-            if (!showList)
-                return; // активный заказ — карточки не показываем
-
-            TMP_FontAsset font = orderName.font;
-            // Верх списка — сразу под заголовком заказа (top-координаты панели).
-            float listTopY = orderTitle.rectTransform.anchoredPosition.y - 52f;
-            int index = 0;
-            foreach (OrderOffer offer in orders.Offers)
-            {
-                if (index >= 3)
-                    break; // в зоне помещается три карточки, остальные ждут
-                GameObject card = CreateCard(offer, font);
-                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, listTopY - index * 118f);
-                cards.Add(card);
-                index++;
-            }
-        }
-
-        private void SetSectionVisible(string name, bool visible)
-        {
-            Transform section = transform.Find(name);
-            if (section != null)
-                section.gameObject.SetActive(visible);
-        }
-
-        // Карточка входящего заказа: имя/архетип, маршрут, пожелание, [ПРИНЯТЬ].
-        private GameObject CreateCard(OrderOffer offer, TMP_FontAsset font)
-        {
-            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
-            card.transform.SetParent(transform, false); // прямо в панели
-            var rect = (RectTransform)card.transform;
-            // Якоря сверху контента: карточки ложатся вниз столбцом.
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(432f, 112f);
-            card.GetComponent<Image>().color = PanelColor;
-
-            // Мини-аватар в рамке.
-            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
-            avatar.transform.SetParent(card.transform, false);
-            var avatarRect = (RectTransform)avatar.transform;
-            avatarRect.sizeDelta = new Vector2(64f, 64f);
-            avatarRect.anchorMin = new Vector2(0f, 1f);
-            avatarRect.anchorMax = new Vector2(0f, 1f);
-            avatarRect.anchoredPosition = new Vector2(40f, -24f);
-            var avatarImage = avatar.GetComponent<Image>();
-            avatarImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.35f); // рамка
-            if (offer.Passenger.Portrait != null)
-            {
-                var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
-                portraitGo.transform.SetParent(avatar.transform, false);
-                var portrait = (RectTransform)portraitGo.transform;
-                portrait.anchorMin = new Vector2(0.5f, 0.5f);
-                portrait.anchorMax = new Vector2(0.5f, 0.5f);
-                portrait.sizeDelta = new Vector2(56f, 56f);
-                var portraitImage = portraitGo.GetComponent<Image>();
-                portraitImage.sprite = offer.Passenger.Portrait;
-                portraitImage.color = offer.Passenger.PortraitTint;
-            }
-            else
-            {
-                TMP_Text avatarText = MakeText(avatar.transform, font, 16f, LabelColor);
-                avatarText.text = offer.Passenger.Archetype.Length > 0
-                    ? offer.Passenger.Archetype.Substring(0, 1) : "?";
-                avatarText.alignment = TextAlignmentOptions.Center;
-                Place(avatarText.rectTransform, Vector2.zero, Vector2.zero, true);
-            }
-
-            TMP_Text name = MakeText(card.transform, font, 22f, BrightColor);
-            name.text = offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype;
-            Place(name.rectTransform, new Vector2(-206f, -6f), new Vector2(-124f, -34f));
-
-            TMP_Text route = MakeText(card.transform, font, 18f, LabelColor);
-            route.text = orders.PlanetName(offer.PickupIndex).ToUpper() + " → "
-                + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн";
-            Place(route.rectTransform, new Vector2(-206f, -38f), new Vector2(-124f, -64f));
-
-            TMP_Text wish = MakeText(card.transform, font, 15f, LabelColor);
-            string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            wish.text = string.IsNullOrEmpty(wishPhrase) ? "" : "доп. условие: «" + wishPhrase + "»";
-            Place(wish.rectTransform, new Vector2(-206f, -66f), new Vector2(-124f, -106f));
-
-            // Кнопки [ПРИНЯТЬ] / [ОТКЛОНИТЬ] — внутри карточки, правый край.
-            OrderOffer captured = offer;
-            MakeCardButton(card.transform, font, "Accept", "ПРИНЯТЬ", TaxiColor,
-                new Color(0.043f, 0.055f, 0.1f), new Vector2(104f, 38f), new Vector2(-60f, -28f),
-                () => orders.Accept(captured));
-            MakeCardButton(card.transform, font, "Decline", "ОТКЛОНИТЬ",
-                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor,
-                new Vector2(104f, 30f), new Vector2(-60f, -76f),
-                () => orders.Decline(captured));
-            return card;
-        }
-
-        private void MakeCardButton(Transform parent, TMP_FontAsset font, string name, string label,
-            Color background, Color textColor, Vector2 size, Vector2 position, UnityEngine.Events.UnityAction action)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
-            var rect = (RectTransform)go.transform;
-            rect.sizeDelta = size;
-            rect.anchorMin = new Vector2(1f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.anchoredPosition = position;
-            go.GetComponent<Image>().color = background;
-
-            TMP_Text text = MakeText(go.transform, font, 15f, textColor);
-            text.text = label;
-            text.alignment = TextAlignmentOptions.Center;
-            Place(text.rectTransform, Vector2.zero, Vector2.zero, true);
-            go.GetComponent<Button>().onClick.AddListener(action);
+            var layout = go.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            return go;
         }
 
-        private void CreateAbandonButton()
-        {
-            abandonButton = new GameObject("AbandonButton", typeof(RectTransform), typeof(Image), typeof(Button));
-            abandonButton.transform.SetParent(transform, false);
-            var rect = (RectTransform)abandonButton.transform;
-            rect.sizeDelta = new Vector2(432f, 40f);
-            rect.anchoredPosition = new Vector2(0f, sysState3.rectTransform.anchoredPosition.y - 36f);
-            abandonButton.GetComponent<Image>().color = new Color(1f, 0.478f, 0.361f, 0.9f);
-
-            TMP_Text text = MakeText(abandonButton.transform, orderName.font, 20f, new Color(0.05f, 0.02f, 0.03f));
-            text.text = "ОТКЛЮЧИТЬ КОРАБЛЬ";
-            text.alignment = TextAlignmentOptions.Center;
-            Place(text.rectTransform, Vector2.zero, Vector2.zero, true);
-
-            abandonButton.GetComponent<Button>().onClick.AddListener(() => hull.Abandon("КОРАБЛЬ ОТКЛЮЧЁН"));
-            abandonButton.SetActive(false);
-        }
-
-        private static TMP_Text MakeText(Transform parent, TMP_FontAsset font, float size, Color color)
+        private TMP_Text Text(GameObject parent, string content, float size, Color color)
         {
             var go = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
+            go.transform.SetParent(parent.transform, false);
             var text = go.GetComponent<TextMeshProUGUI>();
             text.font = font;
             text.fontSize = size;
             text.color = color;
+            text.text = content;
             text.raycastTarget = false;
             return text;
         }
 
-        private static void Place(RectTransform rect, Vector2 min, Vector2 max, bool stretch = false)
+        private GameObject Button(Transform parent, string label, Color background, Color textColor, float size)
         {
-            if (stretch)
-            {
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = Vector2.one;
-                rect.offsetMin = Vector2.zero;
-                rect.offsetMax = Vector2.zero;
-                return;
-            }
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.offsetMin = min;
-            rect.offsetMax = max;
+            var go = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<Image>().color = background;
+            var text = Text(go, label, size, textColor);
+            Stretch(text.rectTransform);
+            text.alignment = TextAlignmentOptions.Center;
+            text.raycastTarget = true;
+            return go;
         }
 
-        // Отказ от активного заказа (под его полями).
-        private void CreateCancelButton()
+        private static void FixedSize(GameObject go, float width, float height)
         {
-            cancelButton = new GameObject("CancelButton", typeof(RectTransform), typeof(Image), typeof(Button));
-            cancelButton.transform.SetParent(transform, false);
-            var rect = (RectTransform)cancelButton.transform;
-            rect.sizeDelta = new Vector2(432f, 36f);
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, orderPay.rectTransform.anchoredPosition.y - 36f);
-            cancelButton.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f);
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = width;
+            le.minHeight = height;
+            le.preferredWidth = width;
+            le.preferredHeight = height;
+        }
 
-            TMP_Text text = MakeText(cancelButton.transform, orderName.font, 17f, LabelColor);
-            text.text = "ОТКАЗАТЬСЯ ОТ ЗАКАЗА";
-            text.alignment = TextAlignmentOptions.Center;
-            Place(text.rectTransform, Vector2.zero, Vector2.zero, true);
-            cancelButton.GetComponent<Button>().onClick.AddListener(() => orders.CancelActive());
-            cancelButton.SetActive(false);
+        private static void FixedHeight(GameObject go, float height)
+        {
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = height;
+            le.preferredHeight = height;
+        }
+
+        private static void FixedWidth(GameObject go, float width)
+        {
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = width;
+            le.preferredWidth = width;
+        }
+
+        private static void Flexible(GameObject go)
+        {
+            go.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        private static TMP_Text FindText(RectTransform parent, string name)
+        {
+            var found = parent.Find(name);
+            return found != null ? found.GetComponent<TMP_Text>() : null;
         }
     }
 }
