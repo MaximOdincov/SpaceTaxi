@@ -195,8 +195,7 @@ namespace SpaceTaxi.UI
 
             TMP_FontAsset font = orderName.font;
             float topY = orderTitle.rectTransform.anchoredPosition.y - 150f;
-            float bottomY = -divAir.rectTransform.anchoredPosition.y + 40f; // не ниже разделителя
-            int maxFit = Mathf.Max(1, (int)((topY + divAir.rectTransform.anchoredPosition.y) / 132f));
+            int maxFit = Mathf.Max(1, (int)((topY + divAir.anchoredPosition.y) / 132f));
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
