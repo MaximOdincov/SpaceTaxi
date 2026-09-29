@@ -80,16 +80,30 @@ namespace SpaceTaxi.UI
             root.AddComponent<LayoutElement>().flexibleHeight = 0f;
 
             // Шапка: связь + название + часы.
-            var header = H("Header", root.transform);
+            var headerWrap = new GameObject("Header", typeof(RectTransform));
+            headerWrap.transform.SetParent(root.transform, false);
+            var wrapLayout = headerWrap.AddComponent<VerticalLayoutGroup>();
+            wrapLayout.spacing = 2;
+            wrapLayout.childControlWidth = true;
+            wrapLayout.childControlHeight = true;
+            wrapLayout.childForceExpandWidth = true;
+            wrapLayout.childForceExpandHeight = false;
+            var header = H("TitleRow", headerWrap.transform);
+            header.AddComponent<LayoutElement>().minHeight = 34f;
             var dot = Text(header, "<voffset=0.35em>●</voffset>", 18f, LabelColor);
             dot.alignment = TextAlignmentOptions.Left;
             FixedWidth(dot.gameObject, 24f);
             var title = Text(header, "БОРТОВОЙ КОМПЬЮТЕР", 24f, BrightColor);
             Flexible(title.gameObject);
-            clock = Text(header, "14:02", 30f, BrightColor);
-            FixedWidth(clock.gameObject, 96f);
-            var money = IconStat(header.transform, cashIcon, out moneyValue);
-            var rating = IconStat(header.transform, ratingIcon, out ratingValue);
+            clock = Text(header, "14:02", 28f, BrightColor);
+            FixedWidth(clock.gameObject, 92f);
+
+            // Второй ряд: деньги и рейтинг справа — не мешают заголовку и часам.
+            var statsRow = H("StatsRow", headerWrap.transform);
+            var spacer = Text(statsRow, "", 18f, LabelColor);
+            spacer.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            var money = IconStat(statsRow.transform, cashIcon, out moneyValue);
+            var rating = IconStat(statsRow.transform, ratingIcon, out ratingValue);
 
             // Секция состояния.
             var state = Section(root.transform, "// СОСТОЯНИЕ", "StateSection");
@@ -573,8 +587,8 @@ namespace SpaceTaxi.UI
 
         private GameObject PlayerButton(Transform parent, string glyph)
         {
-            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 20f);
-            FixedSize(go, 34f, 34f);
+            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 15f);
+            FixedSize(go, 26f, 26f);
             return go;
         }
 
