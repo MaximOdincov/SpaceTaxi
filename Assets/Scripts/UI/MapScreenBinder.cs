@@ -96,7 +96,7 @@ namespace SpaceTaxi.UI
             if (targetGlow == null)
                 targetGlow = CreateCircle("TargetGlow", bodySize * 1.4f,
                     new Color(1f, 0.83f, 0.3f, 0.18f));
-            targetGlow.SetAsFirstSibling(); // позади тел — ободок вокруг планеты
+            targetGlow.SetAsLastSibling(); // поверх тел с малой альфой — иначе скрыт под фоном панели
 
             targetGlow.gameObject.SetActive(true);
             targetGlow.anchoredPosition = WorldToMap(body.Position);

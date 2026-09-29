@@ -30,7 +30,9 @@ namespace SpaceTaxi.UI
         private OrderService orders;
         private HullSystem hull;
         private GameObject abandonButton;
-        private RectTransform incomingRoot;
+        private GameObject cancelButton;
+        private RectTransform incomingContent;
+        private RectTransform divPlayer;
         private float nextSlowUpdate;
         private readonly List<GameObject> cards = new List<GameObject>();
 
@@ -60,6 +62,9 @@ namespace SpaceTaxi.UI
             clientPhotoImage = t.Find("ClientPhoto/Bg").GetComponent<Image>();
             clientPhotoLabel = t.Find("ClientPhoto/Label").GetComponent<TMP_Text>();
             divAir = t.Find("DivAir").GetComponent<RectTransform>();
+            var divPlayerTransform = t.Find("DivPlayer");
+            if (divPlayerTransform != null)
+                divPlayer = (RectTransform)divPlayerTransform;
         }
 
         private void Update()
@@ -74,10 +79,17 @@ namespace SpaceTaxi.UI
                 orders = session.Orders;
                 hull = ship.GetComponent<HullSystem>();
                 orders.OffersChanged += RebuildIncoming;
-                orders.ActiveOrderChanged += RefreshOrder;
+                // Смена активного заказа обновляет и карточки (после сдачи/отмены
+                // входящие должны вернуться сразу, а не со следующим предложением).
+                orders.ActiveOrderChanged += () =>
+                {
+                    RefreshOrder();
+                    RebuildIncoming();
+                };
                 RebuildIncoming();
                 RefreshOrder();
                 CreateAbandonButton();
+                CreateCancelButton();
             }
 
             if (Time.unscaledTime >= nextSlowUpdate)
@@ -109,6 +121,17 @@ namespace SpaceTaxi.UI
 
             if (abandonButton != null)
                 abandonButton.SetActive(ship.Fuel <= 0f);
+            UpdateCancelButton();
+        }
+
+        // Отказ от активного заказа: без пассажира — всегда, с пассажиром — только на планете.
+        private void UpdateCancelButton()
+        {
+            if (cancelButton == null)
+                return;
+            bool visible = orders.Active != null
+                && (orders.Active.State == OrderState.Active || ship.State == ShipState.Landed);
+            cancelButton.SetActive(visible);
         }
 
         private static string Col(string label, string value)
@@ -188,83 +211,158 @@ namespace SpaceTaxi.UI
             foreach (GameObject card in cards)
                 Destroy(card);
             cards.Clear();
-            if (incomingRoot == null)
+            if (incomingContent == null)
                 CreateIncomingRoot();
             if (orders.Active != null)
+            {
+                incomingContent.parent.parent.gameObject.SetActive(false); // скрыть скролл
                 return; // активный заказ — карточки не показываем
+            }
+            incomingContent.parent.parent.gameObject.SetActive(true);
 
             TMP_FontAsset font = orderName.font;
-            // Зона карточек: от заголовка вниз до разделителя (координаты top-якорные).
-            float topY = orderTitle.rectTransform.anchoredPosition.y - 56f;
-            float available = topY - divAir.anchoredPosition.y; // оба отрицательные, сверху вниз
-            int maxFit = Mathf.Max(1, (int)(available / 114f));
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
-                if (index >= maxFit)
-                    break;
                 GameObject card = CreateCard(offer, font);
-                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, topY - index * 114f);
+                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, -index * 118f);
                 cards.Add(card);
                 index++;
             }
+            // Контент выше окна — скроллим; окно — в размер зоны.
+            incomingContent.sizeDelta = new Vector2(0f, Mathf.Max(incomingContent.parent.GetComponent<RectTransform>().rect.height, index * 118f));
         }
 
+        // Скролл входящих: от заголовка заказа до разделителя плеера.
         private void CreateIncomingRoot()
         {
-            incomingRoot = new GameObject("Incoming", typeof(RectTransform)).GetComponent<RectTransform>();
-            incomingRoot.SetParent(transform, false);
-            // Растянуть на всю панель — дети с top-якорями считают от её верха.
-            incomingRoot.anchorMin = Vector2.zero;
-            incomingRoot.anchorMax = Vector2.one;
-            incomingRoot.offsetMin = Vector2.zero;
-            incomingRoot.offsetMax = Vector2.zero;
+            var root = new GameObject("IncomingScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
+            root.transform.SetParent(transform, false);
+            var rootRect = (RectTransform)root.transform;
+            float topY = orderTitle.rectTransform.anchoredPosition.y - 52f;
+            float bottomY = (divPlayer != null ? divPlayer.anchoredPosition.y : divAir.anchoredPosition.y) + 14f;
+            rootRect.anchorMin = new Vector2(0.5f, 1f);
+            rootRect.anchorMax = new Vector2(0.5f, 1f);
+            rootRect.pivot = new Vector2(0.5f, 1f);
+            rootRect.sizeDelta = new Vector2(448f, topY - bottomY);
+            rootRect.anchoredPosition = new Vector2(0f, bottomY);
+            root.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f); // фон не нужен
+
+            var scroll = root.GetComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 30f;
+
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewportGo.transform.SetParent(root.transform, false);
+            var viewport = (RectTransform)viewportGo.transform;
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = Vector2.zero;
+            viewport.offsetMax = Vector2.zero;
+            viewportGo.GetComponent<Image>().color = Color.white;
+            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
+            scroll.viewport = viewport;
+
+            var contentGo = new GameObject("Content", typeof(RectTransform));
+            contentGo.transform.SetParent(viewport, false);
+            incomingContent = (RectTransform)contentGo.transform;
+            incomingContent.anchorMin = new Vector2(0f, 1f);
+            incomingContent.anchorMax = new Vector2(1f, 1f);
+            incomingContent.pivot = new Vector2(0.5f, 1f);
+            incomingContent.sizeDelta = new Vector2(0f, 0f);
+            scroll.content = incomingContent;
         }
 
         // Карточка входящего заказа: имя/архетип, маршрут, пожелание, [ПРИНЯТЬ].
         private GameObject CreateCard(OrderOffer offer, TMP_FontAsset font)
         {
             var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
-            card.transform.SetParent(incomingRoot, false);
+            card.transform.SetParent(incomingContent, false);
             var rect = (RectTransform)card.transform;
-            // Якоря сверху: позиция задаётся вниз от верха панели.
+            // Якоря сверху контента: карточки ложатся вниз столбцом.
             rect.anchorMin = new Vector2(0.5f, 1f);
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(432f, 108f);
+            rect.sizeDelta = new Vector2(432f, 112f);
             card.GetComponent<Image>().color = PanelColor;
+
+            // Мини-аватар в рамке.
+            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
+            avatar.transform.SetParent(card.transform, false);
+            var avatarRect = (RectTransform)avatar.transform;
+            avatarRect.sizeDelta = new Vector2(64f, 64f);
+            avatarRect.anchorMin = new Vector2(0f, 1f);
+            avatarRect.anchorMax = new Vector2(0f, 1f);
+            avatarRect.anchoredPosition = new Vector2(40f, -24f);
+            var avatarImage = avatar.GetComponent<Image>();
+            avatarImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.35f); // рамка
+            if (offer.Passenger.Portrait != null)
+            {
+                var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+                portraitGo.transform.SetParent(avatar.transform, false);
+                var portrait = (RectTransform)portraitGo.transform;
+                portrait.anchorMin = new Vector2(0.5f, 0.5f);
+                portrait.anchorMax = new Vector2(0.5f, 0.5f);
+                portrait.sizeDelta = new Vector2(56f, 56f);
+                var portraitImage = portraitGo.GetComponent<Image>();
+                portraitImage.sprite = offer.Passenger.Portrait;
+                portraitImage.color = offer.Passenger.PortraitTint;
+            }
+            else
+            {
+                TMP_Text avatarText = MakeText(avatar.transform, font, 16f, LabelColor);
+                avatarText.text = offer.Passenger.Archetype.Length > 0
+                    ? offer.Passenger.Archetype.Substring(0, 1) : "?";
+                avatarText.alignment = TextAlignmentOptions.Center;
+                Place(avatarText.rectTransform, Vector2.zero, Vector2.zero, true);
+            }
 
             TMP_Text name = MakeText(card.transform, font, 22f, BrightColor);
             name.text = offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype;
-            Place(name.rectTransform, new Vector2(-116f, -6f), new Vector2(-10f, -34f));
+            Place(name.rectTransform, new Vector2(-206f, -6f), new Vector2(-124f, -34f));
 
             TMP_Text route = MakeText(card.transform, font, 18f, LabelColor);
-            route.text = orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper();
-            Place(route.rectTransform, new Vector2(-116f, -38f), new Vector2(-10f, -64f));
+            route.text = orders.PlanetName(offer.PickupIndex).ToUpper() + " → "
+                + orders.PlanetName(offer.DropoffIndex).ToUpper()
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн";
+            Place(route.rectTransform, new Vector2(-206f, -38f), new Vector2(-124f, -64f));
 
             TMP_Text wish = MakeText(card.transform, font, 15f, LabelColor);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            wish.text = string.IsNullOrEmpty(wishPhrase) ? "" : "«" + wishPhrase + "»";
-            Place(wish.rectTransform, new Vector2(-116f, -68f), new Vector2(-10f, -104f));
+            wish.text = string.IsNullOrEmpty(wishPhrase) ? "" : "доп. условие: «" + wishPhrase + "»";
+            Place(wish.rectTransform, new Vector2(-206f, -66f), new Vector2(-124f, -106f));
 
-            // Кнопка [ПРИНЯТЬ].
-            var buttonGo = new GameObject("Accept", typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonGo.transform.SetParent(card.transform, false);
-            var buttonRect = (RectTransform)buttonGo.transform;
-            buttonRect.sizeDelta = new Vector2(104f, 40f);
-            buttonRect.anchorMin = new Vector2(1f, 1f);
-            buttonRect.anchorMax = new Vector2(1f, 1f);
-            buttonRect.anchoredPosition = new Vector2(-10f, -8f);
-            buttonGo.GetComponent<Image>().color = TaxiColor;
-
-            TMP_Text buttonText = MakeText(buttonGo.transform, font, 18f, new Color(0.043f, 0.055f, 0.1f));
-            buttonText.text = "ПРИНЯТЬ";
-            buttonText.alignment = TextAlignmentOptions.Center;
-            Place(buttonText.rectTransform, Vector2.zero, Vector2.zero, true);
-
+            // Кнопки [ПРИНЯТЬ] / [ОТКЛОНИТЬ] — внутри карточки, правый край.
             OrderOffer captured = offer;
-            buttonGo.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            MakeCardButton(card.transform, font, "Accept", "ПРИНЯТЬ", TaxiColor,
+                new Color(0.043f, 0.055f, 0.1f), new Vector2(104f, 38f), new Vector2(-60f, -28f),
+                () => orders.Accept(captured));
+            MakeCardButton(card.transform, font, "Decline", "ОТКЛОНИТЬ",
+                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor,
+                new Vector2(104f, 30f), new Vector2(-60f, -76f),
+                () => orders.Decline(captured));
             return card;
+        }
+
+        private void MakeCardButton(Transform parent, TMP_FontAsset font, string name, string label,
+            Color background, Color textColor, Vector2 size, Vector2 position, UnityEngine.Events.UnityAction action)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.sizeDelta = size;
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.anchoredPosition = position;
+            go.GetComponent<Image>().color = background;
+
+            TMP_Text text = MakeText(go.transform, font, 15f, textColor);
+            text.text = label;
+            text.alignment = TextAlignmentOptions.Center;
+            Place(text.rectTransform, Vector2.zero, Vector2.zero, true);
+            go.GetComponent<Button>().onClick.AddListener(action);
         }
 
         private void CreateAbandonButton()
@@ -311,6 +409,27 @@ namespace SpaceTaxi.UI
             rect.anchorMax = new Vector2(0f, 1f);
             rect.offsetMin = min;
             rect.offsetMax = max;
+        }
+
+        // Отказ от активного заказа (под его полями).
+        private void CreateCancelButton()
+        {
+            cancelButton = new GameObject("CancelButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            cancelButton.transform.SetParent(transform, false);
+            var rect = (RectTransform)cancelButton.transform;
+            rect.sizeDelta = new Vector2(432f, 36f);
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, orderPay.rectTransform.anchoredPosition.y - 36f);
+            cancelButton.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f);
+
+            TMP_Text text = MakeText(cancelButton.transform, orderName.font, 17f, LabelColor);
+            text.text = "ОТКАЗАТЬСЯ ОТ ЗАКАЗА";
+            text.alignment = TextAlignmentOptions.Center;
+            Place(text.rectTransform, Vector2.zero, Vector2.zero, true);
+            cancelButton.GetComponent<Button>().onClick.AddListener(() => orders.CancelActive());
+            cancelButton.SetActive(false);
         }
     }
 }

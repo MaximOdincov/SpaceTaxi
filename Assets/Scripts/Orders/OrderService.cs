@@ -58,6 +58,7 @@ namespace SpaceTaxi.Orders
         public event Action<OrderOffer> PassengerBoarded;
         public event Action<OrderOffer> OrderDelivered;
         public event Action<OrderOffer> OrderFailed;
+        public event Action<OrderOffer> OrderCancelled;
 
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
         {
@@ -69,7 +70,11 @@ namespace SpaceTaxi.Orders
             hull.Died += FailActive;
             hull.ShipLost += reason => FailActive();
 
-            if (catalog != null)
+            if (catalog == null)
+                Debug.LogWarning("[Orders] каталог пассажиров не назначен — предложений не будет");
+            else if (catalog.Profiles.Count == 0)
+                Debug.LogWarning("[Orders] каталог пассажиров пуст — добавь профиль в PassengerCatalog");
+            else
                 for (int i = 0; i < initialOffers; i++)
                     AddOffer(catalog);
             nextSpawnAt = Time.time + UnityEngine.Random.Range(spawnMin, spawnMax);
@@ -162,6 +167,36 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
+        // Отклонить предложение — карточка исчезает, счётчики не трогаем.
+        public bool Decline(OrderOffer offer)
+        {
+            if (!offers.Contains(offer))
+                return false;
+            offers.Remove(offer);
+            OffersChanged?.Invoke();
+            return true;
+        }
+
+        // Отказаться от активного заказа: без пассажира — всегда; с пассажиром
+        // на борту — только стоя на планете (высадить).
+        public bool CancelActive()
+        {
+            if (Active == null)
+                return false;
+            if (Active.State == OrderState.Aboard)
+            {
+                Ship ship = FindAnyObjectByType<Ship>();
+                if (ship == null || ship.State != ShipState.Landed)
+                    return false;
+            }
+            OrderOffer cancelled = Active;
+            Active = null;
+            OrderCancelled?.Invoke(cancelled);
+            ActiveOrderChanged?.Invoke();
+            Debug.Log("[Orders] заказ отменён оператором");
+            return true;
+        }
+
         private void OnLanded(Planet planet)
         {
             if (Active == null)
@@ -249,6 +284,24 @@ namespace SpaceTaxi.Orders
             return level != null && index >= 0 && index < level.Bodies.Count
                 ? level.Bodies[index].DisplayName
                 : "?";
+        }
+
+        // Дальность маршрута А→Б в юнитах.
+        public float RouteDistance(OrderOffer offer)
+        {
+            if (offer == null || level == null
+                || offer.PickupIndex < 0 || offer.PickupIndex >= level.Bodies.Count
+                || offer.DropoffIndex < 0 || offer.DropoffIndex >= level.Bodies.Count)
+                return 0f;
+            return Vector2.Distance(level.Bodies[offer.PickupIndex].Position, level.Bodies[offer.DropoffIndex].Position);
+        }
+
+        // Дистанция от корабля до планеты заказа.
+        public float DistanceToPlanet(int index, Vector2 from)
+        {
+            if (level == null || index < 0 || index >= level.Bodies.Count)
+                return 0f;
+            return Vector2.Distance(level.Bodies[index].Position, from);
         }
     }
 }

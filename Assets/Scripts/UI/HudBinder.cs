@@ -15,6 +15,9 @@ namespace SpaceTaxi.UI
         private Image[] fuelSegments = new Image[10];
         private GameObject warningBanner;
         private TMP_Text warningText;
+        private TMP_Text goalHint;
+
+        [SerializeField] private TMP_FontAsset font; // JetBrains Mono из сцены
 
         private Ship ship;
         private GravityField gravity;
@@ -32,6 +35,20 @@ namespace SpaceTaxi.UI
                 fuelSegments[i] = transform.Find($"FuelTrack/FuelSeg_{i + 1:00}").GetComponent<Image>();
             warningBanner = transform.Find("WarningBanner").gameObject;
             warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
+
+            // Подсказка-цель: что делать прямо сейчас (под баннером тревоги).
+            var hintGo = new GameObject("GoalHint", typeof(RectTransform), typeof(TextMeshProUGUI));
+            hintGo.transform.SetParent(transform, false);
+            goalHint = hintGo.GetComponent<TextMeshProUGUI>();
+            goalHint.font = font;
+            goalHint.fontSize = 22f;
+            goalHint.color = new Color(0.66f, 1f, 0.8f);
+            goalHint.alignment = TextAlignmentOptions.Center;
+            var hintRect = goalHint.rectTransform;
+            hintRect.anchorMin = new Vector2(0.5f, 1f);
+            hintRect.anchorMax = new Vector2(0.5f, 1f);
+            hintRect.sizeDelta = new Vector2(900f, 30f);
+            hintRect.anchoredPosition = new Vector2(0f, -140f);
         }
 
         private void Update()
@@ -58,6 +75,35 @@ namespace SpaceTaxi.UI
             {
                 speedValue.text = ((int)ship.Body.linearVelocity.magnitude).ToString();
                 UpdateWarning();
+                UpdateGoalHint();
+            }
+        }
+
+        // Подсказка-цель: постоянно показываем следующий шаг игрока.
+        private void UpdateGoalHint()
+        {
+            var session = FindAnyObjectByType<SpaceTaxi.Core.GameSession>();
+            var orders = session != null ? session.Orders : null;
+            var active = orders != null ? orders.Active : null;
+
+            if (active == null)
+            {
+                goalHint.text = "НЕТ ЗАКАЗА · TAB — входящие заказы";
+                return;
+            }
+
+            if (active.State == SpaceTaxi.Orders.OrderState.Aboard)
+            {
+                int index = active.DropoffIndex;
+                goalHint.text = "ПАССАЖИР НА БОРТУ · доставить: " + orders.PlanetName(index).ToUpper()
+                    + " (" + orders.DistanceToPlanet(index, ship.transform.position).ToString("0") + " юн)";
+            }
+            else
+            {
+                int index = active.PickupIndex;
+                goalHint.text = "ЗАКАЗ · забрать: " + active.Passenger.DisplayName + " — "
+                    + orders.PlanetName(index).ToUpper()
+                    + " (" + orders.DistanceToPlanet(index, ship.transform.position).ToString("0") + " юн)";
             }
         }
 
