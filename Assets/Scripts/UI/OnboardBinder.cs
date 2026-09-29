@@ -239,8 +239,15 @@ namespace SpaceTaxi.UI
             var root = new GameObject("IncomingScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
             root.transform.SetParent(transform, false);
             var rootRect = (RectTransform)root.transform;
+
+            // Внимание: якоря элементов панели разные — OrderTitle от ВЕРХА,
+            // DivPlayer от НИЗА. Приводим всё к top-координатам.
+            float panelHeight = ((RectTransform)transform).rect.height;
             float topY = orderTitle.rectTransform.anchoredPosition.y - 52f;
-            float bottomY = (divPlayer != null ? divPlayer.anchoredPosition.y : divAir.anchoredPosition.y) + 14f;
+            float bottomY = divPlayer != null
+                ? divPlayer.anchoredPosition.y - panelHeight + 14f
+                : divAir.anchoredPosition.y + 14f;
+
             rootRect.anchorMin = new Vector2(0.5f, 1f);
             rootRect.anchorMax = new Vector2(0.5f, 1f);
             rootRect.pivot = new Vector2(0.5f, 1f);

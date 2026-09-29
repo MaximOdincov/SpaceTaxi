@@ -88,7 +88,7 @@ namespace SpaceTaxi.UI
 
             if (active == null)
             {
-                goalHint.text = "НЕТ ЗАКАЗА · TAB — входящие заказы";
+                goalHint.text = ""; // без заказа — не висит ничего
                 return;
             }
 

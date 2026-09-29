@@ -11209,6 +11209,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1010346481104642bf64151c51ac7c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.HudBinder
+  font: {fileID: 11400000, guid: 95da15eaff74e468abb324d550c64056, type: 2}
 --- !u!1 &1790138538
 GameObject:
   m_ObjectHideFlags: 0
