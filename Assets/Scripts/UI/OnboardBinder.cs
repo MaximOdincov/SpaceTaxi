@@ -99,8 +99,17 @@ namespace SpaceTaxi.UI
             var orderSectionLayout = orderSection.AddComponent<LayoutElement>();
             orderSectionLayout.minHeight = 280f;
             orderSectionLayout.flexibleHeight = 1f;
+
+            // OrderArea — сама layout-группа: дети (скролл/карточки/кнопки)
+            // без неё остаются дефолтных 100x100 в центре.
             var orderContainer = new GameObject("OrderArea", typeof(RectTransform));
             orderContainer.transform.SetParent(orderSection.transform, false);
+            var orderAreaLayout = orderContainer.AddComponent<VerticalLayoutGroup>();
+            orderAreaLayout.spacing = 8;
+            orderAreaLayout.childControlWidth = true;
+            orderAreaLayout.childControlHeight = true;
+            orderAreaLayout.childForceExpandWidth = true;
+            orderAreaLayout.childForceExpandHeight = false;
             orderArea = (RectTransform)orderContainer.transform;
             orderArea.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             orderPay = Text(orderSection, "", 19f, LabelColor);
@@ -174,7 +183,6 @@ namespace SpaceTaxi.UI
 
             bool hasActive = orders.Active != null;
             orderPay.gameObject.SetActive(hasActive);
-            econSection.SetActive(hasActive);
             cancelButton = null;
 
             if (hasActive)
