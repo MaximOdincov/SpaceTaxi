@@ -48,12 +48,16 @@ namespace SpaceTaxi.UI
             gameObject.SetActive(false);
         }
 
-        public void Show(string message)
+        public void Show(string message, bool emphasized = false)
         {
             gameObject.SetActive(true);
             label.text = message;
             group.alpha = 1f;
-            hideAt = Time.unscaledTime + duration;
+            hideAt = Time.unscaledTime + (emphasized ? 5f : duration);
+
+            // Важные события (доставка, провал) — крупнее и шире.
+            label.fontSize = emphasized ? 30f : 22f;
+            ((RectTransform)transform).sizeDelta = emphasized ? new Vector2(900f, 58f) : new Vector2(700f, 44f);
         }
 
         private void Update()
@@ -71,10 +75,10 @@ namespace SpaceTaxi.UI
             var orders = session.Orders;
             orders.PassengerBoarded += offer => Show("Пассажир на борту: " + offer.Passenger.DisplayName
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Greetings)));
-            orders.OrderDelivered += offer => Show("Доставлено: " + offer.Passenger.DisplayName
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)));
+            orders.OrderDelivered += offer => Show("ЗАКАЗ ВЫПОЛНЕН: " + offer.Passenger.DisplayName
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), true);
             orders.OrderFailed += offer => Show("Заказ провален"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)));
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
 
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: бак и корпус полны");

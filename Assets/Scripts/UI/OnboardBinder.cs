@@ -164,8 +164,8 @@ namespace SpaceTaxi.UI
             string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             wishText.text = string.IsNullOrEmpty(wish) ? "" : "Сообщение от клиента: «" + wish + "»";
             orderTimer.text = Col("Статус:", offer.State == OrderState.Aboard
-                ? "пассажир на борту — на пункт Б"
-                : "за пассажиром");
+                ? "пассажир НА БОРТУ → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
+                : "пассажир ОЖИДАЕТ на " + orders.PlanetName(offer.PickupIndex).ToUpper());
             orderPay.text = Col("Счёт:", orders.Deliveries + " доставлено · " + orders.Failures + " провалов");
 
             // Портрет: спрайт профиля с оттенком или заглушка «ФОТО».

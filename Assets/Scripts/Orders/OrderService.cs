@@ -90,6 +90,62 @@ namespace SpaceTaxi.Orders
                     AddOffer(catalog);
                 nextSpawnAt = Time.time + UnityEngine.Random.Range(spawnMin, spawnMax);
             }
+
+            UpdateTargetGlow();
+        }
+
+        // Подсветка планеты назначения: жёлтый пульсирующий ореол позади планеты
+        // (А — пока пассажир ждёт, Б — когда на борту).
+        private Transform targetGlow;
+        private SpriteRenderer glowRenderer;
+        private string glowBodyName;
+        private GravityField gravityField;
+
+        private void UpdateTargetGlow()
+        {
+            if (Active == null)
+            {
+                if (targetGlow != null)
+                    targetGlow.gameObject.SetActive(false);
+                return;
+            }
+
+            if (gravityField == null)
+                gravityField = FindAnyObjectByType<GravityField>();
+            if (gravityField == null)
+                return;
+
+            int index = Active.State == OrderState.Aboard ? Active.DropoffIndex : Active.PickupIndex;
+            string bodyName = PlanetName(index);
+
+            if (targetGlow == null)
+            {
+                var glowGo = new GameObject("TargetGlow");
+                glowRenderer = glowGo.AddComponent<SpriteRenderer>();
+                glowRenderer.sortingOrder = -2; // позади планеты — виден как ободок
+                targetGlow = glowGo.transform;
+            }
+
+            if (glowBodyName != bodyName || targetGlow.parent == null)
+            {
+                glowBodyName = bodyName;
+                foreach (CelestialBody body in gravityField.Bodies)
+                {
+                    if (body.DisplayName != bodyName)
+                        continue;
+                    var bodyRenderer = body.GetComponent<SpriteRenderer>();
+                    glowRenderer.sprite = bodyRenderer != null ? bodyRenderer.sprite : null;
+                    targetGlow.SetParent(body.transform, false);
+                    break;
+                }
+            }
+
+            targetGlow.gameObject.SetActive(glowRenderer.sprite != null);
+            if (!targetGlow.gameObject.activeSelf)
+                return;
+            float pulse = 1.32f + 0.08f * Mathf.Sin(Time.time * 3f);
+            targetGlow.localScale = Vector3.one * pulse;
+            glowRenderer.color = new Color(1f, 0.83f, 0.3f, 0.16f);
         }
 
         // Принять заказ. Один активный заказ — правило альфы.

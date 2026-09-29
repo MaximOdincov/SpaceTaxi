@@ -64,6 +64,44 @@ namespace SpaceTaxi.UI
             if (ship != null && playerMarker != null)
                 playerMarker.anchoredPosition = WorldToMap(ship.transform.position);
 
+            UpdateTargetGlow();
+        }
+
+        // Подсветка планеты назначения активного заказа — жёлтый пульсирующий ореол.
+        private RectTransform targetGlow;
+        private Core.GameSession sessionCache;
+
+        private void UpdateTargetGlow()
+        {
+            if (sessionCache == null)
+                sessionCache = FindAnyObjectByType<Core.GameSession>();
+            var orders = sessionCache != null ? sessionCache.Orders : null;
+            var active = orders != null ? orders.Active : null;
+
+            if (active == null)
+            {
+                if (targetGlow != null)
+                    targetGlow.gameObject.SetActive(false);
+                return;
+            }
+
+            int index = active.State == Orders.OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
+            if (index < 0 || index >= level.Bodies.Count)
+                return;
+
+            CelestialBodyData body = level.Bodies[index];
+            bool star = body.Type == BodyType.Star;
+            float bodySize = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : 1.9f));
+
+            if (targetGlow == null)
+                targetGlow = CreateCircle("TargetGlow", bodySize * 1.4f,
+                    new Color(1f, 0.83f, 0.3f, 0.18f));
+            targetGlow.SetAsFirstSibling(); // позади тел — ободок вокруг планеты
+
+            targetGlow.gameObject.SetActive(true);
+            targetGlow.anchoredPosition = WorldToMap(body.Position);
+            float pulse = 1.35f + 0.1f * Mathf.Sin(Time.unscaledTime * 3f);
+            targetGlow.sizeDelta = Vector2.one * bodySize * pulse;
         }
 
         private void BuildMap()
