@@ -25,6 +25,10 @@ namespace SpaceTaxi.UI
         private RectTransform orderArea;      // контейнер зоны заказа (переключается)
         private GameObject econSection;
         private TMP_Text econCounters;
+        private TMP_Text moneyValue, ratingValue;
+
+        [SerializeField] private Sprite cashIcon;
+        [SerializeField] private Sprite ratingIcon;
         private TMP_Text orderPay;
         private Button cancelButton;
 
@@ -84,6 +88,8 @@ namespace SpaceTaxi.UI
             Flexible(title.gameObject);
             clock = Text(header, "14:02", 30f, BrightColor);
             FixedWidth(clock.gameObject, 96f);
+            var money = IconStat(header.transform, cashIcon, out moneyValue);
+            var rating = IconStat(header.transform, ratingIcon, out ratingValue);
 
             // Секция состояния.
             var state = Section(root.transform, "// СОСТОЯНИЕ", "StateSection");
@@ -95,10 +101,9 @@ namespace SpaceTaxi.UI
             Abandon(state.transform);
 
             // Секция заказа: контейнер переключается (текущий / входящие).
+            // Зона заказа динамическая: пустая — сжимается до заголовка,
+            // всё ниже поднимается; карточки (максимум 4) влезают без скролла.
             var orderSection = Section(root.transform, "// ЗАКАЗ", "OrderSection");
-            var orderSectionLayout = orderSection.AddComponent<LayoutElement>();
-            orderSectionLayout.minHeight = 280f;
-            orderSectionLayout.flexibleHeight = 1f;
 
             // OrderArea — сама layout-группа: дети (скролл/карточки/кнопки)
             // без неё остаются дефолтных 100x100 в центре.
@@ -111,18 +116,13 @@ namespace SpaceTaxi.UI
             orderAreaLayout.childForceExpandWidth = true;
             orderAreaLayout.childForceExpandHeight = false;
             orderArea = (RectTransform)orderContainer.transform;
-            orderArea.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             orderPay = Text(orderSection, "", 19f, LabelColor);
             FixedHeight(orderPay.gameObject, 24f);
 
             // Экономика (видна не всегда).
             econSection = Section(root.transform, "// СМЕНА", "EconSection");
             var econRow = H("EconRow", econSection.transform);
-            var money = Text(econRow, "● 0", 24f, TaxiColor);
-            FixedWidth(money.gameObject, 110f);
-            var rating = Text(econRow, "★ 0.0", 24f, TaxiColor);
-            FixedWidth(rating.gameObject, 120f);
-            econCounters = Text(econRow, "0 доставок · 0 провалов", 18f, LabelColor);
+            econCounters = Text(econRow, "0 доставок · 0 провалов", 20f, LabelColor);
             econCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             // Плеер — внизу стека.
@@ -192,7 +192,12 @@ namespace SpaceTaxi.UI
             cancelButton = null;
 
             if (hasActive)
+            {
+                foreach (var card in cardMap.Values)
+                    Destroy(card);
+                cardMap.Clear();
                 BuildActiveOrder();
+            }
             else
                 BuildIncoming();
         }
@@ -204,6 +209,7 @@ namespace SpaceTaxi.UI
             var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));
             row.transform.SetParent(orderArea, false);
             orderAreaChildren.Add(row);
+            StartCoroutine(FadeIn(row));
             row.GetComponent<Image>().color = PanelColor;
             var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.padding = new RectOffset(10, 10, 10, 10);
@@ -267,60 +273,75 @@ namespace SpaceTaxi.UI
             orderPay.text = Col("Счёт:", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
         }
 
+        private readonly Dictionary<OrderOffer, GameObject> cardMap = new Dictionary<OrderOffer, GameObject>();
+
         private void BuildIncoming()
         {
-            // Скролл: viewport + content на VerticalLayoutGroup + ContentSizeFitter.
-            var scrollGo = new GameObject("IncomingScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
-            scrollGo.transform.SetParent(orderArea, false);
-            orderAreaChildren.Add(scrollGo);
-            scrollGo.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            // Ушедшие предложения — плавно растворяются.
+            var gone = new List<OrderOffer>();
+            foreach (var pair in cardMap)
+                if (!OfferExists(pair.Key))
+                    gone.Add(pair.Key);
+            foreach (OrderOffer offer in gone)
+            {
+                StartCoroutine(FadeOut(cardMap[offer]));
+                cardMap.Remove(offer);
+            }
 
-            var scroll = scrollGo.GetComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped; // без прокрутки в пустоту
-            scroll.scrollSensitivity = 30f;
-            scrollGo.GetComponent<Image>().color = new Color(0, 0, 0, 0);
-            incomingScroll = scroll;
-
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-            viewportGo.transform.SetParent(scrollGo.transform, false);
-            var viewportRect = (RectTransform)viewportGo.transform;
-            Stretch(viewportRect);
-            viewportRect.offsetMax = new Vector2(-14f, 0f); // место под полоску
-            viewportGo.GetComponent<Image>().color = Color.white;
-            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
-            scroll.viewport = (RectTransform)viewportGo.transform;
-
-            var contentGo = new GameObject("Content", typeof(RectTransform));
-            contentGo.transform.SetParent(viewportGo.transform, false);
-            var content = (RectTransform)contentGo.transform;
-            content.anchorMin = new Vector2(0f, 1f);
-            content.anchorMax = new Vector2(1f, 1f);
-            content.pivot = new Vector2(0.5f, 1f);
-            var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 10;
-            contentLayout.childControlWidth = true;
-            contentLayout.childControlHeight = true;
-            contentLayout.childForceExpandWidth = false;
-            contentLayout.childForceExpandHeight = false;
-            contentLayout.childAlignment = TextAnchor.UpperCenter;
-            var fitter = contentGo.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            scroll.content = content;
-            CreateScrollbar(scrollGo, scroll);
-
+            // Новые появляются с анимацией; порядок — как в списке.
+            int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
-                GameObject card = BuildCard(offer);
-                card.transform.SetParent(content, false);
+                if (!cardMap.TryGetValue(offer, out GameObject card))
+                {
+                    card = BuildCard(offer);
+                    card.transform.SetParent(orderArea, false);
+                    cardMap[offer] = card;
+                    StartCoroutine(FadeIn(card));
+                }
+                card.transform.SetSiblingIndex(index);
+                index++;
             }
         }
 
-        // Полоска прокрутки справа; скрыта, когда контент помещается целиком.
-        private ScrollRect incomingScroll;
-        private GameObject scrollbarGo;
+        private bool OfferExists(OrderOffer offer)
+        {
+            foreach (OrderOffer existing in orders.Offers)
+                if (existing == offer)
+                    return true;
+            return false;
+        }
 
+        private System.Collections.IEnumerator FadeIn(GameObject go)
+        {
+            var group = go.GetComponent<CanvasGroup>();
+            if (group == null)
+                group = go.AddComponent<CanvasGroup>();
+            go.transform.localScale = Vector3.one * 0.95f;
+            for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / 0.18f)
+            {
+                group.alpha = t;
+                go.transform.localScale = Vector3.Lerp(Vector3.one * 0.95f, Vector3.one, t);
+                yield return null;
+            }
+            group.alpha = 1f;
+            go.transform.localScale = Vector3.one;
+        }
+
+        private System.Collections.IEnumerator FadeOut(GameObject go)
+        {
+            var group = go.GetComponent<CanvasGroup>();
+            if (group == null)
+                group = go.AddComponent<CanvasGroup>();
+            for (float t = 1f; t > 0f; t -= Time.unscaledDeltaTime / 0.15f)
+            {
+                group.alpha = t;
+                yield return null;
+            }
+            Destroy(go);
+        }
+
+        // Полоска прокрутки справа; скрыта, когда контент помещается целиком.
         private void CreateScrollbar(GameObject scrollObject, ScrollRect scroll)
         {
             var barGo = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
@@ -348,7 +369,6 @@ namespace SpaceTaxi.UI
             bar.targetGraphic = handle.GetComponent<Image>();
 
             scroll.verticalScrollbar = bar;
-            scrollbarGo = barGo;
         }
 
         // Карточка: [аватар] [имя/маршрут/условие] [кнопки] — всё внутри контейнеров.
@@ -413,7 +433,7 @@ namespace SpaceTaxi.UI
             // Кнопки-иконки в ряд: ✓ принять, ✕ отклонить — компактно, без пустого низа.
             var buttons = new GameObject("Buttons", typeof(RectTransform));
             buttons.transform.SetParent(card.transform, false);
-            var buttonsLayout = buttons.AddComponent<HorizontalLayoutGroup>();
+            var buttonsLayout = buttons.AddComponent<VerticalLayoutGroup>();
             buttonsLayout.spacing = 6;
             buttonsLayout.childControlWidth = true;
             buttonsLayout.childControlHeight = true;
@@ -477,9 +497,6 @@ namespace SpaceTaxi.UI
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed);
 
-            if (incomingScroll != null && scrollbarGo != null)
-                scrollbarGo.SetActive(incomingScroll.content.rect.height > incomingScroll.viewport.rect.height + 1f);
-
             var statusText = FindText(orderArea, "OrderStatus");
             if (orders.Active != null && statusText != null)
                 statusText.text = orders.Active.State == OrderState.Aboard
@@ -527,6 +544,31 @@ namespace SpaceTaxi.UI
             layout.childForceExpandHeight = true;
             layout.childAlignment = TextAnchor.MiddleLeft;
             return go;
+        }
+
+        // Иконка + значение в шапке (деньги, рейтинг).
+        private GameObject IconStat(Transform parent, Sprite icon, out TMP_Text value)
+        {
+            var stat = new GameObject("Stat", typeof(RectTransform));
+            stat.transform.SetParent(parent, false);
+            var layout = stat.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            iconGo.transform.SetParent(stat.transform, false);
+            var iconImage = iconGo.GetComponent<Image>();
+            iconImage.sprite = icon;
+            iconImage.preserveAspect = true;
+            iconImage.color = TaxiColor;
+            FixedSize(iconGo, 24f, 24f);
+
+            value = Text(stat, "0", 22f, BrightColor);
+            FixedWidth(value.gameObject, 64f);
+            return stat;
         }
 
         private GameObject PlayerButton(Transform parent, string glyph)
