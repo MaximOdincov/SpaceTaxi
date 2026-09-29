@@ -125,8 +125,10 @@ namespace SpaceTaxi.UI
 
             // Плеер — внизу стека.
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
-            var track = Text(player, "⏮  ▶  ⏭   ТРЕК: «Дальний рейс»", 17f, LabelColor);
-            FixedHeight(track.gameObject, 24f);
+            var track = Text(player, "⏮   ▶   ⏭   ТРЕК: «Дальний рейс»", 24f, BrightColor);
+            FixedHeight(track.gameObject, 34f);
+            var sub = Text(player, "музыка смены · MTO radio", 17f, LabelColor);
+            FixedHeight(sub.gameObject, 22f);
             var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
             progress.transform.SetParent(player.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
@@ -270,13 +272,16 @@ namespace SpaceTaxi.UI
             var scroll = scrollGo.GetComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.movementType = ScrollRect.MovementType.Clamped; // без прокрутки в пустоту
             scroll.scrollSensitivity = 30f;
             scrollGo.GetComponent<Image>().color = new Color(0, 0, 0, 0);
+            incomingScroll = scroll;
 
             var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
             viewportGo.transform.SetParent(scrollGo.transform, false);
-            Stretch((RectTransform)viewportGo.transform);
+            var viewportRect = (RectTransform)viewportGo.transform;
+            Stretch(viewportRect);
+            viewportRect.offsetMax = new Vector2(-14f, 0f); // место под полоску
             viewportGo.GetComponent<Image>().color = Color.white;
             viewportGo.GetComponent<Mask>().showMaskGraphic = false;
             scroll.viewport = (RectTransform)viewportGo.transform;
@@ -296,12 +301,47 @@ namespace SpaceTaxi.UI
             var fitter = contentGo.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.content = content;
+            CreateScrollbar(scrollGo, scroll);
 
             foreach (OrderOffer offer in orders.Offers)
             {
                 GameObject card = BuildCard(offer);
                 card.transform.SetParent(content, false);
             }
+        }
+
+        // Полоска прокрутки справа; скрыта, когда контент помещается целиком.
+        private ScrollRect incomingScroll;
+        private GameObject scrollbarGo;
+
+        private void CreateScrollbar(GameObject scrollObject, ScrollRect scroll)
+        {
+            var barGo = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
+            barGo.transform.SetParent(scrollObject.transform, false);
+            var barRect = (RectTransform)barGo.transform;
+            barRect.anchorMin = new Vector2(1f, 0f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot = new Vector2(1f, 0.5f);
+            barRect.sizeDelta = new Vector2(8f, 0f);
+            barGo.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+
+            var bar = barGo.GetComponent<Scrollbar>();
+            bar.direction = Scrollbar.Direction.BottomToTop;
+
+            var sliding = new GameObject("SlidingArea", typeof(RectTransform));
+            sliding.transform.SetParent(barGo.transform, false);
+            var slidingRect = (RectTransform)sliding.transform;
+            Stretch(slidingRect);
+
+            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+            handle.transform.SetParent(sliding.transform, false);
+            Stretch((RectTransform)handle.transform);
+            handle.GetComponent<Image>().color = LabelColor;
+            bar.handleRect = (RectTransform)handle.transform;
+            bar.targetGraphic = handle.GetComponent<Image>();
+
+            scroll.verticalScrollbar = bar;
+            scrollbarGo = barGo;
         }
 
         // Карточка: [аватар] [имя/маршрут/условие] [кнопки] — всё внутри контейнеров.
@@ -425,6 +465,9 @@ namespace SpaceTaxi.UI
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed);
 
+            if (incomingScroll != null && scrollbarGo != null)
+                scrollbarGo.SetActive(incomingScroll.content.rect.height > incomingScroll.viewport.rect.height + 1f);
+
             var statusText = FindText(orderArea, "OrderStatus");
             if (orders.Active != null && statusText != null)
                 statusText.text = orders.Active.State == OrderState.Aboard
@@ -506,6 +549,8 @@ namespace SpaceTaxi.UI
             le.minHeight = height;
             le.preferredWidth = width;
             le.preferredHeight = height;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
         }
 
         private static void FixedHeight(GameObject go, float height)
@@ -513,6 +558,7 @@ namespace SpaceTaxi.UI
             var le = go.AddComponent<LayoutElement>();
             le.minHeight = height;
             le.preferredHeight = height;
+            le.flexibleHeight = 0f;
         }
 
         private static void FixedWidth(GameObject go, float width)
@@ -520,6 +566,7 @@ namespace SpaceTaxi.UI
             var le = go.AddComponent<LayoutElement>();
             le.minWidth = width;
             le.preferredWidth = width;
+            le.flexibleWidth = 0f;
         }
 
         private static void Flexible(GameObject go)
