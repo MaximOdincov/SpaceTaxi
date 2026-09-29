@@ -76,10 +76,9 @@ namespace SpaceTaxi.UI
 
             // Шапка: связь + название + часы.
             var header = H("Header", root.transform);
-            var dot = new GameObject("LinkDot", typeof(RectTransform), typeof(Image));
-            dot.transform.SetParent(header.transform, false);
-            dot.GetComponent<Image>().color = LabelColor;
-            FixedSize(dot, 14f, 14f);
+            var dot = Text(header, "●", 18f, LabelColor);
+            dot.alignment = TextAlignmentOptions.Left;
+            FixedWidth(dot.gameObject, 24f);
             var title = Text(header, "БОРТОВОЙ КОМПЬЮТЕР", 24f, BrightColor);
             Flexible(title.gameObject);
             clock = Text(header, "14:02", 30f, BrightColor);
@@ -299,8 +298,9 @@ namespace SpaceTaxi.UI
             contentLayout.spacing = 10;
             contentLayout.childControlWidth = true;
             contentLayout.childControlHeight = true;
-            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandWidth = false;
             contentLayout.childForceExpandHeight = false;
+            contentLayout.childAlignment = TextAnchor.UpperCenter;
             var fitter = contentGo.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.content = content;
@@ -359,7 +359,11 @@ namespace SpaceTaxi.UI
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
             card.GetComponent<Image>().color = PanelColor;
-            card.AddComponent<LayoutElement>().minHeight = 108f;
+            var cardLe = card.AddComponent<LayoutElement>();
+            cardLe.minHeight = 108f;
+            cardLe.minWidth = 410f;
+            cardLe.preferredWidth = 410f;
+            cardLe.flexibleWidth = 0f;
 
             // Аватар в рамке.
             var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
