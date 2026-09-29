@@ -31,7 +31,6 @@ namespace SpaceTaxi.UI
         private HullSystem hull;
         private GameObject abandonButton;
         private GameObject cancelButton;
-        private RectTransform incomingContent;
         private RectTransform divPlayer;
         private float nextSlowUpdate;
         private readonly List<GameObject> cards = new List<GameObject>();
@@ -211,82 +210,42 @@ namespace SpaceTaxi.UI
             foreach (GameObject card in cards)
                 Destroy(card);
             cards.Clear();
-            if (incomingContent == null)
-                CreateIncomingRoot();
-            if (orders.Active != null)
-            {
-                incomingContent.parent.parent.gameObject.SetActive(false); // скрыть скролл
+
+            bool showList = orders.Active == null;
+
+            // Список входящих занимает зону экономики — прячем её на это время.
+            SetSectionVisible("Money", !showList);
+            SetSectionVisible("Rating", !showList);
+            if (!showList)
                 return; // активный заказ — карточки не показываем
-            }
-            incomingContent.parent.parent.gameObject.SetActive(true);
 
             TMP_FontAsset font = orderName.font;
+            // Верх списка — сразу под заголовком заказа (top-координаты панели).
+            float listTopY = orderTitle.rectTransform.anchoredPosition.y - 52f;
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
+                if (index >= 3)
+                    break; // в зоне помещается три карточки, остальные ждут
                 GameObject card = CreateCard(offer, font);
-                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, -index * 118f);
+                ((RectTransform)card.transform).anchoredPosition = new Vector2(0f, listTopY - index * 118f);
                 cards.Add(card);
                 index++;
             }
-            // Контент выше окна — скроллим; окно — в размер зоны.
-            incomingContent.sizeDelta = new Vector2(0f, Mathf.Max(incomingContent.parent.GetComponent<RectTransform>().rect.height, index * 118f));
         }
 
-        // Скролл входящих: от заголовка заказа до разделителя плеера.
-        private void CreateIncomingRoot()
+        private void SetSectionVisible(string name, bool visible)
         {
-            var root = new GameObject("IncomingScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
-            root.transform.SetParent(transform, false);
-            var rootRect = (RectTransform)root.transform;
-
-            // Внимание: якоря элементов панели разные — OrderTitle от ВЕРХА,
-            // DivPlayer от НИЗА. Приводим всё к top-координатам.
-            float panelHeight = ((RectTransform)transform).rect.height;
-            float topY = orderTitle.rectTransform.anchoredPosition.y - 52f;
-            float bottomY = divPlayer != null
-                ? divPlayer.anchoredPosition.y - panelHeight + 14f
-                : divAir.anchoredPosition.y + 14f;
-
-            rootRect.anchorMin = new Vector2(0.5f, 1f);
-            rootRect.anchorMax = new Vector2(0.5f, 1f);
-            rootRect.pivot = new Vector2(0.5f, 1f);
-            rootRect.sizeDelta = new Vector2(448f, topY - bottomY);
-            rootRect.anchoredPosition = new Vector2(0f, bottomY);
-            root.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f); // фон не нужен
-
-            var scroll = root.GetComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30f;
-
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-            viewportGo.transform.SetParent(root.transform, false);
-            var viewport = (RectTransform)viewportGo.transform;
-            viewport.anchorMin = Vector2.zero;
-            viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = Vector2.zero;
-            viewport.offsetMax = Vector2.zero;
-            viewportGo.GetComponent<Image>().color = Color.white;
-            viewportGo.GetComponent<Mask>().showMaskGraphic = false;
-            scroll.viewport = viewport;
-
-            var contentGo = new GameObject("Content", typeof(RectTransform));
-            contentGo.transform.SetParent(viewport, false);
-            incomingContent = (RectTransform)contentGo.transform;
-            incomingContent.anchorMin = new Vector2(0f, 1f);
-            incomingContent.anchorMax = new Vector2(1f, 1f);
-            incomingContent.pivot = new Vector2(0.5f, 1f);
-            incomingContent.sizeDelta = new Vector2(0f, 0f);
-            scroll.content = incomingContent;
+            Transform section = transform.Find(name);
+            if (section != null)
+                section.gameObject.SetActive(visible);
         }
 
         // Карточка входящего заказа: имя/архетип, маршрут, пожелание, [ПРИНЯТЬ].
         private GameObject CreateCard(OrderOffer offer, TMP_FontAsset font)
         {
             var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
-            card.transform.SetParent(incomingContent, false);
+            card.transform.SetParent(transform, false); // прямо в панели
             var rect = (RectTransform)card.transform;
             // Якоря сверху контента: карточки ложатся вниз столбцом.
             rect.anchorMin = new Vector2(0.5f, 1f);
