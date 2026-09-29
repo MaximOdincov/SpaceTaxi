@@ -48,149 +48,58 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
-            // Шрифт забираем у старого мокапа до сноса.
-            var oldTitle = transform.Find("Title");
-            font = oldTitle != null ? oldTitle.GetComponent<TMP_Text>().font : TMP_Settings.defaultFontAsset;
-
-            // Мокап сносим: панель пересобираем на layout-ах.
-            for (int i = transform.childCount - 1; i >= 0; i--)
+            if (transform.Find("Stack") == null)
             {
-                string n = transform.GetChild(i).name;
-                if (n != "Frame" && n != "Background")
-                    Destroy(transform.GetChild(i).gameObject);
+                // Фолбэк для старой сцены: строим каркас кодом.
+                BindRefs(OnboardComputerFactory.Build(transform));
             }
-
-            BuildSkeleton();
+            else
+            {
+                BindExisting();
+            }
         }
 
-        // --- Каркас панели: вертикальный стек секций ---
-
-        private void BuildSkeleton()
+        // Поиск готовых (построенных редактором) элементов по именам.
+        private void BindExisting()
         {
-            var root = new GameObject("Stack", typeof(RectTransform));
-            root.transform.SetParent(transform, false);
-            Stretch((RectTransform)root.transform);
-            var rootLayout = root.AddComponent<VerticalLayoutGroup>();
-            rootLayout.padding = new RectOffset(24, 24, 8, 12);
-            rootLayout.spacing = 8;
-            rootLayout.childControlWidth = true;
-            rootLayout.childControlHeight = true;
-            rootLayout.childForceExpandWidth = true;
-            rootLayout.childForceExpandHeight = false;
-            root.AddComponent<LayoutElement>().flexibleHeight = 0f;
-
-            // Шапка: связь + название + часы.
-            var headerWrap = new GameObject("Header", typeof(RectTransform));
-            headerWrap.transform.SetParent(root.transform, false);
-            var wrapLayout = headerWrap.AddComponent<VerticalLayoutGroup>();
-            wrapLayout.spacing = 2;
-            wrapLayout.childControlWidth = true;
-            wrapLayout.childControlHeight = true;
-            wrapLayout.childForceExpandWidth = true;
-            wrapLayout.childForceExpandHeight = false;
-            var header = H("TitleRow", headerWrap.transform);
-            header.AddComponent<LayoutElement>().minHeight = 34f;
-            var dot = Text(header, "<voffset=0.35em>●</voffset>", 18f, LabelColor);
-            dot.alignment = TextAlignmentOptions.Left;
-            FixedWidth(dot.gameObject, 24f);
-            var title = Text(header, "БОРТОВОЙ КОМПЬЮТЕР", 24f, BrightColor);
-            Flexible(title.gameObject);
-            clock = Text(header, "14:02", 28f, BrightColor);
-            FixedWidth(clock.gameObject, 92f);
-
-            // Второй ряд: деньги и рейтинг справа — не мешают заголовку и часам.
-            var statsRow = H("StatsRow", headerWrap.transform);
-            var spacer = Text(statsRow, "", 18f, LabelColor);
-            spacer.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            var money = IconStat(statsRow.transform, cashIcon, out moneyValue);
-            var rating = IconStat(statsRow.transform, ratingIcon, out ratingValue);
-
-            // Секция состояния.
-            var state = Section(root.transform, "// СОСТОЯНИЕ", "StateSection");
-            shipState1 = Row(state, "—");
-            shipState2 = Row(state, "—");
-            shipState3 = Row(state, "—");
-            sysState2 = Row(state, "—");
-            sysState3 = Row(state, "");
-            Abandon(state.transform);
-
-            // Секция заказа: контейнер переключается (текущий / входящие).
-            // Зона заказа динамическая: пустая — сжимается до заголовка,
-            // всё ниже поднимается; карточки (максимум 4) влезают без скролла.
-            var orderSection = Section(root.transform, "// ЗАКАЗ", "OrderSection");
-
-            // OrderArea — сама layout-группа: дети (скролл/карточки/кнопки)
-            // без неё остаются дефолтных 100x100 в центре.
-            var orderContainer = new GameObject("OrderArea", typeof(RectTransform));
-            orderContainer.transform.SetParent(orderSection.transform, false);
-            var orderAreaLayout = orderContainer.AddComponent<VerticalLayoutGroup>();
-            orderAreaLayout.spacing = 8;
-            orderAreaLayout.childControlWidth = true;
-            orderAreaLayout.childControlHeight = true;
-            orderAreaLayout.childForceExpandWidth = true;
-            orderAreaLayout.childForceExpandHeight = false;
-            orderArea = (RectTransform)orderContainer.transform;
-            orderPay = Text(orderSection, "", 19f, LabelColor);
-            FixedHeight(orderPay.gameObject, 24f);
-
-            // Экономика (видна не всегда).
-            econSection = Section(root.transform, "// СМЕНА", "EconSection");
-            var econRow = H("EconRow", econSection.transform);
-            econCounters = Text(econRow, "0 доставок · 0 провалов", 20f, LabelColor);
-            econCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            // Плеер — внизу стека.
-            var player = Section(root.transform, "// ЭФИР", "PlayerSection");
-            var playerRow = H("PlayerRow", player.transform);
-            PlayerButton(playerRow.transform, "|<");
-            var station = Text(playerRow, "MTO RADIO", 22f, BrightColor);
-            station.alignment = TextAlignmentOptions.Center;
-            station.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            PlayerButton(playerRow.transform, ">|");
-            var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
-            progress.transform.SetParent(player.transform, false);
-            progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
-            FixedHeight(progress, 4f);
+            clock = FindT("Stack/Header/TitleRow/Clock");
+            shipState1 = FindT("Stack/StateSection/ShipState1");
+            shipState2 = FindT("Stack/StateSection/ShipState2");
+            shipState3 = FindT("Stack/StateSection/ShipState3");
+            sysState2 = FindT("Stack/StateSection/SysState2");
+            sysState3 = FindT("Stack/StateSection/SysState3");
+            econCounters = FindT("Stack/EconSection/EconRow/EconCounters");
+            orderPay = FindT("Stack/OrderSection/OrderPay");
+            moneyValue = FindT("Stack/Header/StatsRow/MoneyValue/Value");
+            ratingValue = FindT("Stack/Header/StatsRow/RatingValue/Value");
+            var abandon = transform.Find("Stack/StateSection/AbandonButton");
+            abandonButton = abandon != null ? abandon.GetComponent<Button>() : null;
+            var area = transform.Find("Stack/OrderSection/OrderArea");
+            orderArea = (RectTransform)area;
+            if (clock != null)
+                OnboardComputerFactory.SetFont(clock.font);
         }
 
-        private GameObject Section(Transform parent, string title, string name)
+        private void BindRefs(OnboardRefs refs)
         {
-            var section = new GameObject(name, typeof(RectTransform));
-            section.transform.SetParent(parent, false);
-            var layout = section.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-            section.AddComponent<LayoutElement>().minHeight = 40f;
-
-            var heading = Text(section, title, 21f, LabelColor);
-            FixedHeight(heading.gameObject, 26f);
-            var line = new GameObject("Line", typeof(RectTransform), typeof(Image));
-            line.transform.SetParent(section.transform, false);
-            line.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.4f);
-            FixedHeight(line, 2f);
-            return section;
+            clock = refs.Clock;
+            shipState1 = refs.ShipState1;
+            shipState2 = refs.ShipState2;
+            shipState3 = refs.ShipState3;
+            sysState2 = refs.SysState2;
+            sysState3 = refs.SysState3;
+            econCounters = refs.EconCounters;
+            orderPay = refs.OrderPay;
+            moneyValue = refs.MoneyValue;
+            ratingValue = refs.RatingValue;
+            abandonButton = refs.AbandonButton;
+            orderArea = refs.OrderArea;
         }
 
-        private void Abandon(Transform parent)
+        private TMP_Text FindT(string path)
         {
-            var go = Button(parent, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
-                new Color(0.05f, 0.02f, 0.03f), 20f);
-            var le = go.AddComponent<LayoutElement>();
-            le.minHeight = 38f;
-            le.flexibleWidth = 1f;
-            abandonButton = go.GetComponent<Button>();
-            abandonButton.onClick.AddListener(() => hull.Abandon("КОРАБЛЬ ОТКЛЮЧЁН"));
-            go.SetActive(false);
-        }
-
-        private TMP_Text Row(GameObject parent, string content)
-        {
-            var text = Text(parent, content, 20f, BrightColor);
-            FixedHeight(text.gameObject, 26f);
-            return text;
+            var t = transform.Find(path);
+            return t != null ? t.GetComponent<TMP_Text>() : null;
         }
 
         // --- Зона заказа: активный или список входящих ---
@@ -224,7 +133,7 @@ namespace SpaceTaxi.UI
             row.transform.SetParent(orderArea, false);
             orderAreaChildren.Add(row);
             StartCoroutine(FadeIn(row));
-            row.GetComponent<Image>().color = PanelColor;
+            row.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
             rowLayout.padding = new RectOffset(10, 10, 10, 10);
             rowLayout.spacing = 10;
@@ -238,10 +147,10 @@ namespace SpaceTaxi.UI
             photo.transform.SetParent(row.transform, false);
             var photoImage = photo.GetComponent<Image>();
             photoImage.preserveAspect = true;
-            photoImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.3f);
+            photoImage.color = new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.3f);
             if (offer.Passenger.Portrait != null)
                 photoImage.sprite = offer.Passenger.Portrait;
-            FixedSize(photo, 96f, 96f);
+            OnboardComputerFactory.FixedSize(photo, 96f, 96f);
 
             // Тексты заказа.
             var column = new GameObject("Info", typeof(RectTransform));
@@ -257,26 +166,26 @@ namespace SpaceTaxi.UI
             columnLe.minWidth = 100f;
             columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
 
-            TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 24f, BrightColor);
-            FixedHeight(name.gameObject, 30f);
-            TMP_Text route = Text(column,
+            TMP_Text name = OnboardComputerFactory.Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 24f, OnboardComputerFactory.BrightColor);
+            OnboardComputerFactory.FixedHeight(name.gameObject, 30f);
+            TMP_Text route = OnboardComputerFactory.Text(column,
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper(),
-                22f, TaxiColor);
-            FixedHeight(route.gameObject, 28f);
-            var status = Text(column, "...", 19f, LabelColor);
-            FixedHeight(status.gameObject, 24f);
+                22f, OnboardComputerFactory.TaxiColor);
+            OnboardComputerFactory.FixedHeight(route.gameObject, 28f);
+            var status = OnboardComputerFactory.Text(column, "...", 19f, OnboardComputerFactory.LabelColor);
+            OnboardComputerFactory.FixedHeight(status.gameObject, 24f);
             status.name = "OrderStatus";
 
             string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             if (!string.IsNullOrEmpty(wish))
             {
-                var wishText = Text(column, "«" + wish + "»", 17f, LabelColor);
+                var wishText = OnboardComputerFactory.Text(column, "«" + wish + "»", 17f, OnboardComputerFactory.LabelColor);
                 wishText.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             }
 
             // Отказ: без пассажира — всегда, с пассажиром — только на планете.
-            var cancel = Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
-                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 17f);
+            var cancel = OnboardComputerFactory.Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.25f), OnboardComputerFactory.LabelColor, 17f);
             var cancelLe = cancel.AddComponent<LayoutElement>();
             cancelLe.minHeight = 32f;
             cancelLe.flexibleWidth = 1f;
@@ -373,12 +282,12 @@ namespace SpaceTaxi.UI
             var sliding = new GameObject("SlidingArea", typeof(RectTransform));
             sliding.transform.SetParent(barGo.transform, false);
             var slidingRect = (RectTransform)sliding.transform;
-            Stretch(slidingRect);
+            OnboardComputerFactory.Stretch(slidingRect);
 
             var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
             handle.transform.SetParent(sliding.transform, false);
-            Stretch((RectTransform)handle.transform);
-            handle.GetComponent<Image>().color = LabelColor;
+            OnboardComputerFactory.Stretch((RectTransform)handle.transform);
+            handle.GetComponent<Image>().color = OnboardComputerFactory.LabelColor;
             bar.handleRect = (RectTransform)handle.transform;
             bar.targetGraphic = handle.GetComponent<Image>();
 
@@ -396,7 +305,7 @@ namespace SpaceTaxi.UI
             layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
-            card.GetComponent<Image>().color = PanelColor;
+            card.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var cardLe = card.AddComponent<LayoutElement>();
             cardLe.minHeight = 108f;
             cardLe.minWidth = 410f;
@@ -417,7 +326,7 @@ namespace SpaceTaxi.UI
             {
                 avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
             }
-            FixedSize(avatar, 64f, 64f);
+            OnboardComputerFactory.FixedSize(avatar, 64f, 64f);
 
             // Тексты.
             var column = new GameObject("Info", typeof(RectTransform));
@@ -433,14 +342,14 @@ namespace SpaceTaxi.UI
             columnLe.minWidth = 100f;
             columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
 
-            TMP_Text name = Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, BrightColor);
-            TMP_Text route = Text(column,
+            TMP_Text name = OnboardComputerFactory.Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, OnboardComputerFactory.BrightColor);
+            TMP_Text route = OnboardComputerFactory.Text(column,
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн", 17f, LabelColor);
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн", 17f, OnboardComputerFactory.LabelColor);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             if (!string.IsNullOrEmpty(wishPhrase))
             {
-                var wish = Text(column, "доп.: «" + wishPhrase + "»", 15f, LabelColor);
+                var wish = OnboardComputerFactory.Text(column, "доп.: «" + wishPhrase + "»", 15f, OnboardComputerFactory.LabelColor);
                 wish.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             }
 
@@ -454,12 +363,12 @@ namespace SpaceTaxi.UI
             buttonsLayout.childForceExpandWidth = false;
             buttonsLayout.childForceExpandHeight = false;
             OrderOffer captured = offer;
-            var accept = Button(buttons.transform, "✓", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 26f);
-            FixedSize(accept, 44f, 44f);
+            var accept = OnboardComputerFactory.Button(buttons.transform, "✓", OnboardComputerFactory.TaxiColor, new Color(0.04f, 0.06f, 0.1f), 26f);
+            OnboardComputerFactory.FixedSize(accept, 44f, 44f);
             accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
-            var decline = Button(buttons.transform, "✕",
-                new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 26f);
-            FixedSize(decline, 44f, 44f);
+            var decline = OnboardComputerFactory.Button(buttons.transform, "✕",
+                new Color(OnboardComputerFactory.DangerColor.r, OnboardComputerFactory.DangerColor.g, OnboardComputerFactory.DangerColor.b, 0.3f), OnboardComputerFactory.DangerColor, 26f);
+            OnboardComputerFactory.FixedSize(decline, 44f, 44f);
             decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
 
             return card;
@@ -539,124 +448,10 @@ namespace SpaceTaxi.UI
             dist = Mathf.Max(0f, best);
         }
 
-        // --- Помощники построения ---
-
         private static string Col(string label, string value)
         {
-            return $"<color=#{ColorUtility.ToHtmlStringRGB(LabelColor)}>{label}:</color> {value}";
+            return $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.LabelColor)}>{label}:</color> {value}";
         }
-
-        private GameObject H(string name, Transform parent)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var layout = go.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = true;
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            return go;
-        }
-
-        // Иконка + значение в шапке (деньги, рейтинг).
-        private GameObject IconStat(Transform parent, Sprite icon, out TMP_Text value)
-        {
-            var stat = new GameObject("Stat", typeof(RectTransform));
-            stat.transform.SetParent(parent, false);
-            var layout = stat.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 4;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-
-            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-            iconGo.transform.SetParent(stat.transform, false);
-            var iconImage = iconGo.GetComponent<Image>();
-            iconImage.sprite = icon;
-            iconImage.preserveAspect = true;
-            iconImage.color = TaxiColor;
-            FixedSize(iconGo, 24f, 24f);
-
-            value = Text(stat, "0", 22f, BrightColor);
-            FixedWidth(value.gameObject, 64f);
-            return stat;
-        }
-
-        private GameObject PlayerButton(Transform parent, string glyph)
-        {
-            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 15f);
-            FixedSize(go, 26f, 26f);
-            return go;
-        }
-
-        private TMP_Text Text(GameObject parent, string content, float size, Color color)
-        {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent.transform, false);
-            var text = go.GetComponent<TextMeshProUGUI>();
-            text.font = font;
-            text.fontSize = size;
-            text.color = color;
-            text.text = content;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        private GameObject Button(Transform parent, string label, Color background, Color textColor, float size)
-        {
-            var go = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
-            go.GetComponent<Image>().color = background;
-            var text = Text(go, label, size, textColor);
-            Stretch(text.rectTransform);
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = true;
-            return go;
-        }
-
-        private static void FixedSize(GameObject go, float width, float height)
-        {
-            var le = go.AddComponent<LayoutElement>();
-            le.minWidth = width;
-            le.minHeight = height;
-            le.preferredWidth = width;
-            le.preferredHeight = height;
-            le.flexibleWidth = 0f;
-            le.flexibleHeight = 0f;
-        }
-
-        private static void FixedHeight(GameObject go, float height)
-        {
-            var le = go.AddComponent<LayoutElement>();
-            le.minHeight = height;
-            le.preferredHeight = height;
-            le.flexibleHeight = 0f;
-        }
-
-        private static void FixedWidth(GameObject go, float width)
-        {
-            var le = go.AddComponent<LayoutElement>();
-            le.minWidth = width;
-            le.preferredWidth = width;
-            le.flexibleWidth = 0f;
-        }
-
-        private static void Flexible(GameObject go)
-        {
-            go.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        }
-
-        private static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
-
         private static TMP_Text FindText(RectTransform parent, string name)
         {
             var found = parent.Find(name);
