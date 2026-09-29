@@ -101,27 +101,14 @@ namespace SpaceTaxi.Physics
 
         private void Crash(Planet planet, Collision2D collision, float v)
         {
-            Vector2 normal = collision.contactCount > 0
-                ? collision.contacts[0].normal
-                : (Vector2)(transform.position - planet.transform.position).normalized;
-
-            // Урон: max(5, (v - LandSpeed) * 0.9).
+            // Удар есть удар: урон сразу; выжил — считай сел (без отскоков
+            // и дребезга о поверхность).
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);
-
-            // Отскок: отражение нормальной составляющей (коэф. 1.7) и гашение до 45%.
-            Vector2 velocity = ship.Body.linearVelocity;
-            float vd = Vector2.Dot(velocity, normal);
-            if (vd < 0f)
-                velocity -= 1.7f * vd * normal;
-            velocity *= 0.45f;
-            ship.Body.linearVelocity = velocity;
-
-            // Вытолкнуть над поверхностью.
-            Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + 8f);
-            transform.position = pos;
-
             Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0}");
+
+            if (ship.Hp > 0f)
+                Land(planet, collision);
         }
     }
 }
