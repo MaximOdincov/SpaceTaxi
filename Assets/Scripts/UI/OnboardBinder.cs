@@ -29,6 +29,9 @@ namespace SpaceTaxi.UI
 
         [SerializeField] private Sprite cashIcon;
         [SerializeField] private Sprite ratingIcon;
+
+        [Tooltip("Единый шрифт панели: применяется ко всем текстам (каркас и карточки). Пусто — шрифт часов")]
+        [SerializeField] private TMP_FontAsset panelFont;
         private TMP_Text orderPay;
         private Button cancelButton;
 
@@ -48,6 +51,7 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
+            ApplyPanelFont();
             if (transform.Find("Stack") == null)
             {
                 // Фолбэк для старой сцены: строим каркас кодом.
@@ -60,6 +64,22 @@ namespace SpaceTaxi.UI
         }
 
         // Поиск готовых (построенных редактором) элементов по именам.
+        // Единый шрифт панели: поле panelFont, иначе текущий шрифт часов.
+        private void ApplyPanelFont()
+        {
+            if (panelFont == null)
+            {
+                var clockText = transform.Find("Stack/Header/TitleRow/Clock");
+                if (clockText != null)
+                    panelFont = clockText.GetComponent<TMP_Text>().font;
+            }
+            if (panelFont == null)
+                return;
+            OnboardComputerFactory.SetFont(panelFont);
+            foreach (TMP_Text text in GetComponentsInChildren<TMP_Text>(true))
+                text.font = panelFont;
+        }
+
         private void BindExisting()
         {
             clock = FindT("Stack/Header/TitleRow/Clock");
