@@ -285,6 +285,110 @@ namespace SpaceTaxi.UI
             go.AddComponent<LayoutElement>().flexibleWidth = 1f;
         }
 
+
+        // --- Шаблоны карточек заказов (уходят в префабы, редактируются руками) ---
+
+        // Карточка входящего заказа: [аватар][тексты][кнопки].
+        public static GameObject BuildOfferCard()
+        {
+            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
+            var layout = card.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.spacing = 10;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+            card.GetComponent<Image>().color = PanelColor;
+            var le = card.AddComponent<LayoutElement>();
+            le.minHeight = 108f;
+            le.minWidth = 410f;
+            le.preferredWidth = 410f;
+            le.flexibleWidth = 0f;
+
+            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
+            avatar.transform.SetParent(card.transform, false);
+            var avatarImage = avatar.GetComponent<Image>();
+            avatarImage.preserveAspect = true;
+            avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+            FixedSize(avatar, 64f, 64f);
+
+            var column = new GameObject("Info", typeof(RectTransform));
+            column.transform.SetParent(card.transform, false);
+            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
+            columnLayout.spacing = 2;
+            columnLayout.childControlWidth = true;
+            columnLayout.childControlHeight = true;
+            columnLayout.childForceExpandWidth = true;
+            columnLayout.childForceExpandHeight = false;
+            var columnLe = column.AddComponent<LayoutElement>();
+            columnLe.flexibleWidth = 1f;
+            columnLe.minWidth = 100f;
+            columnLe.preferredWidth = 1f;
+
+            TMP_Text name = Text(column, "Имя · архетип", 20f, BrightColor, "Name");
+            TMP_Text route = Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б · 0 юн", 17f, LabelColor, "Route");
+            Text(column, "доп.: «пожелание»", 15f, LabelColor, "Wish");
+
+            var buttons = new GameObject("Buttons", typeof(RectTransform));
+            buttons.transform.SetParent(card.transform, false);
+            var buttonsLayout = buttons.AddComponent<VerticalLayoutGroup>();
+            buttonsLayout.spacing = 6;
+            buttonsLayout.childControlWidth = true;
+            buttonsLayout.childControlHeight = true;
+            buttonsLayout.childForceExpandWidth = false;
+            buttonsLayout.childForceExpandHeight = false;
+
+            var accept = Button(buttons.transform, "✓", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 26f, "Accept");
+            FixedSize(accept, 44f, 44f);
+            var decline = Button(buttons.transform, "✕", new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 26f, "Decline");
+            FixedSize(decline, 44f, 44f);
+
+            return card;
+        }
+
+        // Блок активного заказа: [фото][тексты].
+        public static GameObject BuildActiveOrderBlock()
+        {
+            var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));
+            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.padding = new RectOffset(10, 10, 10, 10);
+            rowLayout.spacing = 10;
+            rowLayout.childControlWidth = true;
+            rowLayout.childControlHeight = true;
+            rowLayout.childForceExpandWidth = false;
+            rowLayout.childForceExpandHeight = true;
+            row.GetComponent<Image>().color = PanelColor;
+            row.AddComponent<LayoutElement>().minHeight = 120f;
+
+            var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
+            photo.transform.SetParent(row.transform, false);
+            var photoImage = photo.GetComponent<Image>();
+            photoImage.preserveAspect = true;
+            photoImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.3f);
+            FixedSize(photo, 96f, 96f);
+
+            var column = new GameObject("Info", typeof(RectTransform));
+            column.transform.SetParent(row.transform, false);
+            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
+            columnLayout.spacing = 2;
+            columnLayout.childControlWidth = true;
+            columnLayout.childControlHeight = true;
+            columnLayout.childForceExpandWidth = true;
+            columnLayout.childForceExpandHeight = false;
+            var columnLe = column.AddComponent<LayoutElement>();
+            columnLe.flexibleWidth = 1f;
+            columnLe.minWidth = 100f;
+            columnLe.preferredWidth = 1f;
+
+            Text(column, "Имя · архетип", 24f, BrightColor, "Name");
+            Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 22f, TaxiColor, "Route");
+            Text(column, "статус", 19f, LabelColor, "OrderStatus");
+            Text(column, "«пожелание»", 17f, LabelColor, "Wish");
+
+            return row;
+        }
+
         public static void SetFont(TMP_FontAsset font) => currentFont = font;
 
         public static void Stretch(RectTransform rect)

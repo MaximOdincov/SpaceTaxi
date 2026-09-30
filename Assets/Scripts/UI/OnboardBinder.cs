@@ -32,6 +32,10 @@ namespace SpaceTaxi.UI
 
         [Tooltip("Единый шрифт панели: применяется ко всем текстам (каркас и карточки). Пусто — шрифт часов")]
         [SerializeField] private TMP_FontAsset panelFont;
+
+        [Header("Префабы карточек (пусто — собрать кодом)")]
+        [SerializeField] private GameObject offerCardPrefab;
+        [SerializeField] private GameObject activeOrderPrefab;
         private TMP_Text orderPay;
         private Button cancelButton;
 
@@ -149,63 +153,31 @@ namespace SpaceTaxi.UI
         {
             OrderOffer offer = orders.Active;
 
-            var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));
-            row.transform.SetParent(orderArea, false);
+            GameObject row = activeOrderPrefab != null
+                ? Instantiate(activeOrderPrefab, orderArea)
+                : OnboardComputerFactory.BuildActiveOrderBlock();
+            if (activeOrderPrefab == null)
+                row.transform.SetParent(orderArea, false);
             orderAreaChildren.Add(row);
             StartCoroutine(FadeIn(row));
-            row.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
-            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.padding = new RectOffset(10, 10, 10, 10);
-            rowLayout.spacing = 10;
-            rowLayout.childControlWidth = true;
-            rowLayout.childControlHeight = true;
-            rowLayout.childForceExpandWidth = false;
-            rowLayout.childForceExpandHeight = true;
 
-            // Фото пассажира в рамке.
-            var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
-            photo.transform.SetParent(row.transform, false);
-            var photoImage = photo.GetComponent<Image>();
-            photoImage.preserveAspect = true;
-            photoImage.color = new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.3f);
-            if (offer.Passenger.Portrait != null)
-                photoImage.sprite = offer.Passenger.Portrait;
-            OnboardComputerFactory.FixedSize(photo, 96f, 96f);
-
-            // Тексты заказа.
-            var column = new GameObject("Info", typeof(RectTransform));
-            column.transform.SetParent(row.transform, false);
-            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
-            columnLayout.spacing = 2;
-            columnLayout.childControlWidth = true;
-            columnLayout.childControlHeight = true;
-            columnLayout.childForceExpandWidth = true;
-            columnLayout.childForceExpandHeight = false;
-            var columnLe = column.AddComponent<LayoutElement>();
-            columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 100f;
-            columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
-
-            TMP_Text name = OnboardComputerFactory.Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 24f, OnboardComputerFactory.BrightColor);
-            OnboardComputerFactory.FixedHeight(name.gameObject, 30f);
-            TMP_Text route = OnboardComputerFactory.Text(column,
-                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper(),
-                22f, OnboardComputerFactory.TaxiColor);
-            OnboardComputerFactory.FixedHeight(route.gameObject, 28f);
-            var status = OnboardComputerFactory.Text(column, "...", 19f, OnboardComputerFactory.LabelColor);
-            OnboardComputerFactory.FixedHeight(status.gameObject, 24f);
-            status.name = "OrderStatus";
-
-            string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            if (!string.IsNullOrEmpty(wish))
+            var photo = row.transform.Find("Photo");
+            var photoImage = photo != null ? photo.GetComponent<Image>() : null;
+            if (photoImage != null && offer.Passenger.Portrait != null)
             {
-                var wishText = OnboardComputerFactory.Text(column, "«" + wish + "»", 17f, OnboardComputerFactory.LabelColor);
-                wishText.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+                photoImage.sprite = offer.Passenger.Portrait;
+                photoImage.color = offer.Passenger.PortraitTint;
             }
 
-            // Отказ: без пассажира — всегда, с пассажиром — только на планете.
+            SetText(row, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
+            SetText(row, "Info/Route",
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
+            string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            SetText(row, "Info/Wish", string.IsNullOrEmpty(wish) ? "" : "«" + wish + "»");
+
             var cancel = OnboardComputerFactory.Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.25f), OnboardComputerFactory.LabelColor, 17f);
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.25f),
+                OnboardComputerFactory.LabelColor, 17f);
             var cancelLe = cancel.AddComponent<LayoutElement>();
             cancelLe.minHeight = 32f;
             cancelLe.flexibleWidth = 1f;
@@ -214,6 +186,13 @@ namespace SpaceTaxi.UI
             orderAreaChildren.Add(cancel);
 
             orderPay.text = Col("Счёт:", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
+        }
+
+        private static void SetText(GameObject root, string path, string value)
+        {
+            var t = root.transform.Find(path);
+            if (t != null)
+                t.GetComponent<TMP_Text>().text = value;
         }
 
         private readonly Dictionary<OrderOffer, GameObject> cardMap = new Dictionary<OrderOffer, GameObject>();
@@ -314,82 +293,40 @@ namespace SpaceTaxi.UI
             scroll.verticalScrollbar = bar;
         }
 
-        // Карточка: [аватар] [имя/маршрут/условие] [кнопки] — всё внутри контейнеров.
+        // Карточка входящего: префаб (или код), данные заполняем по именам узлов.
         private GameObject BuildCard(OrderOffer offer)
         {
-            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
-            var layout = card.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.spacing = 10;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
-            card.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
-            var cardLe = card.AddComponent<LayoutElement>();
-            cardLe.minHeight = 108f;
-            cardLe.minWidth = 410f;
-            cardLe.preferredWidth = 410f;
-            cardLe.flexibleWidth = 0f;
+            GameObject card = offerCardPrefab != null
+                ? Instantiate(offerCardPrefab, orderArea)
+                : OnboardComputerFactory.BuildOfferCard();
+            if (offerCardPrefab == null)
+                card.transform.SetParent(orderArea, false);
 
-            // Аватар в рамке.
-            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
-            avatar.transform.SetParent(card.transform, false);
-            var avatarImage = avatar.GetComponent<Image>();
-            avatarImage.preserveAspect = true;
-            if (offer.Passenger.Portrait != null)
+            var avatar = card.transform.Find("Avatar");
+            var avatarImage = avatar != null ? avatar.GetComponent<Image>() : null;
+            if (avatarImage != null)
             {
-                avatarImage.sprite = offer.Passenger.Portrait;
-                avatarImage.color = offer.Passenger.PortraitTint;
+                if (offer.Passenger.Portrait != null)
+                {
+                    avatarImage.sprite = offer.Passenger.Portrait;
+                    avatarImage.color = offer.Passenger.PortraitTint;
+                }
             }
-            else
-            {
-                avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
-            }
-            OnboardComputerFactory.FixedSize(avatar, 64f, 64f);
 
-            // Тексты.
-            var column = new GameObject("Info", typeof(RectTransform));
-            column.transform.SetParent(card.transform, false);
-            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
-            columnLayout.spacing = 2;
-            columnLayout.childControlWidth = true;
-            columnLayout.childControlHeight = true;
-            columnLayout.childForceExpandWidth = true;
-            columnLayout.childForceExpandHeight = false;
-            var columnLe = column.AddComponent<LayoutElement>();
-            columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 100f;
-            columnLe.preferredWidth = 1f; // текст не распирает карточку — перенос строк
-
-            TMP_Text name = OnboardComputerFactory.Text(column, offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype, 20f, OnboardComputerFactory.BrightColor);
-            TMP_Text route = OnboardComputerFactory.Text(column,
+            SetText(card, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
+            SetText(card, "Info/Route",
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн", 17f, OnboardComputerFactory.LabelColor);
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            if (!string.IsNullOrEmpty(wishPhrase))
-            {
-                var wish = OnboardComputerFactory.Text(column, "доп.: «" + wishPhrase + "»", 15f, OnboardComputerFactory.LabelColor);
-                wish.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
-            }
+            SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : "доп.: «" + wishPhrase + "»");
 
-            // Кнопки-иконки в ряд: ✓ принять, ✕ отклонить — компактно, без пустого низа.
-            var buttons = new GameObject("Buttons", typeof(RectTransform));
-            buttons.transform.SetParent(card.transform, false);
-            var buttonsLayout = buttons.AddComponent<VerticalLayoutGroup>();
-            buttonsLayout.spacing = 6;
-            buttonsLayout.childControlWidth = true;
-            buttonsLayout.childControlHeight = true;
-            buttonsLayout.childForceExpandWidth = false;
-            buttonsLayout.childForceExpandHeight = false;
             OrderOffer captured = offer;
-            var accept = OnboardComputerFactory.Button(buttons.transform, "✓", OnboardComputerFactory.TaxiColor, new Color(0.04f, 0.06f, 0.1f), 26f);
-            OnboardComputerFactory.FixedSize(accept, 44f, 44f);
-            accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
-            var decline = OnboardComputerFactory.Button(buttons.transform, "✕",
-                new Color(OnboardComputerFactory.DangerColor.r, OnboardComputerFactory.DangerColor.g, OnboardComputerFactory.DangerColor.b, 0.3f), OnboardComputerFactory.DangerColor, 26f);
-            OnboardComputerFactory.FixedSize(decline, 44f, 44f);
-            decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
+            var accept = card.transform.Find("Buttons/Accept");
+            if (accept != null)
+                accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            var decline = card.transform.Find("Buttons/Decline");
+            if (decline != null)
+                decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
 
             return card;
         }

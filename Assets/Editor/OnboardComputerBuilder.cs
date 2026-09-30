@@ -36,5 +36,41 @@ namespace SpaceTaxi.Tools
             EditorSceneManager.MarkSceneDirty(binder.gameObject.scene);
             Debug.Log("[OnboardComputerBuilder] каркас построен: " + refs.Clock.text);
         }
+
+        // Префабы карточек заказов — редактируются в префаб-режиме, binder
+        // только инстанцирует и заполняет данные по именам узлов.
+        [MenuItem("Space Taxi/Create Order UI Prefabs")]
+        public static void CreateOrderPrefabs()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Prefabs/UI"))
+                AssetDatabase.CreateFolder("Assets/Prefabs", "UI");
+
+            var card = SpaceTaxi.UI.OnboardComputerFactory.BuildOfferCard();
+            card.transform.SetParent(null, false);
+            PrefabUtility.SaveAsPrefabAsset(card, "Assets/Prefabs/UI/OfferCard.prefab");
+            Object.DestroyImmediate(card);
+
+            var block = SpaceTaxi.UI.OnboardComputerFactory.BuildActiveOrderBlock();
+            block.transform.SetParent(null, false);
+            PrefabUtility.SaveAsPrefabAsset(block, "Assets/Prefabs/UI/ActiveOrder.prefab");
+            Object.DestroyImmediate(block);
+
+            // Сразу привязать к binder в открытой сцене, если он есть.
+            var binder = Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardBinder>();
+            if (binder != null)
+            {
+                var so = new SerializedObject(binder);
+                so.FindProperty("offerCardPrefab").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/OfferCard.prefab");
+                so.FindProperty("activeOrderPrefab").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/ActiveOrder.prefab");
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(binder.gameObject);
+                EditorSceneManager.MarkSceneDirty(binder.gameObject.scene);
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("[OnboardComputerBuilder] префабы карточек созданы и привязаны");
+        }
     }
 }
