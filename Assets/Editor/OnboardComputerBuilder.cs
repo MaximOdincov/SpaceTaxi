@@ -37,6 +37,17 @@ namespace SpaceTaxi.Tools
             Debug.Log("[OnboardComputerBuilder] каркас построен: " + refs.Clock.text);
         }
 
+        // Принудительно рассчитать layout (без Canvas группы не применяются).
+        private static void RebuildLayout(RectTransform root)
+        {
+            var canvasGo = new GameObject("TempCanvas", typeof(Canvas));
+            root.SetParent(canvasGo.transform, false);
+            Canvas.ForceUpdateCanvases();
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+            root.SetParent(null, false);
+            Object.DestroyImmediate(canvasGo);
+        }
+
         // Префабы карточек заказов — редактируются в префаб-режиме, binder
         // только инстанцирует и заполняет данные по именам узлов.
         [MenuItem("Space Taxi/Create Order UI Prefabs")]
@@ -47,11 +58,13 @@ namespace SpaceTaxi.Tools
 
             var card = SpaceTaxi.UI.OnboardComputerFactory.BuildOfferCard();
             card.transform.SetParent(null, false);
+            RebuildLayout(card.transform as RectTransform);
             PrefabUtility.SaveAsPrefabAsset(card, "Assets/Prefabs/UI/OfferCard.prefab");
             Object.DestroyImmediate(card);
 
             var block = SpaceTaxi.UI.OnboardComputerFactory.BuildActiveOrderBlock();
             block.transform.SetParent(null, false);
+            RebuildLayout(block.transform as RectTransform);
             PrefabUtility.SaveAsPrefabAsset(block, "Assets/Prefabs/UI/ActiveOrder.prefab");
             Object.DestroyImmediate(block);
 

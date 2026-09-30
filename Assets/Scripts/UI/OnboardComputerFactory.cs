@@ -305,6 +305,7 @@ namespace SpaceTaxi.UI
             le.minWidth = 410f;
             le.preferredWidth = 410f;
             le.flexibleWidth = 0f;
+            ((RectTransform)card.transform).sizeDelta = new Vector2(410f, 120f); // стартовый размер для префаб-режима
 
             var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
             avatar.transform.SetParent(card.transform, false);
@@ -360,6 +361,7 @@ namespace SpaceTaxi.UI
             rowLayout.childForceExpandHeight = true;
             row.GetComponent<Image>().color = PanelColor;
             row.AddComponent<LayoutElement>().minHeight = 120f;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(410f, 140f); // стартовый размер для префаб-режима
 
             var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
             photo.transform.SetParent(row.transform, false);
