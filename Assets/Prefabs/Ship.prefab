@@ -257,9 +257,8 @@ MonoBehaviour:
   dashScale: 0.4
   dashWidth: 0.6
   spacing: 12
-  endFade: 0.5
+  endFade: 0.8
   noseOffset: 6
-  horizonSeconds: 2.5
   step: 0.008333334
   maxDashes: 64
 --- !u!114 &3993292597523096005

@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: PhysicsConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
   Thrust: 95
-  Retro: 115
+  Retro: 80
   StrafeAcc: 130
   StrafeMaxTurnRate: 60
   MaxV: 330
-  LandSpeed: 38
+  LandSpeed: 55
   TakeoffV: 85
   EngineMultiplier: 3.2
   LandingRingOffset: 90
@@ -29,5 +29,6 @@ MonoBehaviour:
   CaptureRingK: 3.3
   CaptureRingBase: 30
   HeadingTurnRate: 4
+  HeadingMaxTurnSpeed: 260
   MinControlSpeed: 1
   GravityBoost: 1.15

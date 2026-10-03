@@ -8,14 +8,18 @@ namespace SpaceTaxi.Physics
     {
         [Header("Тяга")]
         public float Thrust = 95f;            // разгон вдоль вектора скорости
-        public float Retro = 115f;            // торможение
+        public float Retro = 80f;             // торможение (2026-10-03: 115 → 80,
+                                              // тормозить стало осмысленным решением)
         public float StrafeAcc = 130f;        // боковая тяга
         [Tooltip("Предел угловой скорости разворота")]
         public float StrafeMaxTurnRate = 60f; // град/с
         public float MaxV = 330f;             // максимальная тяга
 
         [Header("Посадка")]
-        public float LandSpeed = 38f;         // безопасная скорость касания
+        public float LandSpeed = 55f;         // безопасная скорость касания
+                                              // (2026-10-03: 38 → 55 — окно мягкой
+                                              // посадки шире, станции обслуживают
+                                              // только мягкую посадку)
         public float TakeoffV = 85f;          // импульс взлёта от центра планеты
         public float EngineMultiplier = 3.2f; // множитель тяги в посадочном кольце
         public float LandingRingOffset = 90f; // кольцо: поверхность + это расстояние
@@ -36,6 +40,8 @@ namespace SpaceTaxi.Physics
 
         [Header("Нос")]
         public float HeadingTurnRate = 4f;    // доворот носа к скорости, 1/с (8 в прототипе — резче)
+        public float HeadingMaxTurnSpeed = 260f; // предел угловой скорости доворота, град/с
+                                                  // (без предела экспонента даёт ~700°/с — рывок у нуля скорости)
         public float MinControlSpeed = 1f;    // ниже — управление не работает
 
         [Header("Качель")]

@@ -80,6 +80,16 @@ namespace SpaceTaxi.Physics
                 Die();
         }
 
+        // Полный ремонт (станция): именно через метод — с событием HpChanged,
+        // иначе HUD не узнает и цифра зависнет на старом значении.
+        public void RepairAll()
+        {
+            if (ship == null || ship.Config == null)
+                return;
+            ship.Hp = ship.Config.HpMax;
+            HpChanged?.Invoke();
+        }
+
         // Жар звёзд: линейно от 0 на краю зоны до максимума у поверхности.
         private void ApplyHeat(float dt)
         {
@@ -103,6 +113,7 @@ namespace SpaceTaxi.Physics
             if (ship.State == ShipState.Respawning)
                 return;
             Died?.Invoke();
+            CameraFollow.AddShake(0.85f); // гибель — самый сильный толчок
             ship.State = ShipState.Respawning;
             ship.Body.linearVelocity = Vector2.zero;
             StartCoroutine(RespawnAfter(0.6f)); // короткая пауза на взрыв

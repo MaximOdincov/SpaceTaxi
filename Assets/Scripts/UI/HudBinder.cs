@@ -21,11 +21,15 @@ namespace SpaceTaxi.UI
 
         private Ship ship;
         private GravityField gravity;
+        private ShipController controller;
         private bool bound;
+        private Color speedBaseColor;
 
         // Цвета сегментов топлива из макета (10_UI_DESIGN).
         private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
+        private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
+        private static readonly Color SpeedDanger = new Color(1f, 0.35f, 0.3f, 1f);
 
         private void Awake()
         {
@@ -35,6 +39,7 @@ namespace SpaceTaxi.UI
                 fuelSegments[i] = transform.Find($"FuelTrack/FuelSeg_{i + 1:00}").GetComponent<Image>();
             warningBanner = transform.Find("WarningBanner").gameObject;
             warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
+            speedBaseColor = speedValue.color;
 
             // Подсказка-цель: что делать прямо сейчас (под баннером тревоги).
             var hintGo = new GameObject("GoalHint", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -59,6 +64,7 @@ namespace SpaceTaxi.UI
                 gravity = FindAnyObjectByType<GravityField>();
                 if (ship != null && ship.Config != null)
                 {
+                    controller = ship.GetComponent<ShipController>();
                     var hull = ship.GetComponent<HullSystem>();
                     if (hull != null)
                     {
@@ -73,9 +79,27 @@ namespace SpaceTaxi.UI
 
             if (ship != null && ship.Config != null)
             {
-                speedValue.text = ((int)ship.Body.linearVelocity.magnitude).ToString();
+                float speed = ship.Body.linearVelocity.magnitude;
+                speedValue.text = ((int)speed).ToString();
+                UpdateSpeedColor(speed);
                 UpdateWarning();
                 UpdateGoalHint();
+            }
+        }
+
+        // Посадочная индикация: в посадочном кольце скорость зелёная —
+        // касание будет мягким, красная — разобьёшься. Решение «тормозить
+        // или садиться» считывается без арифметики в голове.
+        private void UpdateSpeedColor(float speed)
+        {
+            if (ship.State == ShipState.Flying
+                && controller != null && controller.InLandingRing)
+            {
+                speedValue.color = speed < ship.Config.LandSpeed ? SpeedSafe : SpeedDanger;
+            }
+            else
+            {
+                speedValue.color = speedBaseColor;
             }
         }
 

@@ -236,31 +236,39 @@ namespace SpaceTaxi.UI
 
         private System.Collections.IEnumerator FadeIn(GameObject go)
         {
-            var group = go.GetComponent<CanvasGroup>();
-            if (group == null)
-                group = go.AddComponent<CanvasGroup>();
-            go.transform.localScale = Vector3.one * 0.95f;
             for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / 0.18f)
             {
+                if (go == null) // уничтожен пересборкой — тихо выходим
+                    yield break;
+                var group = go.GetComponent<CanvasGroup>();
+                if (group == null)
+                    group = go.AddComponent<CanvasGroup>();
                 group.alpha = t;
                 go.transform.localScale = Vector3.Lerp(Vector3.one * 0.95f, Vector3.one, t);
                 yield return null;
             }
-            group.alpha = 1f;
+            if (go == null)
+                yield break;
+            var finalGroup = go.GetComponent<CanvasGroup>();
+            if (finalGroup != null)
+                finalGroup.alpha = 1f;
             go.transform.localScale = Vector3.one;
         }
 
         private System.Collections.IEnumerator FadeOut(GameObject go)
         {
-            var group = go.GetComponent<CanvasGroup>();
-            if (group == null)
-                group = go.AddComponent<CanvasGroup>();
             for (float t = 1f; t > 0f; t -= Time.unscaledDeltaTime / 0.15f)
             {
+                if (go == null) // уже уничтожен пересборкой
+                    yield break;
+                var group = go.GetComponent<CanvasGroup>();
+                if (group == null)
+                    group = go.AddComponent<CanvasGroup>();
                 group.alpha = t;
                 yield return null;
             }
-            Destroy(go);
+            if (go != null)
+                Destroy(go);
         }
 
         // Полоска прокрутки справа; скрыта, когда контент помещается целиком.

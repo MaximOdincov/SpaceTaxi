@@ -30,6 +30,11 @@ namespace SpaceTaxi.Core
             var follow = Camera.main.gameObject.AddComponent<CameraFollow>();
             follow.SetTarget(Ship);
 
+            // Параллакс-фон на ту же камеру — ощущение полёта между планетами.
+            var camGo = Camera.main.gameObject;
+            if (camGo.GetComponent<World.StarfieldParallax>() == null)
+                camGo.AddComponent<World.StarfieldParallax>();
+
             Orders = gameObject.AddComponent<OrderService>();
             Orders.Init(level, passengerCatalog, Ship);
         }

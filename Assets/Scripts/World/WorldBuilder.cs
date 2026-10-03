@@ -163,6 +163,12 @@ namespace SpaceTaxi.World
             else
                 go.AddComponent<HullSystem>().Init(level);
 
+            // Отклик движения: выхлоп двигателей и скоростной шлейф.
+            if (go.GetComponent<EngineEffects>() == null)
+                go.AddComponent<EngineEffects>();
+            if (go.GetComponent<SpeedTrail>() == null)
+                go.AddComponent<SpeedTrail>();
+
             go.SetActive(true);
             return ship;
         }

@@ -58,9 +58,13 @@ namespace SpaceTaxi.Physics
             ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
             ship.LandedOn = null;
             ship.State = ShipState.Flying;
+            CameraFollow.AddShake(0.25f); // толчок старта
             Debug.Log($"[Landing] взлёт: v={ship.Body.linearVelocity.magnitude}");
         }
 
+        // Посадка — мягкая или выживший удар. Правило станции: смерть есть
+        // смерть (гибель обрабатывает HullSystem до сюда), а выжившему
+        // станция доводит бак и корпус до 100% — каким бы убитым он ни прилетел.
         private void Land(Planet planet, Collision2D collision)
         {
             Vector2 normal = collision.contactCount > 0
@@ -77,14 +81,17 @@ namespace SpaceTaxi.Physics
 
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
+            CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             ShipLanded?.Invoke(planet);
 
-            // Станция на планете: мгновенная заправка и ремонт (12 par.3.2).
+            // Станция на планете: мгновенная заправка и ремонт (12 par.3.2) —
+            // любая посадка, на которой корабль уцелел. Ремонт — через
+            // RepairAll: событие HpChanged обновит HUD.
             if (planet.HasStation)
             {
                 bool healed = ship.Hp < ship.Config.HpMax;
                 bool refueled = ship.Fuel < ship.Config.FuelMax;
-                ship.Hp = ship.Config.HpMax;
+                Hull.RepairAll();
                 ship.Fuel = ship.Config.FuelMax;
                 if (healed || refueled)
                     StationServiced?.Invoke(planet.DisplayName);
@@ -93,7 +100,7 @@ namespace SpaceTaxi.Physics
             Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: бак/корпус полные)" : ""));
         }
 
-        /// <summary>Посадка на планету со станцией восполнила бак/корпус. Для тоста.</summary>
+        /// <summary>Станция обслужила: бак/корпус полные. Для тоста.</summary>
         public event Action<string> StationServiced;
 
         /// <summary>Мягкая посадка состоялась. Единственная точка взятия/сдачи пассажира.</summary>
@@ -105,6 +112,7 @@ namespace SpaceTaxi.Physics
             // и дребезга о поверхность).
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);
+            CameraFollow.AddShake(Mathf.Clamp01(damage / 45f) * 0.7f); // от «бумкнул» до «въехал»
             Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0}");
 
             if (ship.Hp > 0f)

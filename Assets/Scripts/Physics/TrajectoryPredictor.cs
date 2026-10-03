@@ -22,9 +22,24 @@ namespace SpaceTaxi.Physics
         [SerializeField] private float noseOffset = 6f;
 
         [Header("Симуляция")]
-        [SerializeField] private float horizonSeconds = 4f;
         [SerializeField] private float step = 1f / 120f;
         [SerializeField] private int maxDashes = 64;
+
+        // Горизонт адаптивный: ~1.2 экрана вперёд (от 2 до 4 секунд), опорная
+        // ширина FIXED (не от живого зума камеры — зум «дышит» и линия дёргалась),
+        // само значение сглажено 4/с. Короткий горизонт ещё и убирает «хлёст»
+        // конца линии: чувствительность к начальным условиям растёт с временем².
+        private float horizon = 3f;
+        private float refWidth = 560f;
+        private const float HorizonMin = 2f;
+        private const float HorizonMax = 4f;
+        private const float HorizonScreens = 1.2f;
+
+        // Исход траектории: зелёная — коснёшься планеты ниже порога посадки
+        // (цвет как у скорости в HUD). Красного сознательно нет: линия к
+        // планете краснеет почти всегда — шумит. Опасность видят цифра
+        // скорости и красный цвет в посадочном режиме.
+        private static readonly Color LineSafe = new Color(0.235f, 1f, 0.557f);
 
         private Ship ship;
         private ShipController controller;
@@ -54,6 +69,15 @@ namespace SpaceTaxi.Physics
             }
         }
 
+        private void Start()
+        {
+            // Опорная ширина экрана — константа на сессию: aspect камеры при
+            // полёте 320 высоты. Живой зум (320–470) менять её не должен.
+            var mainCam = Camera.main;
+            if (mainCam != null)
+                refWidth = 2f * 160f * mainCam.aspect;
+        }
+
         private void Update()
         {
             // Скрываем: не в полёте, посадочные режимы (ретро/финал — дэш там
@@ -68,6 +92,13 @@ namespace SpaceTaxi.Physics
                 smoothSpacing = 0f;
                 return;
             }
+
+            // Горизонт по скорости: ~экран вперёд, сглаженно — без рывков
+            // при разгоне/торможении и смене зума.
+            float speed = ship.Body.linearVelocity.magnitude;
+            float target = Mathf.Clamp(HorizonScreens * refWidth / Mathf.Max(speed, 1f), HorizonMin, HorizonMax);
+            horizon += (target - horizon) * Mathf.Min(1f, 4f * Time.deltaTime);
+
             Simulate();
         }
 
@@ -109,7 +140,7 @@ namespace SpaceTaxi.Physics
             Vector2 vel = StartVelocity(out pos);
             var config = ship.Config;
 
-            float targetSpacing = Mathf.Max(spacing, vel.magnitude * horizonSeconds / dashes.Count);
+            float targetSpacing = Mathf.Max(spacing, vel.magnitude * horizon / dashes.Count);
             if (smoothSpacing <= 0f)
                 smoothSpacing = targetSpacing;
             smoothSpacing = Mathf.Lerp(smoothSpacing, targetSpacing, Mathf.Min(1f, 6f * Time.deltaTime));
@@ -118,10 +149,12 @@ namespace SpaceTaxi.Physics
             float travelled = spacingNow - 2f; 
             float total = 0f;     
             int dashIndex = 0;
-            bool crashed = false;
+            bool contact = false;
+            bool contactPlanet = false;
+            float contactSpeed = 0f;
 
-            int steps = Mathf.CeilToInt(horizonSeconds / step);
-            for (int i = 0; i < steps && !crashed; i++)
+            int steps = Mathf.CeilToInt(horizon / step);
+            for (int i = 0; i < steps && !contact; i++)
             {
                 vel += gravity.GetAccelerationAt(pos, config) * step;
                 Vector2 next = pos + vel * step;
@@ -133,7 +166,9 @@ namespace SpaceTaxi.Physics
                 {
                     if (Vector2.Distance(body.transform.position, next) < body.Radius + 4f)
                     {
-                        crashed = true;
+                        contact = true;
+                        contactPlanet = body is Planet;
+                        contactSpeed = vel.magnitude;
                         break;
                     }
                 }
@@ -149,6 +184,18 @@ namespace SpaceTaxi.Physics
 
             for (int i = dashIndex; i < dashes.Count; i++)
                 dashes[i].gameObject.SetActive(false);
+
+            // Цвет всей линии: зелёная — будет мягкое касание планеты,
+            // во всех остальных случаях (удар, звезда, чистый полёт) — обычная.
+            Color lineColor = contact && contactPlanet && contactSpeed < config.LandSpeed
+                ? LineSafe
+                : dashColor;
+            for (int i = 0; i < dashIndex; i++)
+            {
+                Color c = lineColor;
+                c.a *= Mathf.Lerp(1f, 1f - endFade, i / (float)dashes.Count);
+                renderers[i].color = c;
+            }
         }
 
         private void PlaceDash(int index, Vector2 pos, Vector2 vel, float total, float spacingNow)
@@ -157,12 +204,7 @@ namespace SpaceTaxi.Physics
             t.gameObject.SetActive(true);
             t.SetPositionAndRotation(pos,
                 Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg));
-
-            // Плавное затухание к концу линии.
-            float k = index / (float)dashes.Count; // по индексу — стабильно, без миганий
-            Color c = dashColor;
-            c.a *= Mathf.Lerp(1f, 1f - endFade, k);
-            renderers[index].color = c;
+            // Цвет назначается после симуляции — по исходу траектории.
         }
 
         private void HideAll()
