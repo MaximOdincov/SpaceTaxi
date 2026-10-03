@@ -126,8 +126,10 @@ namespace SpaceTaxi.UI
             refs.EconCounters = Text(econRow, "0 доставок · 0 провалов", 20f, LabelColor, "EconCounters");
             refs.EconCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-            // --- ЭФИР ---
+            // --- ЭФИР (несжимаемый: длинный список заказов не должен его душить) ---
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
+            player.GetComponent<LayoutElement>().minHeight = 104f;
+            player.GetComponent<LayoutElement>().preferredHeight = 104f;
             var playerRow = H("PlayerRow", player.transform);
             PlayerButton(playerRow.transform, "|<", "PlayerPrev");
             var station = Text(playerRow, "MTO RADIO", 22f, BrightColor, "Station");

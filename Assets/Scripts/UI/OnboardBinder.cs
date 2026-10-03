@@ -185,7 +185,7 @@ namespace SpaceTaxi.UI
             cancelButton.onClick.AddListener(() => orders.CancelActive());
             orderAreaChildren.Add(cancel);
 
-            orderPay.text = Col("Счёт:", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
+            orderPay.text = Col("Счёт", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
         }
 
         private static void SetText(GameObject root, string path, string value)
@@ -362,13 +362,13 @@ namespace SpaceTaxi.UI
             int minutes = 14 * 60 + 2 + (int)Time.time / 3;
             clock.text = minutes / 60 + ":" + (minutes % 60).ToString("00");
 
-            shipState1.text = Col("Корпус:", Mathf.RoundToInt(ship.HpFraction * 100f) + "%");
-            shipState2.text = Col("Топливо:", Mathf.RoundToInt(ship.FuelFraction * 100f) + "%");
-            shipState3.text = Col("Статус:", ship.State == ShipState.Landed ? "посадка"
+            shipState1.text = Col("Корпус", Mathf.RoundToInt(ship.HpFraction * 100f) + "%");
+            shipState2.text = Col("Топливо", Mathf.RoundToInt(ship.FuelFraction * 100f) + "%");
+            shipState3.text = Col("Статус", ship.State == ShipState.Landed ? "посадка"
                 : ship.Fuel <= 0f ? "дрейф без топлива" : "полёт");
 
             NearestBody(out string name, out float dist, out bool heat);
-            sysState2.text = Col("Ближний объект:", name + " (" + dist.ToString("0") + " юн)");
+            sysState2.text = Col("Ближний объект", name + " (" + dist.ToString("0") + " юн)");
             sysState3.text = heat ? "⚠ жаровая зона" : "";
 
             econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов";
