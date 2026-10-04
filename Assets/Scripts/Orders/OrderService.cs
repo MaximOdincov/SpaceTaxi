@@ -63,6 +63,7 @@ namespace SpaceTaxi.Orders
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
         {
             level = levelAsset;
+            this.catalog = catalog;
 
             // Посадка — единственная точка взятия/сдачи пассажира (правила §4).
             ship.GetComponent<LandingSystem>().ShipLanded += OnLanded;

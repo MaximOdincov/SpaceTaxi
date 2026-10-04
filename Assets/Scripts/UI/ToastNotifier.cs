@@ -45,12 +45,13 @@ namespace SpaceTaxi.UI
             var self = (RectTransform)transform;
             self.sizeDelta = new Vector2(700f, 44f);
 
-            gameObject.SetActive(false);
+            // Объект НЕ выключаем: у неактивного Update не вызывается, и мы
+            // никогда не подпишемся на события. Прячем прозрачностью.
+            group.alpha = 0f;
         }
 
         public void Show(string message, bool emphasized = false)
         {
-            gameObject.SetActive(true);
             label.text = message;
             group.alpha = 1f;
             hideAt = Time.unscaledTime + (emphasized ? 5f : duration);
@@ -62,8 +63,8 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
-            if (gameObject.activeSelf && Time.unscaledTime >= hideAt)
-                gameObject.SetActive(false);
+            if (group.alpha > 0f && Time.unscaledTime >= hideAt)
+                group.alpha = 0f;
 
             if (bound)
                 return;
