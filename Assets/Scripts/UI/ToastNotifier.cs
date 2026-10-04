@@ -18,6 +18,8 @@ namespace SpaceTaxi.UI
         private CanvasGroup group;
         private float hideAt;
         private bool bound;
+        private readonly System.Collections.Generic.Queue<(string message, bool emphasized)> queue
+            = new System.Collections.Generic.Queue<(string, bool)>();
 
         private void Awake()
         {
@@ -52,6 +54,11 @@ namespace SpaceTaxi.UI
 
         public void Show(string message, bool emphasized = false)
         {
+            queue.Enqueue((message, emphasized)); // события в один кадр покажутся по очереди
+        }
+
+        private void Display(string message, bool emphasized)
+        {
             label.text = message;
             group.alpha = 1f;
             hideAt = Time.unscaledTime + (emphasized ? 5f : duration);
@@ -65,6 +72,12 @@ namespace SpaceTaxi.UI
         {
             if (group.alpha > 0f && Time.unscaledTime >= hideAt)
                 group.alpha = 0f;
+
+            if (group.alpha <= 0f && queue.Count > 0)
+            {
+                var next = queue.Dequeue();
+                Display(next.message, next.emphasized);
+            }
 
             if (bound)
                 return;

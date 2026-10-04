@@ -53,7 +53,7 @@ namespace SpaceTaxi.UI
             hintRect.anchorMin = new Vector2(0.5f, 1f);
             hintRect.anchorMax = new Vector2(0.5f, 1f);
             hintRect.sizeDelta = new Vector2(900f, 30f);
-            hintRect.anchoredPosition = new Vector2(0f, -140f);
+            hintRect.anchoredPosition = new Vector2(0f, -156f); // ниже тоста
         }
 
         private void Update()
