@@ -88,12 +88,13 @@ namespace SpaceTaxi.Orders
             if (offers.Count != before)
                 OffersChanged?.Invoke();
 
-            // Появление новой.
-            if (Time.time >= nextSpawnAt)
+            // Появление новой: while — если кадры «застревали» (пауза, лаг),
+            // догоняем пропущенные тики, а не ждём следующего.
+            while (Time.time >= nextSpawnAt)
             {
                 if (offers.Count < maxOffers)
                     AddOffer(catalog);
-                nextSpawnAt = Time.time + UnityEngine.Random.Range(spawnMin, spawnMax);
+                nextSpawnAt = Mathf.Max(nextSpawnAt + UnityEngine.Random.Range(spawnMin, spawnMax), Time.time + 2f);
             }
 
             UpdateTargetGlow();
