@@ -24,9 +24,7 @@ namespace SpaceTaxi.Orders
         public OrderState State = OrderState.Offered;
     }
 
-    // Заказы альфы (12_ALPHA_PLAN §3.3): живой поток входящих карточек,
-    // один активный заказ, посадка — единственная точка взятия/сдачи пассажира.
-    // Провал — гибель или потеря корабля. Счётчики доставок и провалов.
+    // Поток входящих карточек, один активный заказ; посадка — взятие/сдача пассажира
     public sealed class OrderService : MonoBehaviour
     {
         [Header("Поток карточек")]
@@ -52,7 +50,7 @@ namespace SpaceTaxi.Orders
         public int Deliveries { get; private set; }
         public int Failures { get; private set; }
 
-        // События для UI (задача 4).
+        // события для UI
         public event Action OffersChanged;
         public event Action ActiveOrderChanged;
         public event Action<OrderOffer> PassengerBoarded;
@@ -65,7 +63,7 @@ namespace SpaceTaxi.Orders
             level = levelAsset;
             this.catalog = catalog;
 
-            // Посадка — единственная точка взятия/сдачи пассажира (правила §4).
+            // посадка — единственная точка взятия/сдачи пассажира
             ship.GetComponent<LandingSystem>().ShipLanded += OnLanded;
             var hull = ship.GetComponent<HullSystem>();
             hull.Died += FailActive;
@@ -83,14 +81,13 @@ namespace SpaceTaxi.Orders
 
         private void Update()
         {
-            // Смертность карточек.
+            // смертность карточек
             int before = offers.Count;
             offers.RemoveAll(o => Time.time >= o.ExpiresAt);
             if (offers.Count != before)
                 OffersChanged?.Invoke();
 
-            // Появление новой: while — если кадры «застревали» (пауза, лаг),
-            // догоняем пропущенные тики, а не ждём следующего.
+            // while — догоняем пропущенные тики после паузы/лага
             while (Time.time >= nextSpawnAt)
             {
                 if (offers.Count < maxOffers)
@@ -101,8 +98,7 @@ namespace SpaceTaxi.Orders
             UpdateTargetGlow();
         }
 
-        // Подсветка планеты назначения: жёлтый пульсирующий ореол позади планеты
-        // (А — пока пассажир ждёт, Б — когда на борту).
+        // подсветка планеты назначения (А — пока ждёт, Б — на борту)
         private Transform targetGlow;
         private SpriteRenderer glowRenderer;
         private string glowBodyName;
@@ -155,7 +151,6 @@ namespace SpaceTaxi.Orders
             glowRenderer.color = new Color(1f, 0.83f, 0.3f, 0.16f);
         }
 
-        // Принять заказ. Один активный заказ — правило альфы.
         public bool Accept(OrderOffer offer)
         {
             if (Active != null || !offers.Contains(offer))
@@ -169,7 +164,6 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
-        // Отклонить предложение — карточка исчезает, счётчики не трогаем.
         public bool Decline(OrderOffer offer)
         {
             if (!offers.Contains(offer))
@@ -179,8 +173,7 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
-        // Отказаться от активного заказа: без пассажира — всегда; с пассажиром
-        // на борту — только стоя на планете (высадить).
+        // с пассажиром на борту — только стоя на планете (высадить)
         public bool CancelActive()
         {
             if (Active == null)
@@ -262,7 +255,7 @@ namespace SpaceTaxi.Orders
                       $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
         }
 
-        // Полный рандом по планетам уровня (решение 2026-09-27); exclude — не эта.
+        // случайная планета уровня, exclude — не эта
         private int RandomPlanetIndex(int exclude)
         {
             planetIndices.Clear();
@@ -280,7 +273,6 @@ namespace SpaceTaxi.Orders
             return -1;
         }
 
-        // Имя планеты для UI.
         public string PlanetName(int index)
         {
             return level != null && index >= 0 && index < level.Bodies.Count
@@ -288,7 +280,6 @@ namespace SpaceTaxi.Orders
                 : "?";
         }
 
-        // Дальность маршрута А→Б в юнитах.
         public float RouteDistance(OrderOffer offer)
         {
             if (offer == null || level == null
@@ -298,7 +289,6 @@ namespace SpaceTaxi.Orders
             return Vector2.Distance(level.Bodies[offer.PickupIndex].Position, level.Bodies[offer.DropoffIndex].Position);
         }
 
-        // Дистанция от корабля до планеты заказа.
         public float DistanceToPlanet(int index, Vector2 from)
         {
             if (level == null || index < 0 || index >= level.Bodies.Count)

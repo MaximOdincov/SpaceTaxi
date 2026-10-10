@@ -4,24 +4,16 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Прочность: урон от столкновений и жара, гибель и респавн.
-    // События HpChanged/Died/Respawned — задел под HUD.
+    // Прочность: урон от столкновений и жара, гибель и респавн
     public class HullSystem : MonoBehaviour
     {
         private Ship ship;
         private GravityField gravity;
         private LevelAsset level;
 
-        /// <summary>Дробное HP 0..1 — для HUD.</summary>
         public event Action HpChanged;
-
-        /// <summary>Корабль погиб (взрыв).</summary>
         public event Action Died;
-
-        /// <summary>Корабль потерян без взрыва (пустой бак, выход за границу). Причина — для тоста.</summary>
         public event Action<string> ShipLost;
-
-        /// <summary>Респавн завершён.</summary>
         public event Action Respawned;
 
         public void Init(LevelAsset levelAsset)
@@ -43,7 +35,6 @@ namespace SpaceTaxi.Physics
 
         private void Update()
         {
-            // Потеря связи: корабль покинул систему (граница из данных уровня).
             if (ship == null || ship.State != ShipState.Flying)
                 return;
             float worldRadius = level != null ? level.WorldRadius : 2500f;
@@ -51,8 +42,7 @@ namespace SpaceTaxi.Physics
                 Abandon("ПОТЕРЯНА СВЯЗЬ");
         }
 
-        // Потеря корабля: респавн без взрыва. Причина — «ОТКЛЮЧИТЬ КОРАБЛЬ»
-        // с бортового компьютера или граница системы.
+        // потеря корабля без взрыва
         public void Abandon(string reason)
         {
             if (ship == null || ship.State == ShipState.Respawning)
@@ -80,8 +70,7 @@ namespace SpaceTaxi.Physics
                 Die();
         }
 
-        // Полный ремонт (станция): именно через метод — с событием HpChanged,
-        // иначе HUD не узнает и цифра зависнет на старом значении.
+        // через событие HpChanged, иначе HUD не обновится
         public void RepairAll()
         {
             if (ship == null || ship.Config == null)
@@ -90,7 +79,7 @@ namespace SpaceTaxi.Physics
             HpChanged?.Invoke();
         }
 
-        // Жар звёзд: линейно от 0 на краю зоны до максимума у поверхности.
+        // жар: линейно от 0 на краю зоны до максимума у поверхности
         private void ApplyHeat(float dt)
         {
             if (gravity == null)
@@ -135,7 +124,7 @@ namespace SpaceTaxi.Physics
 
             ship.Body.linearVelocity = Vector2.zero;
             ship.Hp = ship.Config.HpMax;
-            ship.Fuel = ship.Config.FuelMax; // бак полный (12_ALPHA_PLAN §3.4)
+            ship.Fuel = ship.Config.FuelMax;
             ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();

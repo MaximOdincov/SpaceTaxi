@@ -22,7 +22,6 @@ namespace SpaceTaxi.Physics
 
         private float fuel = 100f;
 
-        /// <summary>Топливо 0..FuelMax. Событие — для HUD.</summary>
         public float Fuel
         {
             get => fuel;

@@ -6,8 +6,7 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Живой HUD: скорость, прочность, топливо сегментами, баннер тревоги.
-    // Вешается на объект HUD, элементы находит по именам из сцены.
+    // HUD: скорость, прочность, топливо сегментами, баннер тревоги
     public class HudBinder : MonoBehaviour
     {
         private TMP_Text speedValue;
@@ -25,7 +24,6 @@ namespace SpaceTaxi.UI
         private bool bound;
         private Color speedBaseColor;
 
-        // Цвета сегментов топлива из макета (10_UI_DESIGN).
         private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
@@ -41,7 +39,7 @@ namespace SpaceTaxi.UI
             warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
             speedBaseColor = speedValue.color;
 
-            // Подсказка-цель: что делать прямо сейчас (под баннером тревоги).
+            // подсказка текущей цели
             var hintGo = new GameObject("GoalHint", typeof(RectTransform), typeof(TextMeshProUGUI));
             hintGo.transform.SetParent(transform, false);
             goalHint = hintGo.GetComponent<TextMeshProUGUI>();
@@ -87,9 +85,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Посадочная индикация: в посадочном кольце скорость зелёная —
-        // касание будет мягким, красная — разобьёшься. Решение «тормозить
-        // или садиться» считывается без арифметики в голове.
+        // в посадочном кольце: зелёная — сядем, красная — разобьёмся
         private void UpdateSpeedColor(float speed)
         {
             if (ship.State == ShipState.Flying
@@ -103,7 +99,6 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Подсказка-цель: постоянно показываем следующий шаг игрока.
         private void UpdateGoalHint()
         {
             var session = FindAnyObjectByType<SpaceTaxi.Core.GameSession>();
@@ -143,7 +138,7 @@ namespace SpaceTaxi.UI
                 fuelSegments[i].color = i < lit ? SegmentOn : SegmentOff;
         }
 
-        // Один баннер, приоритет: пустой бак > жар > мало топлива.
+        // один баннер, приоритет: пустой бак > жар > мало топлива
         private void UpdateWarning()
         {
             string message = null;

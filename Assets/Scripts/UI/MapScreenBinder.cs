@@ -7,9 +7,7 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Карта системы (M): строится КОДОМ из LevelAsset (не нарисованная копия),
-    // живой маркер корабля, цель заказа жёлтым кольцом, станции помечены.
-    // Вешается на MapScreen/Backing, статичную заготовку удаляет.
+    // Карта системы: строится кодом из LevelAsset, живой маркер корабля
     public class MapScreenBinder : MonoBehaviour
     {
         private LevelAsset level;
@@ -28,7 +26,7 @@ namespace SpaceTaxi.UI
         {
             mapRect = (RectTransform)transform;
 
-            // Заготовку из сцены убираем — карту строим из данных.
+            // заготовку из сцены убираем — карту строим из данных
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 string name = transform.GetChild(i).name;
@@ -49,9 +47,7 @@ namespace SpaceTaxi.UI
                 level = session.Level;
             }
 
-            // Карта строится только когда layout рассчитан: у неактивного
-            // (или только что открытого) RectTransform rect ещё нулевой,
-            // и масштаб выходит мусорным — все тела слипаются.
+            // строим только когда layout рассчитан — у неактивного rect нулевой
             if (!built)
             {
                 if (mapRect.rect.width < 100f)
@@ -67,7 +63,7 @@ namespace SpaceTaxi.UI
             UpdateTargetGlow();
         }
 
-        // Подсветка планеты назначения активного заказа — жёлтый пульсирующий ореол.
+        // подсветка цели заказа
         private RectTransform targetGlow;
         private Core.GameSession sessionCache;
 
@@ -96,7 +92,7 @@ namespace SpaceTaxi.UI
             if (targetGlow == null)
                 targetGlow = CreateCircle("TargetGlow", bodySize * 1.4f,
                     new Color(1f, 0.83f, 0.3f, 0.18f));
-            targetGlow.SetAsLastSibling(); // поверх тел с малой альфой — иначе скрыт под фоном панели
+            targetGlow.SetAsLastSibling(); // поверх тел, иначе скрыт под фоном
 
             targetGlow.gameObject.SetActive(true);
             targetGlow.anchoredPosition = WorldToMap(body.Position);
@@ -106,7 +102,7 @@ namespace SpaceTaxi.UI
 
         private void BuildMap()
         {
-            // Границы мира -> вписываем в подложку с полем.
+            // границы мира → вписываем в подложку с полем
             var bounds = new Bounds();
             bool first = true;
             foreach (CelestialBodyData body in level.Bodies)
@@ -133,8 +129,7 @@ namespace SpaceTaxi.UI
         private void CreateBody(CelestialBodyData body)
         {
             bool star = body.Type == BodyType.Star;
-            // Планеты рисуются крупнее честного масштаба — карта не должна
-            // быть пустой, читаемость важнее точных пропорций.
+            // планеты крупнее честного масштаба — для читаемости
             float size = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : 1.9f));
 
             if (star)
@@ -168,7 +163,6 @@ namespace SpaceTaxi.UI
             ((RectTransform)labelGo.transform).anchoredPosition = WorldToMap(body.Position) + Vector2.up * (size * 0.5f + 18f);
         }
 
-
         private Vector2 WorldToMap(Vector2 world)
         {
             return (world - worldCenter) * scale;
@@ -190,7 +184,7 @@ namespace SpaceTaxi.UI
 
         private RectTransform CreateRing(string name, float size, Color color)
         {
-            // Кольцо-заглушка: жёлтый ореол с точкой (честное кольцо — с арт-паком).
+            // заглушка: ореол с точкой (честное кольцо — с арт-паком)
             RectTransform halo = CreateCircle(name, size, new Color(color.r, color.g, color.b, 0.25f));
             RectTransform dot = CreateCircle(name + "Dot", 8f, color);
             dot.SetParent(halo, false);
@@ -198,7 +192,7 @@ namespace SpaceTaxi.UI
             return halo;
         }
 
-        // Круглый спрайт точек (planet_stub), назначается в инспекторе.
+        // круглый спрайт точек, назначается в инспекторе
         [SerializeField] private Sprite circleSprite;
     }
 }

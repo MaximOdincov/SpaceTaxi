@@ -5,8 +5,7 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Core.Tools
 {
-    // Печёт PNG-заглушки в Assets/Sprites/ — их кладём в префабы Planet/Ship.
-    // Форму и спрайт в префабах задаёт человек; код только масштабирует.
+    // Печёт PNG-заглушки в Assets/Sprites/
     public static class StubSpriteBaker
     {
         private const string Folder = "Assets/Sprites";

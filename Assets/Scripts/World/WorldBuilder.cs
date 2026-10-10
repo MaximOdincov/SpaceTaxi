@@ -142,7 +142,6 @@ namespace SpaceTaxi.World
             if (renderer != null && renderer.sprite == null)
                 renderer.sprite = StubSprites.ShipTriangle();
 
-
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
             go.transform.position = start.Position + dir * (start.Radius + ShipOffset);
@@ -163,7 +162,6 @@ namespace SpaceTaxi.World
             else
                 go.AddComponent<HullSystem>().Init(level);
 
-            // Отклик движения: выхлоп двигателей и скоростной шлейф.
             if (go.GetComponent<EngineEffects>() == null)
                 go.AddComponent<EngineEffects>();
             if (go.GetComponent<SpeedTrail>() == null)

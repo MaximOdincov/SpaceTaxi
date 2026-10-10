@@ -2,9 +2,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Orders
 {
-    // Профиль пассажира: имя, архетип, портрет, фразы. Наполняется руками
-    // в инспекторе (Create → Space Taxi → Passenger Profile).
-    // Расширение на автогенерацию (пулы имён поверх) — бета, 12_ALPHA_PLAN §3.3.
+    // Профиль пассажира, наполняется руками в инспекторе
     [CreateAssetMenu(fileName = "Passenger", menuName = "Space Taxi/Passenger Profile")]
     public sealed class PassengerProfile : ScriptableObject
     {
@@ -12,7 +10,7 @@ namespace SpaceTaxi.Orders
         [Tooltip("Имя, которое видит игрок")]
         public string DisplayName = "Гость системы";
 
-        [Tooltip("Архетип из 02_STORY §6: Торопыга, Барыга, Турист, Тихоня, Чудик")]
+        [Tooltip("Архетип: Торопыга, Барыга, Турист, Тихоня, Чудик")]
         public string Archetype = "Турист";
 
         [TextArea(2, 4)]
@@ -43,7 +41,6 @@ namespace SpaceTaxi.Orders
         [Tooltip("Заказ провален")]
         public string[] Complaints;
 
-        // Случайная фраза из пула; пусто — null.
         public static string PickPhrase(string[] phrases)
         {
             if (phrases == null || phrases.Length == 0)

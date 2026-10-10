@@ -25,20 +25,14 @@ namespace SpaceTaxi.Physics
         [SerializeField] private float step = 1f / 120f;
         [SerializeField] private int maxDashes = 64;
 
-        // Горизонт адаптивный: ~1.2 экрана вперёд (от 2 до 4 секунд), опорная
-        // ширина FIXED (не от живого зума камеры — зум «дышит» и линия дёргалась),
-        // само значение сглажено 4/с. Короткий горизонт ещё и убирает «хлёст»
-        // конца линии: чувствительность к начальным условиям растёт с временем².
+        // Горизонт адаптивный: ~1.2 экрана вперёд, опорная ширина фиксированная
         private float horizon = 3f;
         private float refWidth = 560f;
         private const float HorizonMin = 2f;
         private const float HorizonMax = 4f;
         private const float HorizonScreens = 1.2f;
 
-        // Исход траектории: зелёная — коснёшься планеты ниже порога посадки
-        // (цвет как у скорости в HUD). Красного сознательно нет: линия к
-        // планете краснеет почти всегда — шумит. Опасность видят цифра
-        // скорости и красный цвет в посадочном режиме.
+        // Зелёная линия — коснёшься планеты ниже порога посадки
         private static readonly Color LineSafe = new Color(0.235f, 1f, 0.557f);
 
         private Ship ship;
@@ -71,8 +65,7 @@ namespace SpaceTaxi.Physics
 
         private void Start()
         {
-            // Опорная ширина экрана — константа на сессию: aspect камеры при
-            // полёте 320 высоты. Живой зум (320–470) менять её не должен.
+            // опорная ширина на сессию — не от живого зума
             var mainCam = Camera.main;
             if (mainCam != null)
                 refWidth = 2f * 160f * mainCam.aspect;
@@ -80,8 +73,7 @@ namespace SpaceTaxi.Physics
 
         private void Update()
         {
-            // Скрываем: не в полёте, посадочные режимы (ретро/финал — дэш там
-            // только мешает и лезет из «задней» точки), околонулевая скорость.
+            // прячем не в полёте, в ретро и у нулевой скорости
             if (ship == null || ship.Config == null || gravity == null
                 || ship.State != ShipState.Flying
                 || (controller != null && controller.LandingRetro)
@@ -93,8 +85,6 @@ namespace SpaceTaxi.Physics
                 return;
             }
 
-            // Горизонт по скорости: ~экран вперёд, сглаженно — без рывков
-            // при разгоне/торможении и смене зума.
             float speed = ship.Body.linearVelocity.magnitude;
             float target = Mathf.Clamp(HorizonScreens * refWidth / Mathf.Max(speed, 1f), HorizonMin, HorizonMax);
             horizon += (target - horizon) * Mathf.Min(1f, 4f * Time.deltaTime);
@@ -113,14 +103,13 @@ namespace SpaceTaxi.Physics
             return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
         }
 
-        // Направление прогноза: быстро сглаженное к вектору скорости — линия
-        // стабильна и не дёргается от доворотов носа; старт — от носа корабля.
+        // сглаживаем направление — иначе линия дёргается от доворотов носа
         private Vector2 StartVelocity(out Vector2 startPos)
         {
             Vector2 velocity = ship.Body.linearVelocity;
             float speed = velocity.magnitude;
 
-            float rate = Mathf.Min(1f, 10f * Time.deltaTime); // сглаживание 10/с
+            float rate = Mathf.Min(1f, 10f * Time.deltaTime); // 10/с
             Vector2 target = velocity / Mathf.Max(speed, 0.001f);
             if (smoothDir == Vector2.zero)
                 smoothDir = target;
@@ -185,8 +174,7 @@ namespace SpaceTaxi.Physics
             for (int i = dashIndex; i < dashes.Count; i++)
                 dashes[i].gameObject.SetActive(false);
 
-            // Цвет всей линии: зелёная — будет мягкое касание планеты,
-            // во всех остальных случаях (удар, звезда, чистый полёт) — обычная.
+            // зелёная — если касание будет мягким
             Color lineColor = contact && contactPlanet && contactSpeed < config.LandSpeed
                 ? LineSafe
                 : dashColor;
@@ -204,7 +192,6 @@ namespace SpaceTaxi.Physics
             t.gameObject.SetActive(true);
             t.SetPositionAndRotation(pos,
                 Quaternion.Euler(0f, 0f, Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg));
-            // Цвет назначается после симуляции — по исходу траектории.
         }
 
         private void HideAll()

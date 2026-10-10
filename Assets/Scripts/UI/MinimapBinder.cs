@@ -6,9 +6,7 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Радар: корабль всегда в центре, тела — вокруг в масштабе камеры.
-    // Правило: планета видна на экране => видна на радаре.
-    // Посадка на планету оставляет её круг вплотную к стрелке корабля.
+    // Радар: корабль всегда в центре, тела вокруг в масштабе камеры
     public class MinimapBinder : MonoBehaviour
     {
         [Tooltip("Радиус охвата в юнитах мира (примерно половина видимой области камеры)")]
@@ -30,7 +28,7 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
-            // Статичную заготовку сцены убираем — радар строим из живого мира.
+            // статичную заготовку убираем — радар строим из живого мира
             Transform bodiesTransform = transform.Find("Bodies");
             for (int i = bodiesTransform.childCount - 1; i >= 0; i--)
                 Destroy(bodiesTransform.GetChild(i).gameObject);
@@ -60,12 +58,12 @@ namespace SpaceTaxi.UI
             if (ship == null)
                 return;
 
-            // Корабль — центр радара; позиция тела = (мир - корабль) * масштаб.
+            // корабль — центр радара
             Vector2 center = ship.transform.position;
             for (int i = 0; i < dots.Count; i++)
                 dots[i].anchoredPosition = ((Vector2)bodies[i].transform.position - center) * pxPerUnit;
 
-            // Стрелка по вектору скорости (спрайт остриём вверх).
+            // стрелка по вектору скорости (спрайт остриём вверх)
             Vector2 velocity = ship.Body.linearVelocity;
             if (velocity.sqrMagnitude > 1f)
             {
@@ -74,7 +72,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Точка тела честного масштаба; у звезды ядро — ребёнок полупрозрачного ореола.
+        // у звезды ядро — ребёнок полупрозрачного ореола
         private RectTransform CreateDot(CelestialBody body)
         {
             bool star = body is Star;

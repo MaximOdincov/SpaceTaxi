@@ -10,7 +10,7 @@ namespace SpaceTaxi.World
         public float Radius = 50f;
         public float Mass = 1f;
 
-        /// <summary>На планете станция: посадка = заправка и ремонт.</summary>
+        // станция: посадка = заправка и ремонт
         public bool HasStation { get; private set; }
 
         protected Physics.PhysicsConfig config;

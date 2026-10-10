@@ -4,14 +4,13 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Мягкое касание (v < LandSpeed) — посадка, быстрее — урон (v-LandSpeed)*0.9
-    // и отскок. Касание звезды — мгновенная гибель.
+    // Мягкое касание — посадка, жёсткое — урон; звезда — гибель
     public class LandingSystem : MonoBehaviour
     {
         private Ship ship;
         private HullSystem hull;
 
-        // Лениво: HullSystem может быть добавлен позже Awake (WorldBuilder).
+        // лениво: HullSystem может быть добавлен позже Awake (WorldBuilder)
         private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
 
         private void Awake()
@@ -31,7 +30,6 @@ namespace SpaceTaxi.Physics
 
             if (star != null)
             {
-                // Касание звезды смертельно (как в прототипе).
                 Hull.ApplyDamage(ship.Hp);
                 return;
             }
@@ -49,7 +47,7 @@ namespace SpaceTaxi.Physics
             }
         }
 
-        // Взлёт со стоянки: импульс TakeoffV от центра планеты (W или ПРОБЕЛ).
+        // взлёт со стоянки — импульс от центра планеты
         public void Takeoff()
         {
             if (ship == null || ship.State != ShipState.Landed || ship.LandedOn == null)
@@ -62,16 +60,14 @@ namespace SpaceTaxi.Physics
             Debug.Log($"[Landing] взлёт: v={ship.Body.linearVelocity.magnitude}");
         }
 
-        // Посадка — мягкая или выживший удар. Правило станции: смерть есть
-        // смерть (гибель обрабатывает HullSystem до сюда), а выжившему
-        // станция доводит бак и корпус до 100% — каким бы убитым он ни прилетел.
+        // выжившему на посадке станция чинит и заправляет под ноль
         private void Land(Planet planet, Collision2D collision)
         {
             Vector2 normal = collision.contactCount > 0
                 ? collision.contacts[0].normal
                 : (Vector2)(transform.position - planet.transform.position).normalized;
 
-            // Снап на поверхность, скорость в ноль, нос от центра.
+            // снап на поверхность, скорость в ноль, нос от центра
             Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + 7f);
             transform.position = pos;
             ship.Body.linearVelocity = Vector2.zero;
@@ -84,9 +80,7 @@ namespace SpaceTaxi.Physics
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             ShipLanded?.Invoke(planet);
 
-            // Станция на планете: мгновенная заправка и ремонт (12 par.3.2) —
-            // любая посадка, на которой корабль уцелел. Ремонт — через
-            // RepairAll: событие HpChanged обновит HUD.
+            // станция на планете: заправка и ремонт
             if (planet.HasStation)
             {
                 bool healed = ship.Hp < ship.Config.HpMax;
@@ -100,16 +94,13 @@ namespace SpaceTaxi.Physics
             Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: бак/корпус полные)" : ""));
         }
 
-        /// <summary>Станция обслужила: бак/корпус полные. Для тоста.</summary>
         public event Action<string> StationServiced;
 
-        /// <summary>Мягкая посадка состоялась. Единственная точка взятия/сдачи пассажира.</summary>
         public event Action<World.Planet> ShipLanded;
 
         private void Crash(Planet planet, Collision2D collision, float v)
         {
-            // Удар есть удар: урон сразу; выжил — считай сел (без отскоков
-            // и дребезга о поверхность).
+            // урон сразу; выжил — считается посадкой
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);
             CameraFollow.AddShake(Mathf.Clamp01(damage / 45f) * 0.7f); // от «бумкнул» до «въехал»

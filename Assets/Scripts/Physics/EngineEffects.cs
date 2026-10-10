@@ -3,10 +3,7 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
-    // Визуальный отклик на каждое нажатие: выхлоп главной тяги из кормы,
-    // ретро-сопла из носа (в посадочном развороте струя сама разворачивается
-    // «двигателями вперёд») и боковые микросопла стрейфа. Состояние берём
-    // из ShipController — пустой бак и режимы там уже учтены.
+    // Выхлоп тяги, ретро-сопла и микросопла стрейфа
     public class EngineEffects : MonoBehaviour
     {
         private Ship ship;
@@ -24,7 +21,7 @@ namespace SpaceTaxi.Physics
             ship = GetComponent<Ship>();
             controller = GetComponent<ShipController>();
 
-            // Мягкие круглые частицы из подручных спрайтов, один материал на все сопла.
+            // мягкие круглые частицы из подручных спрайтов, один материал на все сопла
             var src = GetComponent<SpriteRenderer>();
             Shader shader = src != null && src.sharedMaterial != null
                 ? src.sharedMaterial.shader
@@ -33,7 +30,7 @@ namespace SpaceTaxi.Physics
             tex.wrapMode = TextureWrapMode.Repeat;
             Material mat = new Material(shader) { mainTexture = tex };
 
-            // Тёплый выхлоп — тяга и стрейф, холодный — ретро: читается мгновенно.
+            // тёплый выхлоп — тяга и стрейф, холодный — ретро
             mainJet = CreateJet("MainJet", new Vector3(-6f, 0f, 0f), Vector3.left,
                 new Color(1f, 0.85f, 0.45f), new Color(1f, 0.35f, 0.15f), mat, 90f);
             retroJet = CreateJet("RetroJet", new Vector3(7f, 0f, 0f), Vector3.right,
@@ -51,15 +48,14 @@ namespace SpaceTaxi.Physics
 
             bool flying = ship.State == ShipState.Flying;
             SetEmission(mainJet, flying && controller.ThrustOn);
-            SetEmission(retroJet, flying && controller.BrakeOn);
-            SetEmission(strafeTop, flying && controller.StrafeLevel > 0f);
-            SetEmission(strafeBottom, flying && controller.StrafeLevel < 0f);
+            //SetEmission(retroJet, flying && controller.BrakeOn);
+            //SetEmission(strafeTop, flying && controller.StrafeLevel > 0f);
+            //SetEmission(strafeBottom, flying && controller.StrafeLevel < 0f);
 
-            // Ретро: обычно струя из носа по курсу; при посадочном развороте
-            // нос против скорости — разворачиваем сопло, струя к планете.
+            // в посадочном развороте нос против скорости — струя к планете
             retroJet.transform.localRotation = controller.LandingRetro ? RetroFlipped : RetroForward;
 
-            // У поверхности двигатели в 3+ раза мощнее — пламя гуще и крупнее.
+            // у поверхности тяга выше — пламя гуще
             float power = Mathf.Max(1f, controller.EnginePower);
             ApplyPower(mainJet, power);
             ApplyPower(retroJet, power);

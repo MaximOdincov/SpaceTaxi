@@ -7,8 +7,7 @@ using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.UI
 {
-    // Тосты событий: пассажир/доставка/провал/станция/потеря корабля.
-    // Сам подписывается на GameSession.OrderService и системы корабля.
+    // Тосты событий заказов и корабля
     public class ToastNotifier : MonoBehaviour
     {
         [Tooltip("Сколько секунд висит тост")]
@@ -23,7 +22,6 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
-            // Плашка рисуется кодом, стиль — 10_UI_DESIGN (панель/тёмный, текст яркий).
             var image = gameObject.AddComponent<Image>();
             image.color = new Color(0.031f, 0.078f, 0.047f, 0.92f);
             image.raycastTarget = false;
@@ -47,14 +45,13 @@ namespace SpaceTaxi.UI
             var self = (RectTransform)transform;
             self.sizeDelta = new Vector2(700f, 44f);
 
-            // Объект НЕ выключаем: у неактивного Update не вызывается, и мы
-            // никогда не подпишемся на события. Прячем прозрачностью.
+            // объект всегда активен (иначе Update не подпишется на события), прячем альфой
             group.alpha = 0f;
         }
 
         public void Show(string message, bool emphasized = false)
         {
-            queue.Enqueue((message, emphasized)); // события в один кадр покажутся по очереди
+            queue.Enqueue((message, emphasized)); // события в один кадр — по очереди
         }
 
         private void Display(string message, bool emphasized)
@@ -63,7 +60,7 @@ namespace SpaceTaxi.UI
             group.alpha = 1f;
             hideAt = Time.unscaledTime + (emphasized ? 5f : duration);
 
-            // Важные события (доставка, провал) — крупнее и шире.
+            // важные события — крупнее и шире
             label.fontSize = emphasized ? 30f : 22f;
             ((RectTransform)transform).sizeDelta = emphasized ? new Vector2(900f, 58f) : new Vector2(700f, 44f);
         }

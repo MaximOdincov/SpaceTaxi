@@ -4,8 +4,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Tools
 {
-    // Перестройка бортового компьютера В РЕДАКТОРЕ: каркас сериализуется
-    // в сцену и дальше правится руками — Play его не трогает, только данные.
+    // Перестройка бортового компьютера в редакторе: каркас сериализуется в сцену
     public static class OnboardComputerBuilder
     {
         [MenuItem("Space Taxi/Rebuild Onboard Computer")]
@@ -18,7 +17,7 @@ namespace SpaceTaxi.Tools
                 return;
             }
 
-            // Снос старых детей с Undo, построение нового каркаса.
+            // снос старых детей с Undo
             var panel = binder.transform;
             for (int i = panel.childCount - 1; i >= 0; i--)
             {
@@ -28,7 +27,7 @@ namespace SpaceTaxi.Tools
             }
 
             var refs = SpaceTaxi.UI.OnboardComputerFactory.Build(panel, destroyImmediate: true);
-            // Зарегистрировать созданные объекты для Undo.
+            // зарегистрировать созданное для Undo
             foreach (Transform child in panel)
                 Undo.RegisterCreatedObjectUndo(child.gameObject, "Rebuild Onboard Computer");
 
@@ -37,7 +36,7 @@ namespace SpaceTaxi.Tools
             Debug.Log("[OnboardComputerBuilder] каркас построен: " + refs.Clock.text);
         }
 
-        // Принудительно рассчитать layout (без Canvas группы не применяются).
+        // без Canvas layout-группы не применяются
         private static void RebuildLayout(RectTransform root)
         {
             var canvasGo = new GameObject("TempCanvas", typeof(Canvas));
@@ -48,8 +47,7 @@ namespace SpaceTaxi.Tools
             Object.DestroyImmediate(canvasGo);
         }
 
-        // Префабы карточек заказов — редактируются в префаб-режиме, binder
-        // только инстанцирует и заполняет данные по именам узлов.
+        // префабы карточек — правятся в префаб-режиме, binder только заполняет данные
         [MenuItem("Space Taxi/Create Order UI Prefabs")]
         public static void CreateOrderPrefabs()
         {
@@ -68,7 +66,7 @@ namespace SpaceTaxi.Tools
             PrefabUtility.SaveAsPrefabAsset(block, "Assets/Prefabs/UI/ActiveOrder.prefab");
             Object.DestroyImmediate(block);
 
-            // Сразу привязать к binder в открытой сцене, если он есть.
+            // сразу привязать к binder, если он в сцене
             var binder = Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardBinder>();
             if (binder != null)
             {

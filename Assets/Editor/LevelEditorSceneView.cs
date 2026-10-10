@@ -5,12 +5,11 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Tools
 {
-    // Гизмо уровня в Scene View (ТЗ: 09_LEVEL_DESIGN.md §1.3, §1.4): кольца,
-    // жар, спавн, дистанции, рамка камеры, сетка; drag тел со snap и Undo.
+    // Гизмо уровня: кольца, жар, спавн, сетка; drag тел со snap и Undo
     [InitializeOnLoad]
     public static class LevelEditorSceneView
     {
-        // Вид игрока: высота из CameraFollow, 16:9.
+        // вид игрока: высота из CameraFollow, 16:9
         private const float ViewHeight = 320f;
         private const float ViewWidth = ViewHeight * 16f / 9f;
 
@@ -67,7 +66,7 @@ namespace SpaceTaxi.Tools
             HandleDrag(window, level);
         }
 
-        // Граница системы: дальше — потеря связи.
+        // граница системы
         private static void DrawWorldRadius(LevelAsset level)
         {
             if (level.WorldRadius <= 0f)
@@ -78,8 +77,7 @@ namespace SpaceTaxi.Tools
                 "граница системы · " + level.WorldRadius.ToString("0"));
         }
 
-        // Зонд: с зажатым Ctrl в точке курсора — стрелка суммарного притяжения
-        // и его величина. Показывает, куда «повезёт» корабль в этой точке.
+        // зонд: Ctrl — стрелка суммарного притяжения под курсором
         private static void DrawGravityProbe(LevelAsset level)
         {
             Event ev = Event.current;
@@ -118,7 +116,7 @@ namespace SpaceTaxi.Tools
             Vector3 center = body.Position;
             bool star = body.Type == BodyType.Star;
 
-            // Превью внешнего вида: спрайт и цвет из данных уровня.
+            // превью: спрайт и цвет из данных уровня
             var visuals = body.Visuals;
             if (visuals != null && visuals.Sprite != null && Event.current.type == EventType.Repaint)
             {
@@ -137,7 +135,7 @@ namespace SpaceTaxi.Tools
                 GUI.color = prevColor;
             }
 
-            // Заливка + контур + имя.
+            // заливка + контур + имя
             Handles.color = star ? StarFill : PlanetFill;
             if (visuals == null || visuals.Sprite == null)
                 Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
@@ -146,29 +144,29 @@ namespace SpaceTaxi.Tools
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName);
             if (body.HasStation)
             {
-                Handles.color = new Color(1f, 0.84f, 0.3f); // accent/taxi
+                Handles.color = new Color(1f, 0.84f, 0.3f);
                 Handles.Label(center + Vector3.up * (body.Radius + 34f), "станция",
                     new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = new Color(1f, 0.84f, 0.3f) } });
             }
 
-            // Кольца: override из данных или формула (константы из PhysicsConfig).
+            // кольца: override из данных или формула
             var config = FindConfig();
             float landingOffset = config != null ? config.LandingRingOffset : 90f;
             float captureK = config != null ? config.CaptureRingK : 3.3f;
             float captureBase = config != null ? config.CaptureRingBase : 30f;
 
-            // Посадочное кольцо — зелёный пунктир (только планеты).
+            // посадочное кольцо — зелёный пунктир (только планеты)
             if (!star)
             {
                 float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + landingOffset;
                 DottedCircle(center, landing, LandingRing, 4f);
             }
 
-            // Кольцо качели — голубой точечный, мельче.
+            // кольцо качели — мельче
             float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * captureK + captureBase;
             DottedCircle(center, capture, CaptureRing, 2f);
 
-            // Жаровая зона — оранжевый пунктир + слабая заливка.
+            // жаровая зона — пунктир + слабая заливка
             if (star && body.HeatRadius > 0f)
             {
                 Handles.color = new Color(HeatColor.r, HeatColor.g, HeatColor.b, 0.05f);
@@ -177,7 +175,7 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // Линии от выбранного тела до остальных с дистанциями; < 300 — тревожно.
+        // дистанции от выбранного тела; < 300 — тревожно
         private static void DrawSelectionDistances(LevelAsset level, int selectedIndex)
         {
             if (selectedIndex < 0 || selectedIndex >= level.Bodies.Count)
@@ -201,7 +199,7 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // Спавн: маркер-треугольник + стрелка курса от поверхности.
+        // спавн: маркер + стрелка курса
         private static void DrawSpawn(LevelAsset level)
         {
             if (level.StartPlanetIndex < 0 || level.StartPlanetIndex >= level.Bodies.Count)
@@ -223,7 +221,7 @@ namespace SpaceTaxi.Tools
             Handles.Label(a + (Vector3)dir * 10f, "спавн " + level.SpawnAngleDeg.ToString("0") + "°");
         }
 
-        // Рамка «что видит игрок» вокруг спавна.
+        // рамка «что видит игрок» вокруг спавна
         private static void DrawCameraFrame(LevelAsset level)
         {
             Vector3 c = LevelEditorWindow.SpawnPointOf(level);
@@ -252,7 +250,7 @@ namespace SpaceTaxi.Tools
                 Handles.DrawLine(new Vector3(minX, y), new Vector3(maxX, y));
         }
 
-        // Клик — выбрать тело, drag — переместить (snap 10, Shift — свободно).
+        // клик — выбрать, drag — переместить (snap 10, Shift — свободно)
         private static void HandleDrag(LevelEditorWindow window, LevelAsset level)
         {
             Event ev = Event.current;
@@ -293,7 +291,7 @@ namespace SpaceTaxi.Tools
             }
             else if (ev.type == EventType.Repaint && dragging)
             {
-                // Координаты при перетаскивании — рядом с телом.
+                // координаты — рядом с телом
                 Handles.color = Color.white;
                 Handles.Label(dragPosition + Vector2.up * 30f,
                     "(" + dragPosition.x.ToString("0") + ", " + dragPosition.y.ToString("0") + ")");
@@ -328,7 +326,7 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // Ускорение суммарной гравитации в точке (формула игры, без MB).
+        // та же формула гравитации, что в игре
         private static Vector2 GravityAt(LevelAsset level, Vector2 pos, float k, float clamp)
         {
             Vector2 accel = Vector2.zero;
@@ -345,8 +343,7 @@ namespace SpaceTaxi.Tools
             return accel;
         }
 
-        // Первый PhysicsConfig проекта — константы для превью. Кэш обязателен:
-        // FindAssets тяжёлый, а зовётся из отрисовки каждого тела.
+        // кэш: FindAssets тяжёлый, зовётся из отрисовки каждого тела
         private static SpaceTaxi.Physics.PhysicsConfig FindConfig()
         {
             if (cachedConfig != null && EditorApplication.timeSinceStartup - configCacheTime < 5.0)
@@ -359,7 +356,7 @@ namespace SpaceTaxi.Tools
             return cachedConfig;
         }
 
-        // Прогноз свободного полёта из спавна после взлёта (импульс TakeoffV).
+        // прогноз свободного полёта из спавна после взлёта
         private static void DrawSpawnTrajectory(LevelAsset level)
         {
             var config = FindConfig();
@@ -386,7 +383,7 @@ namespace SpaceTaxi.Tools
 
                 foreach (var body in level.Bodies)
                     if (Vector2.Distance(body.Position, pos) < body.Radius + 7f)
-                        return; // врезались — прогноз закончен
+                        return; // врезались — конец прогноза
 
                 if (i % 10 == 0) // точка каждые ~10 шагов
                 {
@@ -396,7 +393,7 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // Стрелки гравиполя: направление и сила (цвет от синего к красному).
+        // стрелки гравиполя: цвет от слабого к сильному
         private static void DrawGravityField(LevelAsset level)
         {
             var config = FindConfig();
@@ -420,7 +417,6 @@ namespace SpaceTaxi.Tools
                     float magnitude = accel.magnitude;
                     if (magnitude < 2f)
                         continue; // пустота — не рисуем
-
                     Vector2 dir = accel / magnitude;
                     float length = Mathf.Min(40f, 6f + magnitude * 0.12f);
                     Vector3 from = pos;

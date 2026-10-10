@@ -9,10 +9,7 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Бортовой компьютер: панель строится кодом на автоматических layout-группах
-    // (VerticalLayoutGroup/HorizontalLayoutGroup + LayoutElement). Дети живут
-    // только внутри родителей — ничего не налезает, новые секции добавляются
-    // в стек и всё сдвигается само. Вешается на OnboardComputer.
+    // Бортовой компьютер: панель на автоматических layout-группах
     public class OnboardBinder : MonoBehaviour
     {
         private TMP_FontAsset font;
@@ -22,7 +19,7 @@ namespace SpaceTaxi.UI
         private TMP_Text sysState2, sysState3;
         private Button abandonButton;
 
-        private RectTransform orderArea;      // контейнер зоны заказа (переключается)
+        private RectTransform orderArea; // контейнер зоны заказа
         private GameObject econSection;
         private TMP_Text econCounters;
         private TMP_Text moneyValue, ratingValue;
@@ -58,7 +55,7 @@ namespace SpaceTaxi.UI
             ApplyPanelFont();
             if (transform.Find("Stack") == null)
             {
-                // Фолбэк для старой сцены: строим каркас кодом.
+                // фолбэк для старой сцены: строим каркас кодом
                 BindRefs(OnboardComputerFactory.Build(transform));
             }
             else
@@ -67,8 +64,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Поиск готовых (построенных редактором) элементов по именам.
-        // Единый шрифт панели: поле panelFont, иначе текущий шрифт часов.
+        // шрифт панели: panelFont или шрифт часов
         private void ApplyPanelFont()
         {
             if (panelFont == null)
@@ -199,7 +195,7 @@ namespace SpaceTaxi.UI
 
         private void BuildIncoming()
         {
-            // Ушедшие предложения — плавно растворяются.
+            // ушедшие предложения — плавно растворяются
             var gone = new List<OrderOffer>();
             foreach (var pair in cardMap)
                 if (!OfferExists(pair.Key))
@@ -210,7 +206,7 @@ namespace SpaceTaxi.UI
                 cardMap.Remove(offer);
             }
 
-            // Новые появляются с анимацией; порядок — как в списке.
+            // новые появляются с анимацией, порядок как в списке
             int index = 0;
             foreach (OrderOffer offer in orders.Offers)
             {
@@ -238,7 +234,7 @@ namespace SpaceTaxi.UI
         {
             for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / 0.18f)
             {
-                if (go == null) // уничтожен пересборкой — тихо выходим
+                if (go == null) // уничтожен пересборкой
                     yield break;
                 var group = go.GetComponent<CanvasGroup>();
                 if (group == null)
@@ -271,7 +267,7 @@ namespace SpaceTaxi.UI
                 Destroy(go);
         }
 
-        // Полоска прокрутки справа; скрыта, когда контент помещается целиком.
+        // скроллбар справа; скрыт, когда контент помещается
         private void CreateScrollbar(GameObject scrollObject, ScrollRect scroll)
         {
             var barGo = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
@@ -301,7 +297,7 @@ namespace SpaceTaxi.UI
             scroll.verticalScrollbar = bar;
         }
 
-        // Карточка входящего: префаб (или код), данные заполняем по именам узлов.
+        // карточка входящего: префаб или код, данные по именам узлов
         private GameObject BuildCard(OrderOffer offer)
         {
             GameObject card = offerCardPrefab != null
@@ -354,6 +350,8 @@ namespace SpaceTaxi.UI
                 hull = ship.GetComponent<HullSystem>();
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
+                if (abandonButton != null && hull != null)
+                    abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
                 RefreshOrder();
                 bound = true;
             }

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace SpaceTaxi.UI
 {
-    // Ссылки на построенные элементы бортового компьютера.
+    // Ссылки на построенные элементы
     public sealed class OnboardRefs
     {
         public TMP_Text Clock, ShipState1, ShipState2, ShipState3;
@@ -15,13 +15,11 @@ namespace SpaceTaxi.UI
         public TMP_FontAsset Font;
     }
 
-    // Строит каркас бортового компьютера на layout-группах. Используется
-    // из редактора (Space Taxi -> Rebuild Onboard Computer) — результат
-    // сериализуется в сцену и свободно правится руками; из рантайма —
-    // только как фолбэк для старых сцен.
+    // Строит каркас бортового компьютера на layout-группах. Из редактора
+    // результат сериализуется в сцену; из рантайма — фолбэк для старых сцен.
     public static class OnboardComputerFactory
     {
-        // Шрифт каркаса; используется и рантайм-карточками.
+        // используется и рантайм-карточками
         private static TMP_FontAsset currentFont;
 
         public static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
@@ -32,14 +30,14 @@ namespace SpaceTaxi.UI
 
         public static OnboardRefs Build(Transform panel, bool destroyImmediate = false)
         {
-            // Шрифт — у старого мокапа, если он ещё стоит.
+            // шрифт — у старого мокапа, если он ещё стоит
             TMP_FontAsset font = TMP_Settings.defaultFontAsset;
             var oldTitle = panel.Find("Title");
             if (oldTitle != null)
                 font = oldTitle.GetComponent<TMP_Text>().font;
             currentFont = font;
 
-            // Старовое содержимое сносим (кроме рамки и фона).
+            // старое содержимое сносим (кроме рамки и фона)
             for (int i = panel.childCount - 1; i >= 0; i--)
             {
                 string n = panel.GetChild(i).name;
@@ -126,7 +124,7 @@ namespace SpaceTaxi.UI
             refs.EconCounters = Text(econRow, "0 доставок · 0 провалов", 20f, LabelColor, "EconCounters");
             refs.EconCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-            // --- ЭФИР (несжимаемый: длинный список заказов не должен его душить) ---
+            // --- ЭФИР (несжимаемый) ---
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
             player.GetComponent<LayoutElement>().minHeight = 104f;
             player.GetComponent<LayoutElement>().preferredHeight = 104f;
@@ -214,7 +212,7 @@ namespace SpaceTaxi.UI
             return go;
         }
 
-        // --- Общие помощники (используются и рантаймом для карточек) ---
+        // --- Общие помощники ---
 
         public static GameObject H(string name, Transform parent)
         {
@@ -287,10 +285,9 @@ namespace SpaceTaxi.UI
             go.AddComponent<LayoutElement>().flexibleWidth = 1f;
         }
 
+        // --- Карточки заказов ---
 
-        // --- Шаблоны карточек заказов (уходят в префабы, редактируются руками) ---
-
-        // Карточка входящего заказа: [аватар][тексты][кнопки].
+        // Карточка входящего: [аватар][тексты][кнопки]
         public static GameObject BuildOfferCard()
         {
             var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
@@ -350,7 +347,7 @@ namespace SpaceTaxi.UI
             return card;
         }
 
-        // Блок активного заказа: [фото][тексты].
+        // Блок активного заказа: [фото][тексты]
         public static GameObject BuildActiveOrderBlock()
         {
             var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));

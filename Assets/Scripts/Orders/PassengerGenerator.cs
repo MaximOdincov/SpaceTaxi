@@ -8,8 +8,7 @@ namespace SpaceTaxi.Orders
         public string Archetype;
     }
 
-    // Генерация пассажиров: архетип из 02_STORY §6 + имя/фамилия из пулов.
-    // Реплики и прихоти — бета (12_ALPHA_PLAN par.3.3).
+    // Случайный пассажир: архетип + имя/фамилия из пулов
     public static class PassengerGenerator
     {
         private static readonly string[] Archetypes =
@@ -17,7 +16,6 @@ namespace SpaceTaxi.Orders
             "Торопыга", "Барыга", "Турист", "Тихоня", "Чудик",
         };
 
-        // Пулы-заготовки [ПРЕДЛОЖЕНО]: объём/состав согласовать в бете.
         private static readonly string[] FirstNames =
         {
             "Марк", "Нова", "Тим", "Рита", "Юки", "Аскольд", "Лем", "Вега",

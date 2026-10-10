@@ -4,8 +4,7 @@ using UnityEngine.InputSystem;
 
 namespace SpaceTaxi.UI
 {
-    // Бортовой компьютер (10_UI_DESIGN.md §5): TAB — выезд слева, 0.25с ease-out.
-    // Панель — обычные объекты сцены; скрипт только показывает/прячет её.
+    // Бортовой компьютер: TAB — выезд панели слева
     public class OnboardComputerPanel : MonoBehaviour
     {
         [SerializeField] private RectTransform panel;   // сама панель (480x1080)
@@ -18,7 +17,7 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
-            SetX(hiddenX); // старт скрыт (за экраном)
+            SetX(hiddenX); // старт скрыт
         }
 
         private void Update()
@@ -36,7 +35,7 @@ namespace SpaceTaxi.UI
 
         public bool IsShown => shown;
 
-        // Показать/скрыть программно (например, при открытии карты). Нужное состояние уже стоит — ничего не делаем.
+        // программное открытие/закрытие (например, из карты или паузы)
         public void Show(bool value)
         {
             if (value != shown) Toggle();

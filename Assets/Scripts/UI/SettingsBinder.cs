@@ -5,9 +5,7 @@ using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.UI
 {
-    // Слайдеры громкости: применяются сразу в AudioManager (мгновенный отклик),
-    // сохранение в PlayerPrefs делает сам менеджер.
-    // Вешается на корень SettingsUI, элементы ищет в Panel по именам.
+    // Слайдеры громкости, применяются сразу; сохраняет сам AudioManager
     public class SettingsBinder : MonoBehaviour
     {
         private void OnEnable()
@@ -24,7 +22,7 @@ namespace SpaceTaxi.UI
             var slider = panel.Find(sliderName).GetComponent<Slider>();
             var value = panel.Find(valueName).GetComponent<TMP_Text>();
 
-            // Текущее значение из менеджера (первый запуск — 100%).
+            // текущее значение из менеджера
             slider.value = get();
             value.text = Mathf.RoundToInt(slider.value * 100f) + "%";
 

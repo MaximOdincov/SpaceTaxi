@@ -3,12 +3,10 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
-    // Скоростной шлейф за кораблём: включается только на скорости, толщина
-    // растёт с ней — дешёвый источник ощущения «насколько быстро летим»
-    // даже в чистом поле между планетами.
+    // Скоростной шлейф за кораблём
     public class SpeedTrail : MonoBehaviour
     {
-        private const float MinSpeed = 65f;   // ниже — шлейф неуместен
+        private const float MinSpeed = 65f;   // ниже шлейф неуместен
         private const float TrailTime = 0.38f;
 
         private Ship ship;
@@ -22,7 +20,6 @@ namespace SpaceTaxi.Physics
 
             trail = gameObject.AddComponent<TrailRenderer>();
 
-            // Мягкая полоса из подручного круглого спрайта.
             var src = GetComponent<SpriteRenderer>();
             Shader shader = src != null && src.sharedMaterial != null
                 ? src.sharedMaterial.shader
@@ -50,7 +47,7 @@ namespace SpaceTaxi.Physics
             if (ship == null || ship.Config == null || ship.Body == null)
                 return;
 
-            // Телепорты (посадка/респавн) не должны тянуть шлейф через полкарты.
+            // телепорт (посадка/респавн) не тянет шлейф через полкарты
             if (ship.State != lastState && ship.State != ShipState.Flying)
                 trail.Clear();
             lastState = ship.State;

@@ -16,7 +16,7 @@ namespace SpaceTaxi.World
     public enum SpawnMode
     {
         Landed = 0, // сидим на планете старта
-        Free = 1,   // свободная точка, в v0.1 не используется
+        Free = 1,   // свободная точка, пока не используется
     }
 
     [Serializable]
@@ -43,7 +43,7 @@ namespace SpaceTaxi.World
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
         public BodyVisuals Visuals = new BodyVisuals();
-        [Tooltip("На планете станция: посадка = заправка и ремонт (12 par.3.2)")]
+        [Tooltip("На планете станция: посадка = заправка и ремонт")]
         public bool HasStation;
 
         [Header("Кольца (0 = считать по формуле)")]
@@ -56,7 +56,7 @@ namespace SpaceTaxi.World
     {
         public string LevelName = "NewLevel";
 
-        [Tooltip("Граница системы: дальше — потеря связи (12_ALPHA_PLAN §3.1)")]
+        [Tooltip("Граница системы: дальше — потеря связи")]
         public float WorldRadius = 2500f;
 
         public List<CelestialBodyData> Bodies = new List<CelestialBodyData>();

@@ -1,37 +1,36 @@
 namespace SpaceTaxi.Audio
 {
-    // Идентификаторы всех звуковых событий (05_AUDIO.md §1).
-    // Добавление нового звука: значение сюда + запись в AudioCatalog.
+    // Идентификаторы звуковых событий
     public enum SoundId
     {
         None = 0,
 
-        // Двигатели — непрерывные, управляемые (loop)
-        EngineMain,     // W — основной гул, интенсивность от тяги/скорости
-        EngineRetro,    // S — ретро-сопла
-        EngineStrafe,   // A/D — маневровые, панорама L/R
-        HeatZone,       // жаровая зона звезды, интенсивность по близости
+        // непрерывные (loop)
+        EngineMain,     // основной гул
+        EngineRetro,    // ретро-сопла
+        EngineStrafe,   // маневровые, панорама L/R
+        HeatZone,       // жаровая зона звезды
 
-        // Разовые (one-shot)
-        Collision,      // столкновение, 3 вариации по силе
-        LandingTouch,   // мягкое касание при посадке
-        Takeoff,        // импульс взлёта
-        Explosion,      // гибель корабля (с приглушением остальных звуков)
-        Respawn,        // перезапуск после гибели
+        // разовые (one-shot)
+        Collision,      // 3 вариации по силе
+        LandingTouch,
+        Takeoff,
+        Explosion,      // с приглушением остальных
+        Respawn,
 
-        // Интерфейс
-        UiClick,        // клик меню/кнопок
-        ComputerPing,   // сообщение бортового компьютера
+        // интерфейс
+        UiClick,
+        ComputerPing,
 
-        // Фон
-        AmbientSpace,   // тихий гул космоса/кабины, layer под музыкой
+        // фон
+        AmbientSpace,   // тихий слой под музыкой
 
-        // Музыка
-        MusicMenu,      // тема меню
-        MusicFlight,    // тема полёта
+        // музыка
+        MusicMenu,
+        MusicFlight,
     }
 
-    // Группы громкости для настроек (раздельные ползунки).
+    // группы громкости для настроек
     public enum AudioGroup
     {
         Engine, // двигатели

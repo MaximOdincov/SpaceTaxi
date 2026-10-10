@@ -2,10 +2,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Physics
 {
-    // Следование за кораблём с опережением по курсу: камера смещается
-    // вперёд по вектору скорости (видно, куда летишь), плавно отъезжает
-    // на большой скорости и дрожит от ударов — сила дрожи = trauma²,
-    // спад линейный (классическая модель, живая и без укачивания).
+    // Следование за кораблём с опережением по курсу, зум по скорости, дрожь от ударов
     public class CameraFollow : MonoBehaviour
     {
         private const float FlightViewHeight = 320f;  // обычный полёт
@@ -27,7 +24,7 @@ namespace SpaceTaxi.Physics
         private float noiseSeed;
         private Vector2 lookOffset;
 
-        /// <summary>Позиция камеры без дрожи — якорь для параллакса.</summary>
+        // без дрожи — якорь для параллакса
         public Vector3 AnchorPosition { get; private set; }
 
         public void SetTarget(Ship target)
@@ -51,8 +48,7 @@ namespace SpaceTaxi.Physics
                 return;
             float dt = Time.deltaTime;
 
-            // Взгляд вперёд по курсу: сглаженное смещение по скорости,
-            // ограничено по длине — и всегда к нулю на стоянке.
+            // взгляд вперёд по курсу
             Vector2 velocity = ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
             Vector2 targetOffset = ship.State == ShipState.Flying
                 ? Vector2.ClampMagnitude(velocity * LookaheadSeconds, LookaheadMax)
@@ -65,7 +61,7 @@ namespace SpaceTaxi.Physics
             pos.y += (target.y - pos.y) * Mathf.Min(1f, 3.5f * dt);
             AnchorPosition = pos;
 
-            // Дрожь: гладкий шум Перлина вместо рваного рандома.
+            // дрожь — шум Перлина вместо рваного рандома
             trauma = Mathf.Max(0f, trauma - ShakeDecay * dt);
             float shake = trauma * trauma;
             float t = Time.time;
@@ -77,7 +73,7 @@ namespace SpaceTaxi.Physics
             transform.rotation = Quaternion.Euler(0f, 0f,
                 (Mathf.PerlinNoise(noiseSeed + 77f, t * 14f) * 2f - 1f) * ShakeRotation * shake);
 
-            // Зум: посадочный ближе, полёт дальше, на скорости ещё дальше.
+            // зум: посадка ближе, скорость дальше
             if (controller == null && ship != null)
                 controller = ship.GetComponent<ShipController>();
             bool landing = ship.State == ShipState.Landed
@@ -92,7 +88,7 @@ namespace SpaceTaxi.Physics
             cam.orthographicSize += (targetSize - cam.orthographicSize) * Mathf.Min(1f, 3f * dt);
         }
 
-        /// <summary>Толчок камеры: ~0.25 — взлёт, ~0.5 — жёсткий удар, ~0.85 — гибель.</summary>
+        // ~0.25 — взлёт, ~0.5 — жёсткий удар, ~0.85 — гибель
         public static void AddShake(float power)
         {
             if (Instance != null)

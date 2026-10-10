@@ -6,8 +6,7 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Tools
 {
-    // Редактор уровня (ТЗ: 09_LEVEL_DESIGN.md §1.2, §1.5): список тел, панель
-    // параметров, блок спавна, живая валидация. Гизмо и drag — LevelEditorSceneView.
+    // Редактор уровня: список тел, параметры, спавн, валидация; гизмо — LevelEditorSceneView
     public sealed class LevelEditorWindow : EditorWindow
     {
         [SerializeField] private LevelAsset level;
@@ -17,7 +16,7 @@ namespace SpaceTaxi.Tools
         [SerializeField] private bool showTrajectory = false;
         [SerializeField] private bool showGravityField = false;
 
-        // Буфер для копирования тел между уровнями.
+        // буфер копирования тел между уровнями
         private static string bodyClipboard;
 
         private Vector2 listScroll;
@@ -30,7 +29,7 @@ namespace SpaceTaxi.Tools
         public bool ShowTrajectory => showTrajectory;
         public bool ShowGravityField => showGravityField;
 
-        // Выбор тела из Scene View (клик/drag).
+        // выбор тела из Scene View (клик/drag)
         public void SetSelected(int index)
         {
             selectedIndex = index;
@@ -84,7 +83,7 @@ namespace SpaceTaxi.Tools
             DrawSpawnBlock(so);
             DrawValidation();
 
-            // Стрелки двигают выбранное тело: 1 юнит, с Shift — 10.
+            // стрелки двигают выбранное тело: 1 юнит, с Shift — 10
             HandleArrowKeys();
 
             if (so.ApplyModifiedProperties())
@@ -214,7 +213,7 @@ namespace SpaceTaxi.Tools
             var modeProp = so.FindProperty("SpawnMode");
             EditorGUILayout.PropertyField(modeProp);
 
-            // Popup имён планет: показываем планеты, храним индекс в общем списке.
+            // popup имён планет: показываем планеты, храним индекс в общем списке
             var indexProp = so.FindProperty("StartPlanetIndex");
             List<string> names = new List<string>();
             List<int> indices = new List<int>();
@@ -231,7 +230,7 @@ namespace SpaceTaxi.Tools
             {
                 int current = indices.IndexOf(indexProp.intValue);
                 if (current < 0)
-                    current = 0; // выбрана звезда или старый индекс — показываем первую планету
+                    current = 0; // выбрана звезда — показываем первую планету
                 int picked = EditorGUILayout.Popup("Стартовая планета", current, names.ToArray());
                 indexProp.intValue = indices[picked];
             }
@@ -305,13 +304,13 @@ namespace SpaceTaxi.Tools
             element.FindPropertyRelative("MassMultiplier").floatValue = star ? 4.5f : 1f;
             float radius = star ? 55f : 26f;
             element.FindPropertyRelative("Radius").floatValue = radius;
-            element.FindPropertyRelative("HeatRadius").floatValue = star ? radius * 3.6f : 0f; // 09 §1.1
+            element.FindPropertyRelative("HeatRadius").floatValue = star ? radius * 3.6f : 0f;
 
             selectedIndex = index;
             SceneView.RepaintAll();
         }
 
-        // Место для нового тела: правее существующих, без наложения.
+        // правее существующих, без наложения
         private Vector2 FindFreeSpot(SerializedProperty bodies, int newIndex)
         {
             float maxX = 0f;
@@ -327,7 +326,7 @@ namespace SpaceTaxi.Tools
             nameProp.stringValue = nameProp.stringValue + " копия";
         }
 
-        // Вставка тела из буфера (работает и в другой уровень).
+        // работает и в другой уровень
         private void PasteBody(SerializedProperty bodies)
         {
             var data = new CelestialBodyData();
@@ -347,7 +346,6 @@ namespace SpaceTaxi.Tools
             SceneView.RepaintAll();
         }
 
-        // Навести камеру Scene View на выбранное тело.
         private void FocusSelected()
         {
             var body = level.Bodies[selectedIndex];
@@ -356,7 +354,6 @@ namespace SpaceTaxi.Tools
                 view.Frame(new Bounds(body.Position, Vector3.one * (body.Radius * 6f + 300f)), false);
         }
 
-        // Камера Scene View — весь уровень целиком.
         private void FrameAll()
         {
             if (level.Bodies.Count == 0)
@@ -370,7 +367,7 @@ namespace SpaceTaxi.Tools
                 view.Frame(bounds, false);
         }
 
-        // Живая валидация (§1.5): предупреждения, не запрет.
+        // предупреждения, не запрет
         public static List<string> Validate(LevelAsset lvl)
         {
             var warnings = new List<string>();
@@ -425,7 +422,7 @@ namespace SpaceTaxi.Tools
             return warnings;
         }
 
-        // Позиция спавна по планете старта и углу (как в игре: r + 7).
+        // как в игре: r + 7
         public static Vector2 SpawnPointOf(LevelAsset lvl)
         {
             if (lvl.StartPlanetIndex < 0 || lvl.StartPlanetIndex >= lvl.Bodies.Count)

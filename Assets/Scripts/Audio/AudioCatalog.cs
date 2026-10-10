@@ -4,8 +4,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Audio
 {
-    // Одна запись каталога: событие → клип(ы) и параметры микса.
-    // Замена звука = правка этой записи, код вызовов не трогаем.
+    // Событие → клип(ы) и параметры микса
     [Serializable]
     public sealed class SoundEntry
     {
@@ -28,7 +27,7 @@ namespace SpaceTaxi.Audio
         public bool IsValid => Clips != null && Clips.Length > 0;
     }
 
-    // Каталог звуков: единственная точка соответствия «событие → ассет».
+    // Каталог звуков: соответствие «событие → ассет»
     [CreateAssetMenu(fileName = "AudioCatalog", menuName = "Space Taxi/Audio Catalog")]
     public sealed class AudioCatalog : ScriptableObject
     {

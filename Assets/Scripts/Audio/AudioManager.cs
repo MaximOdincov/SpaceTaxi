@@ -29,7 +29,6 @@ namespace SpaceTaxi.Audio
         private int musicFlip;
         private Coroutine duckRoutine;
 
-        // Непрерывный звук: источник + параметры.
         private sealed class LoopVoice
         {
             public AudioSource Source;
@@ -187,6 +186,17 @@ namespace SpaceTaxi.Audio
 
         // --- Музыка ---
 
+        // живые корутины кроссфейда; новый кроссфейд гасит предыдущие,
+        // иначе две корутины воюют за один канал и могут застопать свежую музыку
+        private readonly List<Coroutine> musicFades = new List<Coroutine>();
+
+        private void StopAllMusicFades()
+        {
+            foreach (Coroutine fade in musicFades)
+                if (fade != null) StopCoroutine(fade);
+            musicFades.Clear();
+        }
+
         public void PlayMusic(SoundId id)
         {
             if (id == currentMusic)
@@ -204,14 +214,17 @@ namespace SpaceTaxi.Audio
             fadeIn.loop = true;
             fadeIn.pitch = entry.Pitch;
             fadeIn.Play();
-            StartCoroutine(Crossfade(fadeIn, fadeOut, entry.Volume * GroupFactor(AudioGroup.Music)));
+
+            StopAllMusicFades();
+            musicFades.Add(StartCoroutine(Crossfade(fadeIn, fadeOut, entry.Volume * GroupFactor(AudioGroup.Music))));
         }
 
         public void StopMusic()
         {
             currentMusic = SoundId.None;
-            if (musicA.isPlaying) StartCoroutine(Crossfade(null, musicA, 0f));
-            if (musicB.isPlaying) StartCoroutine(Crossfade(null, musicB, 0f));
+            StopAllMusicFades();
+            if (musicA.isPlaying) musicFades.Add(StartCoroutine(Crossfade(null, musicA, 0f)));
+            if (musicB.isPlaying) musicFades.Add(StartCoroutine(Crossfade(null, musicB, 0f)));
         }
 
         private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
@@ -243,7 +256,7 @@ namespace SpaceTaxi.Audio
 
         public float GetGroupVolume(AudioGroup group) => groupVolumes.TryGetValue(group, out float v) ? v : 1f;
 
-        // Общая громкость (ползунок настроек v0.1). Квадратичная кривая — субъективно ровная.
+        // Общая громкость; квадратичная кривая — субъективно ровная
         public void SetMasterVolume(float linear01)
         {
             float v = Mathf.Clamp01(linear01);
@@ -260,7 +273,6 @@ namespace SpaceTaxi.Audio
                     ApplyLoopParams(voice);
         }
 
-        // Приглушение двигателей и эффектов при взрыве, плавный возврат.
         private void DuckAll()
         {
             if (duckRoutine != null) StopCoroutine(duckRoutine);
@@ -305,7 +317,7 @@ namespace SpaceTaxi.Audio
             return entry == null || !entry.IsValid ? null : entry;
         }
 
-        // Выбор вариации: последовательная (по силе) или случайная.
+        // выбор вариации: по силе или случайно
         private AudioClip ChooseClip(SoundEntry entry, float intensity)
         {
             AudioClip[] clips = entry.Clips;
@@ -350,8 +362,7 @@ namespace SpaceTaxi.Audio
         }
     }
 
-    // Статический фасад: Sound.Play(SoundId.Takeoff) из любого кода.
-    // Менеджера нет (сцена без AudioManager) — вызовы молча игнорируются.
+    // Фасад: Sound.Play(SoundId.Takeoff) из любого кода; без менеджера — тихо
     public static class Sound
     {
         public static void Play(SoundId id, float intensity = 1f) =>

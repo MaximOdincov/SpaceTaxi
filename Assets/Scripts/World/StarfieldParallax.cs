@@ -5,11 +5,7 @@ using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.World
 {
-    // Процедурный параллакс-фон из звёзд: три слоя глубины. Корень слоя
-    // держится на камере (без тряски — см. CameraFollow.AnchorPosition),
-    // звёзды внутри тайла дрейфуют с долей скорости камеры (дальние
-    // медленнее) и заворачиваются по краям — бесконечное поле без швов.
-    // Глазу наконец есть опора: корабль «летит», а не висит на месте.
+    // Параллакс: три слоя звёзд, дрейфуют с долей скорости камеры
     [DefaultExecutionOrder(50)] // LateUpdate после CameraFollow — камера уже встала
     public class StarfieldParallax : MonoBehaviour
     {
@@ -37,8 +33,7 @@ namespace SpaceTaxi.World
             var cam = GetComponent<Camera>();
             float aspect = cam != null ? cam.aspect : 1.78f;
 
-            // Тайл с запасом под самый широкий зум и монитор: звезда,
-            // завернувшаяся за краем, не должна вспыхивать на экране.
+            // тайл с запасом под самый широкий зум
             tileX = Mathf.Max(1300f, 2f * 250f * aspect + 400f);
             tileY = Mathf.Max(950f, 2f * 250f + 450f);
 
@@ -81,8 +76,7 @@ namespace SpaceTaxi.World
 
         private void LateUpdate()
         {
-            // Якорь — камера без тряски: дрожь ударов должна сдвигать мир
-            // относительно фона, иначе тряску за звёздами не видно.
+            // якорь — камера без тряски, иначе тряску за звёздами не видно
             var follow = CameraFollow.Instance;
             Vector3 anchor = follow != null
                 ? follow.AnchorPosition
@@ -90,8 +84,7 @@ namespace SpaceTaxi.World
 
             foreach (Layer layer in layers)
             {
-                // z = 0 обязательно: у якоря z камеры (−10) — слои попали бы
-                // в плоскость самой камеры и отсекались near-плоскостью.
+                // z = 0: у якоря z камеры (−10) — слои попали бы в near-плоскость
                 layer.Root.position = new Vector3(anchor.x, anchor.y, 0f);
                 Vector2 drift = (Vector2)anchor * layer.Factor;
                 for (int i = 0; i < layer.Stars.Length; i++)
@@ -99,7 +92,6 @@ namespace SpaceTaxi.World
             }
         }
 
-        // Заворачивание в тайльный прямоугольник [-tile/2, tile/2].
         private Vector2 Wrap(Vector2 v)
         {
             return new Vector2(WrapAxis(v.x, tileX), WrapAxis(v.y, tileY));

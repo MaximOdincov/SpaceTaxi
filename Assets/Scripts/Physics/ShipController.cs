@@ -23,27 +23,25 @@ namespace SpaceTaxi.Physics
 
         private readonly HashSet<CelestialBody> insideRing = new HashSet<CelestialBody>();
 
-        // Пороги топлива: лог один раз (в задаче 4 заменит баннер).
+        // лог порогов топлива — по одному разу
         private bool lowFuelLogged;
         private bool emptyFuelLogged;
 
-        // Липкая посадочная ориентация: тормоз в кольце разворачивает корабль
-        // двигателями к планете — и держит так до посадки, выхода из кольца
-        // или тяги (W). Отпускание S больше не разворачивает нос обратно.
+        // «липкая» посадочная ориентация: тормоз в кольце разворачивает
+        // корабль двигателями к планете и держит до посадки/выхода/тяги
         private bool retroAttitude;
 
-        // Ретро-режим посадки: нос против скорости (для камеры/прогноза).
+        // нос против скорости — для камеры и прогноза
         public bool LandingRetro => retroAttitude;
 
-        // Состояние двигателей для эффектов/индикации — пустой бак учтён.
+        // для эффектов/индикации, пустой бак учтён
         public bool ThrustOn { get; private set; }
         public bool BrakeOn { get; private set; }
         public float StrafeLevel { get; private set; }
 
-        /// <summary>Ближайшая планета ближе посадочного кольца.</summary>
         public bool InLandingRing { get; private set; }
 
-        /// <summary>Текущая тяга двигателей: 1 обычно, EngineMultiplier у поверхности.</summary>
+        // 1 обычно, EngineMultiplier у поверхности
         public float EnginePower { get; private set; } = 1f;
 
         public void SetInput(InputActionAsset asset)
@@ -64,7 +62,7 @@ namespace SpaceTaxi.Physics
             BindActions();
         }
 
-        // Привязка действий: из OnEnable и из SetInput — кто раньше.
+        // Привязка из OnEnable и из SetInput — кто раньше
         private void BindActions()
         {
             InputActionMap map = input != null ? input.FindActionMap("Ship") : null;
@@ -103,13 +101,13 @@ namespace SpaceTaxi.Physics
             Vector2 pos = ship.transform.position;
             float dt = Time.fixedDeltaTime;
 
-            // Гравитация от всех тел.
+            // Гравитация от всех тел
             if (gravity != null)
                 velocity += gravity.GetAccelerationAt(pos, config) * dt;
 
             float v = velocity.magnitude;
 
-            // Качель + ближайшая планета (для посадочного режима).
+            // Качель + ближайшая планета
             Planet planet = null;
             float planetDist = float.MaxValue;
             if (gravity != null)
@@ -152,7 +150,7 @@ namespace SpaceTaxi.Physics
             bool brakeOn = brakeAction != null && brakeAction.IsPressed();
             float strafe = strafeAction != null ? strafeAction.ReadValue<float>() : 0f;
 
-            // Топливо: расход на любую тягу; пустой бак — двигатели молчат.
+            // Топливо: расход на любую тягу, пустой бак — двигатели молчат
             if (thrustOn || brakeOn || Mathf.Abs(strafe) > 0f)
                 ship.Fuel -= config.FuelDrainPerSecond * dt;
             if (ship.Fuel <= 0f)
@@ -165,7 +163,7 @@ namespace SpaceTaxi.Physics
             BrakeOn = brakeOn;
             StrafeLevel = strafe;
 
-            // Липкая посадочная ориентация (вход/выход).
+            // Вход/выход липкой ориентации
             bool finalApproach = InLandingRing && planet != null
                 && planetDist < planet.Radius + 40f && v < 50f;
             if (retroAttitude)
@@ -178,7 +176,7 @@ namespace SpaceTaxi.Physics
                 retroAttitude = true;
             }
 
-            // Пороги для проверки (в задаче 4 заменит баннер).
+            // Пороги — лог по одному разу
             if (ship.Fuel > config.FuelMax * 0.1f)
             {
                 lowFuelLogged = false;
@@ -195,7 +193,7 @@ namespace SpaceTaxi.Physics
                 Debug.Log("[Fuel] бак пуст — двигатели не работают");
             }
 
-            // Ручное управление — все ускорения к вектору скорости.
+            // Все ускорения — к вектору скорости
             if (v > config.MinControlSpeed)
             {
                 Vector2 dir = velocity / v;
@@ -220,20 +218,15 @@ namespace SpaceTaxi.Physics
             UpdateHeading(velocity, v, planet, planetDist);
         }
 
-        // Ориентация носа — как в жизни при посадке (Falcon):
-        // 1) обычно — по вектору скорости;
-        // 2) посадочная ориентация (липкая) — на 180°: двигателями вперёд;
-        // 3) у поверхности при малой скорости — вертикально, носом от планеты.
+        // Нос: обычно по вектору скорости, на посадке — ретро или вертикально от планеты
         private void UpdateHeading(Vector2 velocity, float v, Planet planet, float planetDist)
         {
-            // Финальное выравнивание работает и на малой скорости.
             bool inLandingRing = planet != null && planetDist < planet.LandingRing;
             bool finalApproach = inLandingRing
                 && planetDist < planet.Radius + 40f
                 && v < 50f;
 
-            // Около нуля скорости вектор скорости «шумит» (гравитация крутит
-            // его как хочет) — держим текущую ориентацию, без рывков носом.
+            // у нуля скорости вектор «шумит» — держим текущую ориентацию
             if (!finalApproach && v < 30f)
                 return;
 
@@ -241,7 +234,6 @@ namespace SpaceTaxi.Physics
             float targetWorld;
             if (finalApproach && planet != null)
             {
-                // Вертикаль: нос от центра планеты.
                 Vector2 away = (Vector2)ship.transform.position - (Vector2)planet.transform.position;
                 targetWorld = Mathf.Atan2(away.y, away.x) * Mathf.Rad2Deg;
             }
@@ -257,8 +249,7 @@ namespace SpaceTaxi.Physics
             float target = targetWorld - spriteNoseAngle;
             float current = ship.Body.rotation;
             float delta = Mathf.DeltaAngle(current, target);
-            // Доворот: мягкий экспоненциальный, но с пределом угловой скорости —
-            // иначе у нуля скорости нос «щёлкает» сотни градусов в секунду.
+            // с пределом угловой скорости — иначе у нуля скорости нос «щёлкает»
             float dt = Time.fixedDeltaTime;
             float step = Mathf.Clamp(
                 delta * config.HeadingTurnRate * dt,
@@ -272,7 +263,7 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
-            // Взлёт требует топлива: с пустым баком стоим (выход — «Отключить корабль»).
+            // с пустым баком взлёт невозможен
             if (ship.State == ShipState.Landed && ship.Fuel > 0f
                 && thrustAction != null && thrustAction.WasPressedThisFrame())
             {
