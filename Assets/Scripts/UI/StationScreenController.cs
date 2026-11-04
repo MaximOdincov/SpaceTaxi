@@ -321,6 +321,12 @@ namespace SpaceTaxi.UI
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
+            // Масштаб как у сценического канваса (1920x1080, match 0.5) — иначе
+            // на не-1080p разрешениях станция визуально расходится с HUD
+            var scaler = root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
 
             var background = new GameObject("Background", typeof(RectTransform), typeof(Image));
             background.transform.SetParent(root.transform, false);
@@ -732,6 +738,8 @@ namespace SpaceTaxi.UI
             var configs = Resources.LoadAll<ShipConfig>("Ships");
             if (configs == null || configs.Length == 0)
                 Debug.LogWarning("[Station] Каталог кораблей пуст — Assets/ScriptableObjects/Resources/Ships");
+            if (configs == null)
+                return Array.Empty<ShipConfig>(); // guard: Sort ниже разыменовал бы null
             Array.Sort(configs, (a, b) =>
             {
                 int byTier = a.Tier.CompareTo(b.Tier);
