@@ -13,6 +13,7 @@ namespace SpaceTaxi.UI
 
         private bool paused;
         private StationScreenController stationController; // станция тоже занимает ESC
+        private OrderCompleteScreenController orderCompleteController; // экран завершения тоже
 
         public bool IsPaused => paused;
 
@@ -26,11 +27,15 @@ namespace SpaceTaxi.UI
             var kb = Keyboard.current;
             if (kb == null) return;
             if (stationController == null) stationController = FindAnyObjectByType<StationScreenController>();
+            if (orderCompleteController == null) orderCompleteController = FindAnyObjectByType<OrderCompleteScreenController>();
             if (!kb.escapeKey.wasPressedThisFrame) return;
             // ESC занят картой
             if (mapController != null && (mapController.IsOpened || mapController.EscJustClosed)) return;
             // ESC занят станцией
             if (stationController != null && (stationController.IsOpened || stationController.EscJustClosed)) return;
+            // ESC занят экраном завершения заказа: тот же кадр закрывает ЕГО,
+            // пауза не открывается
+            if (orderCompleteController != null && (orderCompleteController.IsOpened || orderCompleteController.EscJustClosed)) return;
             SetPaused(!paused);
         }
 
@@ -76,6 +81,17 @@ namespace SpaceTaxi.UI
         }
 
         public void NotifyStationClosed()
+        {
+            if (paused) pauseScreen.SetActive(true);
+        }
+
+        // экран завершения заказа (П4.3) — та же договорённость, что у станции
+        public void NotifyOrderCompleteOpened()
+        {
+            if (paused) pauseScreen.SetActive(false);
+        }
+
+        public void NotifyOrderCompleteClosed()
         {
             if (paused) pauseScreen.SetActive(true);
         }

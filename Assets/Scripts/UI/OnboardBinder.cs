@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -44,12 +45,10 @@ namespace SpaceTaxi.UI
         private Wallet wallet;
         private DebtService debt;
         private TMP_Text debtValue;
-        private Button shiftButton;
         private float nextSlowUpdate;
         private bool bound;
         private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
 
-        private const int DemoShiftReward = 100;     // временно, до П4
         private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
@@ -70,7 +69,6 @@ namespace SpaceTaxi.UI
             {
                 BindExisting();
             }
-            EnsureShiftButton();
             EnsureDebtRow();
             WidenMoneyValue();
         }
@@ -332,6 +330,9 @@ namespace SpaceTaxi.UI
             SetText(card, "Info/Route",
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
                 + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
+            TMP_Text price = EnsurePriceNode(card);
+            if (price != null)
+                price.text = PriceTag(offer.Price);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : "доп.: «" + wishPhrase + "»");
 
@@ -370,10 +371,14 @@ namespace SpaceTaxi.UI
                 }
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
+                // слот рейтинга (§3.7): живёт событием, первичный показ при бинде
+                if (session.Rating != null)
+                {
+                    session.Rating.RatingChanged += ShowRating;
+                    ShowRating(session.Rating.Value);
+                }
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
-                if (shiftButton != null)
-                    shiftButton.onClick.AddListener(() => wallet.Add(DemoShiftReward));
                 RefreshOrder();
                 bound = true;
             }
@@ -407,11 +412,37 @@ namespace SpaceTaxi.UI
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed);
 
-            var statusText = FindText(orderArea, "OrderStatus");
+            var statusText = FindText(orderArea, "ActiveOrder/Info/OrderStatus");
             if (orders.Active != null && statusText != null)
                 statusText.text = orders.Active.State == OrderState.Aboard
-                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper())
-                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper());
+                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price)
+                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price);
+        }
+
+        // строка «Цена: N кр» — сумма акцентным цветом такси
+        private static string PriceTag(int price)
+        {
+            return "Цена: <color=" + ColorHex(OnboardComputerFactory.TaxiColor) + ">" + price + " кр</color>";
+        }
+
+        private static string ColorHex(Color color)
+        {
+            return "#" + ColorUtility.ToHtmlStringRGB(color);
+        }
+
+        // узел цены есть у каркасной карточки; в префабе OfferCard его нет — достраиваем рядом с Info/Route
+        private static TMP_Text EnsurePriceNode(GameObject card)
+        {
+            Transform info = card.transform.Find("Info");
+            if (info == null)
+                return null;
+            Transform price = info.Find("Price");
+            if (price != null)
+                return price.GetComponent<TMP_Text>();
+            TMP_Text text = OnboardComputerFactory.Text(info.gameObject, "", 17f, OnboardComputerFactory.BrightColor, "Price");
+            Transform route = info.Find("Route");
+            text.transform.SetSiblingIndex(route != null ? route.GetSiblingIndex() + 1 : info.childCount);
+            return text;
         }
 
         // кредит обновляется событием, без опроса в SlowUpdate
@@ -421,26 +452,11 @@ namespace SpaceTaxi.UI
                 moneyValue.text = credits + " кр";
         }
 
-        // временно, до П4: кнопка тестового начисления кредитов
-        private void EnsureShiftButton()
+        // одна десятая всегда (даже 0.0); точка-разделитель, как в плане §3.7
+        private void ShowRating(float value)
         {
-            if (shiftButton != null)
-                return;
-            var econSection = transform.Find("Stack/EconSection");
-            if (econSection == null)
-                return;
-            var econRow = econSection.Find("EconRow");
-            Transform parent = econRow != null ? econRow : econSection;
-            var label = OnboardComputerFactory.LabelColor;
-            var shiftGo = OnboardComputerFactory.Button(parent, "СМЕНА +100 КР",
-                new Color(label.r, label.g, label.b, 0.22f), OnboardComputerFactory.BrightColor, 17f,
-                "ShiftButton");
-            var layout = shiftGo.AddComponent<LayoutElement>();
-            layout.minHeight = 32f;
-            layout.preferredHeight = 32f;
-            layout.minWidth = 132f;
-            layout.preferredWidth = 132f;
-            shiftButton = shiftGo.GetComponent<Button>();
+            if (ratingValue != null)
+                ratingValue.text = value.ToString("0.0", CultureInfo.InvariantCulture);
         }
 
         // строка долга в секции // СМЕНА: каркас её не содержит, достраиваем кодом

@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
+using SpaceTaxi.UI;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Core
@@ -24,6 +25,8 @@ namespace SpaceTaxi.Core
         public Wallet Wallet { get; private set; }
         public FleetService Fleet { get; private set; }
         public DebtService Debt { get; private set; }
+        public PayoutService Payout { get; private set; }
+        public RatingService Rating { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
         // ассет ввода сцены: контроллерам вне сцены (экран станции строится кодом)
@@ -32,6 +35,7 @@ namespace SpaceTaxi.Core
         public ShipConfig CurrentShip => Fleet.Current;
 
         private bool accidentRegistered; // один инцидент = один долг
+        private OrderCompleteScreenController orderComplete; // спавнится сам (стиль Dismissal)
 
         private void Awake()
         {
@@ -42,6 +46,9 @@ namespace SpaceTaxi.Core
             // с числами плана (никаких NRE)
             Fleet.BindUpgrades(upgradeConfig != null ? upgradeConfig : UpgradeConfig.Default);
             Debt = new DebtService();
+            Payout = new PayoutService();
+            Payout.Bind(Wallet, Debt);
+            Rating = new RatingService();
         }
 
         private void Start()
@@ -68,6 +75,35 @@ namespace SpaceTaxi.Core
 
             Orders = gameObject.AddComponent<OrderService>();
             Orders.Init(level, passengerCatalog, Ship);
+            Orders.Bind(Rating);
+            // доставка платит (16_BETA_PLAN §3.5): цена с карточки, штраф по
+            // столкновениям заказа, комиссия на аренде; оффер приходит в аргументе
+            // события (Active уже обнулён) — отдельный доступ не нужен
+            Orders.OrderDelivered += OnOrderDelivered;
+            // дельты рейтинга (§3.7): отказ и гибель; доставка — внутри OnOrderDelivered
+            Orders.OrderCancelled += _ => Rating.FailNoDeath();
+            Orders.OrderFailed += _ => Rating.FailWithLoss();
+            // столкновение при активном заказе — минус рейтинг. Рейтинг слушает
+            // CrashImpact напрямую; штраф выплаты считает счётчик OrderService —
+            // два независимых потребителя одного события
+            ship.GetComponent<LandingSystem>().CrashImpact += OnCrashImpact;
+        }
+
+        private void OnOrderDelivered(OrderOffer offer)
+        {
+            // сначала дельта рейтинга — экран завершения показывает её же
+            Rating.AddDelivery();
+            // выплата: тосты уходят синхронно внутри Paid, экран открываем после них
+            Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental, Orders.CollisionsOfActive);
+            if (orderComplete == null)
+                orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
+            orderComplete?.Show(offer);
+        }
+
+        private void OnCrashImpact()
+        {
+            if (Orders != null && Orders.Active != null)
+                Rating.AddCollisionPenalty();
         }
 
         // потеря корабля: арендный — долг за аварию. Проверка владения ДО

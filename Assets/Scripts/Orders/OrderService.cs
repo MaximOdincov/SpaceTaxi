@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
 
@@ -21,6 +22,7 @@ namespace SpaceTaxi.Orders
         public int PickupIndex;    // планета А (индекс в LevelAsset.Bodies)
         public int DropoffIndex;   // планета Б
         public float ExpiresAt;    // время смерти карточки (Time.time)
+        public int Price;          // цена предложения, считается при спавне
         public OrderState State = OrderState.Offered;
     }
 
@@ -39,16 +41,33 @@ namespace SpaceTaxi.Orders
         [Tooltip("Сколько карточек сразу на старте")]
         public int initialOffers = 2;
 
+        [Header("Ценообразование")]
+        [Tooltip("Пусто — фолбэк с дефолтными числами (PricingConfig.Default)")]
+        [SerializeField] private PricingConfig pricingConfig;
+
         private readonly List<OrderOffer> offers = new List<OrderOffer>();
         private readonly List<int> planetIndices = new List<int>();
         private LevelAsset level;
         private PassengerCatalog catalog;
+        private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
         public IReadOnlyList<OrderOffer> Offers => offers;
         public int Deliveries { get; private set; }
         public int Failures { get; private set; }
+
+        // столкновения активного заказа (Active или Aboard); сброс при его закрытии/смене
+        public int CollisionsOfActive { get; private set; }
+
+        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2)
+        public PricingConfig Pricing => pricingConfig != null ? pricingConfig : PricingConfig.Default;
+
+        // рейтинг таксиста (П4.3): наценка к цене и замедление спавна — без FindAnyObjectByType
+        public void Bind(RatingService ratingService)
+        {
+            rating = ratingService;
+        }
 
         // события для UI
         public event Action OffersChanged;
@@ -64,7 +83,9 @@ namespace SpaceTaxi.Orders
             this.catalog = catalog;
 
             // посадка — единственная точка взятия/сдачи пассажира
-            ship.GetComponent<LandingSystem>().ShipLanded += OnLanded;
+            var landing = ship.GetComponent<LandingSystem>();
+            landing.ShipLanded += OnLanded;
+            landing.CrashImpact += OnCrashImpact;
             var hull = ship.GetComponent<HullSystem>();
             hull.Died += FailActive;
             hull.ShipLost += reason => FailActive();
@@ -76,7 +97,7 @@ namespace SpaceTaxi.Orders
             else
                 for (int i = 0; i < initialOffers; i++)
                     AddOffer(catalog);
-            nextSpawnAt = Time.time + UnityEngine.Random.Range(spawnMin, spawnMax);
+            nextSpawnAt = Time.time + SpawnDelay();
         }
 
         private void Update()
@@ -92,7 +113,7 @@ namespace SpaceTaxi.Orders
             {
                 if (offers.Count < maxOffers)
                     AddOffer(catalog);
-                nextSpawnAt = Mathf.Max(nextSpawnAt + UnityEngine.Random.Range(spawnMin, spawnMax), Time.time + 2f);
+                nextSpawnAt = Mathf.Max(nextSpawnAt + SpawnDelay(), Time.time + 2f);
             }
 
             UpdateTargetGlow();
@@ -158,6 +179,7 @@ namespace SpaceTaxi.Orders
             offers.Remove(offer);
             offer.State = OrderState.Active;
             Active = offer;
+            CollisionsOfActive = 0; // новый заказ — счёт с нуля
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
@@ -187,9 +209,18 @@ namespace SpaceTaxi.Orders
             OrderOffer cancelled = Active;
             Active = null;
             OrderCancelled?.Invoke(cancelled);
+            CollisionsOfActive = 0;
             ActiveOrderChanged?.Invoke();
             Debug.Log("[Orders] заказ отменён оператором");
             return true;
+        }
+
+        // жёсткое касание с уроном; жар звезды до сюда не доходит
+        private void OnCrashImpact()
+        {
+            if (Active != null
+                && (Active.State == OrderState.Active || Active.State == OrderState.Aboard))
+                CollisionsOfActive++;
         }
 
         private void OnLanded(Planet planet)
@@ -212,7 +243,8 @@ namespace SpaceTaxi.Orders
                 Deliveries++;
                 OrderOffer done = Active;
                 Active = null;
-                OrderDelivered?.Invoke(done);
+                OrderDelivered?.Invoke(done); // выплата внутри читает CollisionsOfActive
+                CollisionsOfActive = 0;
                 ActiveOrderChanged?.Invoke();
                 Debug.Log($"[Orders] доставлен: {done.Passenger.DisplayName} ({Deliveries}/{Failures})");
             }
@@ -227,6 +259,7 @@ namespace SpaceTaxi.Orders
             OrderOffer failed = Active;
             Active = null;
             OrderFailed?.Invoke(failed);
+            CollisionsOfActive = 0;
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] провален: {failed.Passenger.DisplayName} ({Deliveries}/{Failures})");
         }
@@ -249,10 +282,45 @@ namespace SpaceTaxi.Orders
                 DropoffIndex = RandomPlanetIndex(pickup),
                 ExpiresAt = Time.time + offerLifetime,
             };
+            // цена фиксируется в момент спавна карточки и дальше не меняется
+            int basePrice = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
+                RouteDistance(offer), SectorOf(offer.DropoffIndex));
+            offer.Price = PriceWithRatingBonus(basePrice);
             offers.Add(offer);
             OffersChanged?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
-                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
+                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр");
+        }
+
+        // класс района планеты-цели (влияет на цену)
+        private Sector SectorOf(int index)
+        {
+            return level != null && index >= 0 && index < level.Bodies.Count
+                ? level.Bodies[index].Sector
+                : Sector.Near;
+        }
+
+        // §3.7: рейтинг ≥ порога — наценка к цене предложения («популярного
+        // водителя видно»); без рейтинга или ниже порога — базовая цена
+        private int PriceWithRatingBonus(int basePrice)
+        {
+            if (rating == null)
+                return basePrice;
+            PricingConfig pricing = Pricing;
+            if (rating.Value < pricing.RatingPriceBonusThreshold)
+                return basePrice;
+            return (int)Math.Round(basePrice * pricing.RatingPriceBonusMul, MidpointRounding.AwayFromZero);
+        }
+
+        // §3.7: рейтинг < порога — карточки появляются медленнее; spawnMin/spawnMax
+        // остаются базой, сами поля не трогаем
+        private float SpawnDelay()
+        {
+            PricingConfig pricing = Pricing;
+            float mul = rating != null && rating.Value < pricing.LowRatingSpawnThreshold
+                ? pricing.LowRatingSpawnSlowdown
+                : 1f;
+            return UnityEngine.Random.Range(spawnMin, spawnMax) * mul;
         }
 
         // случайная планета уровня, exclude — не эта

@@ -328,6 +328,7 @@ namespace SpaceTaxi.UI
 
             TMP_Text name = Text(column, "Имя · архетип", 20f, BrightColor, "Name");
             TMP_Text route = Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б · 0 юн", 17f, LabelColor, "Route");
+            Text(column, "Цена: 0 кр", 17f, BrightColor, "Price");
             Text(column, "доп.: «пожелание»", 15f, LabelColor, "Wish");
 
             var buttons = new GameObject("Buttons", typeof(RectTransform));
