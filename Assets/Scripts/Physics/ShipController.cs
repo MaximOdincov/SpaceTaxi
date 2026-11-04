@@ -200,7 +200,7 @@ namespace SpaceTaxi.Physics
             if (v > config.MinControlSpeed)
             {
                 Vector2 dir = velocity / v;
-                if (thrustOn && v < config.MaxV)
+                if (thrustOn && v < shipConfig.MaxV)
                     velocity += dir * (shipConfig.Thrust * engMul * dt);
                 if (brakeOn)
                 {

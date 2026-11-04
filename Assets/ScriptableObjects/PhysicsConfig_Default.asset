@@ -14,7 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
   Retro: 80
   StrafeMaxTurnRate: 60
-  MaxV: 330
   LandSpeed: 55
   TakeoffV: 85
   EngineMultiplier: 3.2

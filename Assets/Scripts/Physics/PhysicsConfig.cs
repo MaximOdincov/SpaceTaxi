@@ -8,7 +8,6 @@ namespace SpaceTaxi.Physics
     {
         [Header("Скорость")]
         public float Retro = 80f;             // торможение (было 115 — слишком резко)
-        public float MaxV = 330f;             // максимальная скорость
         [Tooltip("Предел угловой скорости разворота")]
         public float StrafeMaxTurnRate = 60f; // град/с
 

@@ -17,6 +17,7 @@ MonoBehaviour:
   Tier: 4
   Thrust: 135
   StrafeAcc: 125
+  MaxV: 470
   FuelMax: 130
   HpMax: 90
   Price: 5200

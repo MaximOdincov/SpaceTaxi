@@ -78,8 +78,8 @@ namespace SpaceTaxi.Physics
                 controller = ship.GetComponent<ShipController>();
             bool landing = ship.State == ShipState.Landed
                 || (controller != null && controller.LandingRetro);
-            float vNorm = ship.Config != null
-                ? Mathf.Clamp01(velocity.magnitude / ship.Config.MaxV)
+            float vNorm = ship.ShipConfig != null
+                ? Mathf.Clamp01(velocity.magnitude / ship.ShipConfig.MaxV)
                 : 0f;
             float viewHeight = landing
                 ? LandingViewHeight

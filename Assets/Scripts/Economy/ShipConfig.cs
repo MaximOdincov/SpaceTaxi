@@ -18,6 +18,7 @@ namespace SpaceTaxi.Economy
         [Header("Полёт")]
         public float Thrust;    // тяга W — разгон вдоль вектора скорости
         public float StrafeAcc; // боковая тяга A/D
+        public float MaxV;      // потолок скорости от собственной тяги
 
         [Header("Бак и корпус")]
         public float FuelMax;
@@ -45,6 +46,7 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.Tier = 2;
                 eggRentalFallback.Thrust = 95f;
                 eggRentalFallback.StrafeAcc = 85f;
+                eggRentalFallback.MaxV = 330f;
                 eggRentalFallback.FuelMax = 100f;
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
