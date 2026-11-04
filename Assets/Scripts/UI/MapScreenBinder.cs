@@ -21,6 +21,7 @@ namespace SpaceTaxi.UI
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
         private static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);
+        private static readonly Color HoleColor = new Color(0.1f, 0.08f, 0.14f);
 
         private void Awake()
         {
@@ -129,8 +130,9 @@ namespace SpaceTaxi.UI
         private void CreateBody(CelestialBodyData body)
         {
             bool star = body.Type == BodyType.Star;
-            // планеты крупнее честного масштаба — для читаемости
-            float size = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : 1.9f));
+            bool hole = body.Type == BodyType.BlackHole;
+            // планеты крупнее честного масштаба — для читаемости; дыра — маленький тёмный диск
+            float size = Mathf.Max(16f, body.Radius * 2f * scale * (star ? 1.6f : hole ? 1f : 1.9f));
 
             if (star)
             {
@@ -139,7 +141,8 @@ namespace SpaceTaxi.UI
             }
 
             RectTransform circle = CreateCircle(body.DisplayName, size,
-                star ? new Color(1f, 0.82f, 0.35f)
+                hole ? HoleColor
+                     : star ? new Color(1f, 0.82f, 0.35f)
                      : body.Visuals != null && body.Visuals.UseColor ? body.Visuals.Color : new Color(0.55f, 0.62f, 0.72f));
             circle.anchoredPosition = WorldToMap(body.Position);
             markers[body] = circle;

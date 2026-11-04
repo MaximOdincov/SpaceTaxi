@@ -15,6 +15,8 @@ namespace SpaceTaxi.Tools
 
         private static readonly Color PlanetFill = new Color(0.6f, 0.8f, 1f, 0.08f);
         private static readonly Color StarFill = new Color(1f, 0.8f, 0.3f, 0.1f);
+        private static readonly Color HoleFill = new Color(0.1f, 0.08f, 0.16f, 0.5f);
+        private static readonly Color HoleEffectColor = new Color(0.6f, 0.4f, 0.9f, 0.5f);
         private static readonly Color LandingRing = new Color(0.3f, 1f, 0.4f, 0.8f);
         private static readonly Color CaptureRing = new Color(0.4f, 0.8f, 1f, 0.7f);
         private static readonly Color HeatColor = new Color(1f, 0.5f, 0.2f, 0.8f);
@@ -115,6 +117,7 @@ namespace SpaceTaxi.Tools
         {
             Vector3 center = body.Position;
             bool star = body.Type == BodyType.Star;
+            bool hole = body.Type == BodyType.BlackHole;
 
             // превью: спрайт и цвет из данных уровня
             var visuals = body.Visuals;
@@ -136,10 +139,12 @@ namespace SpaceTaxi.Tools
             }
 
             // заливка + контур + имя
-            Handles.color = star ? StarFill : PlanetFill;
+            Handles.color = hole ? HoleFill : star ? StarFill : PlanetFill;
             if (visuals == null || visuals.Sprite == null)
                 Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
-            Handles.color = selected ? Color.white : (star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f));
+            Handles.color = selected ? Color.white
+                : hole ? new Color(0.7f, 0.5f, 1f)
+                : star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f);
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName + " · " + body.Sector);
             if (body.HasStation)
@@ -156,7 +161,7 @@ namespace SpaceTaxi.Tools
             float captureBase = config != null ? config.CaptureRingBase : 30f;
 
             // посадочное кольцо — зелёный пунктир (только планеты)
-            if (!star)
+            if (body.Type == BodyType.Planet)
             {
                 float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + landingOffset;
                 DottedCircle(center, landing, LandingRing, 4f);
@@ -165,6 +170,10 @@ namespace SpaceTaxi.Tools
             // кольцо качели — мельче
             float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * captureK + captureBase;
             DottedCircle(center, capture, CaptureRing, 2f);
+
+            // зона сжатия дыры — r × 6
+            if (hole)
+                DottedCircle(center, body.Radius * BlackHole.EffectRadiusMultiplier, HoleEffectColor, 2f);
 
             // жаровая зона — пунктир + слабая заливка
             if (star && body.HeatRadius > 0f)

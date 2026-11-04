@@ -25,6 +25,8 @@ namespace SpaceTaxi.UI
 
         private static readonly Color DotColor = new Color(0.85f, 1f, 0.9f);
         private static readonly Color StarColor = new Color(1f, 0.82f, 0.35f);
+        private static readonly Color HoleCoreColor = new Color(0.1f, 0.08f, 0.14f);
+        private static readonly Color HoleHaloColor = new Color(0.55f, 0.35f, 0.85f, 0.25f);
 
         private void Awake()
         {
@@ -72,11 +74,22 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // у звезды ядро — ребёнок полупрозрачного ореола
+        // у звезды ядро — ребёнок полупрозрачного ореола; у дыры — тёмное кольцо
         private RectTransform CreateDot(CelestialBody body)
         {
             bool star = body is Star;
             float size = Mathf.Max(6f, body.Radius * 2f * pxPerUnit);
+
+            if (body is BlackHole)
+            {
+                RectTransform holeHalo = Make(body.name + "Halo", size * 1.35f);
+                holeHalo.GetComponent<Image>().color = HoleHaloColor;
+                RectTransform core = Make(body.name, Mathf.Max(4f, size * 0.6f));
+                core.SetParent(holeHalo, false);
+                core.anchoredPosition = Vector2.zero;
+                core.GetComponent<Image>().color = HoleCoreColor;
+                return holeHalo;
+            }
 
             if (!star)
             {
