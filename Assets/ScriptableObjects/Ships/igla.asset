@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 625b3b8c1f4504c20ad62710995c139e, type: 3}
+  m_Name: igla
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Economy.ShipConfig
+  Id: igla
+  DisplayName: "\u0418\u0433\u043B\u0430"
+  Tier: 4
+  Thrust: 135
+  StrafeAcc: 125
+  MaxV: 470
+  FuelMax: 130
+  HpMax: 90
+  Price: 5200
+  IsRental: 0
+  Description: "\u0421\u0430\u043C\u044B\u0439 \u0431\u044B\u0441\u0442\u0440\u044B\u0439, \u0445\u0440\u0443\u043F\u043A\u0438\u0439"

@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using SpaceTaxi.Core;
 using SpaceTaxi.Physics;
 using SpaceTaxi.Audio;
+using SpaceTaxi.Economy;
 
 namespace SpaceTaxi.World
 {
@@ -15,13 +16,16 @@ namespace SpaceTaxi.World
         private readonly PhysicsConfig config;
         private readonly InputActionAsset input;
         private readonly Planet planetPrefab;
-        private readonly Ship shipPrefab;     
+        private readonly Ship shipPrefab;
 
-        public WorldBuilder(LevelAsset level, PhysicsConfig config, InputActionAsset input,
+        private readonly ShipConfig shipConfig;
+
+        public WorldBuilder(LevelAsset level, PhysicsConfig config, ShipConfig shipConfig, InputActionAsset input,
             Planet planetPrefab = null, Ship shipPrefab = null)
         {
             this.level = level;
             this.config = config;
+            this.shipConfig = shipConfig;
             this.input = input;
             this.planetPrefab = planetPrefab;
             this.shipPrefab = shipPrefab;
@@ -148,7 +152,7 @@ namespace SpaceTaxi.World
             float nose = controller != null ? controller.SpriteNoseAngle : 0f;
             go.transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
 
-            ship.Init(config);
+            ship.Init(config, shipConfig);
             ship.State = ShipState.Landed;
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet;
 

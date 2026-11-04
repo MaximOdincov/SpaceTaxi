@@ -55,7 +55,7 @@ namespace SpaceTaxi.Physics
 
         private void FixedUpdate()
         {
-            if (ship == null || ship.Config == null || ship.State != ShipState.Flying)
+            if (ship == null || ship.ShipConfig == null || ship.State != ShipState.Flying)
                 return;
             ApplyHeat(Time.fixedDeltaTime);
         }
@@ -64,7 +64,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.Hp <= 0f)
                 return;
-            ship.Hp = Mathf.Clamp(ship.Hp - amount, 0f, ship.Config.HpMax);
+            ship.Hp = Mathf.Clamp(ship.Hp - amount, 0f, ship.ShipConfig.HpMax);
             HpChanged?.Invoke();
             if (ship.Hp <= 0f)
                 Die();
@@ -73,9 +73,9 @@ namespace SpaceTaxi.Physics
         // через событие HpChanged, иначе HUD не обновится
         public void RepairAll()
         {
-            if (ship == null || ship.Config == null)
+            if (ship == null || ship.ShipConfig == null)
                 return;
-            ship.Hp = ship.Config.HpMax;
+            ship.Hp = ship.ShipConfig.HpMax;
             HpChanged?.Invoke();
         }
 
@@ -123,8 +123,8 @@ namespace SpaceTaxi.Physics
             }
 
             ship.Body.linearVelocity = Vector2.zero;
-            ship.Hp = ship.Config.HpMax;
-            ship.Fuel = ship.Config.FuelMax;
+            ship.Hp = ship.ShipConfig.HpMax;
+            ship.Fuel = ship.ShipConfig.FuelMax;
             ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();

@@ -44,7 +44,7 @@ namespace SpaceTaxi.Physics
 
         private void Update()
         {
-            if (ship == null || ship.Config == null || ship.Body == null)
+            if (ship == null || ship.ShipConfig == null || ship.Body == null)
                 return;
 
             // телепорт (посадка/респавн) не тянет шлейф через полкарты
@@ -56,7 +56,7 @@ namespace SpaceTaxi.Physics
             bool fast = ship.State == ShipState.Flying && v > MinSpeed;
             trail.emitting = fast;
             if (fast)
-                trail.widthMultiplier = Mathf.Lerp(0.5f, 2.6f, Mathf.Clamp01(v / ship.Config.MaxV));
+                trail.widthMultiplier = Mathf.Lerp(0.5f, 2.6f, Mathf.Clamp01(v / ship.ShipConfig.MaxV));
         }
     }
 }

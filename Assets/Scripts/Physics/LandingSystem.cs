@@ -83,10 +83,10 @@ namespace SpaceTaxi.Physics
             // станция на планете: заправка и ремонт
             if (planet.HasStation)
             {
-                bool healed = ship.Hp < ship.Config.HpMax;
-                bool refueled = ship.Fuel < ship.Config.FuelMax;
+                bool healed = ship.Hp < ship.ShipConfig.HpMax;
+                bool refueled = ship.Fuel < ship.ShipConfig.FuelMax;
                 Hull.RepairAll();
-                ship.Fuel = ship.Config.FuelMax;
+                ship.Fuel = ship.ShipConfig.FuelMax;
                 if (healed || refueled)
                     StationServiced?.Invoke(planet.DisplayName);
             }

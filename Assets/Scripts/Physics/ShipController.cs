@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Economy;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
@@ -16,6 +17,7 @@ namespace SpaceTaxi.Physics
         private Ship ship;
         private GravityField gravity;
         private PhysicsConfig config;
+        private ShipConfig shipConfig;
         private LandingSystem landing;
         private InputAction thrustAction;
         private InputAction brakeAction;
@@ -83,7 +85,8 @@ namespace SpaceTaxi.Physics
         private void FixedUpdate()
         {
             config = ship != null ? ship.Config : null;
-            if (config == null)
+            shipConfig = ship != null ? ship.ShipConfig : null;
+            if (config == null || shipConfig == null)
                 return;
 
             if (ship.State != ShipState.Flying)
@@ -177,7 +180,7 @@ namespace SpaceTaxi.Physics
             }
 
             // Пороги — лог по одному разу
-            if (ship.Fuel > config.FuelMax * 0.1f)
+            if (ship.Fuel > shipConfig.FuelMax * 0.1f)
             {
                 lowFuelLogged = false;
                 emptyFuelLogged = false;
@@ -197,8 +200,8 @@ namespace SpaceTaxi.Physics
             if (v > config.MinControlSpeed)
             {
                 Vector2 dir = velocity / v;
-                if (thrustOn && v < config.MaxV)
-                    velocity += dir * (config.Thrust * engMul * dt);
+                if (thrustOn && v < shipConfig.MaxV)
+                    velocity += dir * (shipConfig.Thrust * engMul * dt);
                 if (brakeOn)
                 {
                     float nv = Mathf.Max(0f, v - config.Retro * engMul * dt);
@@ -208,7 +211,7 @@ namespace SpaceTaxi.Physics
                 {
                     Vector2 perp = new Vector2(dir.y, -dir.x);
                     float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad;
-                    float strafeAcc = Mathf.Min(config.StrafeAcc, v * maxTurn);
+                    float strafeAcc = Mathf.Min(shipConfig.StrafeAcc, v * maxTurn);
                     velocity += perp * (strafe * strafeAcc * engMul * dt);
                 }
             }
