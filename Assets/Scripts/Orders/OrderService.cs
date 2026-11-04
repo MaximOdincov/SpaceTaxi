@@ -268,7 +268,10 @@ namespace SpaceTaxi.Orders
         {
             if (catalog == null || level == null)
                 return;
-            PassengerProfile passenger = catalog.Pick();
+            // П5.2: свежий профиль из пулов; пулов нет — старые профили каталога
+            PassengerProfile passenger = catalog.Generate();
+            if (passenger == null)
+                passenger = catalog.Pick();
             if (passenger == null)
                 return;
 
