@@ -11,6 +11,7 @@ namespace SpaceTaxi.Physics
         private Ship ship;
         private GravityField gravity;
         private LevelAsset level;
+        private Vector3 initialScale = Vector3.one; // респавн откатывает сжатие дырой
 
         public event Action HpChanged;
         public event Action Died;
@@ -30,6 +31,7 @@ namespace SpaceTaxi.Physics
         private void Awake()
         {
             ship = GetComponent<Ship>();
+            initialScale = transform.localScale;
             // пересадка на другой корпус — HP стал полным, HUD должен увидеть
             ship.Reconfigured += OnShipReconfigured;
             gravity = FindAnyObjectByType<GravityField>();
@@ -141,6 +143,7 @@ namespace SpaceTaxi.Physics
             ship.Body.linearVelocity = Vector2.zero;
             ship.Hp = ship.Eff.HpMax;
             ship.Fuel = ship.Eff.FuelMax;
+            transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
             ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();

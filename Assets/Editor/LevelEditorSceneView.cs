@@ -15,6 +15,8 @@ namespace SpaceTaxi.Tools
 
         private static readonly Color PlanetFill = new Color(0.6f, 0.8f, 1f, 0.08f);
         private static readonly Color StarFill = new Color(1f, 0.8f, 0.3f, 0.1f);
+        private static readonly Color HoleFill = new Color(0.1f, 0.08f, 0.16f, 0.5f);
+        private static readonly Color HoleEffectColor = new Color(0.6f, 0.4f, 0.9f, 0.5f);
         private static readonly Color LandingRing = new Color(0.3f, 1f, 0.4f, 0.8f);
         private static readonly Color CaptureRing = new Color(0.4f, 0.8f, 1f, 0.7f);
         private static readonly Color HeatColor = new Color(1f, 0.5f, 0.2f, 0.8f);
@@ -26,6 +28,7 @@ namespace SpaceTaxi.Tools
         private static readonly Color TrajectoryColor = new Color(0.8f, 0.5f, 1f, 0.8f);
         private static readonly Color GravityWeak = new Color(0.4f, 0.7f, 1f, 0.5f);
         private static readonly Color GravityStrong = new Color(1f, 0.4f, 0.2f, 0.8f);
+        private static readonly Color BeltColor = new Color(0.75f, 0.68f, 0.58f, 0.7f);
 
         private static bool dragging;
         private static Vector2 dragOffset;
@@ -114,7 +117,25 @@ namespace SpaceTaxi.Tools
         private static void DrawBody(CelestialBodyData body, bool selected)
         {
             Vector3 center = body.Position;
+
+            // пояс: осевая линия + границы разброса, без заливки и колец
+            if (body.Type == BodyType.AsteroidBelt)
+            {
+                float half = Mathf.Max(0f, body.BeltWidth) * 0.5f;
+                Handles.color = selected ? Color.white : BeltColor;
+                Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
+                if (half > 0f)
+                {
+                    Handles.color = BeltColor * new Color(1f, 1f, 1f, 0.5f);
+                    Handles.DrawWireDisc(center, Vector3.forward, Mathf.Max(1f, body.Radius - half));
+                    Handles.DrawWireDisc(center, Vector3.forward, body.Radius + half);
+                }
+                Handles.Label(center + Vector3.up * (body.Radius + half + 12f), body.DisplayName + " · пояс");
+                return;
+            }
+
             bool star = body.Type == BodyType.Star;
+            bool hole = body.Type == BodyType.BlackHole;
 
             // превью: спрайт и цвет из данных уровня
             var visuals = body.Visuals;
@@ -136,10 +157,12 @@ namespace SpaceTaxi.Tools
             }
 
             // заливка + контур + имя
-            Handles.color = star ? StarFill : PlanetFill;
+            Handles.color = hole ? HoleFill : star ? StarFill : PlanetFill;
             if (visuals == null || visuals.Sprite == null)
                 Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
-            Handles.color = selected ? Color.white : (star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f));
+            Handles.color = selected ? Color.white
+                : hole ? new Color(0.7f, 0.5f, 1f)
+                : star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f);
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName + " · " + body.Sector);
             if (body.HasStation)
@@ -156,7 +179,7 @@ namespace SpaceTaxi.Tools
             float captureBase = config != null ? config.CaptureRingBase : 30f;
 
             // посадочное кольцо — зелёный пунктир (только планеты)
-            if (!star)
+            if (body.Type == BodyType.Planet)
             {
                 float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + landingOffset;
                 DottedCircle(center, landing, LandingRing, 4f);
@@ -165,6 +188,10 @@ namespace SpaceTaxi.Tools
             // кольцо качели — мельче
             float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * captureK + captureBase;
             DottedCircle(center, capture, CaptureRing, 2f);
+
+            // зона сжатия дыры — r × 6
+            if (hole)
+                DottedCircle(center, body.Radius * BlackHole.EffectRadiusMultiplier, HoleEffectColor, 2f);
 
             // жаровая зона — пунктир + слабая заливка
             if (star && body.HeatRadius > 0f)
@@ -326,12 +353,14 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // та же формула гравитации, что в игре
+        // та же формула гравитации, что в игре (пояс не источник гравитации — как в рантайме)
         private static Vector2 GravityAt(LevelAsset level, Vector2 pos, float k, float clamp)
         {
             Vector2 accel = Vector2.zero;
             foreach (var body in level.Bodies)
             {
+                if (body.Type == BodyType.AsteroidBelt)
+                    continue;
                 Vector2 delta = body.Position - pos;
                 float d2 = delta.sqrMagnitude;
                 if (d2 < 0.0001f)
@@ -382,8 +411,12 @@ namespace SpaceTaxi.Tools
                 pos += vel * h;
 
                 foreach (var body in level.Bodies)
+                {
+                    if (body.Type == BodyType.AsteroidBelt)
+                        continue; // пояс — не сплошной диск, прогноз через него свободен
                     if (Vector2.Distance(body.Position, pos) < body.Radius + 7f)
                         return; // врезались — конец прогноза
+                }
 
                 if (i % 10 == 0) // точка каждые ~10 шагов
                 {

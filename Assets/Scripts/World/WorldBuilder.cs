@@ -39,6 +39,10 @@ namespace SpaceTaxi.World
             for (int i = 0; i < level.Bodies.Count; i++)
                 bodies.Add(CreateBody(level.Bodies[i], i));
 
+            // кометы (П6.3): одна система на уровень, маршруты по таймеру, не тело гравитации
+            var cometGo = new GameObject("CometSystem");
+            cometGo.AddComponent<CometSystem>().Init(level);
+
             ship = CreateShip(bodies);
 
             Debug.Log($"[World] {level.LevelName}: тел={bodies.Count}, корабль в {ship.transform.position}, состояние={ship.State}");
@@ -46,8 +50,17 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
+            // пояс — не тело гравитации: в списке заглушка ради индексов level.Bodies
+            if (data.Type == BodyType.AsteroidBelt)
+            {
+                var beltGo = new GameObject(data.DisplayName);
+                beltGo.transform.position = data.Position;
+                beltGo.AddComponent<AsteroidBeltSystem>().Init(data, config);
+                return null;
+            }
+
             GameObject go;
-            if (data.Type != BodyType.Star && planetPrefab != null)
+            if (data.Type == BodyType.Planet && planetPrefab != null)
             {
                 go = Object.Instantiate(planetPrefab.gameObject, data.Position, Quaternion.identity);
                 go.name = data.DisplayName;
@@ -57,10 +70,11 @@ namespace SpaceTaxi.World
                 go = new GameObject(data.DisplayName);
                 go.transform.position = data.Position;
 
-                var starRenderer = go.AddComponent<SpriteRenderer>();
-                starRenderer.sprite = StubSprites.Circle(data.Radius * 2f);
-                starRenderer.color = new Color(1f, 0.82f, 0.35f);
-                starRenderer.sortingOrder = 1;
+                var stubRenderer = go.AddComponent<SpriteRenderer>();
+                stubRenderer.sprite = StubSprites.Circle(data.Radius * 2f);
+                // звезда — тёплая заглушка, дыра — тёмное ядро (UseColor перекрасит)
+                stubRenderer.color = data.Type == BodyType.BlackHole ? BlackHole.CoreColor : new Color(1f, 0.82f, 0.35f);
+                stubRenderer.sortingOrder = 1;
             }
 
             var renderer = go.GetComponent<SpriteRenderer>();
@@ -72,6 +86,10 @@ namespace SpaceTaxi.World
             if (data.Type == BodyType.Star)
             {
                 body = go.AddComponent<Star>();
+            }
+            else if (data.Type == BodyType.BlackHole)
+            {
+                body = go.AddComponent<BlackHole>();
             }
             else
             {
@@ -89,6 +107,17 @@ namespace SpaceTaxi.World
                 heatRenderer.sprite = StubSprites.Circle(data.HeatRadius * 2f);
                 heatRenderer.color = new Color(1f, 0.45f, 0.2f, 0.07f);
                 heatRenderer.sortingOrder = -1;
+            }
+
+            // ореол зоны сжатия дыры — по образцу HeatZone
+            if (body is BlackHole hole)
+            {
+                var zoneGo = new GameObject("EffectZone");
+                zoneGo.transform.SetParent(go.transform, false);
+                var zoneRenderer = zoneGo.AddComponent<SpriteRenderer>();
+                zoneRenderer.sprite = StubSprites.Circle(hole.EffectRadius * 2f);
+                zoneRenderer.color = BlackHole.ZoneColor;
+                zoneRenderer.sortingOrder = -1;
             }
 
             return body;

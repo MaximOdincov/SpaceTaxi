@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using SpaceTaxi.Core;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
+using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
@@ -126,6 +127,11 @@ namespace SpaceTaxi.UI
                     if (result.ToDebt > 0)
                         Show($"{result.ToDebt} кр ушло в счёт долга");
                 };
+
+            // кометы (П6.3): предупреждение за 20 с до входа в систему
+            var comets = FindAnyObjectByType<CometSystem>();
+            if (comets != null)
+                comets.CometIncoming += (entry, direction) => Show("Комета приближается!", true);
 
             bound = true;
         }

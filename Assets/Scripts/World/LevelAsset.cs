@@ -58,6 +58,11 @@ namespace SpaceTaxi.World
         [Tooltip("Класс района: влияет на оплату заказов на это тело")]
         public Sector Sector = Sector.Near;
 
+        [Header("Пояс астероидов (Type == AsteroidBelt)")]
+        [Tooltip("Position = центр пояса, Radius = радиус осевой линии кольца")]
+        [Min(0f)] public float BeltWidth = 40f;         // разброс астероидов вокруг осевой
+        [Min(1)] public int BeltAsteroidCount = 30;      // кламп 24–40 при создании пояса
+
         [Header("Кольца (0 = считать по формуле)")]
         [Min(0f)] public float LandingRingRadius; // посадочное: 0 = r + 90
         [Min(0f)] public float CaptureRingRadius; // качели: 0 = r * 3.3 + 30
