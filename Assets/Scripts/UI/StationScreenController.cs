@@ -45,6 +45,7 @@ namespace SpaceTaxi.UI
         private LandingSystem landing;
         private PauseScreenController pauseController;
         private MapScreenController mapController;
+        private OrderCompleteScreenController orderComplete; // модал завершения выше станции
 
         // ввод: действие Station мапы "UI" (binding B), привязка строками — стиль ShipController
         private InputActionAsset input;
@@ -109,6 +110,10 @@ namespace SpaceTaxi.UI
 
             if (stationAction != null && stationAction.WasPressedThisFrame())
             {
+                // экран завершения заказа модален (sortingOrder выше) — B ему не подчиняется
+                if (orderComplete == null) orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
+                if (orderComplete != null && orderComplete.IsOpened)
+                    return;
                 if (opened) Close();
                 else TryOpen();
             }

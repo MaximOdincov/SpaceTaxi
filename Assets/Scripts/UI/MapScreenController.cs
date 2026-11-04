@@ -11,6 +11,7 @@ namespace SpaceTaxi.UI
 
         private bool opened;
         private StationScreenController stationController; // станция поверх карты — её клавиши
+        private OrderCompleteScreenController orderComplete; // модал завершения заказа
 
         public bool IsOpened => opened;
 
@@ -26,6 +27,9 @@ namespace SpaceTaxi.UI
             if (stationController == null) stationController = FindAnyObjectByType<StationScreenController>();
             if (stationController != null && stationController.IsOpened)
                 return; // станция открыта — M/Esc принадлежат ей
+            if (orderComplete == null) orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
+            if (orderComplete != null && orderComplete.IsOpened)
+                return; // экран завершения модален — M/Esc ему не подчиняются
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.mKey.wasPressedThisFrame)
