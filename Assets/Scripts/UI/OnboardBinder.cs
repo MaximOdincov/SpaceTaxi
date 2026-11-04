@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
@@ -40,9 +41,14 @@ namespace SpaceTaxi.UI
         private GravityField gravity;
         private OrderService orders;
         private HullSystem hull;
+        private Wallet wallet;
+        private Button shiftButton;
         private float nextSlowUpdate;
         private bool bound;
         private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
+
+        private const int DemoShiftReward = 100;     // временно, до П4
+        private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
         private static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);      // #A8FFCB
@@ -62,6 +68,8 @@ namespace SpaceTaxi.UI
             {
                 BindExisting();
             }
+            EnsureShiftButton();
+            WidenMoneyValue();
         }
 
         // шрифт панели: panelFont или шрифт часов
@@ -348,10 +356,15 @@ namespace SpaceTaxi.UI
                     return;
                 orders = session.Orders;
                 hull = ship.GetComponent<HullSystem>();
+                wallet = session.Wallet;
+                wallet.CreditsChanged += ShowCredits;
+                ShowCredits(wallet.Credits);
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
+                if (shiftButton != null)
+                    shiftButton.onClick.AddListener(() => wallet.Add(DemoShiftReward));
                 RefreshOrder();
                 bound = true;
             }
@@ -388,6 +401,47 @@ namespace SpaceTaxi.UI
                 statusText.text = orders.Active.State == OrderState.Aboard
                     ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper())
                     : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper());
+        }
+
+        // кредит обновляется событием, без опроса в SlowUpdate
+        private void ShowCredits(int credits)
+        {
+            if (moneyValue != null)
+                moneyValue.text = credits + " кр";
+        }
+
+        // временно, до П4: кнопка тестового начисления кредитов
+        private void EnsureShiftButton()
+        {
+            if (shiftButton != null)
+                return;
+            var econSection = transform.Find("Stack/EconSection");
+            if (econSection == null)
+                return;
+            var econRow = econSection.Find("EconRow");
+            Transform parent = econRow != null ? econRow : econSection;
+            var label = OnboardComputerFactory.LabelColor;
+            var shiftGo = OnboardComputerFactory.Button(parent, "СМЕНА +100 КР",
+                new Color(label.r, label.g, label.b, 0.22f), OnboardComputerFactory.BrightColor, 17f,
+                "ShiftButton");
+            var layout = shiftGo.AddComponent<LayoutElement>();
+            layout.minHeight = 32f;
+            layout.preferredHeight = 32f;
+            layout.minWidth = 132f;
+            layout.preferredWidth = 132f;
+            shiftButton = shiftGo.GetComponent<Button>();
+        }
+
+        // поле денег из фабрики/префаба узкое — суммы не влезают
+        private void WidenMoneyValue()
+        {
+            if (moneyValue == null)
+                return;
+            var layout = moneyValue.gameObject.GetComponent<LayoutElement>();
+            if (layout == null)
+                return;
+            layout.minWidth = MoneyValueWidth;
+            layout.preferredWidth = MoneyValueWidth;
         }
 
         private void NearestBody(out string name, out float dist, out bool heat)
