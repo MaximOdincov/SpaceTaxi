@@ -185,6 +185,8 @@ namespace SpaceTaxi.Tools
             if (type == BodyType.Planet)
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HasStation"),
                     new GUIContent("Станция (заправка+ремонт)"));
+            EditorGUILayout.PropertyField(element.FindPropertyRelative("Sector"),
+                new GUIContent("Сектор (оплата)"));
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField("Кольца", EditorStyles.boldLabel);

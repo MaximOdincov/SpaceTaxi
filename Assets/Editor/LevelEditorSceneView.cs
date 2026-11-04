@@ -141,7 +141,7 @@ namespace SpaceTaxi.Tools
                 Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
             Handles.color = selected ? Color.white : (star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f));
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
-            Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName);
+            Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName + " · " + body.Sector);
             if (body.HasStation)
             {
                 Handles.color = new Color(1f, 0.84f, 0.3f);
