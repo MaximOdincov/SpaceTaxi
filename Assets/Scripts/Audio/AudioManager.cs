@@ -24,6 +24,7 @@ namespace SpaceTaxi.Audio
         private readonly List<AudioSource> oneShotPool = new List<AudioSource>();
         private readonly Dictionary<AudioGroup, float> groupVolumes = new Dictionary<AudioGroup, float>();
         private readonly Dictionary<AudioGroup, float> groupDuck = new Dictionary<AudioGroup, float>();
+        private readonly HashSet<SoundId> warnedSilent = new HashSet<SoundId>(); // уже предупредили о пустых клипах
         private AudioSource musicA, musicB; // чередуем для кроссфейда
         private SoundId currentMusic = SoundId.None;
         private int musicFlip;
@@ -313,8 +314,14 @@ namespace SpaceTaxi.Audio
                 return null;
             SoundEntry entry = catalog.Get(id);
             if (entry == null || !entry.IsValid)
-                Debug.LogWarning($"[Audio] нет клипов для {id}");
-            return entry == null || !entry.IsValid ? null : entry;
+            {
+                // слоты без клипов (ждут файлы): лупы зовут каждый кадр —
+                // предупреждение один раз на id, не спамим
+                if (warnedSilent.Add(id))
+                    Debug.LogWarning($"[Audio] нет клипов для {id}");
+                return null;
+            }
+            return entry;
         }
 
         // выбор вариации: по силе или случайно

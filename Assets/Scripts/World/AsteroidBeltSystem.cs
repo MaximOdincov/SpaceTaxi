@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Physics;
 using SpaceTaxi.UI;
@@ -151,6 +152,7 @@ namespace SpaceTaxi.World
             if (!warned && ringDistance <= zone)
             {
                 warned = true;
+                Sound.StartLoop(SoundId.BeltRumble); // стуки пояса — вход/выход по той же зоне, идемпотентно
                 if (toast == null)
                     toast = FindAnyObjectByType<ToastNotifier>();
                 if (toast != null)
@@ -159,7 +161,14 @@ namespace SpaceTaxi.World
             else if (warned && ringDistance > zone + ToastResetMargin)
             {
                 warned = false;
+                Sound.StopLoop(SoundId.BeltRumble);
             }
+        }
+
+        // сцена может выгрузиться внутри пояса — луп живёт в AudioManager, глушим
+        private void OnDisable()
+        {
+            Sound.StopLoop(SoundId.BeltRumble);
         }
     }
 }
