@@ -128,7 +128,7 @@ namespace SpaceTaxi.UI
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 
-            var menu = OnboardComputerFactory.Button(content, "В МЕНЮ",
+            var menu = OnboardComputerFactory.Button(content.transform, "В МЕНЮ",
                 new Color(OnboardComputerFactory.DangerColor.r, OnboardComputerFactory.DangerColor.g,
                     OnboardComputerFactory.DangerColor.b, 0.28f),
                 OnboardComputerFactory.BrightColor, 26f, "ButtonMenu");
