@@ -7,54 +7,46 @@ namespace SpaceTaxi.Audio
     // Звуки корабля по вводу и контактам
     public sealed class ShipAudio : MonoBehaviour
     {
-        [SerializeField] private InputActionAsset input; // тот же ассет, что у ShipController
-
-        public void SetInput(InputActionAsset asset)
-        {
-            input = asset;
-            BindActions();
-        }
-
         private Ship ship;
-        private InputAction thrustAction;
-        private InputAction brakeAction;
-        private InputAction strafeAction;
-        private float lastHp;
-        private ShipState lastState;
+        private ShipController controller;
+
+        // ввод читается через ShipController (ThrustOn/BrakeOn/StrafeLevel) —
+        // свой биндинг не нужен, метод оставлен для WorldBuilder
+        public void SetInput(InputActionAsset asset) { }
 
         private void Awake()
         {
             ship = GetComponent<Ship>();
-            lastHp = ship != null ? ship.Hp : 0f;
-            lastState = ship != null ? ship.State : ShipState.Flying;
-        }
-
-        private void OnEnable()
-        {
-            BindActions();
-        }
-
-        // из OnEnable и из SetInput — кто раньше
-        private void BindActions()
-        {
-            InputActionMap map = input != null ? input.FindActionMap("Ship") : null;
-            if (map == null)
-                return;
-            thrustAction = map.FindAction("Thrust");
-            brakeAction = map.FindAction("Brake");
-            strafeAction = map.FindAction("Strafe");
+            controller = GetComponent<ShipController>();
         }
 
         private void Update()
         {
-            if (ship == null)
+            if (ship == null || ship.Config == null)
                 return;
 
-            // звук эффектов корабля пока отключён — оставлена только музыка
-            Sound.SetLoop(SoundId.EngineMain, false);
+            // SetLoop идемпотентен: вызов каждый кадр дешевле флагов-переходов;
+            // пустой бак и не-Flying гасят входы в самом контроллере
+            bool thrust = controller != null && controller.ThrustOn;
+            Sound.SetLoop(SoundId.EngineMain, thrust);
+            Sound.SetLoop(SoundId.EngineRetro, controller != null && controller.BrakeOn);
+            Sound.SetLoop(SoundId.EngineStrafe,
+                controller != null && Mathf.Abs(controller.StrafeLevel) > 0.01f);
 
-            lastHp = ship.Hp;
-            lastState = ship.State;
+            if (controller == null)
+                return;
+
+            // качели/посадочное кольцо (EnginePower 1 → EngineMultiplier) — громче и выше тоном
+            if (thrust)
+            {
+                float mulSpan = Mathf.Max(ship.Config.EngineMultiplier - 1f, 0.001f);
+                Sound.SetLoopIntensity(SoundId.EngineMain,
+                    Mathf.Clamp01((controller.EnginePower - 1f) / mulSpan));
+            }
+
+            // лёгкий пан в сторону боковой тяги
+            Sound.SetLoopPan(SoundId.EngineMain,
+                Mathf.Clamp(controller.StrafeLevel * 0.35f, -0.35f, 0.35f));
         }
     }
 }
