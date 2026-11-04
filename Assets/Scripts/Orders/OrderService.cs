@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
 
@@ -21,6 +22,7 @@ namespace SpaceTaxi.Orders
         public int PickupIndex;    // планета А (индекс в LevelAsset.Bodies)
         public int DropoffIndex;   // планета Б
         public float ExpiresAt;    // время смерти карточки (Time.time)
+        public int Price;          // цена предложения, считается при спавне
         public OrderState State = OrderState.Offered;
     }
 
@@ -38,6 +40,10 @@ namespace SpaceTaxi.Orders
         public int maxOffers = 4;
         [Tooltip("Сколько карточек сразу на старте")]
         public int initialOffers = 2;
+
+        [Header("Ценообразование")]
+        [Tooltip("Пусто — фолбэк с дефолтными числами (PricingConfig.Default)")]
+        [SerializeField] private PricingConfig pricingConfig;
 
         private readonly List<OrderOffer> offers = new List<OrderOffer>();
         private readonly List<int> planetIndices = new List<int>();
@@ -249,10 +255,21 @@ namespace SpaceTaxi.Orders
                 DropoffIndex = RandomPlanetIndex(pickup),
                 ExpiresAt = Time.time + offerLifetime,
             };
+            // цена фиксируется в момент спавна карточки и дальше не меняется
+            offer.Price = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
+                RouteDistance(offer), SectorOf(offer.DropoffIndex));
             offers.Add(offer);
             OffersChanged?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
-                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
+                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр");
+        }
+
+        // класс района планеты-цели (влияет на цену)
+        private Sector SectorOf(int index)
+        {
+            return level != null && index >= 0 && index < level.Bodies.Count
+                ? level.Bodies[index].Sector
+                : Sector.Near;
         }
 
         // случайная планета уровня, exclude — не эта
