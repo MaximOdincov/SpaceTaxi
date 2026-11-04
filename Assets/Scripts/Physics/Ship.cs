@@ -79,9 +79,11 @@ namespace SpaceTaxi.Physics
             Reconfigure(shipConfig, null);
         }
 
-        // Новый корпус = полные HP и полный бак; остальное (тяга, MaxV) читается
-        // из Eff динамически контроллерами, респавн тоже берёт новые статы
-        public void Reconfigure(ShipConfig shipConfig, int[] upgradeLevels)
+        // Новый корпус = полные HP и полный бак (refill); остальное (тяга, MaxV)
+        // читается из Eff динамически контроллерами, респавн тоже берёт новые статы.
+        // refill = false — пересчёт статов без лечения/заправки: покупка улучшения
+        // на стоящий корабль не должна быть халявным сервисом станции
+        public void Reconfigure(ShipConfig shipConfig, int[] upgradeLevels, bool refill = true)
         {
             if (shipConfig == null)
                 return;
@@ -91,7 +93,7 @@ namespace SpaceTaxi.Physics
             // Полные HP/бак только живому корпусу: при гибели Reconfigure
             // вызывается до респавна, и мёртвый корабль не должен «ожить»
             // на месте гибели (иначе Crash усыплёт его посадкой)
-            if (Hp > 0f)
+            if (refill && Hp > 0f)
             {
                 Hp = Eff.HpMax;
                 Fuel = Eff.FuelMax; // сеттер сам шлёт FuelChanged

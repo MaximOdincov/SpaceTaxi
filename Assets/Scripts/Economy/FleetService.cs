@@ -107,7 +107,7 @@ namespace SpaceTaxi.Economy
             levels[idx]++;
             UpgradesChanged?.Invoke();
             if (config == Current && ship != null)
-                ship.Reconfigure(config, levels);
+                ship.Reconfigure(config, levels, refill: false); // без лечения/заправки
             return true;
         }
 
