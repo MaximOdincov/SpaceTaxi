@@ -32,7 +32,6 @@ namespace SpaceTaxi.Physics
         private const float HorizonMax = 4f;
         private const float HorizonScreens = 1.2f;
 
-        // Зелёная линия — коснёшься планеты ниже порога посадки
         private static readonly Color LineSafe = new Color(0.235f, 1f, 0.557f);
 
         private Ship ship;
