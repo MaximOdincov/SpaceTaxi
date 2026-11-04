@@ -86,5 +86,10 @@ namespace SpaceTaxi.World
         // Только при SpawnMode = Free.
         public Vector2 SpawnPoint;
         [Range(-180f, 180f)] public float SpawnHeading;
+
+        [Header("Кометы (радиус 0 = хорды по всему миру)")]
+        [Tooltip("Центр зоны комет: маршруты не покидают эту окружность")]
+        public Vector2 CometAreaCenter = Vector2.zero;
+        [Min(0f)] public float CometAreaRadius = 0f;
     }
 }

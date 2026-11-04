@@ -12,6 +12,7 @@ namespace SpaceTaxi.World
 
         private Vector2 direction;
         private float speed;
+        private Vector2 despawnCenter; // центр отсчёта деспавна: мир — ноль, кометная зона — её центр
         private float despawnRadius;
         private Rigidbody2D body;
 
@@ -27,17 +28,25 @@ namespace SpaceTaxi.World
 
         public void Init(Vector2 flightDirection, float flightSpeed, float worldRadius)
         {
+            Init(flightDirection, flightSpeed, Vector2.zero, worldRadius);
+        }
+
+        // вариант для кометной зоны (П7.2): маршрут не покидает окружность зоны,
+        // деспавн — при выходе из неё
+        public void Init(Vector2 flightDirection, float flightSpeed, Vector2 despawnCenter, float despawnRadius)
+        {
             direction = flightDirection.normalized;
             speed = flightSpeed;
-            despawnRadius = worldRadius + DespawnMargin;
+            this.despawnCenter = despawnCenter;
+            this.despawnRadius = despawnRadius + DespawnMargin;
         }
 
         private void FixedUpdate()
         {
             body.MovePosition(body.position + direction * (speed * Time.fixedDeltaTime));
 
-            // вылетела из системы — убираем, чтобы не копить мёртвые объекты
-            if (body.position.sqrMagnitude > despawnRadius * despawnRadius)
+            // вылетела из зоны/системы — убираем, чтобы не копить мёртвые объекты
+            if ((body.position - despawnCenter).sqrMagnitude > despawnRadius * despawnRadius)
                 Destroy(gameObject);
         }
     }

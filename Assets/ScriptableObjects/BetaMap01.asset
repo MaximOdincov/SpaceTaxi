@@ -24,8 +24,8 @@ MonoBehaviour:
     Visuals:
       Sprite: {fileID: 0}
       Material: {fileID: 0}
-      UseColor: 0
-      Color: {r: 1, g: 1, b: 1, a: 1}
+      UseColor: 1
+      Color: {r: 1, g: 0.83, b: 0.3, a: 1}
       SpinSpeed: 0
     HasStation: 1
     Sector: 0
@@ -520,3 +520,5 @@ MonoBehaviour:
   SpawnAngleDeg: 90
   SpawnPoint: {x: 0, y: 0}
   SpawnHeading: 0
+  CometAreaCenter: {x: 0, y: -1300}
+  CometAreaRadius: 700
