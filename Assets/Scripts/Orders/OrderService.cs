@@ -52,6 +52,7 @@ namespace SpaceTaxi.Orders
         private PassengerCatalog catalog;
         private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
         private Ship ship;            // для трекинга задания «тише едем» (П5.3)
+        private CometSystem cometSystem; // лениво: жива — задание «покажите комету» доступно (П8.1)
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
@@ -280,6 +281,109 @@ namespace SpaceTaxi.Orders
                 && !task.Failed && ship != null && ship.Body != null
                 && ship.Body.linearVelocity.magnitude > task.SpeedLimit)
                 task.Failed = true;
+
+            // точки интереса (П8.1): трекинг в тот же период Aboard→доставка,
+            // успех фиксируется один раз — провалить задание может только гибель заказа
+            if (active.State == OrderState.Aboard
+                && PassengerTasks.IsInterestPoint(task.Kind) && !task.Succeeded && !task.Failed)
+                TrackInterestPoint(task);
+        }
+
+        // трекинг точек интереса (П8.1, §3.6): комета/кольцо/тыл звезды/дыра/ожидание
+        private void TrackInterestPoint(PassengerTask task)
+        {
+            if (ship == null || ship.Body == null)
+                return;
+            Vector2 shipPos = ship.Body.position;
+
+            switch (task.Kind)
+            {
+                case PassengerTaskKind.CometFlyby:
+                    if (cometSystem == null)
+                        cometSystem = FindAnyObjectByType<CometSystem>();
+                    if (cometSystem == null)
+                        return;
+                    foreach (Comet comet in cometSystem.ActiveComets)
+                        if (comet != null // Destroy обнуляет ссылку до чистки списка
+                            && Vector2.Distance(shipPos, comet.transform.position) < task.DistanceThreshold)
+                        {
+                            task.Succeeded = true;
+                            return;
+                        }
+                    break;
+
+                case PassengerTaskKind.HoleFlyby:
+                    if (gravityField == null)
+                        gravityField = FindAnyObjectByType<GravityField>();
+                    if (gravityField == null)
+                        return;
+                    foreach (CelestialBody body in gravityField.Bodies)
+                        if (body is BlackHole
+                            && Vector2.Distance(shipPos, body.transform.position) < task.DistanceThreshold)
+                        {
+                            task.Succeeded = true;
+                            return;
+                        }
+                    break;
+
+                case PassengerTaskKind.RingVisit:
+                {
+                    CelestialBody planet = BodyByIndex(task.TargetBodyIndex);
+                    if (planet != null
+                        && Vector2.Distance(shipPos, planet.transform.position) <= planet.CaptureRing)
+                        task.Succeeded = true;
+                    break;
+                }
+
+                case PassengerTaskKind.StarBackside:
+                {
+                    CelestialBody star = BodyByIndex(task.TargetBodyIndex);
+                    if (star != null)
+                    {
+                        // тыл звезды относительно центра мира: проекция вектора
+                        // «звезда → корабль» на направление «центр → звезда»
+                        Vector2 away = star.transform.position.normalized;
+                        if (Vector2.Dot(shipPos - (Vector2)star.transform.position, away) > star.Radius)
+                            task.Succeeded = true;
+                    }
+                    break;
+                }
+
+                case PassengerTaskKind.WaitOnPlanet:
+                {
+                    CelestialBody planet = BodyByIndex(task.TargetBodyIndex);
+                    if (planet != null && ship.State == ShipState.Landed && ship.LandedOn == planet)
+                        task.WaitAccumulated += Time.deltaTime; // копится с прерываниями
+                    if (task.WaitAccumulated >= task.WaitSeconds)
+                        task.Succeeded = true;
+                    break;
+                }
+            }
+        }
+
+        // тело уровня по индексу: сопоставление по имени, как в OnLanded/UpdateTargetGlow
+        // (пояса в GravityField не регистрируются, но целями и не бывают)
+        private CelestialBody BodyByIndex(int index)
+        {
+            if (level == null || index < 0 || index >= level.Bodies.Count)
+                return null;
+            if (gravityField == null)
+                gravityField = FindAnyObjectByType<GravityField>();
+            if (gravityField == null)
+                return null;
+            string name = level.Bodies[index].DisplayName;
+            foreach (CelestialBody body in gravityField.Bodies)
+                if (body.DisplayName == name)
+                    return body;
+            return null;
+        }
+
+        // кометы ставит WorldBuilder всегда; система есть — задание доступно
+        private bool CometsAvailable()
+        {
+            if (cometSystem == null)
+                cometSystem = FindAnyObjectByType<CometSystem>();
+            return cometSystem != null;
         }
 
         private bool TaskIs(PassengerTaskKind kind)
@@ -317,13 +421,16 @@ namespace SpaceTaxi.Orders
 
         // исход задания при доставке (П5.3): успех — +0.10 рейтинга и тост с
         // благодарностью, провал — жалоба (−0.10); заказ при провале задания
-        // НЕ проваливается. Чаевые появятся в П8.2
+        // НЕ проваливается. Чаевые появятся в П8.2.
+        // Точка интереса (П8.1) требует заработанного трекингом успеха —
+        // довёз, не выполнив, = жалоба
         private void SettleTask(OrderOffer delivered)
         {
             PassengerTask task = delivered.Task;
             if (task == null || task.Kind == PassengerTaskKind.None)
                 return;
-            if (task.Failed)
+            if (task.Failed
+                || (PassengerTasks.IsInterestPoint(task.Kind) && !task.Succeeded))
             {
                 TaskFailed?.Invoke(delivered);
                 rating?.TaskFailed();
@@ -375,8 +482,10 @@ namespace SpaceTaxi.Orders
             int basePrice = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex));
             offer.Price = PriceWithRatingBonus(basePrice);
-            // задание пассажира (П5.3): по архетипу, дедлайну нужна дальность маршрута
-            offer.Task = PassengerTasks.Create(passenger.Archetype, RouteDistance(offer));
+            // задание пассажира (П5.3): по архетипу; дедлайну нужна дальность
+            // маршрута, точкам интереса (П8.1) — концы маршрута и контекст уровня
+            offer.Task = PassengerTasks.Create(passenger.Archetype, RouteDistance(offer),
+                pickup, offer.DropoffIndex, level, CometsAvailable());
             offers.Add(offer);
             OffersChanged?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
