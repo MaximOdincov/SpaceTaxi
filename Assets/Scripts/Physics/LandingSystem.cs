@@ -27,11 +27,18 @@ namespace SpaceTaxi.Physics
 
             Planet planet = collision.collider.GetComponentInParent<Planet>();
             Star star = collision.collider.GetComponentInParent<Star>();
+            Asteroid asteroid = collision.collider.GetComponentInParent<Asteroid>();
             float v = collision.relativeVelocity.magnitude;
 
             if (star != null)
             {
                 Hull.ApplyDamage(ship.Hp);
+                return;
+            }
+
+            if (asteroid != null)
+            {
+                HitAsteroid(v);
                 return;
             }
 
@@ -116,6 +123,20 @@ namespace SpaceTaxi.Physics
 
             if (ship.Hp > 0f)
                 Land(planet, collision);
+        }
+
+        // астероид пояса: посадки нет, State не меняется — корабль отскакивает физикой;
+        // медленное касание бесплатно, удар сжимает корпус и считается столкновением заказа
+        private void HitAsteroid(float v)
+        {
+            if (v < ship.Config.LandSpeed)
+                return;
+
+            float damage = Mathf.Min(30f, (v - ship.Config.LandSpeed) * 0.9f);
+            CrashImpact?.Invoke();
+            Hull.ApplyDamage(damage);
+            CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
+            Debug.Log($"[Landing] удар об астероид: v={v:0}, урон={damage:0}");
         }
     }
 }

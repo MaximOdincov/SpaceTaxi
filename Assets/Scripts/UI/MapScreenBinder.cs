@@ -22,6 +22,29 @@ namespace SpaceTaxi.UI
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
         private static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);
         private static readonly Color HoleColor = new Color(0.1f, 0.08f, 0.14f);
+        private static readonly Color BeltColor = new Color(0.52f, 0.47f, 0.4f, 0.55f);
+
+        // тонкое кольцо пояса: одна маска на все пояса, UI растягивает под радиус
+        private static Sprite beltRingSprite;
+
+        private static Sprite BeltRingSprite
+        {
+            get
+            {
+                if (beltRingSprite == null)
+                {
+                    var tex = StubSprites.CreateMaskTexture(256, (x, y) =>
+                    {
+                        float d = Mathf.Sqrt(x * x + y * y);
+                        return d <= 1f && d >= 0.93f;
+                    });
+                    beltRingSprite = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f);
+                }
+                return beltRingSprite;
+            }
+        }
+
+        private int backgroundSibling; // кольца пояса прячем под маркеры тел
 
         private void Awake()
         {
@@ -35,6 +58,8 @@ namespace SpaceTaxi.UI
                     Destroy(transform.GetChild(i).gameObject);
             }
 
+            Transform background = transform.Find("Background");
+            backgroundSibling = background != null ? background.GetSiblingIndex() : 0;
             font = transform.Find("Title").GetComponent<TMP_Text>().font;
         }
 
@@ -129,6 +154,12 @@ namespace SpaceTaxi.UI
 
         private void CreateBody(CelestialBodyData body)
         {
+            if (body.Type == BodyType.AsteroidBelt)
+            {
+                CreateBelt(body);
+                return;
+            }
+
             bool star = body.Type == BodyType.Star;
             bool hole = body.Type == BodyType.BlackHole;
             // планеты крупнее честного масштаба — для читаемости; дыра — маленький тёмный диск
@@ -164,6 +195,30 @@ namespace SpaceTaxi.UI
             label.text = body.DisplayName.ToUpper();
             label.alignment = TextAlignmentOptions.Center;
             ((RectTransform)labelGo.transform).anchoredPosition = WorldToMap(body.Position) + Vector2.up * (size * 0.5f + 18f);
+        }
+
+        // пояс — не диск, а тонкое кольцо осевой линии; под телами, чтобы не перекрывать планеты
+        private void CreateBelt(CelestialBodyData body)
+        {
+            float diameter = Mathf.Max(8f, body.Radius * 2f * scale);
+            RectTransform ring = CreateCircle(body.DisplayName, diameter, BeltColor);
+            ring.GetComponent<Image>().sprite = BeltRingSprite;
+            ring.anchoredPosition = WorldToMap(body.Position);
+            ring.SetSiblingIndex(Mathf.Min(backgroundSibling + 1, transform.childCount - 1));
+            markers[body] = ring;
+
+            if (string.IsNullOrEmpty(body.DisplayName))
+                return;
+
+            var labelGo = new GameObject(body.DisplayName + "Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            labelGo.transform.SetParent(transform, false);
+            var label = labelGo.GetComponent<TextMeshProUGUI>();
+            label.font = font;
+            label.fontSize = 16f;
+            label.color = LabelColor;
+            label.text = body.DisplayName.ToUpper();
+            label.alignment = TextAlignmentOptions.Center;
+            ((RectTransform)labelGo.transform).anchoredPosition = WorldToMap(body.Position) + Vector2.up * (diameter * 0.5f + 18f);
         }
 
         private Vector2 WorldToMap(Vector2 world)
