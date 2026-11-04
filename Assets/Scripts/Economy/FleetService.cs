@@ -6,8 +6,8 @@ namespace SpaceTaxi.Economy
 {
     // Парк кораблей: владение купленными моделями, аренда «Яйца» как фолбэк,
     // уровни улучшений купленных кораблей (аренда всегда сток).
-    // Владелец — GameSession (создаётся в Awake); UI магазина подключается в П3.2,
-    // долг за потерю аренды — в П2.2
+    // Владелец — GameSession (создаётся в Awake); UI магазина — экран станции
+    // (П3.2), долг за потерю аренды — в П2.2
     public sealed class FleetService
     {
         private readonly List<ShipConfig> owned = new List<ShipConfig>();
@@ -83,6 +83,20 @@ namespace SpaceTaxi.Economy
             owned.Add(config);
             SetCurrent(config);
             return true;
+        }
+
+        // Пересадка (П3.2, станция): в любой СВОЙ корабль или обратно в аренду
+        // (аренда всегда «в наличии» — своего продавать не нужно). Чужие и
+        // непродаваемые модели — no-op. Корпус пересаживается сразу, новый
+        // корпус = полные HP и бак (решение координатора: повреждения в бете
+        // не персистятся). Уже текущий — no-op без события.
+        public void SwitchTo(ShipConfig config)
+        {
+            if (config == null || config == Current)
+                return;
+            if (!config.IsRental && !IsOwned(config))
+                return;
+            SetCurrent(config);
         }
 
         // Улучшение: только на купленный (аренда всегда сток), уровень < 3,

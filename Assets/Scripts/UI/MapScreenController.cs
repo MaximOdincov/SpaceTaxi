@@ -5,11 +5,12 @@ namespace SpaceTaxi.UI
 {
     public class MapScreenController : MonoBehaviour
     {
-        [SerializeField] private GameObject mapScreen;           
-        [SerializeField] private OnboardComputerPanel onboard;   
-        [SerializeField] private PauseScreenController pause;    
+        [SerializeField] private GameObject mapScreen;
+        [SerializeField] private OnboardComputerPanel onboard;
+        [SerializeField] private PauseScreenController pause;
 
         private bool opened;
+        private StationScreenController stationController; // станция поверх карты — её клавиши
 
         public bool IsOpened => opened;
 
@@ -22,6 +23,9 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
+            if (stationController == null) stationController = FindAnyObjectByType<StationScreenController>();
+            if (stationController != null && stationController.IsOpened)
+                return; // станция открыта — M/Esc принадлежат ей
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.mKey.wasPressedThisFrame)

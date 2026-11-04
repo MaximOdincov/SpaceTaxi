@@ -81,21 +81,23 @@ namespace SpaceTaxi.Physics
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             ShipLanded?.Invoke(planet);
 
-            // станция на планете: заправка и ремонт
-            if (planet.HasStation)
-            {
-                bool healed = ship.Hp < ship.Eff.HpMax;
-                bool refueled = ship.Fuel < ship.Eff.FuelMax;
-                Hull.RepairAll();
-                ship.Fuel = ship.Eff.FuelMax;
-                if (healed || refueled)
-                    StationServiced?.Invoke(planet.DisplayName);
-            }
+            // станция на планете: сервис платный (экран [B]) — здесь только подсказка
+            if (planet.HasStation && (ship.Fuel < ship.Eff.FuelMax || ship.Hp < ship.Eff.HpMax))
+                StationHint?.Invoke();
 
-            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: бак/корпус полные)" : ""));
+            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: сервис за кредиты, [B])" : ""));
         }
 
         public event Action<string> StationServiced;
+
+        // посадка на станцию с неполным баком/корпусом — подсказка про [B] (ToastNotifier)
+        public event Action StationHint;
+
+        // платный сервис выполнен на экране станции — тот же тост-поток
+        public void ReportServiced(string stationName)
+        {
+            StationServiced?.Invoke(stationName);
+        }
 
         public event Action<World.Planet> ShipLanded;
 

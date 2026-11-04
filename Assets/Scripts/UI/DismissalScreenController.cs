@@ -77,6 +77,9 @@ namespace SpaceTaxi.UI
             var onboard = FindAnyObjectByType<OnboardComputerPanel>();
             if (onboard != null)
                 onboard.enabled = false;
+            var station = FindAnyObjectByType<StationScreenController>();
+            if (station != null)
+                station.enabled = false; // B/Esc не должны работать под модальным экраном
         }
 
         private void GoToMenu()
@@ -100,6 +103,11 @@ namespace SpaceTaxi.UI
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
+            // Масштаб как у сценического канваса (1920x1080, match 0.5)
+            var scaler = root.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
 
             var background = new GameObject("Background", typeof(RectTransform), typeof(Image));
             background.transform.SetParent(root.transform, false);

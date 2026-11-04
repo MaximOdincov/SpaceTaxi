@@ -92,7 +92,8 @@ namespace SpaceTaxi.UI
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
 
             var landing = ship.GetComponent<LandingSystem>();
-            landing.StationServiced += station => Show($"Станция «{station}»: бак и корпус полны");
+            landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
+            landing.StationHint += () => Show("Станция: [B] — сервис, магазин");
 
             var hull = ship.GetComponent<HullSystem>();
             hull.Respawned += () => Show("Респавн на планете старта");

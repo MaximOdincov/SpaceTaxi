@@ -12,6 +12,7 @@ namespace SpaceTaxi.UI
         [SerializeField] private GameObject settingsUi;         // настройки в сцене
 
         private bool paused;
+        private StationScreenController stationController; // станция тоже занимает ESC
 
         public bool IsPaused => paused;
 
@@ -24,9 +25,12 @@ namespace SpaceTaxi.UI
         {
             var kb = Keyboard.current;
             if (kb == null) return;
+            if (stationController == null) stationController = FindAnyObjectByType<StationScreenController>();
             if (!kb.escapeKey.wasPressedThisFrame) return;
             // ESC занят картой
             if (mapController != null && (mapController.IsOpened || mapController.EscJustClosed)) return;
+            // ESC занят станцией
+            if (stationController != null && (stationController.IsOpened || stationController.EscJustClosed)) return;
             SetPaused(!paused);
         }
 
@@ -61,6 +65,17 @@ namespace SpaceTaxi.UI
         }
 
         public void NotifyMapClosed()
+        {
+            if (paused) pauseScreen.SetActive(true);
+        }
+
+        // экран станции (B) прячет меню паузы, пока открыт; закрытие возвращает
+        public void NotifyStationOpened()
+        {
+            if (paused) pauseScreen.SetActive(false);
+        }
+
+        public void NotifyStationClosed()
         {
             if (paused) pauseScreen.SetActive(true);
         }

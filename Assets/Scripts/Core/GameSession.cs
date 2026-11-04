@@ -26,6 +26,8 @@ namespace SpaceTaxi.Core
         public DebtService Debt { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
+        // ассет ввода сцены: контроллерам вне сцены (экран станции строится кодом)
+        public InputActionAsset Input => input;
         // текущий корабль теперь живёт в парке; поле сцены currentShip не читается
         public ShipConfig CurrentShip => Fleet.Current;
 
