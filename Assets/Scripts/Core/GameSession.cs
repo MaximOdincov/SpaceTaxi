@@ -21,21 +21,31 @@ namespace SpaceTaxi.Core
         public Ship Ship { get; private set; }
         public OrderService Orders { get; private set; }
         public Wallet Wallet { get; private set; }
+        public FleetService Fleet { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
-        // модель корабля сессии; без ассета — арендное «Яйцо»
-        public ShipConfig CurrentShip => currentShip != null ? currentShip : ShipConfig.EggRentalFallback;
+        // текущий корабль теперь живёт в парке; поле сцены currentShip не читается
+        public ShipConfig CurrentShip => Fleet.Current;
 
         private void Awake()
         {
             Wallet = new Wallet();
+            // новая игра: арендное «Яйцо», своих кораблей нет
+            Fleet = new FleetService();
         }
 
         private void Start()
         {
-            var builder = new WorldBuilder(level, physicsConfig, CurrentShip, input, planetPrefab, shipPrefab);
+            var builder = new WorldBuilder(level, physicsConfig, Fleet.Current, input, planetPrefab, shipPrefab);
             builder.Build(out Ship ship, out _);
             Ship = ship;
+
+            Fleet.BindShip(ship);
+            var hull = ship.GetComponent<HullSystem>();
+            // гибель/потеря корабля → возврат парка на аренду (ещё один подписчик
+            // тех же событий, что и OrderService)
+            hull.Died += Fleet.NotifyShipLost;
+            hull.ShipLost += _ => Fleet.NotifyShipLost();
 
             var follow = Camera.main.gameObject.AddComponent<CameraFollow>();
             follow.SetTarget(Ship);
