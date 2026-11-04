@@ -169,9 +169,11 @@ namespace SpaceTaxi.UI
 
             var photo = row.transform.Find("Photo");
             var photoImage = photo != null ? photo.GetComponent<Image>() : null;
-            if (photoImage != null && offer.Passenger.Portrait != null)
+            if (photoImage != null)
             {
-                photoImage.sprite = offer.Passenger.Portrait;
+                // без портрета (арт А5) — цветная заглушка из палитры генератора
+                if (offer.Passenger.Portrait != null)
+                    photoImage.sprite = offer.Passenger.Portrait;
                 photoImage.color = offer.Passenger.PortraitTint;
             }
 
@@ -324,11 +326,10 @@ namespace SpaceTaxi.UI
             var avatarImage = avatar != null ? avatar.GetComponent<Image>() : null;
             if (avatarImage != null)
             {
+                // без портрета (арт А5) — цветная заглушка из палитры генератора
                 if (offer.Passenger.Portrait != null)
-                {
                     avatarImage.sprite = offer.Passenger.Portrait;
-                    avatarImage.color = offer.Passenger.PortraitTint;
-                }
+                avatarImage.color = offer.Passenger.PortraitTint;
             }
 
             SetText(card, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);

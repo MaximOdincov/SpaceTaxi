@@ -98,8 +98,8 @@ namespace SpaceTaxi.Orders
 
             if (catalog == null)
                 Debug.LogWarning("[Orders] каталог пассажиров не назначен — предложений не будет");
-            else if (catalog.Profiles.Count == 0)
-                Debug.LogWarning("[Orders] каталог пассажиров пуст — добавь профиль в PassengerCatalog");
+            else if (catalog.Profiles.Count == 0 && !catalog.CanGenerate)
+                Debug.LogWarning("[Orders] ни профилей, ни пулов пассажиров — предложений не будет");
             else
                 for (int i = 0; i < initialOffers; i++)
                     AddOffer(catalog);
@@ -108,9 +108,15 @@ namespace SpaceTaxi.Orders
 
         private void Update()
         {
-            // смертность карточек
+            // смертность карточек; runtime-профили протухших больше не нужны
             int before = offers.Count;
-            offers.RemoveAll(o => Time.time >= o.ExpiresAt);
+            for (int i = offers.Count - 1; i >= 0; i--)
+            {
+                if (Time.time < offers[i].ExpiresAt)
+                    continue;
+                ReleaseProfile(offers[i]);
+                offers.RemoveAt(i);
+            }
             if (offers.Count != before)
                 OffersChanged?.Invoke();
 
@@ -199,8 +205,17 @@ namespace SpaceTaxi.Orders
             if (!offers.Contains(offer))
                 return false;
             offers.Remove(offer);
+            ReleaseProfile(offer);
             OffersChanged?.Invoke();
             return true;
+        }
+
+        // runtime-профиль генератора живёт без сцены — отдаём протухшие/отклонённые
+        // (ассетные профили не трогаем: Destroy(asset) в билде ломает их на сессию)
+        private void ReleaseProfile(OrderOffer offer)
+        {
+            if (offer.Passenger != null && offer.Passenger.RuntimeInstance)
+                Destroy(offer.Passenger);
         }
 
         // с пассажиром на борту — только стоя на планете (высадить)

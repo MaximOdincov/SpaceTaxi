@@ -26,6 +26,7 @@ namespace SpaceTaxi.Orders
                 return null;
 
             var profile = ScriptableObject.CreateInstance<PassengerProfile>();
+            profile.RuntimeInstance = true; // оффер протухнет — профиль отдаст OrderService
             profile.Description = string.Empty;
             profile.PortraitTint = PortraitTints[UnityEngine.Random.Range(0, PortraitTints.Length)];
 

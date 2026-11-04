@@ -29,6 +29,10 @@ namespace SpaceTaxi.Orders
             return p != null ? PassengerGenerator.Create(p) : null;
         }
 
+        // есть ли генерация: пулы есть (лениво из Resources) — каталог без
+        // ручных профилей всё равно может давать офферы
+        public bool CanGenerate => GetPools() != null;
+
         // ленивый фолбэк в Resources (ассет П5.1); повторно не ищем, даже если не нашли
         private PassengerPools GetPools()
         {
