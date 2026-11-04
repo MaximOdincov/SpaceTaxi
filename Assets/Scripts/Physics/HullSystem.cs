@@ -83,7 +83,15 @@ namespace SpaceTaxi.Physics
         {
             if (ship == null || ship.ShipConfig == null)
                 return;
-            ship.Hp = ship.Eff.HpMax;
+            Repair(ship.Eff.HpMax);
+        }
+
+        // частичный ремонт (экран станции) — тоже через HpChanged
+        public void Repair(float amount)
+        {
+            if (amount <= 0f || ship == null || ship.ShipConfig == null)
+                return;
+            ship.Hp = Mathf.Clamp(ship.Hp + amount, 0f, ship.Eff.HpMax);
             HpChanged?.Invoke();
         }
 
