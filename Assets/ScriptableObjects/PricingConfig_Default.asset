@@ -28,3 +28,4 @@ MonoBehaviour:
   RatingPriceBonusMul: 1.1
   LowRatingSpawnThreshold: 2
   LowRatingSpawnSlowdown: 1.3
+  MeridianTipsBonusMul: 1.1

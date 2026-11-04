@@ -41,6 +41,10 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель задержек спавна карточек при рейтинге < порога")]
         public float LowRatingSpawnSlowdown = 1.3f;
 
+        [Header("Чаевые (§3.5, П8.2)")]
+        [Tooltip("Множитель чаевых на «Меридиане» — перк «комфорт-салон» (16 §3.3)")]
+        public float MeridianTipsBonusMul = 1.1f;
+
         public float GetSectorMultiplier(Sector sector)
         {
             switch (sector)
