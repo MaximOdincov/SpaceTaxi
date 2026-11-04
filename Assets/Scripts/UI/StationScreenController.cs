@@ -249,6 +249,13 @@ namespace SpaceTaxi.UI
         {
             if (!opened || screen == null || ship == null || session == null)
                 return;
+            // Взлёт с открытым экраном (гонка FixedUpdate vs Update):
+            // LandedOn уже null — закрываемся до любых разыменований
+            if (ship.LandedOn == null)
+            {
+                Close();
+                return;
+            }
 
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();
             creditsValue.text = session.Wallet.Credits + " кр";
