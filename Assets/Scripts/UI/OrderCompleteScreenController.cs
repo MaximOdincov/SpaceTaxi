@@ -37,6 +37,7 @@ namespace SpaceTaxi.UI
         private TMP_Text debtLine;
         private TMP_Text totalLine;
         private TMP_Text ratingLine;
+        private TMP_Text taskLine;
 
         public bool IsOpened => opened;
 
@@ -154,12 +155,16 @@ namespace SpaceTaxi.UI
             priceLine.text = $"Цена {result.Price} кр";
             SetRow(penaltyLine, result.Penalty > 0, $"Штраф −{result.Penalty} кр ({result.Collisions} столкн.)");
             SetRow(commissionLine, result.Commission > 0, $"Комиссия аренды −{result.Commission} кр");
-            SetRow(tipsLine, result.Tips > 0, $"Чаевые +{result.Tips} кр"); // чаевые появятся в П8.2
+            SetRow(tipsLine, result.Tips > 0, $"Чаевые +{result.Tips} кр");
             SetRow(debtLine, result.ToDebt > 0, $"В счёт долга −{result.ToDebt} кр");
             totalLine.text = $"ИТОГО +{result.Net} кр";
 
             float delta = session.Rating != null ? session.Rating.LastDelta : 0f;
             ratingLine.text = "Рейтинг " + delta.ToString("+0.00;-0.00", CultureInfo.InvariantCulture);
+
+            // статус задания (П8.2) читается напрямую из task (UI-слой), в LastResult не пишется
+            bool taskDone = hasPassenger && offer.Task != null && offer.Task.Succeeded;
+            SetRow(taskLine, taskDone, "Задание пассажира: выполнено");
         }
 
         // строка разбивки: скрыта при нуле (чтобы экран был короче без инцидентов)
@@ -231,6 +236,7 @@ namespace SpaceTaxi.UI
 
             totalLine = BuildRow(panel.transform, "TotalLine", OnboardComputerFactory.TaxiColor, 24f, 30f);
             ratingLine = BuildRow(panel.transform, "RatingLine", OnboardComputerFactory.BrightColor);
+            taskLine = BuildRow(panel.transform, "TaskLine", OnboardComputerFactory.LabelColor, 16f, 20f);
 
             // --- Кнопка продолжения ---
             var button = OnboardComputerFactory.Button(panel.transform, "ПРОДОЛЖИТЬ",

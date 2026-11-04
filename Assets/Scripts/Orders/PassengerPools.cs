@@ -14,6 +14,9 @@ namespace SpaceTaxi.Orders
             [Tooltip("Архетип: Торопыга, Барыга, Турист, Тихоня, Чудик")]
             public string Archetype;
 
+            [Tooltip("Щедрость: доля чаевых от цены при выполненном задании (§3.6)")]
+            public float TipsPct;
+
             [Header("Фразы (покажется случайная из списка)")]
             [TextArea(2, 4)]
             [Tooltip("Пассажир сел на борт")]
@@ -53,6 +56,14 @@ namespace SpaceTaxi.Orders
                     return pool;
             }
             return null;
+        }
+
+        // Lookup щедрости архетипа (П8.2, §3.6): доля чаевых от цены;
+        // архетипа нет в пулах — 0 (без чаевых)
+        public float TipsPctOf(string archetype)
+        {
+            var pool = Get(archetype);
+            return pool != null ? pool.TipsPct : 0f;
         }
 
         public string PickName()

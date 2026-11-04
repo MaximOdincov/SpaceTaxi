@@ -27,6 +27,10 @@ namespace SpaceTaxi.World
         public event Action<Vector2, Vector2> CometIncoming;
         public event Action CometSpawned;
 
+        // живые кометы (П8.1): заданию «покажите комету» нужен перебор целей;
+        // уничтоженные вычищаются в Update — между тиками в списке могут быть null
+        public IReadOnlyList<Comet> ActiveComets => active;
+
         private LevelAsset level;
         private float nextSpawnAt;
         private bool warned;

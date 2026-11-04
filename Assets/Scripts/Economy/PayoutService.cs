@@ -2,8 +2,8 @@ using System;
 
 namespace SpaceTaxi.Economy
 {
-    // Итог выплаты за доставку (16_BETA_PLAN §3.5). Tips всегда 0 —
-    // П8.2 подставит чаевые отдельным параметром/методом по факту
+    // Итог выплаты за доставку (16_BETA_PLAN §3.5). Tips — чаевые за
+    // выполненное задание пассажира (П8.2), иначе 0
     public sealed class PayoutResult
     {
         public int Price;      // цена заказа с карточки
@@ -15,10 +15,14 @@ namespace SpaceTaxi.Economy
         public int Collisions; // столкновений в заказе (строка штрафа на экране завершения)
     }
 
-    // Выплата за доставку: штрафы/комиссия/долг (§3.5). Владелец — GameSession
+    // Выплата за доставку: штрафы/комиссия/долг/чаевые (§3.5). Владелец — GameSession
     // (создаётся в Awake); Wallet и DebtService приходят Bind-ом, без поиска по сцене
     public sealed class PayoutService
     {
+        // перк «комфорт-салон» (16_BETA_PLAN §3.3): модель с этим Id даёт
+        // +10% к чаевым (множитель — PricingConfig.MeridianTipsBonusMul)
+        public const string MeridianShipId = "meridian";
+
         private Wallet wallet;
         private DebtService debt;
 
@@ -35,10 +39,14 @@ namespace SpaceTaxi.Economy
             this.debt = debt;
         }
 
-        // Порядок: штраф (кап −45%) → комиссия аренды → доля в долг → на руки.
+        // Порядок: штраф (кап −45%) → комиссия аренды → чаевые → доля в долг → на руки.
+        // Чаевые (П8.2, §3.5): tipsFraction — щедрость архетипа выполненного задания
+        // (0 = нет чаевых), домножаются на перк «Меридианы»; в долю долга не входят —
+        // Net = price − penalty − commission + Tips − ToDebt.
         // Wallet.Add(Net) и debt.Repay(ToDebt) — порядок не важен: Repay кошелёк не трогает,
         // доля долга уже вычтена из Net
-        public PayoutResult Pay(PricingConfig pricing, int price, bool rentalShip, int collisions)
+        public PayoutResult Pay(PricingConfig pricing, int price, bool rentalShip, int collisions,
+            float tipsFraction = 0f, bool meridianShip = false)
         {
             if (pricing == null)
                 pricing = PricingConfig.Default;
@@ -55,6 +63,10 @@ namespace SpaceTaxi.Economy
                 : 0.0;
             int commission = (int)Math.Round(commissionRaw, MidpointRounding.AwayFromZero);
 
+            double tipsRaw = (double)price * Math.Max(tipsFraction, 0f)
+                * (meridianShip ? pricing.MeridianTipsBonusMul : 1f);
+            int tips = (int)Math.Round(tipsRaw, MidpointRounding.AwayFromZero);
+
             int gross = price - penalty - commission;
 
             int toDebt = 0;
@@ -70,9 +82,9 @@ namespace SpaceTaxi.Economy
                 Price = price,
                 Penalty = penalty,
                 Commission = commission,
-                Tips = 0,
+                Tips = tips,
                 ToDebt = toDebt,
-                Net = gross - toDebt,
+                Net = gross + tips - toDebt,
                 Collisions = Math.Max(collisions, 0),
             };
 

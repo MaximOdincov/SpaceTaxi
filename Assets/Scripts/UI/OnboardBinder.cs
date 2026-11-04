@@ -442,6 +442,13 @@ namespace SpaceTaxi.UI
                         : $"Осталось {remaining:0} с";
                     wishText.text = "«" + task.Text + "» · " + remain;
                 }
+                // прогресс ожидания Чудика (П8.1): посидели X/10 с
+                else if (task != null && task.Kind == PassengerTaskKind.WaitOnPlanet)
+                {
+                    wishText.text = "«" + task.Text + "» · Посидели "
+                        + Mathf.Min(task.WaitAccumulated, task.WaitSeconds).ToString("0")
+                        + "/" + task.WaitSeconds.ToString("0") + " с";
+                }
             }
         }
 
