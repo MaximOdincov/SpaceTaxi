@@ -407,8 +407,43 @@ namespace SpaceTaxi.Tools
                     float d = Vector2.Distance(bodies[i].Position, bodies[j].Position);
                     if (d < 260f)
                         warnings.Add($"«{bodies[i].DisplayName}»—«{bodies[j].DisplayName}»: центры ближе 260 ({d:0}).");
+                    // у пояса Radius — осевая линия кольца, а не диск: проверяется отдельно
+                    if (bodies[i].Type == BodyType.AsteroidBelt || bodies[j].Type == BodyType.AsteroidBelt)
+                        continue;
                     if (d < bodies[i].Radius + bodies[j].Radius)
                         warnings.Add($"«{bodies[i].DisplayName}» и «{bodies[j].DisplayName}» пересекаются поверхностями.");
+                }
+            }
+
+            // тело в полосе астероидов пояса; планеты на осевой линии (пара пояса, П7.1) — задуманы
+            foreach (var belt in bodies)
+            {
+                if (belt.Type != BodyType.AsteroidBelt)
+                    continue;
+                foreach (var other in bodies)
+                {
+                    if (other == belt || other.Type == BodyType.AsteroidBelt)
+                        continue;
+                    float offAxis = Mathf.Abs(Vector2.Distance(belt.Position, other.Position) - belt.Radius);
+                    if (offAxis <= 5f)
+                        continue;
+                    if (offAxis < belt.BeltWidth * 0.5f + other.Radius + 20f)
+                        warnings.Add($"«{other.DisplayName}» попадает в полосу пояса «{belt.DisplayName}».");
+                }
+            }
+
+            // соседям чёрной дыры — отступ не меньше 400 (П7.1)
+            foreach (var hole in bodies)
+            {
+                if (hole.Type != BodyType.BlackHole)
+                    continue;
+                foreach (var other in bodies)
+                {
+                    if (other == hole || other.Type == BodyType.AsteroidBelt)
+                        continue;
+                    float d = Vector2.Distance(hole.Position, other.Position);
+                    if (d < 400f)
+                        warnings.Add($"«{other.DisplayName}» ближе 400 к чёрной дыре «{hole.DisplayName}» ({d:0}).");
                 }
             }
 
@@ -421,7 +456,7 @@ namespace SpaceTaxi.Tools
                 if (toSpawn < body.HeatRadius + 550f)
                     warnings.Add($"Жар «{body.DisplayName}» ближе 550 к спавну ({toSpawn - body.HeatRadius:0} от края зоны).");
                 foreach (var other in bodies)
-                    if (other.Type != BodyType.Star
+                    if (other.Type != BodyType.Star && other.Type != BodyType.AsteroidBelt
                         && Vector2.Distance(body.Position, other.Position) < body.HeatRadius + other.Radius)
                         warnings.Add($"Жар «{body.DisplayName}» задевает «{other.DisplayName}».");
             }
@@ -446,7 +481,49 @@ namespace SpaceTaxi.Tools
                     warnings.Add($"Радиус «{body.DisplayName}» вне нормы звёзд 46–64 ({body.Radius:0}).");
             }
 
+            // достижимость: планета без станции — в пределах запаса хода тира своего сектора (П7.1);
+            // у Хаба порога нет (сам старт), Дальний сознательно без станций
+            var stations = new Dictionary<Sector, List<CelestialBodyData>>();
+            foreach (var body in bodies)
+            {
+                if (body.Type != BodyType.Planet || !body.HasStation)
+                    continue;
+                if (!stations.TryGetValue(body.Sector, out var list))
+                    stations[body.Sector] = list = new List<CelestialBodyData>();
+                list.Add(body);
+            }
+            foreach (var body in bodies)
+            {
+                if (body.Type != BodyType.Planet || body.HasStation)
+                    continue;
+                float reach = StationReachOf(body.Sector);
+                if (reach <= 0f)
+                    continue;
+                if (!stations.TryGetValue(body.Sector, out var list) || list.Count == 0)
+                {
+                    warnings.Add($"В секторе {body.Sector} нет станций — «{body.DisplayName}» не обслуживается.");
+                    continue;
+                }
+                float best = float.MaxValue;
+                foreach (var station in list)
+                    best = Mathf.Min(best, Vector2.Distance(body.Position, station.Position));
+                if (best > reach)
+                    warnings.Add($"«{body.DisplayName}» дальше {reach:0} от станции сектора {body.Sector} ({best:0}).");
+            }
+
             return warnings;
+        }
+
+        // запас хода от центра до центра с запасом 0.6: бак/5.5 ед/с при скорости ~330
+        private static float StationReachOf(Sector sector)
+        {
+            switch (sector)
+            {
+                case Sector.Near: return 1100f;
+                case Sector.Mid1: return 1400f;
+                case Sector.Mid2: return 1800f;
+                default: return 0f; // Hub — старт, Far — без станций по замыслу
+            }
         }
 
         // как в игре: r + 7
