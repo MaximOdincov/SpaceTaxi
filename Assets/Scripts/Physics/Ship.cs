@@ -60,8 +60,14 @@ namespace SpaceTaxi.Physics
             if (shipConfig == null)
                 return;
             ShipConfig = shipConfig;
-            Hp = shipConfig.HpMax;
-            Fuel = shipConfig.FuelMax; // сеттер сам шлёт FuelChanged
+            // Полные HP/бак только живому корпусу: при гибели Reconfigure
+            // вызывается до респавна, и мёртвый корабль не должен «ожить»
+            // на месте гибели (иначе Crash усыплёт его посадкой)
+            if (Hp > 0f)
+            {
+                Hp = shipConfig.HpMax;
+                Fuel = shipConfig.FuelMax; // сеттер сам шлёт FuelChanged
+            }
             Reconfigured?.Invoke();
         }
 
