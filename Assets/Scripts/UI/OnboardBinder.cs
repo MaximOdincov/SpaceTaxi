@@ -332,6 +332,9 @@ namespace SpaceTaxi.UI
             SetText(card, "Info/Route",
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
                 + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
+            TMP_Text price = EnsurePriceNode(card);
+            if (price != null)
+                price.text = PriceTag(offer.Price);
             string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : "доп.: «" + wishPhrase + "»");
 
@@ -407,11 +410,37 @@ namespace SpaceTaxi.UI
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed);
 
-            var statusText = FindText(orderArea, "OrderStatus");
+            var statusText = FindText(orderArea, "ActiveOrder/Info/OrderStatus");
             if (orders.Active != null && statusText != null)
                 statusText.text = orders.Active.State == OrderState.Aboard
-                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper())
-                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper());
+                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price)
+                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price);
+        }
+
+        // строка «Цена: N кр» — сумма акцентным цветом такси
+        private static string PriceTag(int price)
+        {
+            return "Цена: <color=" + ColorHex(OnboardComputerFactory.TaxiColor) + ">" + price + " кр</color>";
+        }
+
+        private static string ColorHex(Color color)
+        {
+            return "#" + ColorUtility.ToHtmlStringRGB(color);
+        }
+
+        // узел цены есть у каркасной карточки; в префабе OfferCard его нет — достраиваем рядом с Info/Route
+        private static TMP_Text EnsurePriceNode(GameObject card)
+        {
+            Transform info = card.transform.Find("Info");
+            if (info == null)
+                return null;
+            Transform price = info.Find("Price");
+            if (price != null)
+                return price.GetComponent<TMP_Text>();
+            TMP_Text text = OnboardComputerFactory.Text(info.gameObject, "", 17f, OnboardComputerFactory.BrightColor, "Price");
+            Transform route = info.Find("Route");
+            text.transform.SetSiblingIndex(route != null ? route.GetSiblingIndex() + 1 : info.childCount);
+            return text;
         }
 
         // кредит обновляется событием, без опроса в SlowUpdate
