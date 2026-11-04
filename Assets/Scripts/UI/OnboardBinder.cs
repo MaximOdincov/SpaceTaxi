@@ -3,6 +3,7 @@ using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
@@ -104,6 +105,8 @@ namespace SpaceTaxi.UI
             ratingValue = FindT("Stack/Header/StatsRow/RatingValue/Value");
             var abandon = transform.Find("Stack/StateSection/AbandonButton");
             abandonButton = abandon != null ? abandon.GetComponent<Button>() : null;
+            // префабная кнопка: хук здесь, потому что фабрика её не строила
+            UiSfx.Hook(abandonButton);
             var area = transform.Find("Stack/OrderSection/OrderArea");
             orderArea = (RectTransform)area;
             if (clock != null)
@@ -350,10 +353,18 @@ namespace SpaceTaxi.UI
             OrderOffer captured = offer;
             var accept = card.transform.Find("Buttons/Accept");
             if (accept != null)
-                accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            {
+                Button acceptButton = accept.GetComponent<Button>();
+                UiSfx.Hook(acceptButton); // префабная кнопка — фабрика не хукала
+                acceptButton.onClick.AddListener(() => orders.Accept(captured));
+            }
             var decline = card.transform.Find("Buttons/Decline");
             if (decline != null)
-                decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
+            {
+                Button declineButton = decline.GetComponent<Button>();
+                UiSfx.Hook(declineButton);
+                declineButton.onClick.AddListener(() => orders.Decline(captured));
+            }
 
             return card;
         }

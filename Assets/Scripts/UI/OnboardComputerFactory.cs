@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.UI
 {
@@ -250,6 +251,8 @@ namespace SpaceTaxi.UI
             Stretch(text.rectTransform);
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = true;
+            // хук первым — щелчок звучит до обработчиков, добавленных вызывателем
+            UiSfx.Hook(go.GetComponent<Button>());
             return go;
         }
 
