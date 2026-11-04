@@ -84,10 +84,10 @@ namespace SpaceTaxi.UI
             {
                 RectTransform holeHalo = Make(body.name + "Halo", size * 1.35f);
                 holeHalo.GetComponent<Image>().color = HoleHaloColor;
-                RectTransform core = Make(body.name, Mathf.Max(4f, size * 0.6f));
-                core.SetParent(holeHalo, false);
-                core.anchoredPosition = Vector2.zero;
-                core.GetComponent<Image>().color = HoleCoreColor;
+                RectTransform holeCore = Make(body.name, Mathf.Max(4f, size * 0.6f));
+                holeCore.SetParent(holeHalo, false);
+                holeCore.anchoredPosition = Vector2.zero;
+                holeCore.GetComponent<Image>().color = HoleCoreColor;
                 return holeHalo;
             }
 
