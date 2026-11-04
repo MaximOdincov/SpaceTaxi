@@ -28,6 +28,7 @@ namespace SpaceTaxi.Tools
         private static readonly Color TrajectoryColor = new Color(0.8f, 0.5f, 1f, 0.8f);
         private static readonly Color GravityWeak = new Color(0.4f, 0.7f, 1f, 0.5f);
         private static readonly Color GravityStrong = new Color(1f, 0.4f, 0.2f, 0.8f);
+        private static readonly Color BeltColor = new Color(0.75f, 0.68f, 0.58f, 0.7f);
 
         private static bool dragging;
         private static Vector2 dragOffset;
@@ -116,6 +117,23 @@ namespace SpaceTaxi.Tools
         private static void DrawBody(CelestialBodyData body, bool selected)
         {
             Vector3 center = body.Position;
+
+            // пояс: осевая линия + границы разброса, без заливки и колец
+            if (body.Type == BodyType.AsteroidBelt)
+            {
+                float half = Mathf.Max(0f, body.BeltWidth) * 0.5f;
+                Handles.color = selected ? Color.white : BeltColor;
+                Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
+                if (half > 0f)
+                {
+                    Handles.color = BeltColor * new Color(1f, 1f, 1f, 0.5f);
+                    Handles.DrawWireDisc(center, Vector3.forward, Mathf.Max(1f, body.Radius - half));
+                    Handles.DrawWireDisc(center, Vector3.forward, body.Radius + half);
+                }
+                Handles.Label(center + Vector3.up * (body.Radius + half + 12f), body.DisplayName + " · пояс");
+                return;
+            }
+
             bool star = body.Type == BodyType.Star;
             bool hole = body.Type == BodyType.BlackHole;
 

@@ -46,6 +46,15 @@ namespace SpaceTaxi.World
 
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
+            // пояс — не тело гравитации: в списке заглушка ради индексов level.Bodies
+            if (data.Type == BodyType.AsteroidBelt)
+            {
+                var beltGo = new GameObject(data.DisplayName);
+                beltGo.transform.position = data.Position;
+                beltGo.AddComponent<AsteroidBeltSystem>().Init(data, config);
+                return null;
+            }
+
             GameObject go;
             if (data.Type == BodyType.Planet && planetPrefab != null)
             {

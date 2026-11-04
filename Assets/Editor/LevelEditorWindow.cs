@@ -108,6 +108,10 @@ namespace SpaceTaxi.Tools
             {
                 AddBody(bodies, BodyType.BlackHole);
             }
+            if (GUILayout.Button("+ Пояс"))
+            {
+                AddBody(bodies, BodyType.AsteroidBelt);
+            }
             GUI.enabled = selectedIndex >= 0 && selectedIndex < bodies.arraySize;
             if (GUILayout.Button("Дублировать") && selectedIndex >= 0)
             {
@@ -156,7 +160,7 @@ namespace SpaceTaxi.Tools
                 bool station = element.FindPropertyRelative("HasStation").boolValue;
                 bool selected = i == selectedIndex;
 
-                string icon = (type == BodyType.Star ? "★" : type == BodyType.BlackHole ? "◉" : "●") + (station ? "⛽" : "");
+                string icon = (type == BodyType.Star ? "★" : type == BodyType.BlackHole ? "◉" : type == BodyType.AsteroidBelt ? "◌" : "●") + (station ? "⛽" : "");
                 GUIStyle style = selected ? EditorStyles.helpBox : EditorStyles.label;
                 if (GUILayout.Button($"{icon}  {name}  (r={radius:0})", style))
                 {
@@ -186,6 +190,13 @@ namespace SpaceTaxi.Tools
             EditorGUILayout.PropertyField(element.FindPropertyRelative("MassMultiplier"));
             if (type == BodyType.Star)
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HeatRadius"));
+            if (type == BodyType.AsteroidBelt)
+            {
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("BeltWidth"),
+                    new GUIContent("Ширина пояса (разброс)"));
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("BeltAsteroidCount"),
+                    new GUIContent("Астероидов (24–40)"));
+            }
             if (type == BodyType.Planet)
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HasStation"),
                     new GUIContent("Станция (заправка+ремонт)"));
@@ -300,19 +311,25 @@ namespace SpaceTaxi.Tools
 
             bool star = type == BodyType.Star;
             bool hole = type == BodyType.BlackHole;
+            bool belt = type == BodyType.AsteroidBelt;
             int counter = 1;
             for (int i = 0; i < index; i++)
                 if ((BodyType)bodies.GetArrayElementAtIndex(i).FindPropertyRelative("Type").intValue == type)
                     counter++;
 
             element.FindPropertyRelative("DisplayName").stringValue =
-                (hole ? "Чёрная дыра " : star ? "Звезда " : "Планета ") + counter;
+                (hole ? "Чёрная дыра " : star ? "Звезда " : belt ? "Пояс " : "Планета ") + counter;
             element.FindPropertyRelative("Type").intValue = (int)type;
             element.FindPropertyRelative("Position").vector2Value = FindFreeSpot(bodies, index);
             element.FindPropertyRelative("MassMultiplier").floatValue = hole ? 8f : star ? 4.5f : 1f;
-            float radius = hole ? 30f : star ? 55f : 26f;
+            float radius = hole ? 30f : star ? 55f : belt ? 200f : 26f;
             element.FindPropertyRelative("Radius").floatValue = radius;
             element.FindPropertyRelative("HeatRadius").floatValue = star ? radius * 3.6f : 0f;
+            if (belt)
+            {
+                element.FindPropertyRelative("BeltWidth").floatValue = 40f;
+                element.FindPropertyRelative("BeltAsteroidCount").intValue = 30;
+            }
 
             selectedIndex = index;
             SceneView.RepaintAll();
