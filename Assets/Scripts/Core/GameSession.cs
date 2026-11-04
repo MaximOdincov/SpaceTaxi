@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
@@ -18,8 +19,14 @@ namespace SpaceTaxi.Core
 
         public Ship Ship { get; private set; }
         public OrderService Orders { get; private set; }
+        public Wallet Wallet { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
+
+        private void Awake()
+        {
+            Wallet = new Wallet();
+        }
 
         private void Start()
         {
