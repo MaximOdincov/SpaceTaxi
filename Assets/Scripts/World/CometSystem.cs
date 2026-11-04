@@ -92,15 +92,21 @@ namespace SpaceTaxi.World
         }
 
         // след по образцу SpeedTrail: тот же материал-тайлинг, длиннее и ярче — виден издалека
+        private static Material trailMaterial; // общий след всех комет (не на каждый спавн)
+
         private void AddTrail(GameObject go, SpriteRenderer renderer)
         {
             var trail = go.AddComponent<TrailRenderer>();
-            Shader shader = renderer.sharedMaterial != null
-                ? renderer.sharedMaterial.shader
-                : Shader.Find("Sprites/Default");
-            Texture2D tex = StubSprites.Circle(8).texture;
-            tex.wrapMode = TextureWrapMode.Repeat; // тайлится вдоль шлейфа
-            trail.material = new Material(shader) { mainTexture = tex };
+            if (trailMaterial == null)
+            {
+                Shader shader = renderer.sharedMaterial != null
+                    ? renderer.sharedMaterial.shader
+                    : Shader.Find("Sprites/Default");
+                Texture2D tex = StubSprites.Circle(8).texture;
+                tex.wrapMode = TextureWrapMode.Repeat; // тайлится вдоль шлейфа
+                trailMaterial = new Material(shader) { mainTexture = tex };
+            }
+            trail.material = trailMaterial;
 
             trail.time = 1.1f; // при скорости 400 — хвост в несколько сотен юнитов
             trail.minVertexDistance = 2f;

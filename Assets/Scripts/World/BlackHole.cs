@@ -30,6 +30,9 @@ namespace SpaceTaxi.World
         {
             base.Init(data, physicsConfig);
             Mass = Mathf.Max(data.MassMultiplier, HoleMassMultiplier);
+            // горизонт должен пропускать корабль внутрь: иначе физический
+            // коллайдер держит его на R+4 и «гибель на горизонте» не срабатывает
+            GetComponent<CircleCollider2D>().isTrigger = true;
         }
 
         private void Update()
@@ -54,15 +57,15 @@ namespace SpaceTaxi.World
                     Kill();
                     return;
                 }
+                ship.transform.localScale = shipScale * (1f - shrink);
             }
-            else
+            else if (shrink > 0f)
             {
                 // мёртвый/приземлённый корабль тоже восстанавливается — без деформаций
                 shrink = Mathf.MoveTowards(shrink, 0f, Time.deltaTime / RestoreDuration);
+                // последняя итерация вернёт исходный масштаб и больше не пишет
+                ship.transform.localScale = shrink > 0f ? shipScale * (1f - shrink) : shipScale;
             }
-
-            // масштаб меняем, коллайдер не трогаем; RespawnAfter вернёт исходный
-            ship.transform.localScale = shrink > 0f ? shipScale * (1f - shrink) : shipScale;
         }
 
         private void Kill()
@@ -81,6 +84,13 @@ namespace SpaceTaxi.World
                 return false;
             shipScale = ship.transform.localScale;
             hull = ship.GetComponent<HullSystem>();
+            if (hull != null)
+            {
+                // смерть от другого источника — перестаём трогать масштаб,
+                // иначе перетираем восстановленный RespawnAfter
+                hull.Died += () => shrink = 0f;
+                hull.ShipLost += _ => shrink = 0f;
+            }
             return hull != null;
         }
     }

@@ -80,10 +80,12 @@ namespace SpaceTaxi.World
                     return;
             }
 
-            float distance = Vector2.Distance(ship.transform.position, transform.position);
-            float zone = axisRadius + halfWidth + ToastZoneMargin;
+            // кольцевая зона: пояс — кольцо вокруг центра, не диск (иначе тост
+            // срабатывает в пустой середине и не перезводится до вылета из мира)
+            float ringDistance = Mathf.Abs(Vector2.Distance(ship.transform.position, transform.position) - axisRadius);
+            float zone = halfWidth + ToastZoneMargin;
 
-            if (!warned && distance <= zone)
+            if (!warned && ringDistance <= zone)
             {
                 warned = true;
                 if (toast == null)
@@ -91,7 +93,7 @@ namespace SpaceTaxi.World
                 if (toast != null)
                     toast.Show("Пояс астероидов: маневрируй аккуратно");
             }
-            else if (warned && distance > zone + ToastResetMargin)
+            else if (warned && ringDistance > zone + ToastResetMargin)
             {
                 warned = false;
             }

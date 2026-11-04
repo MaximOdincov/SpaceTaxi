@@ -13,6 +13,17 @@ namespace SpaceTaxi.World
         private Vector2 direction;
         private float speed;
         private float despawnRadius;
+        private Rigidbody2D body;
+
+        // кинематик с Continuous: на 400 ед/с статический коллайдер при просадках
+        // FPS туннелирует сквозь корабль — «гибель при контакте» нарушается
+        private void Awake()
+        {
+            body = gameObject.AddComponent<Rigidbody2D>();
+            body.isKinematic = true;
+            body.gravityScale = 0f;
+            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        }
 
         public void Init(Vector2 flightDirection, float flightSpeed, float worldRadius)
         {
@@ -21,12 +32,12 @@ namespace SpaceTaxi.World
             despawnRadius = worldRadius + DespawnMargin;
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
-            transform.position += (Vector3)(direction * (speed * Time.deltaTime));
+            body.MovePosition(body.position + direction * (speed * Time.fixedDeltaTime));
 
             // вылетела из системы — убираем, чтобы не копить мёртвые объекты
-            if (((Vector2)transform.position).sqrMagnitude > despawnRadius * despawnRadius)
+            if (body.position.sqrMagnitude > despawnRadius * despawnRadius)
                 Destroy(gameObject);
         }
     }

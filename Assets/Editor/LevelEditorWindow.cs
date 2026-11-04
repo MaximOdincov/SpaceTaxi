@@ -367,6 +367,8 @@ namespace SpaceTaxi.Tools
             element.FindPropertyRelative("Radius").floatValue = data.Radius;
             element.FindPropertyRelative("MassMultiplier").floatValue = data.MassMultiplier;
             element.FindPropertyRelative("HeatRadius").floatValue = data.HeatRadius;
+            element.FindPropertyRelative("BeltWidth").floatValue = data.BeltWidth;
+            element.FindPropertyRelative("BeltAsteroidCount").intValue = data.BeltAsteroidCount;
             selectedIndex = index;
             SceneView.RepaintAll();
         }

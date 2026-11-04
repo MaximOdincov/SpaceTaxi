@@ -353,12 +353,14 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // та же формула гравитации, что в игре
+        // та же формула гравитации, что в игре (пояс не источник гравитации — как в рантайме)
         private static Vector2 GravityAt(LevelAsset level, Vector2 pos, float k, float clamp)
         {
             Vector2 accel = Vector2.zero;
             foreach (var body in level.Bodies)
             {
+                if (body.Type == BodyType.AsteroidBelt)
+                    continue;
                 Vector2 delta = body.Position - pos;
                 float d2 = delta.sqrMagnitude;
                 if (d2 < 0.0001f)
@@ -409,8 +411,12 @@ namespace SpaceTaxi.Tools
                 pos += vel * h;
 
                 foreach (var body in level.Bodies)
+                {
+                    if (body.Type == BodyType.AsteroidBelt)
+                        continue; // пояс — не сплошной диск, прогноз через него свободен
                     if (Vector2.Distance(body.Position, pos) < body.Radius + 7f)
                         return; // врезались — конец прогноза
+                }
 
                 if (i % 10 == 0) // точка каждые ~10 шагов
                 {
