@@ -91,6 +91,12 @@ namespace SpaceTaxi.UI
             orders.OrderFailed += offer => Show("Заказ провален"
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
 
+            // итог задания пассажира (П5.3): благодарность или жалоба
+            orders.TaskSucceeded += offer => Show("Задание выполнено"
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)));
+            orders.TaskFailed += offer => Show("Жалоба пассажира"
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
+
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
             landing.StationHint += () => Show("Станция: [B] — сервис, магазин");
