@@ -98,6 +98,19 @@ namespace SpaceTaxi.UI
             hull.Respawned += () => Show("Респавн на планете старта");
             hull.ShipLost += reason => Show("КОРАБЛЬ ПОТЕРЯН — " + reason);
 
+            var debt = session.Debt;
+            if (debt != null)
+            {
+                int prevBalance = debt.Balance;
+                // рост долга — новая авария; гашение (П3.3/П4.2) тоста не даёт
+                debt.DebtChanged += value =>
+                {
+                    if (value > prevBalance)
+                        Show($"ДОЛГ +{value - prevBalance} кр за арендный корабль", true);
+                    prevBalance = value;
+                };
+            }
+
             bound = true;
         }
 
