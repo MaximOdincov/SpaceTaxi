@@ -112,6 +112,15 @@ namespace SpaceTaxi.UI
                 };
             }
 
+            // выплата за доставку (П4.2): сумма на руки + уход в долг
+            if (session.Payout != null)
+                session.Payout.Paid += result =>
+                {
+                    Show($"Доставка: +{result.Net} кр", true);
+                    if (result.ToDebt > 0)
+                        Show($"{result.ToDebt} кр ушло в счёт долга");
+                };
+
             bound = true;
         }
 

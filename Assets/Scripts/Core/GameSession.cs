@@ -24,6 +24,7 @@ namespace SpaceTaxi.Core
         public Wallet Wallet { get; private set; }
         public FleetService Fleet { get; private set; }
         public DebtService Debt { get; private set; }
+        public PayoutService Payout { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
         // ассет ввода сцены: контроллерам вне сцены (экран станции строится кодом)
@@ -42,6 +43,8 @@ namespace SpaceTaxi.Core
             // с числами плана (никаких NRE)
             Fleet.BindUpgrades(upgradeConfig != null ? upgradeConfig : UpgradeConfig.Default);
             Debt = new DebtService();
+            Payout = new PayoutService();
+            Payout.Bind(Wallet, Debt);
         }
 
         private void Start()
@@ -68,6 +71,15 @@ namespace SpaceTaxi.Core
 
             Orders = gameObject.AddComponent<OrderService>();
             Orders.Init(level, passengerCatalog, Ship);
+            // доставка платит (16_BETA_PLAN §3.5): цена с карточки, штраф по
+            // столкновениям заказа, комиссия на аренде; оффер приходит в аргументе
+            // события (Active уже обнулён) — отдельный доступ не нужен
+            Orders.OrderDelivered += OnOrderDelivered;
+        }
+
+        private void OnOrderDelivered(OrderOffer offer)
+        {
+            Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental, Orders.CollisionsOfActive);
         }
 
         // потеря корабля: арендный — долг за аварию. Проверка владения ДО

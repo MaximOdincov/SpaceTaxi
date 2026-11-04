@@ -44,12 +44,10 @@ namespace SpaceTaxi.UI
         private Wallet wallet;
         private DebtService debt;
         private TMP_Text debtValue;
-        private Button shiftButton;
         private float nextSlowUpdate;
         private bool bound;
         private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
 
-        private const int DemoShiftReward = 100;     // временно, до П4
         private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
@@ -70,7 +68,6 @@ namespace SpaceTaxi.UI
             {
                 BindExisting();
             }
-            EnsureShiftButton();
             EnsureDebtRow();
             WidenMoneyValue();
         }
@@ -375,8 +372,6 @@ namespace SpaceTaxi.UI
                 orders.ActiveOrderChanged += RefreshOrder;
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
-                if (shiftButton != null)
-                    shiftButton.onClick.AddListener(() => wallet.Add(DemoShiftReward));
                 RefreshOrder();
                 bound = true;
             }
@@ -448,28 +443,6 @@ namespace SpaceTaxi.UI
         {
             if (moneyValue != null)
                 moneyValue.text = credits + " кр";
-        }
-
-        // временно, до П4: кнопка тестового начисления кредитов
-        private void EnsureShiftButton()
-        {
-            if (shiftButton != null)
-                return;
-            var econSection = transform.Find("Stack/EconSection");
-            if (econSection == null)
-                return;
-            var econRow = econSection.Find("EconRow");
-            Transform parent = econRow != null ? econRow : econSection;
-            var label = OnboardComputerFactory.LabelColor;
-            var shiftGo = OnboardComputerFactory.Button(parent, "СМЕНА +100 КР",
-                new Color(label.r, label.g, label.b, 0.22f), OnboardComputerFactory.BrightColor, 17f,
-                "ShiftButton");
-            var layout = shiftGo.AddComponent<LayoutElement>();
-            layout.minHeight = 32f;
-            layout.preferredHeight = 32f;
-            layout.minWidth = 132f;
-            layout.preferredWidth = 132f;
-            shiftButton = shiftGo.GetComponent<Button>();
         }
 
         // строка долга в секции // СМЕНА: каркас её не содержит, достраиваем кодом
