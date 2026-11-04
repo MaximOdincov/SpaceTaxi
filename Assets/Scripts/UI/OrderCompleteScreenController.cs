@@ -155,7 +155,7 @@ namespace SpaceTaxi.UI
             priceLine.text = $"Цена {result.Price} кр";
             SetRow(penaltyLine, result.Penalty > 0, $"Штраф −{result.Penalty} кр ({result.Collisions} столкн.)");
             SetRow(commissionLine, result.Commission > 0, $"Комиссия аренды −{result.Commission} кр");
-            SetRow(tipsLine, result.Tips > 0, $"Чаевые +{result.Tips} кр"); // чаевые появятся в П8.2
+            SetRow(tipsLine, result.Tips > 0, $"Чаевые +{result.Tips} кр");
             SetRow(debtLine, result.ToDebt > 0, $"В счёт долга −{result.ToDebt} кр");
             totalLine.text = $"ИТОГО +{result.Net} кр";
 
