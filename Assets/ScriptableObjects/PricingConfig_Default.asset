@@ -24,3 +24,7 @@ MonoBehaviour:
   PenaltyCapPct: 45
   RentalCommissionPct: 25
   DebtRepaySharePct: 50
+  RatingPriceBonusThreshold: 4
+  RatingPriceBonusMul: 1.1
+  LowRatingSpawnThreshold: 2
+  LowRatingSpawnSlowdown: 1.3

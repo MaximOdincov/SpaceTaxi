@@ -31,6 +31,16 @@ namespace SpaceTaxi.Economy
         [Tooltip("% выплаты, автоматически уходящий в счёт долга (пока долг > 0)")]
         public int DebtRepaySharePct = 50;
 
+        [Header("Эффекты рейтинга (§3.7)")]
+        [Tooltip("Рейтинг ≥ порога — наценка к цене предложения")]
+        public float RatingPriceBonusThreshold = 4.0f;
+        [Tooltip("Множитель цены предложения при рейтинге ≥ порога")]
+        public float RatingPriceBonusMul = 1.1f;
+        [Tooltip("Рейтинг ниже порога — карточки заказов появляются реже")]
+        public float LowRatingSpawnThreshold = 2.0f;
+        [Tooltip("Множитель задержек спавна карточек при рейтинге < порога")]
+        public float LowRatingSpawnSlowdown = 1.3f;
+
         public float GetSectorMultiplier(Sector sector)
         {
             switch (sector)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -370,6 +371,12 @@ namespace SpaceTaxi.UI
                 }
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
+                // слот рейтинга (§3.7): живёт событием, первичный показ при бинде
+                if (session.Rating != null)
+                {
+                    session.Rating.RatingChanged += ShowRating;
+                    ShowRating(session.Rating.Value);
+                }
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
                 RefreshOrder();
@@ -443,6 +450,13 @@ namespace SpaceTaxi.UI
         {
             if (moneyValue != null)
                 moneyValue.text = credits + " кр";
+        }
+
+        // одна десятая всегда (даже 0.0); точка-разделитель, как в плане §3.7
+        private void ShowRating(float value)
+        {
+            if (ratingValue != null)
+                ratingValue.text = value.ToString("0.0", CultureInfo.InvariantCulture);
         }
 
         // строка долга в секции // СМЕНА: каркас её не содержит, достраиваем кодом

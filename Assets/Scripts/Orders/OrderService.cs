@@ -49,6 +49,7 @@ namespace SpaceTaxi.Orders
         private readonly List<int> planetIndices = new List<int>();
         private LevelAsset level;
         private PassengerCatalog catalog;
+        private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
@@ -61,6 +62,12 @@ namespace SpaceTaxi.Orders
 
         // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2)
         public PricingConfig Pricing => pricingConfig != null ? pricingConfig : PricingConfig.Default;
+
+        // рейтинг таксиста (П4.3): наценка к цене и замедление спавна — без FindAnyObjectByType
+        public void Bind(RatingService ratingService)
+        {
+            rating = ratingService;
+        }
 
         // события для UI
         public event Action OffersChanged;
@@ -90,7 +97,7 @@ namespace SpaceTaxi.Orders
             else
                 for (int i = 0; i < initialOffers; i++)
                     AddOffer(catalog);
-            nextSpawnAt = Time.time + UnityEngine.Random.Range(spawnMin, spawnMax);
+            nextSpawnAt = Time.time + SpawnDelay();
         }
 
         private void Update()
@@ -106,7 +113,7 @@ namespace SpaceTaxi.Orders
             {
                 if (offers.Count < maxOffers)
                     AddOffer(catalog);
-                nextSpawnAt = Mathf.Max(nextSpawnAt + UnityEngine.Random.Range(spawnMin, spawnMax), Time.time + 2f);
+                nextSpawnAt = Mathf.Max(nextSpawnAt + SpawnDelay(), Time.time + 2f);
             }
 
             UpdateTargetGlow();
@@ -276,8 +283,9 @@ namespace SpaceTaxi.Orders
                 ExpiresAt = Time.time + offerLifetime,
             };
             // цена фиксируется в момент спавна карточки и дальше не меняется
-            offer.Price = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
+            int basePrice = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex));
+            offer.Price = PriceWithRatingBonus(basePrice);
             offers.Add(offer);
             OffersChanged?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
@@ -290,6 +298,29 @@ namespace SpaceTaxi.Orders
             return level != null && index >= 0 && index < level.Bodies.Count
                 ? level.Bodies[index].Sector
                 : Sector.Near;
+        }
+
+        // §3.7: рейтинг ≥ порога — наценка к цене предложения («популярного
+        // водителя видно»); без рейтинга или ниже порога — базовая цена
+        private int PriceWithRatingBonus(int basePrice)
+        {
+            if (rating == null)
+                return basePrice;
+            PricingConfig pricing = Pricing;
+            if (rating.Value < pricing.RatingPriceBonusThreshold)
+                return basePrice;
+            return (int)Math.Round(basePrice * pricing.RatingPriceBonusMul, MidpointRounding.AwayFromZero);
+        }
+
+        // §3.7: рейтинг < порога — карточки появляются медленнее; spawnMin/spawnMax
+        // остаются базой, сами поля не трогаем
+        private float SpawnDelay()
+        {
+            PricingConfig pricing = Pricing;
+            float mul = rating != null && rating.Value < pricing.LowRatingSpawnThreshold
+                ? pricing.LowRatingSpawnSlowdown
+                : 1f;
+            return UnityEngine.Random.Range(spawnMin, spawnMax) * mul;
         }
 
         // случайная планета уровня, exclude — не эта
