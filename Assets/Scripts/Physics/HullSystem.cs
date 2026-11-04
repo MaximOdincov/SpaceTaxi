@@ -21,9 +21,16 @@ namespace SpaceTaxi.Physics
             level = levelAsset;
         }
 
+        private void OnShipReconfigured()
+        {
+            HpChanged?.Invoke();
+        }
+
         private void Awake()
         {
             ship = GetComponent<Ship>();
+            // пересадка на другой корпус — HP стал полным, HUD должен увидеть
+            ship.Reconfigured += OnShipReconfigured;
             gravity = FindAnyObjectByType<GravityField>();
             if (level == null)
             {

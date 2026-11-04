@@ -39,6 +39,9 @@ namespace SpaceTaxi.Physics
 
         public event Action FuelChanged;
 
+        // смена корпуса на живом корабле (FleetService) — HullSystem разошлёт HpChanged
+        public event Action Reconfigured;
+
         public void Init(PhysicsConfig config, ShipConfig shipConfig)
         {
             Config = config;
@@ -48,6 +51,18 @@ namespace SpaceTaxi.Physics
 
             Hp = shipConfig.HpMax;
             Fuel = shipConfig.FuelMax;
+        }
+
+        // Новый корпус = полные HP и полный бак; остальное (тяга, MaxV) читается
+        // из ShipConfig динамически контроллерами, респавн тоже берёт новый конфиг
+        public void Reconfigure(ShipConfig shipConfig)
+        {
+            if (shipConfig == null)
+                return;
+            ShipConfig = shipConfig;
+            Hp = shipConfig.HpMax;
+            Fuel = shipConfig.FuelMax; // сеттер сам шлёт FuelChanged
+            Reconfigured?.Invoke();
         }
 
         // Для HUD.
