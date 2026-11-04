@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceTaxi.Core; // StubSprites
 using Random = UnityEngine.Random; // System.Random конфликтует с using System
 
 namespace SpaceTaxi.World
