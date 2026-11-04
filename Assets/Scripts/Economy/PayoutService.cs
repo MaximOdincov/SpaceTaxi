@@ -12,6 +12,7 @@ namespace SpaceTaxi.Economy
         public int Tips;       // чаевые (П8.2)
         public int ToDebt;     // автоматически ушло в счёт долга
         public int Net;        // на руки
+        public int Collisions; // столкновений в заказе (строка штрафа на экране завершения)
     }
 
     // Выплата за доставку: штрафы/комиссия/долг (§3.5). Владелец — GameSession
@@ -23,6 +24,10 @@ namespace SpaceTaxi.Economy
 
         // выплата состоялась — для UI (тосты суммы и ухода в долг)
         public event Action<PayoutResult> Paid;
+
+        // последняя выплата — данные экрана завершения заказа (П4.3);
+        // null, пока в забеге никто не платил
+        public PayoutResult LastResult { get; private set; }
 
         public void Bind(Wallet wallet, DebtService debt)
         {
@@ -68,8 +73,10 @@ namespace SpaceTaxi.Economy
                 Tips = 0,
                 ToDebt = toDebt,
                 Net = gross - toDebt,
+                Collisions = Math.Max(collisions, 0),
             };
 
+            LastResult = result;
             wallet?.Add(result.Net);
             debt?.Repay(result.ToDebt);
             Paid?.Invoke(result);

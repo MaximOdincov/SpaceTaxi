@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
+using SpaceTaxi.UI;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Core
@@ -34,6 +35,7 @@ namespace SpaceTaxi.Core
         public ShipConfig CurrentShip => Fleet.Current;
 
         private bool accidentRegistered; // один инцидент = один долг
+        private OrderCompleteScreenController orderComplete; // спавнится сам (стиль Dismissal)
 
         private void Awake()
         {
@@ -89,9 +91,13 @@ namespace SpaceTaxi.Core
 
         private void OnOrderDelivered(OrderOffer offer)
         {
-            // дельта рейтинга — её покажет экран завершения (П4.3)
+            // сначала дельта рейтинга — экран завершения показывает её же
             Rating.AddDelivery();
+            // выплата: тосты уходят синхронно внутри Paid, экран открываем после них
             Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental, Orders.CollisionsOfActive);
+            if (orderComplete == null)
+                orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
+            orderComplete?.Show(offer);
         }
 
         private void OnCrashImpact()

@@ -192,6 +192,9 @@ namespace SpaceTaxi.UI
             if (mapController == null) mapController = FindAnyObjectByType<MapScreenController>();
             if (mapController != null && mapController.IsOpened)
                 return; // карта открыта — станция поверх неё не нужна
+            var complete = FindAnyObjectByType<OrderCompleteScreenController>();
+            if (complete != null && complete.IsOpened)
+                return; // модальный экран завершения — станция не должна лезть поверх
 
             if (screen == null)
                 screen = BuildScreen();
