@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,14 +11,13 @@ using SpaceTaxi.Physics;
 namespace SpaceTaxi.UI
 {
     // Экран станции [B]: платная заправка/ремонт (1 кр = 1 ед топлива / 1 HP,
-    // план §3.1), улучшения текущего корабля (§3.4) и досрочное гашение долга
-    // (§3.2) — блоки секции магазина; магазин кораблей (П3.2) добавит свой блок
-    // тем же способом — отдельным методом-строителем. Доступен ТОЛЬКО стоя
-    // (State == Landed) на планете со станцией; мир не ставится на паузу (как
-    // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
-    // и карта (NotifyStationOpened/Closed + EscJustClosed). Контроллера в
-    // сценах нет — появляется сам (стиль DismissalScreenController), панель
-    // строится кодом при первом открытии.
+    // план §3.1), магазин кораблей (П3.2, секция АНГАР), улучшения текущего
+    // корабля (§3.4) и досрочное гашение долга (§3.2) — блоки секции магазина.
+    // Доступен ТОЛЬКО стоя (State == Landed) на планете со станцией; мир не
+    // ставится на паузу (как карта). Закрытие по B/Esc — ESC уступается по той
+    // же договорённости, что и карта (NotifyStationOpened/Closed +
+    // EscJustClosed). Контроллера в сценах нет — появляется сам (стиль
+    // DismissalScreenController), панель строится кодом при первом открытии.
     public class StationScreenController : MonoBehaviour
     {
         private const int SortingOrder = 100; // поверх HUD/паузы, ниже увольнения (200)
@@ -62,7 +62,7 @@ namespace SpaceTaxi.UI
         private Button fuelButton;
         private Button hullButton;
 
-        // блок улучшений и долга (П3.3); магазин кораблей (П3.2) — свои поля
+        // блоки магазина: улучшения/долг (П3.3), ангар (П3.2)
         private GameObject upgradesOwned;   // 4 строки линий (свой корабль)
         private TMP_Text upgradesRental;    // строка-пояснение (аренда всегда сток)
         private UpgradeRowRefs[] upgradeRows;
@@ -70,6 +70,10 @@ namespace SpaceTaxi.UI
         private TMP_Text debtLine;
         private Button repayButton;
         private TMP_Text repayLabel;
+        // ангар: каталог читается из Resources один раз, карточки строятся
+        // один раз при первом открытии — дальше только перечитываются
+        private ShipConfig[] shipCatalog;
+        private ShipCardRefs[] shipCards;
         private ToastNotifier toast;
 
         public bool IsOpened => opened;
@@ -364,18 +368,48 @@ namespace SpaceTaxi.UI
             fuelButton = BuildServiceButton(service.transform, "FuelButton", Refuel, out fuelButtonLabel);
             hullButton = BuildServiceButton(service.transform, "HullButton", Repair, out hullButtonLabel);
 
-            // --- Секция магазина (ShopSection): каждый блок — отдельный
-            // метод-строитель; магазин кораблей (П3.2) добавит свой блок сюда же ---
+            // --- Секция магазина (ShopSection): улучшения/долг (П3.3) и ангар
+            // (П3.2) — каждый блок отдельный метод-строитель. Девять карточек
+            // ангара не влезают в экран целиком — блок живёт в скролле ---
+            var shopWrap = new GameObject("ShopScroll", typeof(RectTransform), typeof(ScrollRect));
+            shopWrap.transform.SetParent(panel.transform, false);
+            var wrapElement = shopWrap.AddComponent<LayoutElement>();
+            // высота окна скролла от высоты экрана: остальное — сервис и шапка
+            wrapElement.preferredHeight = Mathf.Clamp(Screen.height * 0.45f, 260f, 560f);
+            wrapElement.flexibleHeight = 0f;
+            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
+            viewport.transform.SetParent(shopWrap.transform, false);
+            OnboardComputerFactory.Stretch((RectTransform)viewport.transform);
+            // прозрачный фон — raycast-цель под курсором, иначе колесо мыши не скроллит
+            viewport.GetComponent<Image>().color = Color.clear;
+
             var shop = new GameObject("ShopSection", typeof(RectTransform));
-            shop.transform.SetParent(panel.transform, false);
+            shop.transform.SetParent(viewport.transform, false);
+            var shopRect = (RectTransform)shop.transform;
+            // контент растёт вниз от верхней кромки вьюпорта — стандартная схема ScrollRect
+            shopRect.anchorMin = new Vector2(0f, 1f);
+            shopRect.anchorMax = new Vector2(1f, 1f);
+            shopRect.pivot = new Vector2(0.5f, 1f);
+            shopRect.offsetMin = Vector2.zero;
+            shopRect.offsetMax = Vector2.zero;
             var shopLayout = shop.AddComponent<VerticalLayoutGroup>();
             shopLayout.spacing = 12f;
             shopLayout.childControlWidth = true;
             shopLayout.childControlHeight = true;
             shopLayout.childForceExpandWidth = true;
             shopLayout.childForceExpandHeight = false;
+            shop.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scroll = shopWrap.GetComponent<ScrollRect>();
+            scroll.viewport = (RectTransform)viewport.transform;
+            scroll.content = shopRect;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 24f;
+
             BuildUpgradesBlock(shop.transform);
             BuildDebtBlock(shop.transform);
+            BuildHangarBlock(shop.transform);
             shop.SetActive(true); // в контейнере теперь есть содержимое
 
             var footer = OnboardComputerFactory.Text(panel, "B / ESC — закрыть", 16f, OnboardComputerFactory.LabelColor, "Footer");
@@ -473,6 +507,7 @@ namespace SpaceTaxi.UI
         {
             RefreshUpgrades();
             RefreshDebt();
+            RefreshHangar();
         }
 
         private void OnShopChanged()
@@ -487,8 +522,7 @@ namespace SpaceTaxi.UI
             OnShopChanged();
         }
 
-        // блок «Улучшения» — свой метод-строитель: магазин кораблей (П3.2)
-        // добавит в ShopSection свой блок независимо
+        // блок «Улучшения» — свой метод-строитель (как долг ниже и ангар П3.2)
         private void BuildUpgradesBlock(Transform shop)
         {
             var section = Section(shop, "// УЛУЧШЕНИЯ", "UpgradesSection");
@@ -627,7 +661,7 @@ namespace SpaceTaxi.UI
             fleet.TryUpgrade(fleet.Current, line, session.Wallet);
         }
 
-        // блок «Долг» — свой метод-строитель (с П3.2 не пересекается)
+        // блок «Долг» — свой метод-строитель
         private void BuildDebtBlock(Transform shop)
         {
             debtSection = Section(shop, "// ДОЛГ", "DebtSection");
@@ -671,10 +705,200 @@ namespace SpaceTaxi.UI
             if (balance <= 0 || !session.Wallet.TrySpend(balance))
                 return;
             session.Debt.Repay(balance); // DebtChanged скроет блок, счётчик аварий обнулится сам
+            ShowToast("Долг погашен", emphasized: true);
+        }
+
+        // --- П3.2: блок «Ангар» — каталог моделей, покупка и пересадка ---
+
+        private sealed class ShipCardRefs
+        {
+            public ShipConfig Config;
+            public Image Thumb;
+            public TMP_Text Title;
+            public TMP_Text Status;
+            public TMP_Text Stats;
+            public Button Buy;
+            public TMP_Text BuyLabel;
+            public Button Sit;
+            public TMP_Text SitLabel;
+        }
+
+        // каталог читается из Resources один раз; порядок — по тиру (при равенстве
+        // по цене и имени, чтобы список не плясал)
+        private ShipConfig[] Catalog()
+        {
+            if (shipCatalog != null)
+                return shipCatalog;
+            var configs = Resources.LoadAll<ShipConfig>("Ships");
+            if (configs == null || configs.Length == 0)
+                Debug.LogWarning("[Station] Каталог кораблей пуст — Assets/ScriptableObjects/Resources/Ships");
+            Array.Sort(configs, (a, b) =>
+            {
+                int byTier = a.Tier.CompareTo(b.Tier);
+                if (byTier != 0)
+                    return byTier;
+                int byPrice = a.Price.CompareTo(b.Price);
+                return byPrice != 0 ? byPrice : string.CompareOrdinal(a.DisplayName, b.DisplayName);
+            });
+            shipCatalog = configs;
+            return shipCatalog;
+        }
+
+        private void BuildHangarBlock(Transform shop)
+        {
+            var section = Section(shop, "// АНГАР", "HangarSection");
+            var catalog = Catalog();
+            shipCards = new ShipCardRefs[catalog.Length];
+            for (int i = 0; i < catalog.Length; i++)
+                shipCards[i] = BuildShipCard(section.transform, catalog[i]);
+            RefreshHangar();
+        }
+
+        // карточка модели: [миниатюра | название/статус | кнопка] + строка статов
+        private ShipCardRefs BuildShipCard(Transform parent, ShipConfig config)
+        {
+            var card = new GameObject("Card_" + config.Id, typeof(RectTransform), typeof(Image));
+            card.transform.SetParent(parent, false);
+            card.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
+            var cardLayout = card.AddComponent<VerticalLayoutGroup>();
+            cardLayout.padding = new RectOffset(10, 10, 8, 8);
+            cardLayout.spacing = 4f;
+            cardLayout.childControlWidth = true;
+            cardLayout.childControlHeight = true;
+            cardLayout.childForceExpandWidth = true;
+            cardLayout.childForceExpandHeight = false;
+
+            var refs = new ShipCardRefs { Config = config };
+
+            var top = OnboardComputerFactory.H("Top", card.transform);
+            // миниатюра — слот под спрайт корабля: пока треугольник-заглушка
+            // с затенением по тиру, реальная графика придёт с артом А1/А2
+            var thumbGo = new GameObject("Thumb", typeof(RectTransform), typeof(Image));
+            thumbGo.transform.SetParent(top.transform, false);
+            refs.Thumb = thumbGo.GetComponent<Image>();
+            refs.Thumb.sprite = StubSprites.ShipTriangle();
+            refs.Thumb.preserveAspect = true;
+            OnboardComputerFactory.FixedSize(thumbGo, 40f, 40f);
+
+            var info = new GameObject("Info", typeof(RectTransform));
+            info.transform.SetParent(top.transform, false);
+            var infoLayout = info.AddComponent<VerticalLayoutGroup>();
+            infoLayout.spacing = 2f;
+            infoLayout.childControlWidth = true;
+            infoLayout.childControlHeight = true;
+            infoLayout.childForceExpandWidth = true;
+            infoLayout.childForceExpandHeight = false;
+            var infoElement = info.AddComponent<LayoutElement>();
+            infoElement.flexibleWidth = 1f;
+            infoElement.minWidth = 100f;
+
+            refs.Title = OnboardComputerFactory.Text(info, config.DisplayName, 18f, OnboardComputerFactory.BrightColor, "Title");
+            refs.Status = OnboardComputerFactory.Text(info, "", 15f, OnboardComputerFactory.LabelColor, "Status");
+
+            refs.Buy = BuildRowButton(top.transform, () => BuyShip(config), out refs.BuyLabel);
+            refs.Sit = BuildRowButton(top.transform, () => SitIn(config), out refs.SitLabel);
+
+            refs.Stats = OnboardComputerFactory.Text(card, "", 14f, OnboardComputerFactory.LabelColor, "Stats");
+            OnboardComputerFactory.FixedHeight(refs.Stats.gameObject, 20f);
+            return refs;
+        }
+
+        // «Макс» — потолок скорости MaxV (тяга/манёвр/бак/HP — из ShipConfig)
+        private static string ShipStatsLine(ShipConfig config)
+        {
+            return "Тяга " + Mathf.RoundToInt(config.Thrust)
+                + " · Манёвр " + Mathf.RoundToInt(config.StrafeAcc)
+                + " · Бак " + Mathf.RoundToInt(config.FuelMax)
+                + " · HP " + Mathf.RoundToInt(config.HpMax)
+                + " · Макс " + Mathf.RoundToInt(config.MaxV);
+        }
+
+        // статусы/кнопки перечитываются на каждый RefreshShop: смену корабля
+        // приносит ShipChanged, доступность покупки по деньгам — CreditsChanged
+        private void RefreshHangar()
+        {
+            if (shipCards == null || session == null || session.Fleet == null)
+                return;
+            var fleet = session.Fleet;
+            int credits = session.Wallet.Credits;
+            foreach (var card in shipCards)
+            {
+                var config = card.Config;
+                bool rental = config.IsRental;
+                bool owned = fleet.IsOwned(config);
+                bool current = IsCurrent(fleet, config);
+
+                card.Title.text = config.DisplayName + " · Т" + config.Tier;
+                card.Thumb.color = TierShade(config.Tier);
+                card.Stats.text = ShipStatsLine(config);
+                card.Status.text = current ? "В полёте (текущий)"
+                    : owned ? "В ангаре"
+                    : rental ? "Аренда"
+                    : config.Price + " кр";
+
+                bool canBuy = !owned && !rental && config.Price > 0;
+                card.Buy.gameObject.SetActive(canBuy);
+                if (canBuy)
+                {
+                    card.BuyLabel.text = $"КУПИТЬ ({config.Price} КР)";
+                    card.Buy.interactable = credits >= config.Price;
+                }
+
+                bool canSit = !current && (owned || rental);
+                card.Sit.gameObject.SetActive(canSit);
+                if (canSit)
+                    card.SitLabel.text = "СЕСТЬ В";
+            }
+        }
+
+        // «Яйцо» из фолбэка (инстанс в памяти) и ассет egg_rental — одна модель:
+        // до первой пересадки Current не совпадает по ссылке с карточкой аренды
+        private static bool IsCurrent(FleetService fleet, ShipConfig config)
+        {
+            if (fleet.Current == config)
+                return true;
+            return config != null && config.IsRental
+                && fleet.Current != null && fleet.Current.IsRental;
+        }
+
+        // затенение миниатюры по тиру: Т1 — приглушённая, Т5 — яркая
+        private static Color TierShade(int tier)
+        {
+            float t = Mathf.Clamp01((tier - 1) / 4f);
+            var dim = OnboardComputerFactory.LabelColor;
+            dim.a = 0.4f;
+            return Color.Lerp(dim, OnboardComputerFactory.BrightColor, t);
+        }
+
+        // правила покупки — в FleetService.TryBuy: не-аренда, Price > 0, не куплен;
+        // после оплаты TryBuy сразу пересаживает (полные HP/бак), ShipChanged
+        // перерисует карточки сам
+        private void BuyShip(ShipConfig config)
+        {
+            if (session == null || session.Fleet == null || config == null || !CanOpen())
+                return;
+            int price = config.Price;
+            if (!session.Fleet.TryBuy(config, session.Wallet))
+                return;
+            ShowToast($"Куплен «{config.DisplayName}» (−{price} кр)", emphasized: true);
+        }
+
+        private void SitIn(ShipConfig config)
+        {
+            if (session == null || session.Fleet == null || config == null || !CanOpen())
+                return;
+            if (IsCurrent(session.Fleet, config))
+                return; // уже за штурвалом — кнопка и не должна была быть видна
+            session.Fleet.SwitchTo(config);
+            ShowToast($"Пересел в «{config.DisplayName}»");
+        }
+
+        private void ShowToast(string message, bool emphasized = false)
+        {
             if (toast == null)
                 toast = FindAnyObjectByType<ToastNotifier>();
             if (toast != null)
-                toast.Show("Долг погашен", emphasized: true);
+                toast.Show(message, emphasized);
         }
     }
 }
