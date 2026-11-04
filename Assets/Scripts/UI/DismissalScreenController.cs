@@ -77,6 +77,9 @@ namespace SpaceTaxi.UI
             var onboard = FindAnyObjectByType<OnboardComputerPanel>();
             if (onboard != null)
                 onboard.enabled = false;
+            var station = FindAnyObjectByType<StationScreenController>();
+            if (station != null)
+                station.enabled = false; // B/Esc не должны работать под модальным экраном
         }
 
         private void GoToMenu()
