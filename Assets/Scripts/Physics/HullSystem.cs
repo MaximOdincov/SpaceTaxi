@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using SpaceTaxi.Economy;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
@@ -71,7 +72,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.Hp <= 0f)
                 return;
-            ship.Hp = Mathf.Clamp(ship.Hp - amount, 0f, ship.ShipConfig.HpMax);
+            ship.Hp = Mathf.Clamp(ship.Hp - amount, 0f, ship.Eff.HpMax);
             HpChanged?.Invoke();
             if (ship.Hp <= 0f)
                 Die();
@@ -82,7 +83,7 @@ namespace SpaceTaxi.Physics
         {
             if (ship == null || ship.ShipConfig == null)
                 return;
-            ship.Hp = ship.ShipConfig.HpMax;
+            ship.Hp = ship.Eff.HpMax;
             HpChanged?.Invoke();
         }
 
@@ -100,7 +101,7 @@ namespace SpaceTaxi.Physics
                 if (d >= star.HeatRadius)
                     continue;
                 float k = Mathf.Clamp01(1f - (d - star.Radius) / (star.HeatRadius - star.Radius));
-                ApplyDamage(k * star.HeatDamagePerSecond * dt);
+                ApplyDamage(k * star.HeatDamagePerSecond * dt * ship.Eff.HeatMul); // жар-защита корпуса
             }
         }
 
@@ -130,8 +131,8 @@ namespace SpaceTaxi.Physics
             }
 
             ship.Body.linearVelocity = Vector2.zero;
-            ship.Hp = ship.ShipConfig.HpMax;
-            ship.Fuel = ship.ShipConfig.FuelMax;
+            ship.Hp = ship.Eff.HpMax;
+            ship.Fuel = ship.Eff.FuelMax;
             ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();

@@ -124,7 +124,7 @@ namespace SpaceTaxi.Physics
                     {
                         if (!wasInside && v > PhysicsConfig.EscapeVelocity(config.GravParamOf(body), d))
                         {
-                            velocity *= config.GravityBoost;
+                            velocity *= ship.Eff.GravityBoost; // улучшение двигателя усиливает качели
                             v = velocity.magnitude;
                         }
                         insideRing.Add(body);
@@ -155,7 +155,7 @@ namespace SpaceTaxi.Physics
 
             // Топливо: расход на любую тягу, пустой бак — двигатели молчат
             if (thrustOn || brakeOn || Mathf.Abs(strafe) > 0f)
-                ship.Fuel -= config.FuelDrainPerSecond * dt;
+                ship.Fuel -= ship.Eff.FuelDrain * dt;
             if (ship.Fuel <= 0f)
             {
                 thrustOn = false;
@@ -180,7 +180,7 @@ namespace SpaceTaxi.Physics
             }
 
             // Пороги — лог по одному разу
-            if (ship.Fuel > shipConfig.FuelMax * 0.1f)
+            if (ship.Fuel > ship.Eff.FuelMax * 0.1f)
             {
                 lowFuelLogged = false;
                 emptyFuelLogged = false;
@@ -201,7 +201,7 @@ namespace SpaceTaxi.Physics
             {
                 Vector2 dir = velocity / v;
                 if (thrustOn && v < shipConfig.MaxV)
-                    velocity += dir * (shipConfig.Thrust * engMul * dt);
+                    velocity += dir * (ship.Eff.Thrust * engMul * dt);
                 if (brakeOn)
                 {
                     float nv = Mathf.Max(0f, v - config.Retro * engMul * dt);
@@ -211,7 +211,7 @@ namespace SpaceTaxi.Physics
                 {
                     Vector2 perp = new Vector2(dir.y, -dir.x);
                     float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad;
-                    float strafeAcc = Mathf.Min(shipConfig.StrafeAcc, v * maxTurn);
+                    float strafeAcc = Mathf.Min(ship.Eff.Strafe, v * maxTurn);
                     velocity += perp * (strafe * strafeAcc * engMul * dt);
                 }
             }
