@@ -42,6 +42,8 @@ namespace SpaceTaxi.UI
         private OrderService orders;
         private HullSystem hull;
         private Wallet wallet;
+        private DebtService debt;
+        private TMP_Text debtValue;
         private Button shiftButton;
         private float nextSlowUpdate;
         private bool bound;
@@ -69,6 +71,7 @@ namespace SpaceTaxi.UI
                 BindExisting();
             }
             EnsureShiftButton();
+            EnsureDebtRow();
             WidenMoneyValue();
         }
 
@@ -359,6 +362,12 @@ namespace SpaceTaxi.UI
                 wallet = session.Wallet;
                 wallet.CreditsChanged += ShowCredits;
                 ShowCredits(wallet.Credits);
+                debt = session.Debt;
+                if (debt != null)
+                {
+                    debt.DebtChanged += RefreshDebt;
+                    RefreshDebt(debt.Balance);
+                }
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
                 if (abandonButton != null && hull != null)
@@ -391,6 +400,8 @@ namespace SpaceTaxi.UI
             sysState3.text = heat ? "⚠ жаровая зона" : "";
 
             econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов";
+            if (debt != null)
+                RefreshDebt(debt.Balance); // страховка от пропущенного события
             abandonButton.gameObject.SetActive(ship.Fuel <= 0f);
             if (cancelButton != null && orders.Active != null)
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
@@ -430,6 +441,28 @@ namespace SpaceTaxi.UI
             layout.minWidth = 132f;
             layout.preferredWidth = 132f;
             shiftButton = shiftGo.GetComponent<Button>();
+        }
+
+        // строка долга в секции // СМЕНА: каркас её не содержит, достраиваем кодом
+        private void EnsureDebtRow()
+        {
+            if (debtValue != null)
+                return;
+            var econSection = transform.Find("Stack/EconSection");
+            if (econSection == null)
+                return;
+            debtValue = OnboardComputerFactory.Text(econSection.gameObject, "", 20f, BrightColor, "DebtValue");
+            OnboardComputerFactory.FixedHeight(debtValue.gameObject, 24f);
+        }
+
+        // при нуле строка пуста; долг — цветом тревоги фабрики
+        private void RefreshDebt(int value)
+        {
+            if (debtValue == null)
+                return;
+            debtValue.text = value > 0
+                ? $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.DangerColor)}>Долг: {value} кр</color>"
+                : "";
         }
 
         // поле денег из фабрики/префаба узкое — суммы не влезают

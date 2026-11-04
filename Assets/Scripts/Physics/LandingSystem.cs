@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using SpaceTaxi.Economy;
 using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
@@ -83,10 +84,10 @@ namespace SpaceTaxi.Physics
             // станция на планете: заправка и ремонт
             if (planet.HasStation)
             {
-                bool healed = ship.Hp < ship.ShipConfig.HpMax;
-                bool refueled = ship.Fuel < ship.ShipConfig.FuelMax;
+                bool healed = ship.Hp < ship.Eff.HpMax;
+                bool refueled = ship.Fuel < ship.Eff.FuelMax;
                 Hull.RepairAll();
-                ship.Fuel = ship.ShipConfig.FuelMax;
+                ship.Fuel = ship.Eff.FuelMax;
                 if (healed || refueled)
                     StationServiced?.Invoke(planet.DisplayName);
             }

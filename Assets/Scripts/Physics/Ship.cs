@@ -22,6 +22,15 @@ namespace SpaceTaxi.Physics
         public Rigidbody2D Body { get; private set; }
         public World.Planet LandedOn { get; set; }
 
+        // уровни улучшений [Engine, Tank, Hull, Maneuver], 0..3; 0 = сток
+        public int[] UpgradeLevels { get; private set; }
+
+        // эффективные статы (база + улучшения) — единственный источник чисел
+        // для полёта и корпуса; пересчитывается в Init/Reconfigure/BindUpgradeConfig
+        public EffectiveStats Eff { get; private set; }
+
+        private UpgradeConfig upgradeConfig;
+
         private float fuel = 100f;
 
         public float Fuel
@@ -29,7 +38,7 @@ namespace SpaceTaxi.Physics
             get => fuel;
             set
             {
-                float clamped = Mathf.Clamp(value, 0f, ShipConfig != null ? ShipConfig.FuelMax : 100f);
+                float clamped = Mathf.Clamp(value, 0f, ShipConfig != null ? Eff.FuelMax : 100f);
                 if (Mathf.Approximately(clamped, fuel))
                     return;
                 fuel = clamped;
@@ -39,6 +48,9 @@ namespace SpaceTaxi.Physics
 
         public event Action FuelChanged;
 
+        // смена корпуса на живом корабле (FleetService) — HullSystem разошлёт HpChanged
+        public event Action Reconfigured;
+
         public void Init(PhysicsConfig config, ShipConfig shipConfig)
         {
             Config = config;
@@ -46,12 +58,56 @@ namespace SpaceTaxi.Physics
             Body = GetComponent<Rigidbody2D>();
             Body.gravityScale = 0f; // притяжение считает GravityField
 
-            Hp = shipConfig.HpMax;
-            Fuel = shipConfig.FuelMax;
+            UpgradeLevels = ShipStats.NormalizeLevels(null);
+            RecomputeEff();
+            Hp = Eff.HpMax;
+            Fuel = Eff.FuelMax;
+        }
+
+        // конфиг улучшений привязывается после постройки корабля (FleetService.BindShip)
+        public void BindUpgradeConfig(UpgradeConfig config)
+        {
+            if (config == null || config == upgradeConfig)
+                return;
+            upgradeConfig = config;
+            RecomputeEff();
+        }
+
+        // стоковый корпус (старый вызов): уровни обнуляются
+        public void Reconfigure(ShipConfig shipConfig)
+        {
+            Reconfigure(shipConfig, null);
+        }
+
+        // Новый корпус = полные HP и полный бак (refill); остальное (тяга, MaxV)
+        // читается из Eff динамически контроллерами, респавн тоже берёт новые статы.
+        // refill = false — пересчёт статов без лечения/заправки: покупка улучшения
+        // на стоящий корабль не должна быть халявным сервисом станции
+        public void Reconfigure(ShipConfig shipConfig, int[] upgradeLevels, bool refill = true)
+        {
+            if (shipConfig == null)
+                return;
+            ShipConfig = shipConfig;
+            UpgradeLevels = ShipStats.NormalizeLevels(upgradeLevels);
+            RecomputeEff();
+            // Полные HP/бак только живому корпусу: при гибели Reconfigure
+            // вызывается до респавна, и мёртвый корабль не должен «ожить»
+            // на месте гибели (иначе Crash усыплёт его посадкой)
+            if (refill && Hp > 0f)
+            {
+                Hp = Eff.HpMax;
+                Fuel = Eff.FuelMax; // сеттер сам шлёт FuelChanged
+            }
+            Reconfigured?.Invoke();
+        }
+
+        private void RecomputeEff()
+        {
+            Eff = ShipStats.Compute(Config, ShipConfig, UpgradeLevels, upgradeConfig);
         }
 
         // Для HUD.
-        public float HpFraction => ShipConfig != null ? Hp / ShipConfig.HpMax : 0f;
-        public float FuelFraction => ShipConfig != null ? Fuel / ShipConfig.FuelMax : 0f;
+        public float HpFraction => Eff.HpMax > 0f ? Hp / Eff.HpMax : 0f;
+        public float FuelFraction => Eff.FuelMax > 0f ? Fuel / Eff.FuelMax : 0f;
     }
 }
