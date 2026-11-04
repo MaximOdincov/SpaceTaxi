@@ -58,14 +58,14 @@ namespace SpaceTaxi.Orders
         public string PickName()
         {
             return Names != null && Names.Length > 0
-                ? Names[Random.Range(0, Names.Length)]
+                ? Names[UnityEngine.Random.Range(0, Names.Length)]
                 : null;
         }
 
         public string PickSurname()
         {
             return Surnames != null && Surnames.Length > 0
-                ? Surnames[Random.Range(0, Surnames.Length)]
+                ? Surnames[UnityEngine.Random.Range(0, Surnames.Length)]
                 : null;
         }
     }
