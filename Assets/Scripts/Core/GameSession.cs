@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
@@ -10,6 +11,7 @@ namespace SpaceTaxi.Core
     {
         [SerializeField] private LevelAsset level;
         [SerializeField] private PhysicsConfig physicsConfig;
+        [SerializeField] private ShipConfig currentShip;
         [SerializeField] private InputActionAsset input;
         [SerializeField] private PassengerCatalog passengerCatalog;
 
@@ -20,10 +22,12 @@ namespace SpaceTaxi.Core
         public OrderService Orders { get; private set; }
         public LevelAsset Level => level;
         public PhysicsConfig Config => physicsConfig;
+        // модель корабля сессии; без ассета — арендное «Яйцо»
+        public ShipConfig CurrentShip => currentShip != null ? currentShip : ShipConfig.EggRentalFallback;
 
         private void Start()
         {
-            var builder = new WorldBuilder(level, physicsConfig, input, planetPrefab, shipPrefab);
+            var builder = new WorldBuilder(level, physicsConfig, CurrentShip, input, planetPrefab, shipPrefab);
             builder.Build(out Ship ship, out _);
             Ship = ship;
 

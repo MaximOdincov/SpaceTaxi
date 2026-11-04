@@ -6,13 +6,11 @@ namespace SpaceTaxi.Physics
     [CreateAssetMenu(fileName = "PhysicsConfig", menuName = "Space Taxi/Physics Config")]
     public sealed class PhysicsConfig : ScriptableObject
     {
-        [Header("Тяга")]
-        public float Thrust = 95f;            // разгон вдоль вектора скорости
+        [Header("Скорость")]
         public float Retro = 80f;             // торможение (было 115 — слишком резко)
-        public float StrafeAcc = 130f;        // боковая тяга
+        public float MaxV = 330f;             // максимальная скорость
         [Tooltip("Предел угловой скорости разворота")]
         public float StrafeMaxTurnRate = 60f; // град/с
-        public float MaxV = 330f;             // максимальная скорость
 
         [Header("Посадка")]
         public float LandSpeed = 55f;         // безопасная скорость касания (было 38)
@@ -20,10 +18,8 @@ namespace SpaceTaxi.Physics
         public float EngineMultiplier = 3.2f; // множитель тяги в посадочном кольце
         public float LandingRingOffset = 90f; // кольцо: поверхность + это расстояние
 
-        [Header("Бак и корпус")]
-        public float FuelMax = 100f;
+        [Header("Бак")]
         public float FuelDrainPerSecond = 5.5f;
-        public float HpMax = 100f;
 
         [Header("Гравитация")]
         public float GravityParamK = 52000f;  // гравитационный параметр: g = K * r * масса

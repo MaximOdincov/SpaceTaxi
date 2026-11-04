@@ -12,18 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9746210878ef941f5b1b5bdf24f402d1, type: 3}
   m_Name: PhysicsConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
-  Thrust: 95
   Retro: 80
-  StrafeAcc: 130
   StrafeMaxTurnRate: 60
   MaxV: 330
   LandSpeed: 55
   TakeoffV: 85
   EngineMultiplier: 3.2
   LandingRingOffset: 90
-  FuelMax: 100
   FuelDrainPerSecond: 5.5
-  HpMax: 100
   GravityParamK: 52000
   GravityAccelClamp: 240
   CaptureRingK: 3.3
