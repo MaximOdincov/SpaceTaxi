@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Economy;
 using SpaceTaxi.World;
 
@@ -73,6 +74,7 @@ namespace SpaceTaxi.Physics
             ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
             ship.LandedOn = null;
             ship.State = ShipState.Flying;
+            Sound.Play(SoundId.Takeoff);
             CameraFollow.AddShake(0.25f); // толчок старта
             Debug.Log($"[Landing] взлёт: v={ship.Body.linearVelocity.magnitude}");
         }
@@ -95,6 +97,7 @@ namespace SpaceTaxi.Physics
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
+            Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);
 
             // станция на планете: сервис платный (экран [B]) — здесь только подсказка
@@ -127,6 +130,7 @@ namespace SpaceTaxi.Physics
             // урон сразу; выжил — считается посадкой
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);
+            Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f)); // вариация по силе удара
             CameraFollow.AddShake(Mathf.Clamp01(damage / 45f) * 0.7f); // от «бумкнул» до «въехал»
             Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0}");
 
@@ -144,6 +148,7 @@ namespace SpaceTaxi.Physics
             float damage = Mathf.Min(30f, (v - ship.Config.LandSpeed) * 0.9f);
             CrashImpact?.Invoke();
             Hull.ApplyDamage(damage);
+            Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
             Debug.Log($"[Landing] удар об астероид: v={v:0}, урон={damage:0}");
         }

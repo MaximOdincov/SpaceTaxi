@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Economy;
 using SpaceTaxi.World;
 
@@ -120,6 +121,7 @@ namespace SpaceTaxi.Physics
             if (ship.State == ShipState.Respawning)
                 return;
             Died?.Invoke();
+            Sound.Play(SoundId.Explosion); // дакнет остальные группы в AudioManager
             CameraFollow.AddShake(0.85f); // гибель — самый сильный толчок
             ship.State = ShipState.Respawning;
             ship.Body.linearVelocity = Vector2.zero;
@@ -148,6 +150,7 @@ namespace SpaceTaxi.Physics
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();
             Respawned?.Invoke();
+            Sound.Play(SoundId.Respawn);
         }
 
         private Planet LandedPlanet()
