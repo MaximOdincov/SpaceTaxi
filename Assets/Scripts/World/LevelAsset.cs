@@ -19,6 +19,16 @@ namespace SpaceTaxi.World
         Free = 1,   // свободная точка, пока не используется
     }
 
+    // Класс района системы: сектор планеты назначения влияет на цену заказа
+    public enum Sector
+    {
+        Hub = 0,
+        Near = 1,
+        Mid1 = 2,
+        Mid2 = 3,
+        Far = 4,
+    }
+
     [Serializable]
     public sealed class BodyVisuals
     {
@@ -45,6 +55,8 @@ namespace SpaceTaxi.World
         public BodyVisuals Visuals = new BodyVisuals();
         [Tooltip("На планете станция: посадка = заправка и ремонт")]
         public bool HasStation;
+        [Tooltip("Класс района: влияет на оплату заказов на это тело")]
+        public Sector Sector = Sector.Near;
 
         [Header("Кольца (0 = считать по формуле)")]
         [Min(0f)] public float LandingRingRadius; // посадочное: 0 = r + 90
