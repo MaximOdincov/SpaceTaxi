@@ -14,6 +14,7 @@ namespace SpaceTaxi.Economy
         private const float DeliveryBonus = 0.15f;
         private const float CollisionPenalty = 0.10f;
         private const float TaskBonus = 0.10f;
+        private const float TaskFailPenalty = 0.10f; // жалоба пассажира на задание (§3.7, решение координатора)
         private const float FailNoDeathPenalty = 0.30f;
         private const float FailWithLossPenalty = 0.50f;
 
@@ -29,8 +30,10 @@ namespace SpaceTaxi.Economy
 
         public void AddCollisionPenalty() => Move(-CollisionPenalty);
 
-        // хук П5.3/П8.2 (задания пассажиров) — вызовов пока нет
+        // задание пассажира (П5.3): успех при доставке / жалоба при провале задания
         public void TaskCompleted() => Move(TaskBonus);
+
+        public void TaskFailed() => Move(-TaskFailPenalty);
 
         public void FailNoDeath() => Move(-FailNoDeathPenalty);
 
