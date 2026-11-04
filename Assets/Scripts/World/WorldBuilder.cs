@@ -19,6 +19,7 @@ namespace SpaceTaxi.World
         private readonly Ship shipPrefab;
 
         private readonly ShipConfig shipConfig;
+        private List<CelestialBodyData> planetsForBelts; // лениво: планеты уровня для отсева поясов
 
         public WorldBuilder(LevelAsset level, PhysicsConfig config, ShipConfig shipConfig, InputActionAsset input,
             Planet planetPrefab = null, Ship shipPrefab = null)
@@ -48,6 +49,20 @@ namespace SpaceTaxi.World
             Debug.Log($"[World] {level.LevelName}: тел={bodies.Count}, корабль в {ship.transform.position}, состояние={ship.State}");
         }
 
+        // планеты уровня (Type == Planet) — оси поясов проходят через них,
+        // без отсева астероид может заспавниться внутри планеты
+        private List<CelestialBodyData> Planets()
+        {
+            if (planetsForBelts == null)
+            {
+                planetsForBelts = new List<CelestialBodyData>();
+                for (int i = 0; i < level.Bodies.Count; i++)
+                    if (level.Bodies[i].Type == BodyType.Planet)
+                        planetsForBelts.Add(level.Bodies[i]);
+            }
+            return planetsForBelts;
+        }
+
         private CelestialBody CreateBody(CelestialBodyData data, int index)
         {
             // пояс — не тело гравитации: в списке заглушка ради индексов level.Bodies
@@ -55,7 +70,7 @@ namespace SpaceTaxi.World
             {
                 var beltGo = new GameObject(data.DisplayName);
                 beltGo.transform.position = data.Position;
-                beltGo.AddComponent<AsteroidBeltSystem>().Init(data, config);
+                beltGo.AddComponent<AsteroidBeltSystem>().Init(data, config, Planets());
                 return null;
             }
 

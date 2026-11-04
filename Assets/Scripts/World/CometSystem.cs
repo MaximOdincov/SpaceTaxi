@@ -32,11 +32,18 @@ namespace SpaceTaxi.World
         private bool warned;
         private Vector2 entryPoint;
         private Vector2 entryDirection;
+        private Vector2 areaCenter;   // зона комет (П7.2): радиус 0 — хорды по всему миру
+        private float areaRadius;
         private readonly List<Comet> active = new List<Comet>();
 
         public void Init(LevelAsset levelAsset)
         {
             level = levelAsset;
+            if (levelAsset != null && levelAsset.CometAreaRadius > 0f)
+            {
+                areaCenter = levelAsset.CometAreaCenter;
+                areaRadius = levelAsset.CometAreaRadius;
+            }
             nextSpawnAt = Time.time + Random.Range(SpawnIntervalMin, SpawnIntervalMax);
         }
 
@@ -87,7 +94,10 @@ namespace SpaceTaxi.World
             AddTrail(go, renderer);
 
             var comet = go.AddComponent<Comet>();
-            comet.Init(entryDirection, CometSpeed, level.WorldRadius);
+            if (areaRadius > 0f)
+                comet.Init(entryDirection, CometSpeed, areaCenter, areaRadius);
+            else
+                comet.Init(entryDirection, CometSpeed, level.WorldRadius);
             active.Add(comet);
         }
 
@@ -130,19 +140,22 @@ namespace SpaceTaxi.World
             }
         }
 
-        // точка входа на окружности мира, не ближе EntryMarginFromSpawn к точке спавна корабля
+        // точка входа: в зоне — на окружности зоны, иначе — на окружности мира;
+        // не ближе EntryMarginFromSpawn к точке спавна корабля
         private Vector2 PickEntry()
         {
             Vector2 guard = SpawnGuardPoint();
-            float radius = level.WorldRadius;
+            float radius = areaRadius > 0f ? areaRadius : level.WorldRadius;
+            Vector2 center = areaRadius > 0f ? areaCenter : Vector2.zero;
             for (int attempt = 0; attempt < 16; attempt++)
             {
                 float angle = Random.Range(0f, Mathf.PI * 2f);
-                var point = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+                var point = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
                 if (Vector2.Distance(point, guard) >= EntryMarginFromSpawn)
                     return point;
             }
-            return -guard.normalized * radius; // запасной ход: противоположная от старта сторона
+            // запасной ход: самая далёкая от старта точка окружности
+            return center + (center - guard).normalized * radius;
         }
 
         // точка респавна корабля — как считает WorldBuilder (Landed) или явный SpawnPoint (Free)
@@ -155,9 +168,20 @@ namespace SpaceTaxi.World
             return start.Position + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (start.Radius + ShipOffset);
         }
 
-        // внутрь мира под случайным углом к нормали входа
+        // в зоне — случайная хорда окружности зоны (маршрут не покидает её),
+        // иначе — внутрь мира под случайным углом к нормали входа
         private Vector2 PickDirection(Vector2 entry)
         {
+            if (areaRadius > 0f)
+            {
+                float angle = Random.Range(0f, Mathf.PI * 2f);
+                Vector2 target = areaCenter + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * areaRadius;
+                Vector2 chord = target - entry;
+                if (chord.sqrMagnitude > 0.0001f)
+                    return chord.normalized;
+                return (areaCenter - entry).normalized; // вырожденная хорда — через центр зоны
+            }
+
             Vector2 inward = -entry.normalized;
             float deviation = Random.Range(-MaxChordDeviationDeg, MaxChordDeviationDeg) * Mathf.Deg2Rad;
             float cos = Mathf.Cos(deviation);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using SpaceTaxi.Core;
 using SpaceTaxi.Physics;
@@ -24,19 +25,43 @@ namespace SpaceTaxi.World
 
         public static readonly Color AsteroidColor = new Color(0.48f, 0.42f, 0.36f); // серо-коричневый
 
+        private const float PlanetClearMargin = 8f;    // зазор планета–астероид сверх радиусов
+        private const int RejectionAttempts = 12;      // rejection sampling до N попыток
+        private const float AngleShiftStepDeg = 5f;    // сдвиг угла после неудачных попыток
+
+        private readonly struct PlanetGuard
+        {
+            public readonly Vector2 Position;
+            public readonly float Radius;
+
+            public PlanetGuard(Vector2 position, float radius)
+            {
+                Position = position;
+                Radius = radius;
+            }
+        }
+
         private float axisRadius;
         private float halfWidth;
         private Color asteroidColor = AsteroidColor;
         private Ship ship;
         private ToastNotifier toast;
         private bool warned;
+        private readonly List<PlanetGuard> planetGuards = new List<PlanetGuard>();
 
-        public void Init(CelestialBodyData data, PhysicsConfig config)
+        public void Init(CelestialBodyData data, PhysicsConfig config, List<CelestialBodyData> planets = null)
         {
             axisRadius = data.Radius;
             halfWidth = Mathf.Max(0f, data.BeltWidth) * 0.5f;
             if (data.Visuals != null && data.Visuals.UseColor)
                 asteroidColor = data.Visuals.Color;
+
+            planetGuards.Clear();
+            if (planets != null)
+            {
+                for (int i = 0; i < planets.Count; i++)
+                    planetGuards.Add(new PlanetGuard(planets[i].Position, planets[i].Radius));
+            }
 
             int count = Mathf.Clamp(data.BeltAsteroidCount, MinAsteroids, MaxAsteroids);
             for (int i = 0; i < count; i++)
@@ -49,8 +74,8 @@ namespace SpaceTaxi.World
             go.transform.SetParent(transform, false);
 
             float radius = Random.Range(MinAsteroidRadius, MaxAsteroidRadius);
-            float angle = Random.Range(0f, Mathf.PI * 2f);
             float distance = Random.Range(axisRadius - halfWidth, axisRadius + halfWidth);
+            float angle = PickClearAngle(radius, distance);
             go.transform.localPosition = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
 
             var collider = go.AddComponent<CircleCollider2D>();
@@ -62,6 +87,44 @@ namespace SpaceTaxi.World
             renderer.sortingOrder = 1;
 
             go.AddComponent<Asteroid>().Init(radius);
+        }
+
+        // отсев планет на оси (П7.1): rejection sampling до N попыток, затем сдвиг
+        // угла по кругу; перекрыт весь круг (планета накрывает пояс) — ставим как есть
+        private float PickClearAngle(float asteroidRadius, float distance)
+        {
+            if (planetGuards.Count == 0)
+                return Random.Range(0f, Mathf.PI * 2f);
+
+            for (int attempt = 0; attempt < RejectionAttempts; attempt++)
+            {
+                float angle = Random.Range(0f, Mathf.PI * 2f);
+                if (AngleClear(angle, distance, asteroidRadius))
+                    return angle;
+            }
+
+            float fallback = Random.Range(0f, Mathf.PI * 2f);
+            for (float shift = 0f; shift < 360f; shift += AngleShiftStepDeg)
+            {
+                float angle = fallback + shift * Mathf.Deg2Rad;
+                if (AngleClear(angle, distance, asteroidRadius))
+                    return angle;
+            }
+            return fallback;
+        }
+
+        private bool AngleClear(float angle, float distance, float asteroidRadius)
+        {
+            // на момент спавна пояс не повёрнут, позиция в мире = центр пояса + локальная точка
+            Vector2 world = (Vector2)transform.position
+                            + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
+            for (int i = 0; i < planetGuards.Count; i++)
+            {
+                float clear = planetGuards[i].Radius + asteroidRadius + PlanetClearMargin;
+                if ((world - planetGuards[i].Position).sqrMagnitude < clear * clear)
+                    return false;
+            }
+            return true;
         }
 
         private void Update()
