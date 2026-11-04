@@ -101,8 +101,13 @@ namespace SpaceTaxi.Physics
 
         public event Action<World.Planet> ShipLanded;
 
+        // контактный удар с уроном — для штрафа выплаты (жар звезды НЕ считается)
+        public event Action CrashImpact;
+
         private void Crash(Planet planet, Collision2D collision, float v)
         {
+            CrashImpact?.Invoke();
+
             // урон сразу; выжил — считается посадкой
             float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);

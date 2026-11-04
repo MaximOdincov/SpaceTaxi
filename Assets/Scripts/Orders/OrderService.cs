@@ -56,6 +56,12 @@ namespace SpaceTaxi.Orders
         public int Deliveries { get; private set; }
         public int Failures { get; private set; }
 
+        // столкновения активного заказа (Active или Aboard); сброс при его закрытии/смене
+        public int CollisionsOfActive { get; private set; }
+
+        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2)
+        public PricingConfig Pricing => pricingConfig != null ? pricingConfig : PricingConfig.Default;
+
         // события для UI
         public event Action OffersChanged;
         public event Action ActiveOrderChanged;
@@ -70,7 +76,9 @@ namespace SpaceTaxi.Orders
             this.catalog = catalog;
 
             // посадка — единственная точка взятия/сдачи пассажира
-            ship.GetComponent<LandingSystem>().ShipLanded += OnLanded;
+            var landing = ship.GetComponent<LandingSystem>();
+            landing.ShipLanded += OnLanded;
+            landing.CrashImpact += OnCrashImpact;
             var hull = ship.GetComponent<HullSystem>();
             hull.Died += FailActive;
             hull.ShipLost += reason => FailActive();
@@ -164,6 +172,7 @@ namespace SpaceTaxi.Orders
             offers.Remove(offer);
             offer.State = OrderState.Active;
             Active = offer;
+            CollisionsOfActive = 0; // новый заказ — счёт с нуля
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
@@ -193,9 +202,18 @@ namespace SpaceTaxi.Orders
             OrderOffer cancelled = Active;
             Active = null;
             OrderCancelled?.Invoke(cancelled);
+            CollisionsOfActive = 0;
             ActiveOrderChanged?.Invoke();
             Debug.Log("[Orders] заказ отменён оператором");
             return true;
+        }
+
+        // жёсткое касание с уроном; жар звезды до сюда не доходит
+        private void OnCrashImpact()
+        {
+            if (Active != null
+                && (Active.State == OrderState.Active || Active.State == OrderState.Aboard))
+                CollisionsOfActive++;
         }
 
         private void OnLanded(Planet planet)
@@ -218,7 +236,8 @@ namespace SpaceTaxi.Orders
                 Deliveries++;
                 OrderOffer done = Active;
                 Active = null;
-                OrderDelivered?.Invoke(done);
+                OrderDelivered?.Invoke(done); // выплата внутри читает CollisionsOfActive
+                CollisionsOfActive = 0;
                 ActiveOrderChanged?.Invoke();
                 Debug.Log($"[Orders] доставлен: {done.Passenger.DisplayName} ({Deliveries}/{Failures})");
             }
@@ -233,6 +252,7 @@ namespace SpaceTaxi.Orders
             OrderOffer failed = Active;
             Active = null;
             OrderFailed?.Invoke(failed);
+            CollisionsOfActive = 0;
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] провален: {failed.Passenger.DisplayName} ({Deliveries}/{Failures})");
         }
