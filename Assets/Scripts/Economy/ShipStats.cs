@@ -1,4 +1,5 @@
 using UnityEngine;
+using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.Economy
 {

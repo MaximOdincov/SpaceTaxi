@@ -12,6 +12,7 @@ namespace SpaceTaxi.Core
         [SerializeField] private LevelAsset level;
         [SerializeField] private PhysicsConfig physicsConfig;
         [SerializeField] private ShipConfig currentShip;
+        [SerializeField] private UpgradeConfig upgradeConfig;
         [SerializeField] private InputActionAsset input;
         [SerializeField] private PassengerCatalog passengerCatalog;
 
@@ -35,6 +36,9 @@ namespace SpaceTaxi.Core
             Wallet = new Wallet();
             // новая игра: арендное «Яйцо», своих кораблей нет
             Fleet = new FleetService();
+            // улучшения: ассет сцены, при отсутствии — кодовый инстанс
+            // с числами плана (никаких NRE)
+            Fleet.BindUpgrades(upgradeConfig != null ? upgradeConfig : UpgradeConfig.Default);
             Debt = new DebtService();
         }
 
