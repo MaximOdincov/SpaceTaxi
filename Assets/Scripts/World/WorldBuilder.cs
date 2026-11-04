@@ -172,8 +172,15 @@ namespace SpaceTaxi.World
             }
 
             var renderer = go.GetComponent<SpriteRenderer>();
-            if (renderer != null && renderer.sprite == null)
-                renderer.sprite = StubSprites.ShipTriangle();
+            if (renderer != null)
+            {
+                // спрайт модели из ShipConfig (арт А1/А2); пусто — что было
+                // в префабе, в последнюю очередь — заглушка-треугольник
+                if (shipConfig != null && shipConfig.ShipSprite != null)
+                    renderer.sprite = shipConfig.ShipSprite;
+                else if (renderer.sprite == null)
+                    renderer.sprite = StubSprites.ShipTriangle();
+            }
 
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
