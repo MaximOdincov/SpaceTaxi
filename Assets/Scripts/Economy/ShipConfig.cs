@@ -24,6 +24,9 @@ namespace SpaceTaxi.Economy
         public float FuelMax;
         public float HpMax;
 
+        [Tooltip("Спрайт модели (арт А1/А2, 512×512 PPU 32, нос вправо); пусто — заглушка")]
+        public Sprite ShipSprite;
+
         [Header("Магазин")]
         public int Price;     // 0 = не продаётся
         public bool IsRental; // арендный — всегда сток

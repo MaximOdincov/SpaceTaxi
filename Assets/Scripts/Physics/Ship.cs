@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using SpaceTaxi.Core; // StubSprites
 using SpaceTaxi.Economy;
 
 namespace SpaceTaxi.Physics
@@ -90,6 +91,7 @@ namespace SpaceTaxi.Physics
             ShipConfig = shipConfig;
             UpgradeLevels = ShipStats.NormalizeLevels(upgradeLevels);
             RecomputeEff();
+            ApplyModelSprite(shipConfig);
             // Полные HP/бак только живому корпусу: при гибели Reconfigure
             // вызывается до респавна, и мёртвый корабль не должен «ожить»
             // на месте гибели (иначе Crash усыплёт его посадкой)
@@ -99,6 +101,18 @@ namespace SpaceTaxi.Physics
                 Fuel = Eff.FuelMax; // сеттер сам шлёт FuelChanged
             }
             Reconfigured?.Invoke();
+        }
+
+        // спрайт модели (арт А1/А2): своя — ставим, нет — заглушка, чужой
+        // корпус оставлять нельзя (пересадка должна быть видна)
+        private void ApplyModelSprite(ShipConfig shipConfig)
+        {
+            var spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+                return;
+            spriteRenderer.sprite = shipConfig.ShipSprite != null
+                ? shipConfig.ShipSprite
+                : StubSprites.ShipTriangle();
         }
 
         private void RecomputeEff()
