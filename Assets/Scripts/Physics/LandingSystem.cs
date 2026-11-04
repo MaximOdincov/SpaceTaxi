@@ -28,10 +28,19 @@ namespace SpaceTaxi.Physics
             Planet planet = collision.collider.GetComponentInParent<Planet>();
             Star star = collision.collider.GetComponentInParent<Star>();
             Asteroid asteroid = collision.collider.GetComponentInParent<Asteroid>();
+            Comet comet = collision.collider.GetComponentInParent<Comet>();
             float v = collision.relativeVelocity.magnitude;
 
             if (star != null)
             {
+                Hull.ApplyDamage(ship.Hp);
+                return;
+            }
+
+            if (comet != null)
+            {
+                // комета — гибель, как у звезды; CrashImpact не файрим: провал
+                // заказа уже ловит Died-путь, штраф столкновения тут не при чём
                 Hull.ApplyDamage(ship.Hp);
                 return;
             }

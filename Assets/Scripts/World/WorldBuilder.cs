@@ -39,6 +39,10 @@ namespace SpaceTaxi.World
             for (int i = 0; i < level.Bodies.Count; i++)
                 bodies.Add(CreateBody(level.Bodies[i], i));
 
+            // кометы (П6.3): одна система на уровень, маршруты по таймеру, не тело гравитации
+            var cometGo = new GameObject("CometSystem");
+            cometGo.AddComponent<CometSystem>().Init(level);
+
             ship = CreateShip(bodies);
 
             Debug.Log($"[World] {level.LevelName}: тел={bodies.Count}, корабль в {ship.transform.position}, состояние={ship.State}");
