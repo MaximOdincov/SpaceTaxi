@@ -64,7 +64,7 @@ namespace SpaceTaxi.UI
 
         // блок улучшений и долга (П3.3); магазин кораблей (П3.2) — свои поля
         private GameObject upgradesOwned;   // 4 строки линий (свой корабль)
-        private GameObject upgradesRental;  // строка-пояснение (аренда всегда сток)
+        private TMP_Text upgradesRental;    // строка-пояснение (аренда всегда сток)
         private UpgradeRowRefs[] upgradeRows;
         private GameObject debtSection;     // виден только при долге > 0
         private TMP_Text debtLine;
@@ -155,7 +155,7 @@ namespace SpaceTaxi.UI
             // отписок нет — стиль биндеров)
             session.Fleet.UpgradesChanged += OnShopChanged;
             session.Fleet.ShipChanged += OnShopChanged; // сменил корабль — блок перестроился
-            session.Debt.DebtChanged += OnShopChanged;
+            session.Debt.DebtChanged += OnDebtChanged; // Action<int>: аргумент не нужен, блок перечитает сам
             bound = true;
         }
 
@@ -479,6 +479,12 @@ namespace SpaceTaxi.UI
         {
             if (opened)
                 RefreshShop();
+        }
+
+        // DebtChanged приходит с новым балансом (Action<int>) — аргумент не нужен
+        private void OnDebtChanged(int balance)
+        {
+            OnShopChanged();
         }
 
         // блок «Улучшения» — свой метод-строитель: магазин кораблей (П3.2)
