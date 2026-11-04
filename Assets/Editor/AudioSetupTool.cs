@@ -84,6 +84,14 @@ namespace SpaceTaxi.Audio.Tools
                 Entry(SoundId.Explosion, AudioGroup.Sfx, 1.00f, clips: "sfx_explosion"),
                 Entry(SoundId.Respawn, AudioGroup.Sfx, 0.65f, clips: "sfx_respawn"),
 
+                // состояния и опасности (П9.2): клипы кладёт владелец —
+                // слоты в GameInfo/05_AUDIO.md §6, до файлов — тишина
+                Entry(SoundId.LowFuel, AudioGroup.Sfx, 0.60f, clips: "sfx_low_fuel"),
+                Entry(SoundId.LowHull, AudioGroup.Sfx, 0.55f, clips: "sfx_low_hull"),
+                Entry(SoundId.BlackHoleHum, AudioGroup.Sfx, 0.50f, loop: true, clips: "sfx_blackhole_hum"),
+                Entry(SoundId.BlackHoleSwallow, AudioGroup.Sfx, 0.90f, clips: "sfx_blackhole_swallow"),
+                Entry(SoundId.BeltRumble, AudioGroup.Sfx, 0.45f, loop: true, clips: "sfx_belt_rumble"),
+
                 // интерфейс
                 Entry(SoundId.UiClick, AudioGroup.Ui,     0.50f, jitter: 0f, clips: "ui_click"),
                 Entry(SoundId.ComputerPing, AudioGroup.Ui,     0.55f, jitter: 0f, clips: "ui_computer_ping"),
