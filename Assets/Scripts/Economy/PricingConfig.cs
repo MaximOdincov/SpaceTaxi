@@ -21,6 +21,16 @@ namespace SpaceTaxi.Economy
         public float SectorMid2Mul = 1.6f;
         public float SectorFarMul = 2.0f;
 
+        [Header("Выплата (§3.5): штраф, комиссия аренды, доля в долг")]
+        [Tooltip("% от цены за одно столкновение (урон от контакта; жар не считается)")]
+        public int PenaltyPerCollisionPct = 15;
+        [Tooltip("Потолок суммарного штрафа, % от цены")]
+        public int PenaltyCapPct = 45;
+        [Tooltip("% от (цена − штраф), только на арендном корабле")]
+        public int RentalCommissionPct = 25;
+        [Tooltip("% выплаты, автоматически уходящий в счёт долга (пока долг > 0)")]
+        public int DebtRepaySharePct = 50;
+
         public float GetSectorMultiplier(Sector sector)
         {
             switch (sector)
