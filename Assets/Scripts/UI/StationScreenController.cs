@@ -4,22 +4,33 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.UI
 {
     // Экран станции [B]: платная заправка/ремонт (1 кр = 1 ед топлива / 1 HP,
-    // план §3.1). Доступен ТОЛЬКО стоя (State == Landed) на планете со станцией;
-    // мир не ставится на паузу (как карта). Закрытие по B/Esc — ESC уступается
-    // по той же договорённости, что и карта (NotifyStationOpened/Closed +
-    // EscJustClosed). Секции будущего контента (магазин П3.2, улучшения/долг
-    // П3.3) — коллапсируемый контейнер в layout, без заглушек. Контроллера в
+    // план §3.1), улучшения текущего корабля (§3.4) и досрочное гашение долга
+    // (§3.2) — блоки секции магазина; магазин кораблей (П3.2) добавит свой блок
+    // тем же способом — отдельным методом-строителем. Доступен ТОЛЬКО стоя
+    // (State == Landed) на планете со станцией; мир не ставится на паузу (как
+    // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
+    // и карта (NotifyStationOpened/Closed + EscJustClosed). Контроллера в
     // сценах нет — появляется сам (стиль DismissalScreenController), панель
     // строится кодом при первом открытии.
     public class StationScreenController : MonoBehaviour
     {
         private const int SortingOrder = 100; // поверх HUD/паузы, ниже увольнения (200)
         private const int SegmentCount = 10;  // как в HUD
+        // подпись счётчика аварий (§3.2: увольнение после третьей непогашенной)
+        private const int MaxUnpaidAccidents = 3;
+
+        // шаблоны описания прибавки ОДНОГО уровня: проценты считаются из
+        // UpgradeConfig (максимум / 3, шкала линейная) — числа не дублируются
+        private const string EngineEffectFormat = "+{0}% тяги";
+        private const string TankEffectFormat = "+{0}% бака, −{1}% расхода";
+        private const string HullEffectFormat = "+{0}% корпуса, −{1}% жара";
+        private const string ManeuverEffectFormat = "+{0}% боковой тяги";
 
         // цвета сегментов — как в HudBinder
         private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
@@ -50,6 +61,16 @@ namespace SpaceTaxi.UI
         private Image[] hullSegments;
         private Button fuelButton;
         private Button hullButton;
+
+        // блок улучшений и долга (П3.3); магазин кораблей (П3.2) — свои поля
+        private GameObject upgradesOwned;   // 4 строки линий (свой корабль)
+        private GameObject upgradesRental;  // строка-пояснение (аренда всегда сток)
+        private UpgradeRowRefs[] upgradeRows;
+        private GameObject debtSection;     // виден только при долге > 0
+        private TMP_Text debtLine;
+        private Button repayButton;
+        private TMP_Text repayLabel;
+        private ToastNotifier toast;
 
         public bool IsOpened => opened;
 
@@ -130,6 +151,11 @@ namespace SpaceTaxi.UI
             hull.HpChanged += OnShipValuesChanged;
             hull.Respawned += OnRespawned;
             session.Wallet.CreditsChanged += OnCreditsChanged;
+            // П3.3: блоки магазина перечитываются сами (сессия одна на сцену,
+            // отписок нет — стиль биндеров)
+            session.Fleet.UpgradesChanged += OnShopChanged;
+            session.Fleet.ShipChanged += OnShopChanged; // сменил корабль — блок перестроился
+            session.Debt.DebtChanged += OnShopChanged;
             bound = true;
         }
 
@@ -272,6 +298,8 @@ namespace SpaceTaxi.UI
             fuelButton.interactable = fuelCost > 0 && solvent;
             hullButtonLabel.text = hullCost > 0 ? $"РЕМОНТ ДО ПОЛНОГО ({hullCost} кр)" : "КОРПУС ЦЕЛ";
             hullButton.interactable = hullCost > 0 && solvent;
+
+            RefreshShop();
         }
 
         private void UpdateGauge(Image[] segments, float fraction)
@@ -336,17 +364,19 @@ namespace SpaceTaxi.UI
             fuelButton = BuildServiceButton(service.transform, "FuelButton", Refuel, out fuelButtonLabel);
             hullButton = BuildServiceButton(service.transform, "HullButton", Repair, out hullButtonLabel);
 
-            // --- Закладка под будущие секции (магазин П3.2, улучшения/долг П3.3):
-            // коллапсируемый контейнер в layout, без видимой заглушки ---
+            // --- Секция магазина (ShopSection): каждый блок — отдельный
+            // метод-строитель; магазин кораблей (П3.2) добавит свой блок сюда же ---
             var shop = new GameObject("ShopSection", typeof(RectTransform));
             shop.transform.SetParent(panel.transform, false);
             var shopLayout = shop.AddComponent<VerticalLayoutGroup>();
-            shopLayout.spacing = 4f;
+            shopLayout.spacing = 12f;
             shopLayout.childControlWidth = true;
             shopLayout.childControlHeight = true;
             shopLayout.childForceExpandWidth = true;
             shopLayout.childForceExpandHeight = false;
-            shop.SetActive(false);
+            BuildUpgradesBlock(shop.transform);
+            BuildDebtBlock(shop.transform);
+            shop.SetActive(true); // в контейнере теперь есть содержимое
 
             var footer = OnboardComputerFactory.Text(panel, "B / ESC — закрыть", 16f, OnboardComputerFactory.LabelColor, "Footer");
             OnboardComputerFactory.FixedHeight(footer.gameObject, 20f);
@@ -427,6 +457,218 @@ namespace SpaceTaxi.UI
             button.onClick.AddListener(onClick);
             label = go.GetComponentInChildren<TMP_Text>();
             return button;
+        }
+
+        // --- П3.3: блок улучшений и досрочного гашения долга ---
+
+        private sealed class UpgradeRowRefs
+        {
+            public TMP_Text Level;
+            public TMP_Text Effect;
+            public Button Buy;
+            public TMP_Text BuyLabel;
+        }
+
+        private void RefreshShop()
+        {
+            RefreshUpgrades();
+            RefreshDebt();
+        }
+
+        private void OnShopChanged()
+        {
+            if (opened)
+                RefreshShop();
+        }
+
+        // блок «Улучшения» — свой метод-строитель: магазин кораблей (П3.2)
+        // добавит в ShopSection свой блок независимо
+        private void BuildUpgradesBlock(Transform shop)
+        {
+            var section = Section(shop, "// УЛУЧШЕНИЯ", "UpgradesSection");
+
+            // аренда: строка-пояснение без кнопок
+            upgradesRental = OnboardComputerFactory.Text(section,
+                "Аренда всегда сток — улучшения только на свой корабль", 17f,
+                OnboardComputerFactory.LabelColor, "RentalNote");
+            OnboardComputerFactory.FixedHeight(upgradesRental.gameObject, 24f);
+
+            // свой корабль: по строке на линию улучшений
+            upgradesOwned = new GameObject("OwnedRows", typeof(RectTransform));
+            upgradesOwned.transform.SetParent(section.transform, false);
+            var rows = upgradesOwned.AddComponent<VerticalLayoutGroup>();
+            rows.spacing = 6f;
+            rows.childControlWidth = true;
+            rows.childControlHeight = true;
+            rows.childForceExpandWidth = true;
+            rows.childForceExpandHeight = false;
+
+            var upgrades = session.Fleet.Upgrades; // GameSession в Awake ставит ассет или фолбэк
+            string[] names =
+            {
+                upgrades.EngineName, upgrades.TankName, upgrades.HullName, upgrades.ManeuverName,
+            };
+            upgradeRows = new UpgradeRowRefs[ShipStats.LineCount];
+            for (int i = 0; i < ShipStats.LineCount; i++)
+            {
+                var line = (UpgradeLine)i;
+                var rowGo = new GameObject("Row_" + (i + 1), typeof(RectTransform));
+                rowGo.transform.SetParent(upgradesOwned.transform, false);
+                var rowLayout = rowGo.AddComponent<VerticalLayoutGroup>();
+                rowLayout.spacing = 2f;
+                rowLayout.childControlWidth = true;
+                rowLayout.childControlHeight = true;
+                rowLayout.childForceExpandWidth = true;
+                rowLayout.childForceExpandHeight = false;
+
+                var top = OnboardComputerFactory.H("Top", rowGo.transform);
+                var caption = OnboardComputerFactory.Text(top, names[i], 17f, OnboardComputerFactory.BrightColor, "Caption");
+                OnboardComputerFactory.FixedWidth(caption.gameObject, 120f);
+                var refs = new UpgradeRowRefs();
+                refs.Level = OnboardComputerFactory.Text(top, "ур. 0/3", 17f, OnboardComputerFactory.LabelColor, "Level");
+                OnboardComputerFactory.FixedWidth(refs.Level.gameObject, 76f);
+                var spacer = OnboardComputerFactory.Text(top, "", 15f, OnboardComputerFactory.LabelColor, "Spacer");
+                OnboardComputerFactory.Flexible(spacer.gameObject);
+                refs.Buy = BuildRowButton(top.transform, () => BuyUpgrade(line), out refs.BuyLabel);
+
+                refs.Effect = OnboardComputerFactory.Text(rowGo, "", 15f, OnboardComputerFactory.LabelColor, "Effect");
+                OnboardComputerFactory.FixedHeight(refs.Effect.gameObject, 20f);
+                upgradeRows[i] = refs;
+            }
+
+            RefreshUpgrades();
+        }
+
+        // компактная кнопка строки улучшения (стиль BuildServiceButton)
+        private static Button BuildRowButton(Transform parent, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
+        {
+            var go = OnboardComputerFactory.Button(parent, "—",
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                    OnboardComputerFactory.LabelColor.b, 0.22f),
+                OnboardComputerFactory.BrightColor, 15f, "BuyButton");
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = 150f;
+            le.preferredWidth = 150f;
+            le.minHeight = 32f;
+            le.preferredHeight = 32f;
+            var button = go.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            label = go.GetComponentInChildren<TMP_Text>();
+            return button;
+        }
+
+        // уровни/цены — из конфига; аренда всегда сток, ур.3 — без кнопки
+        private void RefreshUpgrades()
+        {
+            if (upgradeRows == null || session == null || session.Fleet == null)
+                return;
+            var fleet = session.Fleet;
+            bool owned = fleet.IsOwned(fleet.Current);
+            upgradesRental.gameObject.SetActive(!owned);
+            upgradesOwned.SetActive(owned);
+            if (!owned)
+                return;
+            var upgrades = fleet.Upgrades;
+            if (upgrades == null)
+                return;
+            int[] prices = upgrades.PricesPerLevel;
+            for (int i = 0; i < upgradeRows.Length; i++)
+            {
+                var row = upgradeRows[i];
+                int level = fleet.GetLevel(fleet.Current, (UpgradeLine)i);
+                bool maxed = level >= ShipStats.MaxLevel;
+                row.Level.text = $"ур. {level}/{ShipStats.MaxLevel}";
+                row.Effect.text = maxed ? "макс. уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
+                // цена следующего уровня — PricesPerLevel[текущий уровень], как в TryUpgrade
+                int price = prices != null && level < prices.Length ? prices[level] : 0;
+                row.BuyLabel.text = maxed ? "МАКС." : $"КУПИТЬ ({price} КР)";
+                row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
+            }
+        }
+
+        // прибавка следующего уровня: максимум из конфига / 3 — шкала линейная
+        private static string NextLevelEffect(UpgradeConfig upgrades, UpgradeLine line)
+        {
+            float third = 1f / ShipStats.MaxLevel;
+            switch (line)
+            {
+                case UpgradeLine.Engine:
+                    return string.Format(EngineEffectFormat, Mathf.RoundToInt(upgrades.EngineThrustPct * third));
+                case UpgradeLine.Tank:
+                    return string.Format(TankEffectFormat,
+                        Mathf.RoundToInt(upgrades.TankCapacityPct * third),
+                        Mathf.RoundToInt(upgrades.TankDrainRedPct * third));
+                case UpgradeLine.Hull:
+                    return string.Format(HullEffectFormat,
+                        Mathf.RoundToInt(upgrades.HullHpPct * third),
+                        Mathf.RoundToInt(upgrades.HullHeatRedPct * third));
+                case UpgradeLine.Maneuver:
+                    return string.Format(ManeuverEffectFormat, Mathf.RoundToInt(upgrades.ManeuverStrafePct * third));
+                default:
+                    return "";
+            }
+        }
+
+        // покупка улучшения: только свой корабль; эффект применит сам TryUpgrade
+        // (Ship.Eff пересчитывается, без лечения/заправки)
+        private void BuyUpgrade(UpgradeLine line)
+        {
+            if (session == null || session.Fleet == null || !CanOpen())
+                return;
+            var fleet = session.Fleet;
+            if (!fleet.IsOwned(fleet.Current))
+                return; // аренда всегда сток
+            fleet.TryUpgrade(fleet.Current, line, session.Wallet);
+        }
+
+        // блок «Долг» — свой метод-строитель (с П3.2 не пересекается)
+        private void BuildDebtBlock(Transform shop)
+        {
+            debtSection = Section(shop, "// ДОЛГ", "DebtSection");
+            debtLine = OnboardComputerFactory.Text(debtSection, "", 18f, OnboardComputerFactory.DangerColor, "DebtLine");
+            OnboardComputerFactory.FixedHeight(debtLine.gameObject, 24f);
+
+            var go = OnboardComputerFactory.Button(debtSection.transform, "—",
+                new Color(OnboardComputerFactory.DangerColor.r, OnboardComputerFactory.DangerColor.g,
+                    OnboardComputerFactory.DangerColor.b, 0.22f),
+                OnboardComputerFactory.DangerColor, 20f, "RepayButton");
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = 44f;
+            le.preferredHeight = 44f;
+            repayButton = go.GetComponent<Button>();
+            repayButton.onClick.AddListener(RepayDebt);
+            repayLabel = go.GetComponentInChildren<TMP_Text>();
+
+            RefreshDebt(); // Balance == 0 → секция скрыта сразу
+        }
+
+        // виден только при Balance > 0; кнопка активна при достатке кредитов
+        private void RefreshDebt()
+        {
+            if (debtSection == null || session == null || session.Debt == null)
+                return;
+            int balance = session.Debt.Balance;
+            debtSection.SetActive(balance > 0);
+            if (balance <= 0)
+                return;
+            debtLine.text = $"Долг: {balance} кр · Аварий: {session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
+            repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({balance} КР)";
+            repayButton.interactable = session.Wallet.Credits >= balance;
+        }
+
+        // §3.2: досрочное гашение — единовременно полной суммой
+        private void RepayDebt()
+        {
+            if (session == null || session.Debt == null)
+                return;
+            int balance = session.Debt.Balance;
+            if (balance <= 0 || !session.Wallet.TrySpend(balance))
+                return;
+            session.Debt.Repay(balance); // DebtChanged скроет блок, счётчик аварий обнулится сам
+            if (toast == null)
+                toast = FindAnyObjectByType<ToastNotifier>();
+            if (toast != null)
+                toast.Show("Долг погашен", emphasized: true);
         }
     }
 }
