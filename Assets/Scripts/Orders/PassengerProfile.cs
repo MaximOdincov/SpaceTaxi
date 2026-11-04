@@ -6,6 +6,10 @@ namespace SpaceTaxi.Orders
     [CreateAssetMenu(fileName = "Passenger", menuName = "Space Taxi/Passenger Profile")]
     public sealed class PassengerProfile : ScriptableObject
     {
+        // runtime-инстанс генератора (П5.2) — его можно Destroy при протухании
+        // оффера; ассетные профили живут вечно и Destroy не проходят
+        public bool RuntimeInstance { get; set; }
+
         [Header("Кто это")]
         [Tooltip("Имя, которое видит игрок")]
         public string DisplayName = "Гость системы";

@@ -50,6 +50,7 @@ namespace SpaceTaxi.UI
         private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
 
         private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
+        private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
         private static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);      // #A8FFCB
@@ -168,16 +169,22 @@ namespace SpaceTaxi.UI
 
             var photo = row.transform.Find("Photo");
             var photoImage = photo != null ? photo.GetComponent<Image>() : null;
-            if (photoImage != null && offer.Passenger.Portrait != null)
+            if (photoImage != null)
             {
-                photoImage.sprite = offer.Passenger.Portrait;
+                // без портрета (арт А5) — цветная заглушка из палитры генератора
+                if (offer.Passenger.Portrait != null)
+                    photoImage.sprite = offer.Passenger.Portrait;
                 photoImage.color = offer.Passenger.PortraitTint;
             }
 
             SetText(row, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
             SetText(row, "Info/Route",
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
-            string wish = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            // П5.3: вместо пожелания — текст задания, если архетип его дал
+            PassengerTask task = offer.Task;
+            string wish = task != null && task.Kind != PassengerTaskKind.None
+                ? task.Text
+                : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             SetText(row, "Info/Wish", string.IsNullOrEmpty(wish) ? "" : "«" + wish + "»");
 
             var cancel = OnboardComputerFactory.Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
@@ -319,11 +326,10 @@ namespace SpaceTaxi.UI
             var avatarImage = avatar != null ? avatar.GetComponent<Image>() : null;
             if (avatarImage != null)
             {
+                // без портрета (арт А5) — цветная заглушка из палитры генератора
                 if (offer.Passenger.Portrait != null)
-                {
                     avatarImage.sprite = offer.Passenger.Portrait;
-                    avatarImage.color = offer.Passenger.PortraitTint;
-                }
+                avatarImage.color = offer.Passenger.PortraitTint;
             }
 
             SetText(card, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
@@ -333,8 +339,13 @@ namespace SpaceTaxi.UI
             TMP_Text price = EnsurePriceNode(card);
             if (price != null)
                 price.text = PriceTag(offer.Price);
-            string wishPhrase = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : "доп.: «" + wishPhrase + "»");
+            // П5.3: задание пассажира вместо пожелания; текст статичен — на карточке оффера таймер не нужен
+            PassengerTask task = offer.Task;
+            string wishPhrase = task != null && task.Kind != PassengerTaskKind.None
+                ? task.Text
+                : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            string wishPrefix = task != null && task.Kind != PassengerTaskKind.None ? "задание: " : "доп.: ";
+            SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : wishPrefix + "«" + wishPhrase + "»");
 
             OrderOffer captured = offer;
             var accept = card.transform.Find("Buttons/Accept");
@@ -417,6 +428,21 @@ namespace SpaceTaxi.UI
                 statusText.text = orders.Active.State == OrderState.Aboard
                     ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price)
                     : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price);
+
+            // остаток дедлайна Торопыги (П5.3): строка задания, обновление раз в SlowUpdate
+            var wishText = FindText(orderArea, "ActiveOrder/Info/Wish");
+            if (orders.Active != null && wishText != null)
+            {
+                PassengerTask task = orders.Active.Task;
+                if (task != null && task.Kind == PassengerTaskKind.Deadline)
+                {
+                    float remaining = task.DeadlineRemaining(Time.time);
+                    string remain = remaining < DeadlineWarnSeconds
+                        ? $"<color=#{ColorUtility.ToHtmlStringRGB(DangerColor)}>Осталось {remaining:0} с</color>"
+                        : $"Осталось {remaining:0} с";
+                    wishText.text = "«" + task.Text + "» · " + remain;
+                }
+            }
         }
 
         // строка «Цена: N кр» — сумма акцентным цветом такси

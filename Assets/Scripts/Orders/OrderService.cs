@@ -23,6 +23,7 @@ namespace SpaceTaxi.Orders
         public int DropoffIndex;   // планета Б
         public float ExpiresAt;    // время смерти карточки (Time.time)
         public int Price;          // цена предложения, считается при спавне
+        public PassengerTask Task; // задание пассажира (П5.3); null — архетип без задания
         public OrderState State = OrderState.Offered;
     }
 
@@ -50,6 +51,7 @@ namespace SpaceTaxi.Orders
         private LevelAsset level;
         private PassengerCatalog catalog;
         private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
+        private Ship ship;            // для трекинга задания «тише едем» (П5.3)
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
@@ -76,24 +78,28 @@ namespace SpaceTaxi.Orders
         public event Action<OrderOffer> OrderDelivered;
         public event Action<OrderOffer> OrderFailed;
         public event Action<OrderOffer> OrderCancelled;
+        public event Action<OrderOffer> TaskSucceeded; // задание выполнено (П5.3)
+        public event Action<OrderOffer> TaskFailed;    // задание провалено — жалоба
 
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
         {
             level = levelAsset;
             this.catalog = catalog;
+            this.ship = ship;
 
             // посадка — единственная точка взятия/сдачи пассажира
             var landing = ship.GetComponent<LandingSystem>();
             landing.ShipLanded += OnLanded;
             landing.CrashImpact += OnCrashImpact;
+            landing.StationServiced += OnStationServiced;
             var hull = ship.GetComponent<HullSystem>();
             hull.Died += FailActive;
             hull.ShipLost += reason => FailActive();
 
             if (catalog == null)
                 Debug.LogWarning("[Orders] каталог пассажиров не назначен — предложений не будет");
-            else if (catalog.Profiles.Count == 0)
-                Debug.LogWarning("[Orders] каталог пассажиров пуст — добавь профиль в PassengerCatalog");
+            else if (catalog.Profiles.Count == 0 && !catalog.CanGenerate)
+                Debug.LogWarning("[Orders] ни профилей, ни пулов пассажиров — предложений не будет");
             else
                 for (int i = 0; i < initialOffers; i++)
                     AddOffer(catalog);
@@ -102,9 +108,15 @@ namespace SpaceTaxi.Orders
 
         private void Update()
         {
-            // смертность карточек
+            // смертность карточек; runtime-профили протухших больше не нужны
             int before = offers.Count;
-            offers.RemoveAll(o => Time.time >= o.ExpiresAt);
+            for (int i = offers.Count - 1; i >= 0; i--)
+            {
+                if (Time.time < offers[i].ExpiresAt)
+                    continue;
+                ReleaseProfile(offers[i]);
+                offers.RemoveAt(i);
+            }
             if (offers.Count != before)
                 OffersChanged?.Invoke();
 
@@ -117,6 +129,7 @@ namespace SpaceTaxi.Orders
             }
 
             UpdateTargetGlow();
+            TrackTask();
         }
 
         // подсветка планеты назначения (А — пока ждёт, Б — на борту)
@@ -180,6 +193,7 @@ namespace SpaceTaxi.Orders
             offer.State = OrderState.Active;
             Active = offer;
             CollisionsOfActive = 0; // новый заказ — счёт с нуля
+            offer.Task?.StartDeadline(Time.time); // дедлайн Торопыги пошёл (П5.3)
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
@@ -191,8 +205,17 @@ namespace SpaceTaxi.Orders
             if (!offers.Contains(offer))
                 return false;
             offers.Remove(offer);
+            ReleaseProfile(offer);
             OffersChanged?.Invoke();
             return true;
+        }
+
+        // runtime-профиль генератора живёт без сцены — отдаём протухшие/отклонённые
+        // (ассетные профили не трогаем: Destroy(asset) в билде ломает их на сессию)
+        private void ReleaseProfile(OrderOffer offer)
+        {
+            if (offer.Passenger != null && offer.Passenger.RuntimeInstance)
+                Destroy(offer.Passenger);
         }
 
         // с пассажиром на борту — только стоя на планете (высадить)
@@ -215,12 +238,53 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
-        // жёсткое касание с уроном; жар звезды до сюда не доходит
+        // жёсткое касание с уроном; жар звезды до сюда не доходит.
+        // Один обработчик на оба потребителя CrashImpact: счётчик выплаты (П4.2)
+        // считает удары в Active И Aboard, задание «без столкновений» — только Aboard
         private void OnCrashImpact()
         {
-            if (Active != null
-                && (Active.State == OrderState.Active || Active.State == OrderState.Aboard))
+            if (Active == null)
+                return;
+            if (Active.State == OrderState.Active || Active.State == OrderState.Aboard)
                 CollisionsOfActive++;
+            if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.NoCollision))
+                Active.Task.Failed = true;
+        }
+
+        // платный сервис (заправка/ремонт) на станции при пассажире — Барыга против
+        private void OnStationServiced(string station)
+        {
+            if (Active != null && Active.State == OrderState.Aboard
+                && TaskIs(PassengerTaskKind.NoRefuel))
+                Active.Task.Failed = true;
+        }
+
+        // покадровый трекинг задания активного заказа (П5.3)
+        private void TrackTask()
+        {
+            OrderOffer active = Active;
+            if (active == null
+                || (active.State != OrderState.Active && active.State != OrderState.Aboard))
+                return;
+            PassengerTask task = active.Task;
+            if (task == null)
+                return;
+
+            // время вышло до доставки — задание провалено, заказ может доставиться
+            if (task.Kind == PassengerTaskKind.Deadline && !task.Failed
+                && task.DeadlineRemaining(Time.time) <= 0f)
+                task.Failed = true;
+
+            // превышение скорости ловим в одном кадре — только с пассажиром на борту
+            if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.SpeedLimit
+                && !task.Failed && ship != null && ship.Body != null
+                && ship.Body.linearVelocity.magnitude > task.SpeedLimit)
+                task.Failed = true;
+        }
+
+        private bool TaskIs(PassengerTaskKind kind)
+        {
+            return Active != null && Active.Task != null && Active.Task.Kind == kind;
         }
 
         private void OnLanded(Planet planet)
@@ -242,11 +306,33 @@ namespace SpaceTaxi.Orders
                 Active.State = OrderState.Delivered;
                 Deliveries++;
                 OrderOffer done = Active;
+                SettleTask(done); // итог задания (П5.3) до события: экран завершения продолжает показывать дельту доставки
                 Active = null;
                 OrderDelivered?.Invoke(done); // выплата внутри читает CollisionsOfActive
                 CollisionsOfActive = 0;
                 ActiveOrderChanged?.Invoke();
                 Debug.Log($"[Orders] доставлен: {done.Passenger.DisplayName} ({Deliveries}/{Failures})");
+            }
+        }
+
+        // исход задания при доставке (П5.3): успех — +0.10 рейтинга и тост с
+        // благодарностью, провал — жалоба (−0.10); заказ при провале задания
+        // НЕ проваливается. Чаевые появятся в П8.2
+        private void SettleTask(OrderOffer delivered)
+        {
+            PassengerTask task = delivered.Task;
+            if (task == null || task.Kind == PassengerTaskKind.None)
+                return;
+            if (task.Failed)
+            {
+                TaskFailed?.Invoke(delivered);
+                rating?.TaskFailed();
+            }
+            else
+            {
+                task.Succeeded = true;
+                TaskSucceeded?.Invoke(delivered);
+                rating?.TaskCompleted();
             }
         }
 
@@ -268,7 +354,10 @@ namespace SpaceTaxi.Orders
         {
             if (catalog == null || level == null)
                 return;
-            PassengerProfile passenger = catalog.Pick();
+            // П5.2: свежий профиль из пулов; пулов нет — старые профили каталога
+            PassengerProfile passenger = catalog.Generate();
+            if (passenger == null)
+                passenger = catalog.Pick();
             if (passenger == null)
                 return;
 
@@ -286,6 +375,8 @@ namespace SpaceTaxi.Orders
             int basePrice = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex));
             offer.Price = PriceWithRatingBonus(basePrice);
+            // задание пассажира (П5.3): по архетипу, дедлайну нужна дальность маршрута
+            offer.Task = PassengerTasks.Create(passenger.Archetype, RouteDistance(offer));
             offers.Add(offer);
             OffersChanged?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
