@@ -159,14 +159,14 @@ namespace SpaceTaxi.UI
                 PlaceMarker();
             }
 
-            if (markerRoot != null && !markerRoot.activeSelf)
-                markerRoot.SetActive(true);
+            if (markerRoot != null && !markerRoot.gameObject.activeSelf)
+                markerRoot.gameObject.SetActive(true);
         }
 
         private void HideMarker()
         {
-            if (markerRoot != null && markerRoot.activeSelf)
-                markerRoot.SetActive(false);
+            if (markerRoot != null && markerRoot.gameObject.activeSelf)
+                markerRoot.gameObject.SetActive(false);
         }
 
         private CelestialBody ResolveBody(string displayName)
@@ -231,7 +231,7 @@ namespace SpaceTaxi.UI
         // маркер без родителя: сам догоняет тело (кометы живут, спин телу не мешает)
         private void UpdateMarkerPose()
         {
-            if (markerRoot == null || !markerRoot.activeSelf || markerBody == null)
+            if (markerRoot == null || !markerRoot.gameObject.activeSelf || markerBody == null)
                 return;
             Vector3 p = markerBody.transform.position;
             markerRoot.position = new Vector3(p.x, p.y, 0f);
