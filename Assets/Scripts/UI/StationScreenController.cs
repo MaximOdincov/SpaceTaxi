@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
@@ -672,7 +673,8 @@ namespace SpaceTaxi.UI
             var fleet = session.Fleet;
             if (!fleet.IsOwned(fleet.Current))
                 return; // аренда всегда сток
-            fleet.TryUpgrade(fleet.Current, line, session.Wallet);
+            if (fleet.TryUpgrade(fleet.Current, line, session.Wallet))
+                Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку улучшения
         }
 
         // блок «Долг» — свой метод-строитель
@@ -719,6 +721,7 @@ namespace SpaceTaxi.UI
             if (balance <= 0 || !session.Wallet.TrySpend(balance))
                 return;
             session.Debt.Repay(balance); // DebtChanged скроет блок, счётчик аварий обнулится сам
+            Sound.Play(SoundId.DebtTone); // П9.3: тон расчёта по долгу
             ShowToast("Долг погашен", emphasized: true);
         }
 
@@ -896,6 +899,7 @@ namespace SpaceTaxi.UI
             int price = config.Price;
             if (!session.Fleet.TryBuy(config, session.Wallet))
                 return;
+            Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
             ShowToast($"Куплен «{config.DisplayName}» (−{price} кр)", emphasized: true);
         }
 

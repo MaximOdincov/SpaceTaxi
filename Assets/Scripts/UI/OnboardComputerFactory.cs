@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.UI
 {
@@ -124,20 +125,32 @@ namespace SpaceTaxi.UI
             refs.EconCounters = Text(econRow, "0 доставок · 0 провалов", 20f, LabelColor, "EconCounters");
             refs.EconCounters.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
-            // --- ЭФИР (несжимаемый) ---
+            // --- ЭФИР: плеер музыки каталога (П9.3, несжимаемый) ---
             var player = Section(root.transform, "// ЭФИР", "PlayerSection");
             player.GetComponent<LayoutElement>().minHeight = 104f;
             player.GetComponent<LayoutElement>().preferredHeight = 104f;
             var playerRow = H("PlayerRow", player.transform);
             PlayerButton(playerRow.transform, "|<", "PlayerPrev");
-            var station = Text(playerRow, "MTO RADIO", 22f, BrightColor, "Station");
-            station.alignment = TextAlignmentOptions.Center;
-            station.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            PlayerButton(playerRow.transform, "▶", "PlayerPlay"); // глиф ведёт биндер: ▶/||
+            var track = Text(playerRow, "МУЗЫКА · —", 22f, BrightColor, "Track");
+            track.alignment = TextAlignmentOptions.Center;
+            track.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             PlayerButton(playerRow.transform, ">|", "PlayerNext");
             var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
             progress.transform.SetParent(player.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
             FixedHeight(progress, 4f);
+            // заливка прогресса: ширина = доля clip position/length (ведёт OnboardBinder)
+            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(progress.transform, false);
+            Image fillImage = fill.GetComponent<Image>();
+            fillImage.color = BrightColor;
+            fillImage.raycastTarget = false;
+            var fillRect = (RectTransform)fill.transform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = new Vector2(0f, 1f); // правый край двигает биндер
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
 
             return refs;
         }
@@ -250,6 +263,8 @@ namespace SpaceTaxi.UI
             Stretch(text.rectTransform);
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = true;
+            // хук первым — щелчок звучит до обработчиков, добавленных вызывателем
+            UiSfx.Hook(go.GetComponent<Button>());
             return go;
         }
 

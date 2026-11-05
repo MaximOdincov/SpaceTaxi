@@ -1,4 +1,5 @@
 using UnityEngine;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.World
@@ -49,8 +50,15 @@ namespace SpaceTaxi.World
                 return;
             }
 
+            // гул притяжения: 0.3 у края зоны эффекта → 1.0 у горизонта;
+            // StartLoop/StopLoop идемпотентны — вызов каждый кадр дешевле флагов
             if (d <= EffectRadius && ship.State == ShipState.Flying)
             {
+                Sound.StartLoop(SoundId.BlackHoleHum);
+                float span = Mathf.Max(EffectRadius - Horizon, 0.001f);
+                float depth = Mathf.Clamp01((EffectRadius - d) / span);
+                Sound.SetLoopIntensity(SoundId.BlackHoleHum, Mathf.Lerp(0.3f, 1f, depth));
+
                 shrink = Mathf.MoveTowards(shrink, 1f, Time.deltaTime / ShrinkDuration);
                 if (shrink >= 1f)
                 {
@@ -59,12 +67,16 @@ namespace SpaceTaxi.World
                 }
                 ship.transform.localScale = shipScale * (1f - shrink);
             }
-            else if (shrink > 0f)
+            else
             {
-                // мёртвый/приземлённый корабль тоже восстанавливается — без деформаций
-                shrink = Mathf.MoveTowards(shrink, 0f, Time.deltaTime / RestoreDuration);
-                // последняя итерация вернёт исходный масштаб и больше не пишет
-                ship.transform.localScale = shrink > 0f ? shipScale * (1f - shrink) : shipScale;
+                Sound.StopLoop(SoundId.BlackHoleHum);
+                if (shrink > 0f)
+                {
+                    // мёртвый/приземлённый корабль тоже восстанавливается — без деформаций
+                    shrink = Mathf.MoveTowards(shrink, 0f, Time.deltaTime / RestoreDuration);
+                    // последняя итерация вернёт исходный масштаб и больше не пишет
+                    ship.transform.localScale = shrink > 0f ? shipScale * (1f - shrink) : shipScale;
+                }
             }
         }
 
@@ -72,7 +84,21 @@ namespace SpaceTaxi.World
         {
             if (hull == null)
                 return;
+            // одноразово: Update зовёт Kill каждый кадр, пока труп в горизонте,
+            // повторный проход молчит по guard-у ApplyDamage (Hp <= 0)
+            if (ship.Hp > 0f)
+            {
+                Sound.StopLoop(SoundId.BlackHoleHum);
+                Sound.Play(SoundId.BlackHoleSwallow);
+            }
             hull.ApplyDamage(ship.Hp); // весь HP разом, как при касании звезды
+        }
+
+        // сцена может выгрузиться прямо в гуле — луп живёт в AudioManager, глушим
+        protected override void OnDisable()
+        {
+            base.OnDisable(); // разрегистрация в GravityField
+            Sound.StopLoop(SoundId.BlackHoleHum);
         }
 
         private bool LazyBindShip()

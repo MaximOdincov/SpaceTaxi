@@ -24,6 +24,7 @@ namespace SpaceTaxi.Audio
         private readonly List<AudioSource> oneShotPool = new List<AudioSource>();
         private readonly Dictionary<AudioGroup, float> groupVolumes = new Dictionary<AudioGroup, float>();
         private readonly Dictionary<AudioGroup, float> groupDuck = new Dictionary<AudioGroup, float>();
+        private readonly HashSet<SoundId> warnedSilent = new HashSet<SoundId>(); // уже предупредили о пустых клипах
         private AudioSource musicA, musicB; // чередуем для кроссфейда
         private SoundId currentMusic = SoundId.None;
         private int musicFlip;
@@ -127,6 +128,8 @@ namespace SpaceTaxi.Audio
         {
             if (!loops.TryGetValue(id, out LoopVoice voice))
                 return;
+            if (voice.FadingOut)
+                return; // затухание уже идёт: пер-кадровые повторы не роняют корутину
             if (voice.Fade != null) StopCoroutine(voice.Fade);
             voice.FadingOut = true;
             voice.Fade = StartCoroutine(FadeLoop(voice, 0f, removeWhenDone: true));
@@ -160,10 +163,13 @@ namespace SpaceTaxi.Audio
         {
             // dir: 1 — до рабочих параметров, 0 — до тишины
             float from = voice.Source.volume;
-            float targetFull = FullLoopVolume(voice);
-            float target = dir > 0f ? targetFull : 0f;
+            float target = dir > 0f ? FullLoopVolume(voice) : 0f;
             for (float t = 0f; t < LoopFadeTime; t += Time.unscaledDeltaTime)
             {
+                // цель пересчитывается каждый кадр: SetLoopIntensity мог
+                // сменить Intensity в том же кадре — иначе слышимый памп
+                if (dir > 0f)
+                    target = FullLoopVolume(voice);
                 voice.Source.volume = Mathf.Lerp(from, target, t / LoopFadeTime);
                 yield return null;
             }
@@ -209,22 +215,111 @@ namespace SpaceTaxi.Audio
             AudioSource fadeIn = musicFlip % 2 == 0 ? musicA : musicB;
             AudioSource fadeOut = musicFlip % 2 == 0 ? musicB : musicA;
             musicFlip++;
+            musicActive = fadeIn;
 
             fadeIn.clip = ChooseClip(entry, 1f);
             fadeIn.loop = true;
             fadeIn.pitch = entry.Pitch;
+            fadeIn.mute = musicPaused; // пауза плеера переживает смену трека
             fadeIn.Play();
 
             StopAllMusicFades();
             musicFades.Add(StartCoroutine(Crossfade(fadeIn, fadeOut, entry.Volume * GroupFactor(AudioGroup.Music))));
+            MusicStateChanged?.Invoke(); // подписчики узнают о смене трека (меню↔игра)
         }
 
         public void StopMusic()
         {
             currentMusic = SoundId.None;
+            musicActive = null;
             StopAllMusicFades();
             if (musicA.isPlaying) musicFades.Add(StartCoroutine(Crossfade(null, musicA, 0f)));
             if (musicB.isPlaying) musicFades.Add(StartCoroutine(Crossfade(null, musicB, 0f)));
+            MusicStateChanged?.Invoke();
+        }
+
+        // --- Плейлист музыки (П9.3) ---
+
+        private SoundId[] playlist;       // треки каталога для плеера борткомпа
+        private AudioSource musicActive;  // канал текущего трека (для прогресса)
+        private bool musicPaused;         // пауза = mute канала, НЕ Time.timeScale
+
+        // смена трека/паузы — имя и состояние для UI плеера
+        public event System.Action MusicStateChanged;
+
+        public SoundId CurrentTrack => currentMusic;
+
+        public bool MusicPaused => musicPaused;
+
+        // треки для плеера: группа Music, но эмбиент — подложка SceneMusic,
+        // не трек; записи без клипов в плейлист не попадают
+        public IReadOnlyList<SoundId> MusicPlaylist
+        {
+            get
+            {
+                if (playlist == null)
+                {
+                    var tracks = new List<SoundId>();
+                    if (catalog != null)
+                        foreach (SoundId id in catalog.IdsOfGroup(AudioGroup.Music))
+                        {
+                            SoundEntry entry = catalog.Get(id);
+                            if (id != SoundId.AmbientSpace && entry != null && entry.IsValid)
+                                tracks.Add(id);
+                        }
+                    playlist = tracks.ToArray();
+                }
+                return playlist;
+            }
+        }
+
+        // dir: +1 — следующий трек, −1 — предыдущий, по кругу; ничего не играет —
+        // первый запуск плеером продолжает то, что играет (MusicFlight в игре),
+        // при тишине плейлист стартует с начала
+        public void PlayPlaylistNext(int dir)
+        {
+            IReadOnlyList<SoundId> tracks = MusicPlaylist;
+            if (tracks.Count == 0)
+                return;
+            int index = -1;
+            for (int i = 0; i < tracks.Count; i++)
+                if (tracks[i] == currentMusic)
+                {
+                    index = i;
+                    break;
+                }
+            if (index < 0)
+                index = dir >= 0 ? -1 : tracks.Count; // вне плейлиста — с краю по направлению
+            index = (index + dir + tracks.Count) % tracks.Count;
+            PlayMusic(tracks[index]);
+            MusicStateChanged?.Invoke();
+        }
+
+        // ▶/⏸ плеера: mute музыкальных каналов — кроссфейд и timeScale не трогаем;
+        // при тишине запуск плейлиста вместо бессмысленного переключения mute
+        public void ToggleMusicPause()
+        {
+            if (currentMusic == SoundId.None)
+            {
+                PlayPlaylistNext(1);
+                return;
+            }
+            musicPaused = !musicPaused;
+            musicA.mute = musicPaused;
+            musicB.mute = musicPaused;
+            MusicStateChanged?.Invoke();
+        }
+
+        // доля проигранного трека для прогресс-бара (0..1)
+        public float MusicProgress
+        {
+            get
+            {
+                if (musicActive == null || musicActive.clip == null)
+                    return 0f;
+                float length = musicActive.clip.length;
+                return length > 0f ? Mathf.Clamp01(musicActive.time / length) : 0f;
+            }
         }
 
         private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
@@ -313,8 +408,14 @@ namespace SpaceTaxi.Audio
                 return null;
             SoundEntry entry = catalog.Get(id);
             if (entry == null || !entry.IsValid)
-                Debug.LogWarning($"[Audio] нет клипов для {id}");
-            return entry == null || !entry.IsValid ? null : entry;
+            {
+                // слоты без клипов (ждут файлы): лупы зовут каждый кадр —
+                // предупреждение один раз на id, не спамим
+                if (warnedSilent.Add(id))
+                    Debug.LogWarning($"[Audio] нет клипов для {id}");
+                return null;
+            }
+            return entry;
         }
 
         // выбор вариации: по силе или случайно

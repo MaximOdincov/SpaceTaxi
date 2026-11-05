@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
@@ -87,6 +88,23 @@ namespace SpaceTaxi.Core
             // CrashImpact напрямую; штраф выплаты считает счётчик OrderService —
             // два независимых потребителя одного события
             ship.GetComponent<LandingSystem>().CrashImpact += OnCrashImpact;
+
+            // звуковые хуки заказов/экономики (П9.3): системные события, не UI.
+            // «новый заказ» — реюз ComputerPing (отдельный OrderPing не заводили)
+            Orders.OfferAdded += () => Sound.Play(SoundId.ComputerPing);
+            Orders.PassengerBoarded += _ => Sound.Play(SoundId.BoardBip);
+            Orders.OrderDelivered += _ => Sound.Play(SoundId.DeliveryChime);
+            Orders.TaskSucceeded += _ => Sound.Play(SoundId.TaskSuccess);
+            Orders.TaskFailed += _ => Sound.Play(SoundId.TaskFail);
+
+            // тон долга — только на рост (авария); гашения тонов не дают
+            int prevDebt = Debt.Balance;
+            Debt.DebtChanged += value =>
+            {
+                if (value > prevDebt)
+                    Sound.Play(SoundId.DebtTone);
+                prevDebt = value;
+            };
         }
 
         private void OnOrderDelivered(OrderOffer offer)

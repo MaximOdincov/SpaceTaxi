@@ -84,6 +84,25 @@ namespace SpaceTaxi.Audio.Tools
                 Entry(SoundId.Explosion, AudioGroup.Sfx, 1.00f, clips: "sfx_explosion"),
                 Entry(SoundId.Respawn, AudioGroup.Sfx, 0.65f, clips: "sfx_respawn"),
 
+                // состояния и опасности (П9.2): клипы кладёт владелец —
+                // слоты в GameInfo/05_AUDIO.md §6, до файлов — тишина
+                Entry(SoundId.LowFuel, AudioGroup.Sfx, 0.60f, clips: "sfx_low_fuel"),
+                Entry(SoundId.LowHull, AudioGroup.Sfx, 0.55f, clips: "sfx_low_hull"),
+                Entry(SoundId.BlackHoleHum, AudioGroup.Sfx, 0.50f, loop: true, clips: "sfx_blackhole_hum"),
+                Entry(SoundId.BlackHoleSwallow, AudioGroup.Sfx, 0.90f, clips: "sfx_blackhole_swallow"),
+                Entry(SoundId.BeltRumble, AudioGroup.Sfx, 0.45f, loop: true, clips: "sfx_belt_rumble"),
+
+                // заказы и экономика (П9.3): клипы кладёт владелец — слоты в
+                // GameInfo/05_AUDIO.md §6, до файлов — тишина; «новый заказ»
+                // — ComputerPing (реюз, отдельный OrderPing не заводился)
+                Entry(SoundId.BoardBip,      AudioGroup.Sfx, 0.55f, clips: "sfx_board_bip"),
+                Entry(SoundId.DeliveryChime, AudioGroup.Sfx, 0.70f, clips: "sfx_delivery_chime"),
+                Entry(SoundId.TaskSuccess,   AudioGroup.Sfx, 0.60f, clips: "sfx_task_success"),
+                Entry(SoundId.TaskFail,      AudioGroup.Sfx, 0.55f, clips: "sfx_task_fail"),
+                Entry(SoundId.PurchaseCash,  AudioGroup.Sfx, 0.65f, clips: "sfx_purchase"),
+                Entry(SoundId.DebtTone,      AudioGroup.Sfx, 0.60f, clips: "sfx_debt"),
+                Entry(SoundId.DismissalTone, AudioGroup.Sfx, 0.70f, clips: "sfx_dismissal"),
+
                 // интерфейс
                 Entry(SoundId.UiClick, AudioGroup.Ui,     0.50f, jitter: 0f, clips: "ui_click"),
                 Entry(SoundId.ComputerPing, AudioGroup.Ui,     0.55f, jitter: 0f, clips: "ui_computer_ping"),
@@ -166,9 +185,8 @@ namespace SpaceTaxi.Audio.Tools
                 shipAudio = ship.gameObject.AddComponent<ShipAudio>();
             if (ship.GetComponent<HeatAudio>() == null)
                 ship.gameObject.AddComponent<HeatAudio>();
-            var so = new SerializedObject(shipAudio);
-            so.FindProperty("input").objectReferenceValue = input;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // поле input у ShipAudio удалено (ввод берётся из ShipController) —
+            // сериализовать нечего, SerializedObject падал бы NRE
         }
 
         // --- Хелперы сборки каталога ---

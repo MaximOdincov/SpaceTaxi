@@ -3,6 +3,7 @@ using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
@@ -49,6 +50,13 @@ namespace SpaceTaxi.UI
         private bool bound;
         private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
 
+        // плеер «// ЭФИР» (П9.3)
+        private Button playerPrev, playerPlay, playerNext;
+        private TMP_Text trackTitle;
+        private RectTransform progressFill;
+        private AudioManager audioManager;
+        private bool musicBound;
+
         private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
         private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
 
@@ -61,17 +69,26 @@ namespace SpaceTaxi.UI
         private void Awake()
         {
             ApplyPanelFont();
-            if (transform.Find("Stack") == null)
+            bool fromPrefab = transform.Find("Stack") != null;
+            if (fromPrefab)
+            {
+                BindExisting();
+            }
+            else
             {
                 // фолбэк для старой сцены: строим каркас кодом
                 BindRefs(OnboardComputerFactory.Build(transform));
             }
-            else
-            {
-                BindExisting();
-            }
             EnsureDebtRow();
             WidenMoneyValue();
+            SetupMusicPlayer(fromPrefab);
+        }
+
+        private void OnDestroy()
+        {
+            // AudioManager переживает сцену — иначе событие пришло бы в разрушенный биндер
+            if (musicBound && audioManager != null)
+                audioManager.MusicStateChanged -= RefreshMusicPlayer;
         }
 
         // шрифт панели: panelFont или шрифт часов
@@ -104,6 +121,8 @@ namespace SpaceTaxi.UI
             ratingValue = FindT("Stack/Header/StatsRow/RatingValue/Value");
             var abandon = transform.Find("Stack/StateSection/AbandonButton");
             abandonButton = abandon != null ? abandon.GetComponent<Button>() : null;
+            // префабная кнопка: хук здесь, потому что фабрика её не строила
+            UiSfx.Hook(abandonButton);
             var area = transform.Find("Stack/OrderSection/OrderArea");
             orderArea = (RectTransform)area;
             if (clock != null)
@@ -350,10 +369,18 @@ namespace SpaceTaxi.UI
             OrderOffer captured = offer;
             var accept = card.transform.Find("Buttons/Accept");
             if (accept != null)
-                accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            {
+                Button acceptButton = accept.GetComponent<Button>();
+                UiSfx.Hook(acceptButton); // префабная кнопка — фабрика не хукала
+                acceptButton.onClick.AddListener(() => orders.Accept(captured));
+            }
             var decline = card.transform.Find("Buttons/Decline");
             if (decline != null)
-                decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
+            {
+                Button declineButton = decline.GetComponent<Button>();
+                UiSfx.Hook(declineButton);
+                declineButton.onClick.AddListener(() => orders.Decline(captured));
+            }
 
             return card;
         }
@@ -362,6 +389,16 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
+            // AudioManager живёт между сценами: биндим лениво, отписка в OnDestroy
+            if (audioManager == null)
+                audioManager = AudioManager.Instance;
+            if (audioManager != null && !musicBound)
+            {
+                audioManager.MusicStateChanged += RefreshMusicPlayer;
+                musicBound = true;
+                RefreshMusicPlayer(); // музыка могла стартовать до бинда (SceneMusic)
+            }
+
             if (!bound)
             {
                 var session = FindAnyObjectByType<GameSession>();
@@ -418,6 +455,9 @@ namespace SpaceTaxi.UI
             econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов";
             if (debt != null)
                 RefreshDebt(debt.Balance); // страховка от пропущенного события
+            // прогресс трека плеера (П9.3): доля clip position/length, опрос в SlowUpdate
+            if (progressFill != null && audioManager != null)
+                progressFill.anchorMax = new Vector2(audioManager.MusicProgress, 1f);
             abandonButton.gameObject.SetActive(ship.Fuel <= 0f);
             if (cancelButton != null && orders.Active != null)
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
@@ -512,6 +552,132 @@ namespace SpaceTaxi.UI
             debtValue.text = value > 0
                 ? $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.DangerColor)}>Долг: {value} кр</color>"
                 : "";
+        }
+
+        // --- Плеер «// ЭФИР» (П9.3) ---
+
+        // каркас фабрики содержит все узлы; в старом префабе ряд был мокапом
+        // [|<][MTO RADIO][>|] без play-кнопки и заливки — недостающее достраиваем
+        // (стиль EnsureDebtRow). fromPrefab: runtime-хуки фабрики в префаб не
+        // сериализуются — вешаем UiClick сами; у построенных фабрикой в рантайме
+        // хук уже есть (двойной дал бы двойной щелчок)
+        private void SetupMusicPlayer(bool fromPrefab)
+        {
+            Transform row = transform.Find("Stack/PlayerSection/PlayerRow");
+            if (row == null)
+                return;
+            playerPrev = EnsurePlayerButton(row, "PlayerPrev", fromPrefab);
+            playerNext = EnsurePlayerButton(row, "PlayerNext", fromPrefab);
+
+            Transform play = row.Find("PlayerPlay");
+            if (play == null)
+            {
+                // старый префаб: play-кнопки нет — строим фабрикой (хук внутри)
+                // и вставляем между |< и названием трека
+                play = OnboardComputerFactory.Button(row, "▶",
+                    new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                        OnboardComputerFactory.LabelColor.b, 0.22f),
+                    OnboardComputerFactory.BrightColor, 15f, "PlayerPlay").transform;
+                play.SetSiblingIndex(1);
+                OnboardComputerFactory.FixedSize(play.gameObject, 26f, 26f);
+            }
+            else if (fromPrefab)
+            {
+                UiSfx.Hook(play.GetComponent<Button>()); // сериализованная кнопка без runtime-хуков
+            }
+            playerPlay = play.GetComponent<Button>();
+
+            Transform track = row.Find("Track");
+            if (track == null)
+                track = row.Find("Station"); // имя узла мокапа в старом префабе
+            if (track == null)
+            {
+                TMP_Text created = OnboardComputerFactory.Text(row.gameObject, "", 22f, BrightColor, "Track");
+                created.alignment = TextAlignmentOptions.Center;
+                created.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                track = created.transform;
+            }
+            trackTitle = track.GetComponent<TMP_Text>();
+
+            Transform progress = transform.Find("Stack/PlayerSection/Progress");
+            if (progress == null)
+            {
+                var progressGo = new GameObject("Progress", typeof(RectTransform), typeof(Image));
+                progressGo.transform.SetParent(transform.Find("Stack/PlayerSection"), false);
+                progressGo.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
+                OnboardComputerFactory.FixedHeight(progressGo, 4f);
+                progress = progressGo.transform;
+            }
+            Transform fill = progress.Find("Fill");
+            if (fill == null)
+            {
+                var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+                fillGo.transform.SetParent(progress, false);
+                Image fillImage = fillGo.GetComponent<Image>();
+                fillImage.color = BrightColor;
+                fillImage.raycastTarget = false;
+                var rect = (RectTransform)fillGo.transform;
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = new Vector2(0f, 1f); // правый край двигает SlowUpdate
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+            }
+            progressFill = (RectTransform)fill;
+
+            // AudioManager.Instance — синглтон между сценами, разрешается на клике
+            if (playerPrev != null)
+                playerPrev.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(-1));
+            if (playerPlay != null)
+                playerPlay.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicPause());
+            if (playerNext != null)
+                playerNext.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(1));
+        }
+
+        private Button EnsurePlayerButton(Transform row, string name, bool fromPrefab)
+        {
+            Transform node = row.Find(name);
+            if (node == null)
+                return null;
+            Button button = node.GetComponent<Button>();
+            if (fromPrefab)
+                UiSfx.Hook(button);
+            return button;
+        }
+
+        // имя трека и глиф ▶/⏸ по состоянию менеджера; событие MusicStateChanged
+        private void RefreshMusicPlayer()
+        {
+            if (trackTitle == null)
+                return; // биндер разрушен, менеджер живёт между сценами
+            if (audioManager == null || audioManager.MusicPlaylist.Count == 0)
+            {
+                trackTitle.text = "МУЗЫКА · треки не найдены";
+            }
+            else
+            {
+                SoundId track = audioManager.CurrentTrack;
+                trackTitle.text = track == SoundId.None
+                    ? "МУЗЫКА · —"
+                    : "МУЗЫКА · " + TrackTitle(track);
+            }
+            if (playerPlay != null)
+            {
+                TMP_Text glyph = playerPlay.GetComponentInChildren<TMP_Text>();
+                if (glyph != null)
+                    glyph.text = audioManager != null && audioManager.MusicPaused ? "||" : "▶";
+            }
+        }
+
+        // у SoundEntry DisplayName нет — карта известных треков,
+        // незнакомые — имя enum
+        private static string TrackTitle(SoundId id)
+        {
+            switch (id)
+            {
+                case SoundId.MusicFlight: return "Полёт";
+                case SoundId.MusicMenu: return "Меню";
+                default: return id.ToString();
+            }
         }
 
         // поле денег из фабрики/префаба узкое — суммы не влезают
