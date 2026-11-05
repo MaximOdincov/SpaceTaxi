@@ -67,6 +67,8 @@ namespace SpaceTaxi.UI
         private Image[] hullSegments;
         private Button fuelButton;
         private Button hullButton;
+        private TMP_Text fuelButtonLabel;
+        private TMP_Text hullButtonLabel;
 
         // окна-вкладки: видимость переключает SelectTab, состав — ApplyTabs
         private GameObject fuelWindow;
