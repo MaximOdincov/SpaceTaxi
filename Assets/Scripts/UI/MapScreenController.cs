@@ -12,6 +12,7 @@ namespace SpaceTaxi.UI
         private bool opened;
         private StationScreenController stationController; // станция поверх карты — её клавиши
         private OrderCompleteScreenController orderComplete; // модал завершения заказа
+        private MapScreenBinder binder; // зум/записка карты едят Esc раньше закрытия карты
 
         public bool IsOpened => opened;
 
@@ -36,6 +37,10 @@ namespace SpaceTaxi.UI
                 SetOpened(!opened);
             else if (opened && kb.escapeKey.wasPressedThisFrame)
             {
+                if (binder == null && mapScreen != null)
+                    binder = mapScreen.GetComponentInChildren<MapScreenBinder>(true);
+                if (binder != null && binder.TryHandleEscape())
+                    return; // Esc вернул зум/закрыл записку — карта остаётся открытой
                 SetOpened(false);
                 EscJustClosed = true;
             }
