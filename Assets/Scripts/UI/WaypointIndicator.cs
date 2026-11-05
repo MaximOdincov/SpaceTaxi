@@ -48,6 +48,11 @@ namespace SpaceTaxi.UI
 
         // краевые стрелки
         private Canvas arrowCanvas;
+        // кэш текста дистанции стрелок: строки в LateUpdate аллоцировать нельзя
+        private float lastDistWValue = -1f;
+        private string lastDistWText;
+        private float lastDistTValue = -1f;
+        private string lastDistTText;
         private RectTransform waypointArrow;
         private RectTransform targetArrow;
         private RectTransform waypointArrowTip;
@@ -248,16 +253,27 @@ namespace SpaceTaxi.UI
 
         private void UpdateArrows()
         {
-            EnsureArrowUi();
             Camera cam = Camera.main;
-            arrowCanvas.enabled = cam != null && !IsAnyPanelOpen();
+            bool canvasOn = cam != null && !IsAnyPanelOpen();
+            if (!canvasOn)
+            {
+                if (arrowCanvas != null && arrowCanvas.enabled)
+                    arrowCanvas.enabled = false; // панель погасила — не считаем вхолостую
+                return;
+            }
+            EnsureArrowUi();
+            arrowCanvas.enabled = true;
 
             (Vector2? pos, float radius) wp = WaypointRef();
             (Vector2? pos, float radius) tp = TargetRef();
             bool showWaypoint = ComputeEdge(wp.pos, wp.radius, cam, out Vector2 posW, out float angleW);
-            string distW = showWaypoint ? FormatDistance(Vector2.Distance(ShipPos(), wp.pos.Value)) : null;
+            string distW = showWaypoint
+                ? CachedDistance(ref lastDistWValue, ref lastDistWText, Vector2.Distance(ShipPos(), wp.pos.Value))
+                : null;
             bool showTarget = ComputeEdge(tp.pos, tp.radius, cam, out Vector2 posT, out float angleT);
-            string distT = showTarget ? FormatDistance(Vector2.Distance(ShipPos(), tp.pos.Value)) : null;
+            string distT = showTarget
+                ? CachedDistance(ref lastDistTValue, ref lastDistTText, Vector2.Distance(ShipPos(), tp.pos.Value))
+                : null;
 
             // одно направление — расталкиваем по краю, чтобы не слипались
             if (showWaypoint && showTarget)
@@ -305,6 +321,16 @@ namespace SpaceTaxi.UI
                 return false;
 
             Vector2 delta = worldPoint.Value - (Vector2)cam.transform.position;
+            // тряска крутит камеру до ~±2.5° (CameraFollow) — канвас при этом
+            // не вращается, поэтому дельту приводим к системе экрана заранее
+            float roll = cam.transform.eulerAngles.z;
+            if (roll > 0.01f || roll < -0.01f)
+            {
+                float rad = -roll * Mathf.Deg2Rad;
+                float cos = Mathf.Cos(rad);
+                float sin = Mathf.Sin(rad);
+                delta = new Vector2(delta.x * cos - delta.y * sin, delta.x * sin + delta.y * cos);
+            }
             float halfH = cam.orthographicSize;
             float halfW = halfH * cam.aspect;
             // тело краем уже в кадре — стрелка не нужна
@@ -425,6 +451,17 @@ namespace SpaceTaxi.UI
             if (d < 1000f)
                 return ((int)d).ToString();
             return (d / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
+        }
+
+        // пересчёт текста только при изменении дистанции на ≥10 — без аллокаций в кадр
+        private static string CachedDistance(ref float lastValue, ref string lastText, float d)
+        {
+            if (lastText == null || Mathf.Abs(d - lastValue) >= 10f)
+            {
+                lastValue = d;
+                lastText = FormatDistance(d);
+            }
+            return lastText;
         }
     }
 }

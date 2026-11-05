@@ -60,12 +60,6 @@ namespace SpaceTaxi.UI
             public RectTransform Ring;
         }
 
-        private struct CometDot
-        {
-            public Comet Comet;
-            public RectTransform Dot;
-        }
-
         private GameSession session;
         private LevelAsset level;
         private OrderService orders;
@@ -100,7 +94,8 @@ namespace SpaceTaxi.UI
 
         private readonly List<BodyMark> marks = new List<BodyMark>();
         private readonly List<BeltMark> belts = new List<BeltMark>();
-        private readonly List<CometDot> cometDots = new List<CometDot>();
+        // словарь, а не List+Exists: поиск точки кометы — O(1) без аллокаций в кадр
+        private readonly Dictionary<Comet, RectTransform> cometDots = new Dictionary<Comet, RectTransform>();
 
         // — процедурные спрайты прибора (UI рисует по sizeDelta, PPU не важен) —
         private static Sprite thickRingSprite;   // кольцо потолще: цель, станции, дыра
@@ -478,25 +473,29 @@ namespace SpaceTaxi.UI
                 return;
 
             // живые кометы — голубые точки по ActiveComets; мёртвые записи чистим
-            for (int i = cometDots.Count - 1; i >= 0; i--)
+            List<Comet> dead = null;
+            foreach (KeyValuePair<Comet, RectTransform> kv in cometDots)
             {
-                if (cometDots[i].Comet == null)
+                if (kv.Key == null)
                 {
-                    if (cometDots[i].Dot != null)
-                        Destroy(cometDots[i].Dot.gameObject);
-                    cometDots.RemoveAt(i);
+                    (dead ??= new List<Comet>()).Add(kv.Key);
+                    if (kv.Value != null)
+                        Destroy(kv.Value.gameObject);
                 }
                 else
                 {
-                    cometDots[i].Dot.anchoredPosition = WorldToRadar(cometDots[i].Comet.transform.position);
+                    kv.Value.anchoredPosition = WorldToRadar(kv.Key.transform.position);
                 }
             }
+            if (dead != null)
+                foreach (Comet comet in dead)
+                    cometDots.Remove(comet);
             foreach (Comet comet in cometSystem.ActiveComets)
             {
-                if (comet == null || cometDots.Exists(d => d.Comet == comet))
+                if (comet == null || cometDots.ContainsKey(comet))
                     continue;
                 RectTransform dot = MakeImg("CometDot", bodiesRoot, StubSprites.Circle(64f), Comet.CometColor, Vector2.one * 5f);
-                cometDots.Add(new CometDot { Comet = comet, Dot = dot });
+                cometDots.Add(comet, dot);
             }
 
             // предупреждение: остриё по направлению входа, кламп к краю радара;
