@@ -81,6 +81,10 @@ namespace SpaceTaxi.UI
         // ремонт (Н-5): три карточки пакетов вместо одной кнопки
         private TMP_Text repairTierLine; // «Мастерская: тир N — за визит не более X% починки»
         private RepairPackRefs[] repairPacks;
+        // бюджет «за визит не более X%»: кап × недостающее на момент посадки;
+        // покупки минусуют его, иначе повторные мелкие пакеты собирают 100%
+        private Planet repairBudgetPlanet;
+        private float repairBudgetRemaining;
 
         // окна-вкладки: видимость переключает SelectTab, состав — ApplyTabs
         private GameObject fuelWindow;
@@ -505,6 +509,15 @@ namespace SpaceTaxi.UI
             return refs;
         }
 
+        // бюджет визита считается от недостающего HP на момент посадки и
+        // уменьшается покупками — «за визит не более X%» выполняется ровно
+        private void InitRepairBudget()
+        {
+            repairBudgetPlanet = currentPlanet;
+            float cap = Pricing.GetRepairTierCap(RepairTier);
+            repairBudgetRemaining = cap * RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
+        }
+
         // потолок станции и карточки — при каждом Refresh: ремонт, урон, деньги
         private void UpdateRepairWindow()
         {
@@ -532,12 +545,20 @@ namespace SpaceTaxi.UI
                 }
 
                 bool tierOk = i <= maxPack;
-                // пакет вне тира не предлагается — на карточке его номинал,
-                // чтобы было видно, что именно станция отказывается делать
-                float fraction = tierOk
-                    ? RepairNetwork.EffectiveFraction(i, tier, Pricing)
-                    : Pricing.GetRepairPackFraction(i);
-                float amount = missing * fraction;
+                float amount;
+                if (tierOk)
+                {
+                    // пакет от текущего недостающего, зажатый остатком бюджета визита
+                    amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp, i, tier,
+                        Pricing, repairBudgetRemaining);
+                }
+                else
+                {
+                    // пакет вне тира не предлагается — на карточке его номинал,
+                    // чтобы было видно, что именно станция отказывается делать
+                    amount = missing * Pricing.GetRepairPackFraction(i);
+                }
+                float fraction = amount / missing;
                 int cost = RepairNetwork.CostOf(amount, i, Pricing);
 
                 card.Info.text = $"+{Mathf.RoundToInt(fraction * 100f)}% · +{Mathf.RoundToInt(amount)} HP";
@@ -549,6 +570,13 @@ namespace SpaceTaxi.UI
                     card.BuyLabel.text = "НЕ ВОЗЬМЁМСЯ";
                     card.Note.text = "не тот уровень станции";
                     card.Note.color = OnboardComputerFactory.DangerColor;
+                }
+                else if (amount <= 0.01f)
+                {
+                    card.Buy.interactable = false;
+                    card.BuyLabel.text = "ЛИМИТ ВИЗИТА";
+                    card.Note.text = "потолок станции исчерпан";
+                    card.Note.color = OnboardComputerFactory.LabelColor;
                 }
                 else if (credits < cost)
                 {
@@ -576,11 +604,13 @@ namespace SpaceTaxi.UI
             float missing = RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
             if (missing <= 0f)
                 return;
-            float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp, packIndex, RepairTier, Pricing);
+            float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp, packIndex, RepairTier,
+                Pricing, repairBudgetRemaining);
             int cost = RepairNetwork.CostOf(amount, packIndex, Pricing);
-            if (cost <= 0 || !session.Wallet.TrySpend(cost))
+            if (amount <= 0.01f || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
             hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — карточки пересчитаются
+            repairBudgetRemaining = Mathf.Max(0f, repairBudgetRemaining - amount);
             int pct = Mathf.RoundToInt(amount / missing * 100f);
             hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {cost} кр";
             ShowToast($"Отремонтировано на {pct}%");
@@ -604,6 +634,12 @@ namespace SpaceTaxi.UI
             {
                 currentPlanet = ship.LandedOn;
                 ApplyTabs();
+                InitRepairBudget();
+            }
+            else if (repairBudgetPlanet != currentPlanet)
+            {
+                // экран пересоздан в рамках того же визита — бюджет тот же
+                InitRepairBudget();
             }
 
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();

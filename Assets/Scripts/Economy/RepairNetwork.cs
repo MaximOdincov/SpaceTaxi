@@ -31,10 +31,14 @@ namespace SpaceTaxi.Economy
             return Mathf.Min(Mathf.Max(0f, pack), Mathf.Max(0f, cap));
         }
 
-        // сколько HP восстановит пакет с учётом потолка сети
-        public static float RepairAmount(float hpMax, float hp, int packIndex, int tier, PricingConfig pricing)
+        // сколько HP восстановит пакет: пакет от ТЕКУЩЕГО недостающего, зажатый
+        // остатком бюджета визита (кап × недостающее на момент посадки) — иначе
+        // повторные мелкие пакеты от нового недостающего собирают 100% на любом тире
+        public static float RepairAmount(float hpMax, float hp, int packIndex, int tier,
+            PricingConfig pricing, float visitBudget)
         {
-            return MissingHp(hpMax, hp) * EffectiveFraction(packIndex, tier, pricing);
+            float pack = MissingHp(hpMax, hp) * EffectiveFraction(packIndex, tier, pricing);
+            return Mathf.Min(pack, Mathf.Max(0f, visitBudget));
         }
 
         // ceil(HP × множитель пакета): базовая цена 1 кр/HP, недостающая доля ед. тоже платная
