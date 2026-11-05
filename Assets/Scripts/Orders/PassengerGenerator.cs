@@ -27,22 +27,18 @@ namespace SpaceTaxi.Orders
 
             var profile = ScriptableObject.CreateInstance<PassengerProfile>();
             profile.RuntimeInstance = true; // оффер протухнет — профиль отдаст OrderService
-            profile.Description = string.Empty;
             profile.PortraitTint = PortraitTints[UnityEngine.Random.Range(0, PortraitTints.Length)];
 
             string fullName = BuildName(pools);
             if (!string.IsNullOrEmpty(fullName))
                 profile.DisplayName = fullName;
 
-            var archetype = PickArchetype(pools);
-            if (archetype == null)
-                return profile; // останется дефолт «Турист» без реплик — UI терпит пустые массивы
-
-            profile.Archetype = archetype.Archetype;
-            profile.Greetings = Copy(archetype.Greetings);
-            profile.Wishes = Copy(archetype.Wishes);
-            profile.Thanks = Copy(archetype.Thanks);
-            profile.Complaints = Copy(archetype.Complaints);
+            // общие пулы фраз (Н-14): полные копии массивов — реплика выбирается
+            // случайно при показе (PickPhrase), офферы не делят состояние
+            profile.Greetings = Copy(pools.Greetings);
+            profile.Wishes = Copy(pools.Wishes);
+            profile.Thanks = Copy(pools.Thanks);
+            profile.Complaints = Copy(pools.Complaints);
             return profile;
         }
 
@@ -56,22 +52,6 @@ namespace SpaceTaxi.Orders
             if (string.IsNullOrEmpty(surname))
                 return name;
             return name + " " + surname;
-        }
-
-        private static PassengerPools.ArchetypePool PickArchetype(PassengerPools pools)
-        {
-            var list = pools.Archetypes;
-            if (list == null || list.Count == 0)
-                return null;
-            int start = UnityEngine.Random.Range(0, list.Count);
-            // пропуск пустых слотов, если ассет заполнен криво
-            for (int i = 0; i < list.Count; i++)
-            {
-                var pool = list[(start + i) % list.Count];
-                if (pool != null)
-                    return pool;
-            }
-            return null;
         }
 
         // полные копии массивов: реплика выбирается случайно при показе (PickPhrase)

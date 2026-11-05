@@ -168,11 +168,11 @@ namespace SpaceTaxi.UI
                 photoImage.color = offer.Passenger.PortraitTint;
             }
 
-            SetText(row, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
+            SetText(row, "Info/Name", offer.Passenger.DisplayName);
             SetText(row, "Info/Route",
                 orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
                 + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
-            // П5.3: вместо пожелания — текст задания, если архетип его дал;
+            // П5.3: вместо пожелания — текст задания, если оно выпало;
             // таймер дедлайна дописывается в SlowUpdate
             PassengerTask task = offer.Task;
             string wish = task != null && task.Kind != PassengerTaskKind.None
@@ -293,7 +293,7 @@ namespace SpaceTaxi.UI
                 avatarImage.color = offer.Passenger.PortraitTint;
             }
 
-            SetText(card, "Info/NameRow/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
+            SetText(card, "Info/NameRow/Name", offer.Passenger.DisplayName);
             var priceNode = card.transform.Find("Info/NameRow/Price");
             if (priceNode != null)
                 priceNode.GetComponent<TMP_Text>().text = offer.Price + " кр";
@@ -411,7 +411,7 @@ namespace SpaceTaxi.UI
                         : $"Осталось {remaining:0} с";
                     wishText.text = "«" + task.Text + "» · " + remain;
                 }
-                // прогресс ожидания Чудика (П8.1): посидели X/10 с
+                // прогресс ожидания на планете (П8.1): посидели X/10 с
                 else if (task != null && task.Kind == PassengerTaskKind.WaitOnPlanet)
                 {
                     wishText.text = "«" + task.Text + "» · Посидели "

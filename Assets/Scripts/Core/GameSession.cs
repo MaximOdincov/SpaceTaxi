@@ -123,26 +123,16 @@ namespace SpaceTaxi.Core
             // сначала дельта рейтинга — экран завершения показывает её же
             Rating.AddDelivery();
             // выплата: тосты уходят синхронно внутри Paid, экран открываем после них.
-            // Чаевые (П8.2, §3.5): только за выполненное задание пассажира, доля —
-            // щедрость архетипа из пулов; перк «Меридианы» домножается в выплате
+            // Чаевые (Н-14): случайная доля 10–25%, брошенная при спавне карточки;
+            // перк «Меридианы» домножается в выплате
             Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental,
-                Orders.CollisionsOfActive, TipsFractionOf(offer), IsMeridian);
+                Orders.CollisionsOfActive, offer.TipsFraction, IsMeridian);
             // автосейв §3.9 (П10.1): сразу после выплаты — счётчики/рейтинг/долг
             // уже консистентны, экран завершения данных не меняет
             SaveSystem.Save(this);
             if (orderComplete == null)
                 orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
             orderComplete?.Show(offer);
-        }
-
-        // доля чаевых выполненного задания (П8.2, §3.5–3.6): Succeeded ставится
-        // в OrderService.SettleTask до этого события; задания нет или провалено — 0
-        private float TipsFractionOf(OrderOffer offer)
-        {
-            if (offer?.Task == null || !offer.Task.Succeeded || offer.Passenger == null)
-                return 0f;
-            var pools = passengerCatalog != null ? passengerCatalog.Pools : null;
-            return pools != null ? pools.TipsPctOf(offer.Passenger.Archetype) : 0f;
         }
 
         // перк «комфорт-салон» (16 §3.3) — только у «Меридиана»

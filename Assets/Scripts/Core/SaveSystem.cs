@@ -69,8 +69,8 @@ namespace SpaceTaxi.Core
             public int Price;
             public int State; // OrderState: 1 = ждём пассажира, 2 = на борту
             public string PassengerName;
-            public string PassengerArchetype;
             public Color PortraitTint;
+            public float TipsFraction; // доля чаевых заказа (Н-14), фиксируется при спавне
             public string TaskKind; // имя PassengerTaskKind; пусто — задания нет
             public string TaskText;
             public float TaskDeadlineRemaining; // остаток дедлайна (Kind == Deadline)
@@ -181,9 +181,9 @@ namespace SpaceTaxi.Core
             if (offer.Passenger != null)
             {
                 save.PassengerName = offer.Passenger.DisplayName;
-                save.PassengerArchetype = offer.Passenger.Archetype;
                 save.PortraitTint = offer.Passenger.PortraitTint;
             }
+            save.TipsFraction = offer.TipsFraction;
             if (offer.Task != null)
             {
                 save.TaskKind = offer.Task.Kind.ToString();
@@ -432,9 +432,9 @@ namespace SpaceTaxi.Core
             return null;
         }
 
-        // активный заказ: пассажир пересобирается по архетипу из пулов (имя и
-        // тон портрета — из сейва, реплики не храним), задание — из сохранённых
-        // параметров; дедлайн продолжает тикать с сохранённого остатка
+        // активный заказ: пассажир пересобирается по пулам (имя и тон портрета —
+        // из сейва, реплики не храним), задание — из сохранённых параметров;
+        // дедлайн продолжает тикать с сохранённого остатка
         private static void RestoreActiveOrder(GameSession session, OrderSave save)
         {
             if (save == null || session.Orders == null || session.Level == null)
@@ -449,6 +449,7 @@ namespace SpaceTaxi.Core
                 PickupIndex = save.PickupIndex,
                 DropoffIndex = save.DropoffIndex,
                 Price = Mathf.Max(0, save.Price),
+                TipsFraction = save.TipsFraction,
                 State = save.State == (int)OrderState.Aboard ? OrderState.Aboard : OrderState.Active,
                 ExpiresAt = float.MaxValue, // активный карточкой не протухает
                 Task = RebuildTask(save),
@@ -481,7 +482,7 @@ namespace SpaceTaxi.Core
         }
 
         // runtime-профиль, как у генератора (Destroy при протухании безопасен);
-        // архетипа нет в пулах — реплики пустые, UI это терпит
+        // реплики — общие пулы (Н-14), пулов нет — пустые, UI это терпит
         private static PassengerProfile RebuildPassenger(GameSession session, OrderSave save)
         {
             var profile = ScriptableObject.CreateInstance<PassengerProfile>();
@@ -489,20 +490,16 @@ namespace SpaceTaxi.Core
             profile.DisplayName = string.IsNullOrEmpty(save.PassengerName)
                 ? "Гость системы"
                 : save.PassengerName;
-            profile.Archetype = string.IsNullOrEmpty(save.PassengerArchetype)
-                ? "Турист"
-                : save.PassengerArchetype;
             profile.PortraitTint = save.PortraitTint;
 
             PassengerPools pools = session.Passengers != null ? session.Passengers.Pools : null;
-            PassengerPools.ArchetypePool pool = pools != null ? pools.Get(profile.Archetype) : null;
-            if (pool != null)
+            if (pools != null)
             {
                 // полные копии массивов — реплика выбирается случайно при показе
-                profile.Greetings = pool.Greetings != null ? (string[])pool.Greetings.Clone() : null;
-                profile.Wishes = pool.Wishes != null ? (string[])pool.Wishes.Clone() : null;
-                profile.Thanks = pool.Thanks != null ? (string[])pool.Thanks.Clone() : null;
-                profile.Complaints = pool.Complaints != null ? (string[])pool.Complaints.Clone() : null;
+                profile.Greetings = pools.Greetings != null ? (string[])pools.Greetings.Clone() : null;
+                profile.Wishes = pools.Wishes != null ? (string[])pools.Wishes.Clone() : null;
+                profile.Thanks = pools.Thanks != null ? (string[])pools.Thanks.Clone() : null;
+                profile.Complaints = pools.Complaints != null ? (string[])pools.Complaints.Clone() : null;
             }
             return profile;
         }

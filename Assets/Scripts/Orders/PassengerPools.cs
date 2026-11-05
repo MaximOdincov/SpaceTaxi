@@ -1,70 +1,34 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace SpaceTaxi.Orders
 {
-    // Пулы данных генератора пассажиров (П5.2): имена, фамилии, реплики по архетипам
+    // Пулы данных генератора пассажиров (П5.2): имена, фамилии, общие реплики —
+    // без деления по типажам (Н-14): задания и чаевые от пассажира не зависят
     [CreateAssetMenu(fileName = "PassengerPools", menuName = "Space Taxi/Passenger Pools")]
     public sealed class PassengerPools : ScriptableObject
     {
-        [Serializable]
-        public sealed class ArchetypePool
-        {
-            [Tooltip("Архетип: Торопыга, Барыга, Турист, Тихоня, Чудик")]
-            public string Archetype;
-
-            [Tooltip("Щедрость: доля чаевых от цены при выполненном задании (§3.6)")]
-            public float TipsPct;
-
-            [Header("Фразы (покажется случайная из списка)")]
-            [TextArea(2, 4)]
-            [Tooltip("Пассажир сел на борт")]
-            public string[] Greetings;
-
-            [TextArea(2, 4)]
-            [Tooltip("«Пожелание» — текст задания, видно в карточке заказа до принятия")]
-            public string[] Wishes;
-
-            [TextArea(2, 4)]
-            [Tooltip("Доставлен на место")]
-            public string[] Thanks;
-
-            [TextArea(2, 4)]
-            [Tooltip("Заказ провален")]
-            public string[] Complaints;
-        }
-
         [Tooltip("Имена пассажиров")]
         public string[] Names;
 
         [Tooltip("Фамилии пассажиров")]
         public string[] Surnames;
 
-        [Tooltip("Ровно 5 архетипов, порядок как в бета-плане §3.6")]
-        public List<ArchetypePool> Archetypes = new List<ArchetypePool>();
+        [Header("Фразы (покажется случайная из списка)")]
+        [TextArea(2, 4)]
+        [Tooltip("Пассажир сел на борт")]
+        public string[] Greetings;
 
-        // Пул архетипа по имени; null, если такого нет
-        public ArchetypePool Get(string archetype)
-        {
-            if (string.IsNullOrEmpty(archetype) || Archetypes == null)
-                return null;
-            for (int i = 0; i < Archetypes.Count; i++)
-            {
-                var pool = Archetypes[i];
-                if (pool != null && pool.Archetype == archetype)
-                    return pool;
-            }
-            return null;
-        }
+        [TextArea(2, 4)]
+        [Tooltip("«Пожелание» — видно в карточке заказа до принятия, если задания нет")]
+        public string[] Wishes;
 
-        // Lookup щедрости архетипа (П8.2, §3.6): доля чаевых от цены;
-        // архетипа нет в пулах — 0 (без чаевых)
-        public float TipsPctOf(string archetype)
-        {
-            var pool = Get(archetype);
-            return pool != null ? pool.TipsPct : 0f;
-        }
+        [TextArea(2, 4)]
+        [Tooltip("Доставлен на место")]
+        public string[] Thanks;
+
+        [TextArea(2, 4)]
+        [Tooltip("Заказ провален")]
+        public string[] Complaints;
 
         public string PickName()
         {
