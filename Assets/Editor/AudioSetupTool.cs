@@ -70,7 +70,9 @@ namespace SpaceTaxi.Audio.Tools
             {
                 // двигатели — тихий фон, не истребитель
                 Entry(SoundId.EngineMain, AudioGroup.Engine, 0.60f, loop: true,  clips: "sfx_engine_main_loop"),
-                Entry(SoundId.EngineRetro, AudioGroup.Engine, 0.45f, loop: true,  clips: "sfx_engine_retro_loop"),
+                // Н-6: громкость -20% как временная мера — звук «дребезжит»,
+                // ждём файл замены от владельца, тогда вернуть 0.45
+                Entry(SoundId.EngineRetro, AudioGroup.Engine, 0.36f, loop: true,  clips: "sfx_engine_retro_loop"),
                 Entry(SoundId.EngineStrafe, AudioGroup.Engine, 0.35f, loop: true,  clips: "sfx_engine_strafe_loop"),
 
                 // жар — корабельная пожарная тревога
