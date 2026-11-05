@@ -15,15 +15,17 @@ namespace SpaceTaxi.UI
 {
     // Экран станции [B] (§3.3): вкладки по услугам планеты — хаб МТО даёт все
     // четыре [МАГАЗИН][УЛУЧШЕНИЯ][ЗАПРАВКА][РЕМОНТ], обычная станция — по
-    // флагам (заправка/мастерская). Заправка/ремонт платные (1 кр = 1 ед
-    // топлива / 1 HP, план §3.1); магазин ВРЕМЕННО показывает каталог кораблей
-    // (витрина — Н-3а); улучшения (§3.4) и гашение долга (§3.2) — на хабе
-    // отдельной вкладкой, на обычной станции — внутри окна ремонта. Доступен
-    // ТОЛЬКО стоя (State == Landed) на планете с услугами; мир не ставится на
-    // паузу (как карта). Закрытие по B/Esc — ESC уступается по той же
-    // договорённости, что и карта (NotifyStationOpened/Closed +
-    // EscJustClosed). Контроллера в сценах нет — появляется сам (стиль
-    // DismissalScreenController), панель строится кодом при первом открытии.
+    // флагам (заправка/мастерская). Заправка (Н-4): слайдер объёма, цена/ед и
+    // запас визита — по тиру сети планеты (PricingConfig), оплата ровно за
+    // взятое. Ремонт платный (1 кр = 1 HP, план §3.1); магазин ВРЕМЕННО
+    // показывает каталог кораблей (витрина — Н-3а); улучшения (§3.4) и гашение
+    // долга (§3.2) — на хабе отдельной вкладкой, на обычной станции — внутри
+    // окна ремонта. Доступен ТОЛЬКО стоя (State == Landed) на планете с
+    // услугами; мир не ставится на паузу (как карта). Закрытие по B/Esc — ESC
+    // уступается по той же договорённости, что и карта
+    // (NotifyStationOpened/Closed + EscJustClosed). Контроллера в сценах нет —
+    // появляется сам (стиль DismissalScreenController), панель строится кодом
+    // при первом открытии.
     public class StationScreenController : MonoBehaviour
     {
         private const int SortingOrder = 100; // поверх HUD/паузы, ниже увольнения (200)
@@ -69,6 +71,13 @@ namespace SpaceTaxi.UI
         private Button hullButton;
         private TMP_Text fuelButtonLabel;
         private TMP_Text hullButtonLabel;
+        // заправка (Н-4): слайдер объёма с живым предрасчётом и пресеты
+        private TMP_Text fuelStockLine;  // «Топлива на станции: N ед · цена M кр/ед»
+        private TMP_Text fuelOfferLabel; // «Заправить: X ед (Y кр)»
+        private Slider fuelSlider;
+        private Button fuelPreset10;
+        private Button fuelPreset50;
+        private Button fuelPresetAll;
 
         // окна-вкладки: видимость переключает SelectTab, состав — ApplyTabs
         private GameObject fuelWindow;
@@ -267,21 +276,154 @@ namespace SpaceTaxi.UI
                 Close(); // респавн мог унести на другую планету
         }
 
-        // 1 кр = 1 ед топлива (план §3.1); при нехватке кредитов — частичная заправка
-        private void Refuel()
+        // --- Заправка (Н-4): слайдер объёма, цена/ед и запас — по тиру сети планеты ---
+
+        // конфиг цен: из OrderService (ассет сцены / Resources) или кодовый фолбэк
+        private PricingConfig Pricing =>
+            session != null && session.Orders != null ? session.Orders.Pricing : PricingConfig.Default;
+
+        private int FuelTier => currentPlanet != null ? currentPlanet.FuelTier : PricingConfig.BaseFuelTier;
+
+        private int FuelAvailable()
         {
-            if (!CanOpen() || session == null)
+            if (ship == null || currentPlanet == null)
+                return 0;
+            return FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, FuelTier, Pricing);
+        }
+
+        // подтверждение: оплата ровно за выбранное (Wallet.TrySpend → Ship.Fuel → ReportServiced)
+        private void ConfirmRefuel()
+        {
+            if (!CanOpen() || session == null || fuelSlider == null)
                 return;
-            int cost = FuelCost();
-            if (cost <= 0)
+            int units = Mathf.RoundToInt(fuelSlider.value);
+            int cost = FuelNetwork.CostOf(units, FuelTier, Pricing);
+            if (units <= 0 || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
-            int units = Mathf.Min(cost, session.Wallet.Credits);
-            if (units <= 0 || !session.Wallet.TrySpend(units))
-                return;
-            ship.Fuel += units; // сеттер шлёт FuelChanged — HUD и экран обновятся
-            fuelStatus.text = $"Заправлено {units} ед за {units} кр"
-                + (units < cost ? " — хватило только на часть" : "");
+            ship.Fuel += units; // сеттер клампит и шлёт FuelChanged — HUD и экран обновятся
+            fuelStatus.text = $"Заправлено {units} ед за {cost} кр";
             landing.ReportServiced(ship.LandedOn.DisplayName);
+        }
+
+        private void NudgeFuel(int delta) => SetFuelSelection(Mathf.RoundToInt(fuelSlider.value) + delta);
+
+        // сдвиг выбора слайдера; onValueChanged сам обновит подписи
+        private void SetFuelSelection(int units)
+        {
+            if (fuelSlider != null)
+                fuelSlider.value = Mathf.Clamp(units, 0, FuelAvailable());
+        }
+
+        // запас сети и диапазон слайдера — при каждом Refresh: посадка, заправка
+        // и улучшение бака меняют Eff.FuelMax/топливо
+        private void UpdateFuelWindow()
+        {
+            int available = FuelAvailable();
+            float perUnit = Pricing.GetFuelPricePerUnit(FuelTier);
+
+            // 0 доступно: бак полон — заправка не нужна; иначе бак уже глубже запаса сети
+            fuelStockLine.text = available > 0
+                ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} кр/ед"
+                : ship.Fuel >= ship.Eff.FuelMax - 0.5f
+                    ? "Бак полон — заправка не нужна"
+                    : "Запас сети ниже текущего топлива";
+
+            fuelSlider.minValue = 0f;
+            fuelSlider.maxValue = Mathf.Max(1, available); // 0..0 слайдер не показывает
+            fuelSlider.interactable = available > 0;
+            fuelSlider.SetValueWithoutNotify(Mathf.Clamp(fuelSlider.value, 0f, available));
+
+            bool hasStock = available > 0;
+            fuelPreset10.interactable = hasStock;
+            fuelPreset50.interactable = hasStock;
+            fuelPresetAll.interactable = hasStock;
+
+            UpdateFuelOffer();
+        }
+
+        // живой предрасчёт: подпись объёма и доступность подтверждения
+        private void UpdateFuelOffer()
+        {
+            int available = FuelAvailable();
+            int selected = Mathf.Clamp(Mathf.RoundToInt(fuelSlider.value), 0, available);
+            int cost = FuelNetwork.CostOf(selected, FuelTier, Pricing);
+
+            fuelOfferLabel.text = $"Заправить: {selected} ед ({cost} кр)";
+            fuelButton.interactable = selected > 0 && session.Wallet.Credits >= cost;
+            fuelButtonLabel.text = selected > 0
+                ? $"ЗАПРАВИТЬ ({cost} кр)"
+                : available > 0 ? "ВЫБЕРИТЕ ОБЪЁМ" : "ТОПЛИВА НЕТ";
+        }
+
+        // слайдер объёма: дорожка/заполнение/ручка собираются кодом (схема UGUI Slider)
+        private static Slider BuildFuelSlider(Transform parent)
+        {
+            var go = new GameObject("FuelSlider", typeof(RectTransform), typeof(Slider));
+            go.transform.SetParent(parent, false);
+            var dim = OnboardComputerFactory.LabelColor;
+
+            var track = new GameObject("Track", typeof(RectTransform), typeof(Image));
+            track.transform.SetParent(go.transform, false);
+            OnboardComputerFactory.Stretch((RectTransform)track.transform);
+            track.GetComponent<Image>().color = new Color(dim.r, dim.g, dim.b, 0.14f);
+
+            var fillArea = new GameObject("FillArea", typeof(RectTransform));
+            fillArea.transform.SetParent(go.transform, false);
+            var fillAreaRect = (RectTransform)fillArea.transform;
+            fillAreaRect.anchorMin = new Vector2(0f, 0.3f);
+            fillAreaRect.anchorMax = new Vector2(1f, 0.7f);
+            fillAreaRect.offsetMin = new Vector2(4f, 0f);
+            fillAreaRect.offsetMax = new Vector2(-4f, 0f);
+            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(fillArea.transform, false);
+            OnboardComputerFactory.Stretch((RectTransform)fill.transform);
+            fill.GetComponent<Image>().color = new Color(dim.r, dim.g, dim.b, 0.7f);
+
+            var handleArea = new GameObject("HandleArea", typeof(RectTransform));
+            handleArea.transform.SetParent(go.transform, false);
+            var handleAreaRect = (RectTransform)handleArea.transform;
+            handleAreaRect.anchorMin = Vector2.zero;
+            handleAreaRect.anchorMax = Vector2.one;
+            handleAreaRect.offsetMin = new Vector2(8f, 0f);
+            handleAreaRect.offsetMax = new Vector2(-8f, 0f);
+            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+            handle.transform.SetParent(handleArea.transform, false);
+            var handleRect = (RectTransform)handle.transform;
+            handleRect.sizeDelta = new Vector2(12f, 0f); // ширину двигает сам Slider
+            handle.GetComponent<Image>().color = OnboardComputerFactory.BrightColor;
+
+            var slider = go.GetComponent<Slider>();
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.fillRect = (RectTransform)fill.transform;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handle.GetComponent<Image>();
+            slider.wholeNumbers = true;
+            return slider;
+        }
+
+        // пресеты объёма: сдвиг выбора с клампом в доступный запас
+        private void BuildFuelPresets(Transform parent)
+        {
+            var row = OnboardComputerFactory.H("FuelPresets", parent);
+            OnboardComputerFactory.FixedHeight(row.gameObject, 34f);
+            fuelPreset10 = BuildPresetButton(row.transform, "+10 ед", () => NudgeFuel(10));
+            fuelPreset50 = BuildPresetButton(row.transform, "+50 ед", () => NudgeFuel(50));
+            fuelPresetAll = BuildPresetButton(row.transform, "ПОЛНЫЙ ДОСТУПНЫЙ", () => SetFuelSelection(FuelAvailable()));
+        }
+
+        private static Button BuildPresetButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = OnboardComputerFactory.Button(parent, label,
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                    OnboardComputerFactory.LabelColor.b, 0.18f),
+                OnboardComputerFactory.LabelColor, 16f);
+            var le = go.AddComponent<LayoutElement>();
+            le.flexibleWidth = 1f;
+            le.minHeight = 34f;
+            le.preferredHeight = 34f;
+            var button = go.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            return button;
         }
 
         // 1 кр = 1 HP (план §3.1); аналогично с частичным ремонтом
@@ -301,9 +443,7 @@ namespace SpaceTaxi.UI
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
 
-        // N = ceil(FuelMax − Fuel) — округление вверх: недостающая доля ед. тоже платная
-        private int FuelCost() => Mathf.CeilToInt(ship.Eff.FuelMax - ship.Fuel);
-
+        // N = ceil(HpMax − Hp) — округление вверх: недостающая доля ед. тоже платная
         private int HullCost() => Mathf.CeilToInt(ship.Eff.HpMax - ship.Hp);
 
         private void Refresh()
@@ -333,13 +473,11 @@ namespace SpaceTaxi.UI
             UpdateGauge(hullSegments, ship.HpFraction);
             hullValue.text = Mathf.RoundToInt(ship.Hp) + "/" + Mathf.RoundToInt(ship.Eff.HpMax);
 
-            int fuelCost = FuelCost();
+            UpdateFuelWindow();
+
             int hullCost = HullCost();
-            bool solvent = session.Wallet.Credits > 0;
-            fuelButtonLabel.text = fuelCost > 0 ? $"ЗАПРАВИТЬ ДО ПОЛНОГО ({fuelCost} кр)" : "БАК ПОЛОН";
-            fuelButton.interactable = fuelCost > 0 && solvent;
             hullButtonLabel.text = hullCost > 0 ? $"РЕМОНТ ДО ПОЛНОГО ({hullCost} кр)" : "КОРПУС ЦЕЛ";
-            hullButton.interactable = hullCost > 0 && solvent;
+            hullButton.interactable = hullCost > 0 && session.Wallet.Credits > 0;
 
             RefreshShop();
         }
@@ -498,14 +636,22 @@ namespace SpaceTaxi.UI
             AddTabButton(StationTab.Fuel, tabRow.transform, "ЗАПРАВКА");
             AddTabButton(StationTab.Repair, tabRow.transform, "РЕМОНТ");
 
-            // --- Окно заправки (вкладка ЗАПРАВКА) ---
+            // --- Окно заправки (вкладка ЗАПРАВКА): слайдер объёма (Н-4) ---
             fuelWindow = Section(panel.transform, "// ЗАПРАВКА", "FuelWindow");
             var fuelGauge = BuildGauge(fuelWindow, "ТОПЛИВО", "Fuel");
             fuelSegments = fuelGauge.Segments;
             fuelValue = fuelGauge.Value;
+            fuelStockLine = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "StockLine");
+            OnboardComputerFactory.FixedHeight(fuelStockLine.gameObject, 22f);
+            fuelOfferLabel = OnboardComputerFactory.Text(fuelWindow, "", 18f, OnboardComputerFactory.BrightColor, "OfferLabel");
+            OnboardComputerFactory.FixedHeight(fuelOfferLabel.gameObject, 24f);
+            fuelSlider = BuildFuelSlider(fuelWindow.transform);
+            OnboardComputerFactory.FixedHeight(fuelSlider.gameObject, 30f);
+            fuelSlider.onValueChanged.AddListener(_ => UpdateFuelOffer());
+            BuildFuelPresets(fuelWindow.transform);
+            fuelButton = BuildServiceButton(fuelWindow.transform, "FuelButton", ConfirmRefuel, out fuelButtonLabel);
             fuelStatus = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
             OnboardComputerFactory.FixedHeight(fuelStatus.gameObject, 22f);
-            fuelButton = BuildServiceButton(fuelWindow.transform, "FuelButton", Refuel, out fuelButtonLabel);
 
             // --- Окно ремонта (вкладка РЕМОНТ) ---
             hullWindow = Section(panel.transform, "// РЕМОНТ", "HullWindow");

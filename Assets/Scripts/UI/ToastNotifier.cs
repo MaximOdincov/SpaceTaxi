@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
+using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
@@ -110,6 +111,17 @@ namespace SpaceTaxi.UI
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
             landing.StationHint += planet => Show("Станция: [B] — " + StationServices(planet));
+            // запас топливной сети при посадке (Н-4): сколько единиц продают и по чём
+            landing.ShipLanded += planet =>
+            {
+                if (!planet.HasFuel || session.Orders == null)
+                    return;
+                var pricing = session.Orders.Pricing;
+                int available = FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, planet.FuelTier, pricing);
+                if (available <= 0)
+                    return;
+                Show($"Топлива на станции: {available} ед · цена {pricing.GetFuelPricePerUnit(planet.FuelTier):0.##} кр/ед");
+            };
 
             var hull = ship.GetComponent<HullSystem>();
             hull.Respawned += () => Show("Респавн на планете старта");
