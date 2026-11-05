@@ -32,6 +32,8 @@ namespace SpaceTaxi.Core
         public PhysicsConfig Config => physicsConfig;
         // ассет ввода сцены: контроллерам вне сцены (экран станции строится кодом)
         public InputActionAsset Input => input;
+        // каталог пассажиров: восстановление пассажира активного заказа из сейва (П10.1)
+        public PassengerCatalog Passengers => passengerCatalog;
         // текущий корабль теперь живёт в парке; поле сцены currentShip не читается
         public ShipConfig CurrentShip => Fleet.Current;
 
@@ -105,6 +107,10 @@ namespace SpaceTaxi.Core
                     Sound.Play(SoundId.DebtTone);
                 prevDebt = value;
             };
+
+            // продолжение забега (П10.1): мир построен по умолчанию — поверх
+            // применяется состояние сейва (без флага «продолжить» — тихий выход)
+            SaveSystem.ApplyTo(this);
         }
 
         private void OnOrderDelivered(OrderOffer offer)
@@ -116,6 +122,9 @@ namespace SpaceTaxi.Core
             // щедрость архетипа из пулов; перк «Меридианы» домножается в выплате
             Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental,
                 Orders.CollisionsOfActive, TipsFractionOf(offer), IsMeridian);
+            // автосейв §3.9 (П10.1): сразу после выплаты — счётчики/рейтинг/долг
+            // уже консистентны, экран завершения данных не меняет
+            SaveSystem.Save(this);
             if (orderComplete == null)
                 orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
             orderComplete?.Show(offer);

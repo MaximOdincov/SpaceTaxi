@@ -86,6 +86,10 @@ namespace SpaceTaxi.UI
 
         private void GoToMenu()
         {
+            // увольнение сбрасывает забег (§3.9): сейв удаляется, «Продолжить»
+            // становится неактивным (П10.2); автосейв выхода в меню его не
+            // воскресит — Save пропускает терминальное состояние
+            SaveSystem.DeleteSave();
             var flow = FindAnyObjectByType<SceneFlowButtons>();
             if (flow != null)
             {
