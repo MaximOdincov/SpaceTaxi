@@ -264,11 +264,11 @@ namespace SpaceTaxi.UI
 #endif
         }
 
-        private static GameObject PlayerButton(Transform parent, string glyph, string name)
+        private static Button PlayerButton(Transform parent, string glyph, string name)
         {
             var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 15f, name);
             FixedSize(go, 26f, 26f);
-            return go;
+            return go.GetComponent<Button>();
         }
 
         // --- Общие помощники ---
