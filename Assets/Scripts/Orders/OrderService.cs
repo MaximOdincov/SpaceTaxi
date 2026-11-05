@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
@@ -140,12 +141,19 @@ namespace SpaceTaxi.Orders
         private string glowBodyName;
         private GravityField gravityField;
 
+        // посадочное кольцо цели (П11.1): ободок на LandingRing, мягкий пульс ~1.5 Гц
+        private Transform targetRing;
+        private SpriteRenderer ringRenderer;
+        private string ringBodyName;
+        private float ringBaseScale = 1f;
+
         private void UpdateTargetGlow()
         {
             if (Active == null)
             {
                 if (targetGlow != null)
                     targetGlow.gameObject.SetActive(false);
+                HideTargetRing();
                 return;
             }
 
@@ -156,6 +164,8 @@ namespace SpaceTaxi.Orders
 
             int index = Active.State == OrderState.Aboard ? Active.DropoffIndex : Active.PickupIndex;
             string bodyName = PlanetName(index);
+
+            UpdateTargetRing(index, bodyName);
 
             if (targetGlow == null)
             {
@@ -185,6 +195,48 @@ namespace SpaceTaxi.Orders
             float pulse = 1.32f + 0.08f * Mathf.Sin(Time.time * 3f);
             targetGlow.localScale = Vector3.one * pulse;
             glowRenderer.color = new Color(1f, 0.83f, 0.3f, 0.16f);
+        }
+
+        // кольцо той же цели, что и TargetGlow: при смене цели переезжает на новую
+        // планету, при потере заказа — гаснет. Пульс по альфе, ширина «дышит» масштабом
+        private void UpdateTargetRing(int index, string bodyName)
+        {
+            if (targetRing == null || ringBodyName != bodyName)
+            {
+                CelestialBody body = BodyByIndex(index);
+                if (body == null)
+                {
+                    HideTargetRing();
+                    return;
+                }
+                ringBodyName = bodyName;
+                if (targetRing == null)
+                {
+                    var ringGo = new GameObject("LandingRingGlow", typeof(SpriteRenderer));
+                    ringRenderer = ringGo.GetComponent<SpriteRenderer>();
+                    ringRenderer.sortingOrder = -1; // позади тел, как HeatZone; корабль (2) поверх
+                    targetRing = ringGo.transform;
+                }
+                ringRenderer.sprite = StubSprites.Ring(body.LandingRing * 2f);
+                // планета масштабирована под Radius — компенсируем, чтобы кольцо
+                // не растягивалось вместе с телом
+                float parentScale = Mathf.Max(Mathf.Abs(body.transform.localScale.x), 0.0001f);
+                ringBaseScale = 1f / parentScale;
+                targetRing.SetParent(body.transform, false);
+                targetRing.localPosition = Vector3.zero;
+                targetRing.gameObject.SetActive(true);
+            }
+
+            float breath = 0.5f + 0.5f * Mathf.Sin(Time.time * (2f * Mathf.PI * 1.5f)); // ~1.5 Гц
+            ringRenderer.color = new Color(0.235f, 1f, 0.557f, Mathf.Lerp(0.22f, 0.5f, breath));
+            targetRing.localScale = Vector3.one * ringBaseScale * (1f + 0.015f * breath);
+        }
+
+        private void HideTargetRing()
+        {
+            if (targetRing != null && targetRing.gameObject.activeSelf)
+                targetRing.gameObject.SetActive(false);
+            ringBodyName = null; // цель сменилась/потерялась — при новой соберём заново
         }
 
         public bool Accept(OrderOffer offer)

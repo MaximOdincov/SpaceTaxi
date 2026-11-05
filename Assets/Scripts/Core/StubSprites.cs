@@ -6,6 +6,7 @@ namespace SpaceTaxi.Core
     public static class StubSprites
     {
         private static readonly Dictionary<int, Sprite> circles = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> rings = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
         private static Sprite line;
         public static Sprite Circle(float diameter)
@@ -16,6 +17,24 @@ namespace SpaceTaxi.Core
                 var tex = CreateCircleTexture(64, 0.08f);
                 sprite = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f / diameter);
                 circles[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // тонкое посадочное кольцо: одна маска на все радиусы (как BeltRing в карте),
+        // PPU подгоняет спрайт под диаметр в юнитах
+        public static Sprite Ring(float diameter)
+        {
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
+            if (!rings.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateMaskTexture(256, (x, y) =>
+                {
+                    float d = Mathf.Sqrt(x * x + y * y);
+                    return d <= 1f && d >= 0.96f;
+                });
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f / diameter);
+                rings[key] = sprite;
             }
             return sprite;
         }
