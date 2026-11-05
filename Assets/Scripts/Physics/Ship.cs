@@ -26,6 +26,10 @@ namespace SpaceTaxi.Physics
         // уровни улучшений [Engine, Tank, Hull, Maneuver], 0..3; 0 = сток
         public int[] UpgradeLevels { get; private set; }
 
+        // покраска корпуса: 0 = заводская, 1..N — PaintVariants (Н-3а);
+        // переживает Reconfigure (улучшения/респавн не перекрашивают)
+        public int PaintIndex { get; private set; }
+
         // эффективные статы (база + улучшения) — единственный источник чисел
         // для полёта и корпуса; пересчитывается в Init/Reconfigure/BindUpgradeConfig
         public EffectiveStats Eff { get; private set; }
@@ -103,16 +107,25 @@ namespace SpaceTaxi.Physics
             Reconfigured?.Invoke();
         }
 
-        // спрайт модели (арт А1/А2): своя — ставим, нет — заглушка, чужой
+        // Спрайт покраски (Н-3а): вариант или заводская — решает GetPaintSprite.
+        // Перекрашивает текущий корпус; смена модели проходит через Reconfigure
+        public void SetPaint(int paintIndex)
+        {
+            if (paintIndex == PaintIndex || ShipConfig == null)
+                return;
+            PaintIndex = paintIndex;
+            ApplyModelSprite(ShipConfig);
+        }
+
+        // спрайт модели (арт А1/А2): покраска → базовый → заглушка, чужой
         // корпус оставлять нельзя (пересадка должна быть видна)
         private void ApplyModelSprite(ShipConfig shipConfig)
         {
             var spriteRenderer = GetComponent<SpriteRenderer>();
             if (spriteRenderer == null)
                 return;
-            spriteRenderer.sprite = shipConfig.ShipSprite != null
-                ? shipConfig.ShipSprite
-                : StubSprites.ShipTriangle();
+            Sprite sprite = shipConfig.GetPaintSprite(PaintIndex);
+            spriteRenderer.sprite = sprite != null ? sprite : StubSprites.ShipTriangle();
         }
 
         private void RecomputeEff()

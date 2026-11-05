@@ -46,6 +46,7 @@ namespace SpaceTaxi.Core
             public int Deliveries;
             public int Failures;
             public string CurrentShipId;
+            public int PaintIndex; // покраска текущего корабля (Н-3а), 0 = заводская
             public string[] OwnedShipIds;
             public List<ShipUpgrades> Upgrades;
             public bool HasOrder;
@@ -123,6 +124,7 @@ namespace SpaceTaxi.Core
                 Deliveries = session.Orders.Deliveries,
                 Failures = session.Orders.Failures,
                 CurrentShipId = session.Fleet.Current != null ? session.Fleet.Current.Id : null,
+                PaintIndex = session.Fleet.CurrentPaintIndex,
                 SavedAt = DateTime.UtcNow.ToString("o"),
             };
 
@@ -348,7 +350,7 @@ namespace SpaceTaxi.Core
                     if (entry != null && !string.IsNullOrEmpty(entry.ShipId) && entry.Levels != null)
                         levels[entry.ShipId] = entry.Levels;
 
-            session.Fleet.RestoreState(FindInCatalog(catalog, data.CurrentShipId), owned, levels);
+            session.Fleet.RestoreState(FindInCatalog(catalog, data.CurrentShipId), owned, levels, data.PaintIndex);
         }
 
         private static ShipConfig FindInCatalog(ShipConfig[] catalog, string id)

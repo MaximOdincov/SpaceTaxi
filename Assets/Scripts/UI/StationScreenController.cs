@@ -20,8 +20,11 @@ namespace SpaceTaxi.UI
     // взятое. Ремонт (Н-5): пакеты мелкий/средний/полный — доля недостающего
     // HP по базовой цене 1 кр/HP × множитель пакета; тир сети ремонта планеты
     // режет максимальный пакет и потолок визита, ограничения видны на карточках
-    // заранее. Магазин ВРЕМЕННО показывает каталог кораблей (витрина — Н-3а);
-    // улучшения (§3.4) и гашение долга (§3.2) — на хабе отдельной вкладкой, на
+    // заранее. Магазин (Н-3а): витрина — большой спрайт модели, статы, цена,
+    // листание [←][→], сортировка по цене; базовые корабли всегда в наличии,
+    // вариант покраски (ShipConfig.PaintVariants) ротирует ShopStockService
+    // раз в 2 игровых часа, покупка запоминает показанный вариант.
+    // Улучшения (§3.4) и гашение долга (§3.2) — на хабе отдельной вкладкой, на
     // обычной станции — внутри окна ремонта. Доступен ТОЛЬКО стоя
     // (State == Landed) на планете с услугами; мир не ставится на паузу (как
     // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
@@ -90,7 +93,7 @@ namespace SpaceTaxi.UI
         private GameObject fuelWindow;
         private GameObject hullWindow;
         private GameObject upgradeWindow; // улучшения + гашение долга (§3.4/§3.2)
-        private GameObject shopScroll;    // скролл ангара — только вкладка МАГАЗИН
+        private GameObject shopWindow;    // витрина магазина — только вкладка МАГАЗИН
 
         // вкладки услуг (§3.3): полный набор только у хаба МТО
         private enum StationTab { Shop, Upgrades, Fuel, Repair }
@@ -109,10 +112,21 @@ namespace SpaceTaxi.UI
         private TMP_Text debtLine;
         private Button repayButton;
         private TMP_Text repayLabel;
-        // ангар: каталог читается из Resources один раз, карточки строятся
-        // один раз при первом открытии — дальше только перечитываются
+        // витрина (Н-3а): каталог из Resources сортируется по цене один раз,
+        // листается стрелками; показанный вариант покраски ротирует
+        // ShopStockService (раз в 2 игровых часа) — витрина меняется сама
         private ShipConfig[] shipCatalog;
-        private ShipCardRefs[] shipCards;
+        private int showcaseIndex;
+        private int stockSlot;           // слот ротации на последней отрисовке
+        private ShipConfig showcaseShip; // модель на витрине сейчас
+        private Image showcaseSprite;
+        private TMP_Text showcaseName;
+        private TMP_Text showcasePaint;
+        private TMP_Text showcaseStats;
+        private TMP_Text showcaseStatus;
+        private Button shopBuy;
+        private TMP_Text shopBuyLabel;
+        private TMP_Text shopStatus; // строка обратной связи покупки
         private ToastNotifier toast;
 
         public bool IsOpened => opened;
@@ -164,6 +178,15 @@ namespace SpaceTaxi.UI
             // контекст потерян (взлёт, гибель, потеря корабля) — экран закрывается сам
             if (opened && !CanOpen())
                 Close();
+
+            // ротация витрины (Н-3а): слот сменился — витрина перерисовывается
+            // сама («за витриной интересно наблюдать»); проверка дешёвая — пара int
+            if (opened && shopWindow != null && shopWindow.activeSelf)
+            {
+                int slot = ShopStockService.CurrentSlot(Time.time);
+                if (slot != stockSlot)
+                    RefreshShowcase(); // внутри обновит stockSlot
+            }
         }
 
         private void LateUpdate()
@@ -711,8 +734,8 @@ namespace SpaceTaxi.UI
             bool upgradesHere = tab == StationTab.Upgrades
                 || (tab == StationTab.Repair && !currentPlanet.IsHub);
             upgradeWindow.SetActive(upgradesHere);
-            if (shopScroll != null)
-                shopScroll.SetActive(tab == StationTab.Shop);
+            if (shopWindow != null)
+                shopWindow.SetActive(tab == StationTab.Shop);
 
             // подсветка активной вкладки: ярче фон и текст
             foreach (var pair in tabButtons)
@@ -852,48 +875,9 @@ namespace SpaceTaxi.UI
             BuildUpgradesBlock(upgradeWindow.transform);
             BuildDebtBlock(upgradeWindow.transform);
 
-            // --- Вкладка МАГАЗИН: контент ВРЕМЕННО — каталог кораблей ангара
-            // (П3.2), витрина товаров приедет с Н-3а. Карточки не влезают в
-            // экран целиком — блок живёт в скролле ---
-            var scrollWrap = new GameObject("ShopScroll", typeof(RectTransform), typeof(ScrollRect));
-            scrollWrap.transform.SetParent(panel.transform, false);
-            var wrapElement = scrollWrap.AddComponent<LayoutElement>();
-            // высота окна скролла от высоты экрана: остальное — вкладки и шапка
-            wrapElement.preferredHeight = Mathf.Clamp(Screen.height * 0.45f, 260f, 560f);
-            wrapElement.flexibleHeight = 0f;
-            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
-            viewport.transform.SetParent(scrollWrap.transform, false);
-            OnboardComputerFactory.Stretch((RectTransform)viewport.transform);
-            // прозрачный фон — raycast-цель под курсором, иначе колесо мыши не скроллит
-            viewport.GetComponent<Image>().color = Color.clear;
-
-            var shop = new GameObject("ShopSection", typeof(RectTransform));
-            shop.transform.SetParent(viewport.transform, false);
-            var shopRect = (RectTransform)shop.transform;
-            // контент растёт вниз от верхней кромки вьюпорта — стандартная схема ScrollRect
-            shopRect.anchorMin = new Vector2(0f, 1f);
-            shopRect.anchorMax = new Vector2(1f, 1f);
-            shopRect.pivot = new Vector2(0.5f, 1f);
-            shopRect.offsetMin = Vector2.zero;
-            shopRect.offsetMax = Vector2.zero;
-            var shopLayout = shop.AddComponent<VerticalLayoutGroup>();
-            shopLayout.spacing = 12f;
-            shopLayout.childControlWidth = true;
-            shopLayout.childControlHeight = true;
-            shopLayout.childForceExpandWidth = true;
-            shopLayout.childForceExpandHeight = false;
-            shop.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = scrollWrap.GetComponent<ScrollRect>();
-            scroll.viewport = (RectTransform)viewport.transform;
-            scroll.content = shopRect;
-            scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 24f;
-
-            BuildHangarBlock(shop.transform);
-            shop.SetActive(true); // в контейнере теперь есть содержимое
-            shopScroll = scrollWrap;
+            // --- Вкладка МАГАЗИН: витрина (Н-3а) — большая модель на экране,
+            // листание стрелками, покупка показанного варианта покраски ---
+            BuildShowcaseBlock(panel.transform);
 
             var footer = OnboardComputerFactory.Text(panel, "B / ESC — закрыть", 16f, OnboardComputerFactory.LabelColor, "Footer");
             OnboardComputerFactory.FixedHeight(footer.gameObject, 20f);
@@ -990,7 +974,7 @@ namespace SpaceTaxi.UI
         {
             RefreshUpgrades();
             RefreshDebt();
-            RefreshHangar();
+            RefreshShowcase();
         }
 
         private void OnShopChanged()
@@ -1193,23 +1177,11 @@ namespace SpaceTaxi.UI
             ShowToast("Долг погашен", emphasized: true);
         }
 
-        // --- П3.2: блок «Ангар» — каталог моделей, покупка и пересадка ---
+        // --- Н-3а: витрина магазина — одна модель на экране, листание,
+        // ротация покрасок, покупка показанного варианта ---
 
-        private sealed class ShipCardRefs
-        {
-            public ShipConfig Config;
-            public Image Thumb;
-            public TMP_Text Title;
-            public TMP_Text Status;
-            public TMP_Text Stats;
-            public Button Buy;
-            public TMP_Text BuyLabel;
-            public Button Sit;
-            public TMP_Text SitLabel;
-        }
-
-        // каталог читается из Resources один раз; порядок — по тиру (при равенстве
-        // по цене и имени, чтобы список не плясал)
+        // каталог читается из Resources один раз; порядок витрины — по цене
+        // (при равенстве по тиру и имени, чтобы список не плясал)
         private ShipConfig[] Catalog()
         {
             if (shipCatalog != null)
@@ -1221,73 +1193,119 @@ namespace SpaceTaxi.UI
                 return Array.Empty<ShipConfig>(); // guard: Sort ниже разыменовал бы null
             Array.Sort(configs, (a, b) =>
             {
-                int byTier = a.Tier.CompareTo(b.Tier);
-                if (byTier != 0)
-                    return byTier;
                 int byPrice = a.Price.CompareTo(b.Price);
-                return byPrice != 0 ? byPrice : string.CompareOrdinal(a.DisplayName, b.DisplayName);
+                if (byPrice != 0)
+                    return byPrice;
+                int byTier = a.Tier.CompareTo(b.Tier);
+                return byTier != 0 ? byTier : string.CompareOrdinal(a.DisplayName, b.DisplayName);
             });
             shipCatalog = configs;
             return shipCatalog;
         }
 
-        private void BuildHangarBlock(Transform shop)
+        // каркас витрины: [←] спрайт [→] над именем, статами, ценой и кнопкой
+        private void BuildShowcaseBlock(Transform parent)
         {
-            var section = Section(shop, "// МАГАЗИН · АНГАР", "HangarSection");
-            var catalog = Catalog();
-            shipCards = new ShipCardRefs[catalog.Length];
-            for (int i = 0; i < catalog.Length; i++)
-                shipCards[i] = BuildShipCard(section.transform, catalog[i]);
-            RefreshHangar();
+            shopWindow = Section(parent, "// МАГАЗИН", "ShopWindow");
+
+            var showcaseRow = OnboardComputerFactory.H("ShowcaseRow", shopWindow.transform);
+            BuildArrowButton(showcaseRow.transform, "←", () => FlipShowcase(-1));
+            var box = new GameObject("SpriteBox", typeof(RectTransform), typeof(Image));
+            box.transform.SetParent(showcaseRow.transform, false);
+            showcaseSprite = box.GetComponent<Image>();
+            showcaseSprite.color = new Color(
+                OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                OnboardComputerFactory.LabelColor.b, 0.08f);
+            showcaseSprite.preserveAspect = true;
+            OnboardComputerFactory.FixedSize(box, 168f, 122f);
+            BuildArrowButton(showcaseRow.transform, "→", () => FlipShowcase(1));
+
+            showcaseName = OnboardComputerFactory.Text(shopWindow, "", 22f, OnboardComputerFactory.BrightColor, "ModelName");
+            OnboardComputerFactory.FixedHeight(showcaseName.gameObject, 28f);
+            showcasePaint = OnboardComputerFactory.Text(shopWindow, "", 16f, OnboardComputerFactory.LabelColor, "PaintLine");
+            OnboardComputerFactory.FixedHeight(showcasePaint.gameObject, 20f);
+            showcaseStats = OnboardComputerFactory.Text(shopWindow, "", 15f, OnboardComputerFactory.LabelColor, "StatsLine");
+            OnboardComputerFactory.FixedHeight(showcaseStats.gameObject, 20f);
+            showcaseStatus = OnboardComputerFactory.Text(shopWindow, "", 19f, OnboardComputerFactory.TaxiColor, "PriceLine");
+            OnboardComputerFactory.FixedHeight(showcaseStatus.gameObject, 24f);
+            shopBuy = BuildServiceButton(shopWindow.transform, "ShopBuyButton", ConfirmShopAction, out shopBuyLabel);
+            shopStatus = OnboardComputerFactory.Text(shopWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
+            OnboardComputerFactory.FixedHeight(shopStatus.gameObject, 22f);
+
+            Catalog(); // сортировка по цене — до первой отрисовки
+            RefreshShowcase();
         }
 
-        // карточка модели: [миниатюра | название/статус | кнопка] + строка статов
-        private ShipCardRefs BuildShipCard(Transform parent, ShipConfig config)
+        // стрелка листания витрины [←]/[→]
+        private void BuildArrowButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
         {
-            var card = new GameObject("Card_" + config.Id, typeof(RectTransform), typeof(Image));
-            card.transform.SetParent(parent, false);
-            card.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
-            var cardLayout = card.AddComponent<VerticalLayoutGroup>();
-            cardLayout.padding = new RectOffset(10, 10, 8, 8);
-            cardLayout.spacing = 4f;
-            cardLayout.childControlWidth = true;
-            cardLayout.childControlHeight = true;
-            cardLayout.childForceExpandWidth = true;
-            cardLayout.childForceExpandHeight = false;
+            var go = OnboardComputerFactory.Button(parent, label,
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                    OnboardComputerFactory.LabelColor.b, 0.18f),
+                OnboardComputerFactory.LabelColor, 26f, "Arrow");
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = 48f;
+            le.preferredWidth = 48f;
+            le.minHeight = 122f;
+            le.preferredHeight = 122f;
+            go.GetComponent<Button>().onClick.AddListener(onClick);
+        }
 
-            var refs = new ShipCardRefs { Config = config };
+        private void FlipShowcase(int delta)
+        {
+            int count = Catalog().Length;
+            if (count == 0)
+                return;
+            showcaseIndex = (showcaseIndex + delta + count) % count;
+            RefreshShowcase();
+        }
 
-            var top = OnboardComputerFactory.H("Top", card.transform);
-            // миниатюра — слот под спрайт корабля: пока треугольник-заглушка
-            // с затенением по тиру, реальная графика придёт с артом А1/А2
-            var thumbGo = new GameObject("Thumb", typeof(RectTransform), typeof(Image));
-            thumbGo.transform.SetParent(top.transform, false);
-            refs.Thumb = thumbGo.GetComponent<Image>();
-            refs.Thumb.sprite = StubSprites.ShipTriangle();
-            refs.Thumb.preserveAspect = true;
-            OnboardComputerFactory.FixedSize(thumbGo, 40f, 40f);
+        // витрина перечитывается на каждый RefreshShop (деньги/парк) и при
+        // смене слота ротации из Update — вариант покраски меняется сам
+        private void RefreshShowcase()
+        {
+            ShipConfig[] catalog = Catalog();
+            if (shopWindow == null || catalog.Length == 0
+                || session == null || session.Fleet == null)
+                return;
+            var fleet = session.Fleet;
+            var config = catalog[showcaseIndex];
+            showcaseShip = config;
+            int slot = ShopStockService.CurrentSlot(Time.time);
+            stockSlot = slot;
+            int paintIndex = ShopStockService.DisplayPaintIndex(config, slot);
 
-            var info = new GameObject("Info", typeof(RectTransform));
-            info.transform.SetParent(top.transform, false);
-            var infoLayout = info.AddComponent<VerticalLayoutGroup>();
-            infoLayout.spacing = 2f;
-            infoLayout.childControlWidth = true;
-            infoLayout.childControlHeight = true;
-            infoLayout.childForceExpandWidth = true;
-            infoLayout.childForceExpandHeight = false;
-            var infoElement = info.AddComponent<LayoutElement>();
-            infoElement.flexibleWidth = 1f;
-            infoElement.minWidth = 100f;
+            // спрайт: показанный вариант покраски (ротация) или заводской;
+            // арта нет вовсе — заглушка-треугольник с затенением по тиру
+            Sprite sprite = config.GetPaintSprite(paintIndex);
+            bool current = IsCurrent(fleet, config);
+            bool owned = fleet.IsOwned(config);
+            showcaseSprite.sprite = sprite != null ? sprite : StubSprites.ShipTriangle();
+            showcaseSprite.color = sprite == null ? TierShade(config.Tier)
+                : owned && !current ? new Color(0.62f, 0.62f, 0.62f, 0.9f) // «в ангаре» — серым
+                : Color.white;
 
-            refs.Title = OnboardComputerFactory.Text(info, config.DisplayName, 18f, OnboardComputerFactory.BrightColor, "Title");
-            refs.Status = OnboardComputerFactory.Text(info, "", 15f, OnboardComputerFactory.LabelColor, "Status");
+            bool rental = config.IsRental;
+            showcaseName.text = config.DisplayName + " · Т" + config.Tier;
+            showcaseStats.text = ShipStatsLine(config);
+            int variants = config.PaintVariantCount;
+            showcasePaint.text = variants == 0 ? "Расцветка: заводская"
+                : paintIndex == 0
+                    ? $"Расцветка: заводская · ещё {variants} в ротации"
+                    : $"Расцветка: вариант {paintIndex} из {variants} (ротация 2 игрочаса)";
+            showcaseStatus.text = current ? "В полёте (текущий)"
+                : owned ? "В ангаре"
+                : rental ? "Аренда"
+                : config.Price + " кр";
 
-            refs.Buy = BuildRowButton(top.transform, () => BuyShip(config), out refs.BuyLabel);
-            refs.Sit = BuildRowButton(top.transform, () => SitIn(config), out refs.SitLabel);
-
-            refs.Stats = OnboardComputerFactory.Text(card, "", 14f, OnboardComputerFactory.LabelColor, "Stats");
-            OnboardComputerFactory.FixedHeight(refs.Stats.gameObject, 20f);
-            return refs;
+            bool canBuy = !owned && !rental && config.Price > 0;
+            bool canSit = !current && (owned || rental);
+            shopBuy.interactable = (canBuy && session.Wallet.Credits >= config.Price) || canSit;
+            shopBuyLabel.text = canBuy
+                ? $"КУПИТЬ ({config.Price} КР)"
+                : canSit ? "СЕСТЬ В"
+                : current ? "В ПОЛЁТЕ"
+                : "НЕТ В ПРОДАЖЕ";
         }
 
         // «Макс» — потолок скорости MaxV (тяга/манёвр/бак/HP — из ShipConfig)
@@ -1300,46 +1318,8 @@ namespace SpaceTaxi.UI
                 + " · Макс " + Mathf.RoundToInt(config.MaxV);
         }
 
-        // статусы/кнопки перечитываются на каждый RefreshShop: смену корабля
-        // приносит ShipChanged, доступность покупки по деньгам — CreditsChanged
-        private void RefreshHangar()
-        {
-            if (shipCards == null || session == null || session.Fleet == null)
-                return;
-            var fleet = session.Fleet;
-            int credits = session.Wallet.Credits;
-            foreach (var card in shipCards)
-            {
-                var config = card.Config;
-                bool rental = config.IsRental;
-                bool owned = fleet.IsOwned(config);
-                bool current = IsCurrent(fleet, config);
-
-                card.Title.text = config.DisplayName + " · Т" + config.Tier;
-                card.Thumb.color = TierShade(config.Tier);
-                card.Stats.text = ShipStatsLine(config);
-                card.Status.text = current ? "В полёте (текущий)"
-                    : owned ? "В ангаре"
-                    : rental ? "Аренда"
-                    : config.Price + " кр";
-
-                bool canBuy = !owned && !rental && config.Price > 0;
-                card.Buy.gameObject.SetActive(canBuy);
-                if (canBuy)
-                {
-                    card.BuyLabel.text = $"КУПИТЬ ({config.Price} КР)";
-                    card.Buy.interactable = credits >= config.Price;
-                }
-
-                bool canSit = !current && (owned || rental);
-                card.Sit.gameObject.SetActive(canSit);
-                if (canSit)
-                    card.SitLabel.text = "СЕСТЬ В";
-            }
-        }
-
         // «Яйцо» из фолбэка (инстанс в памяти) и ассет egg_rental — одна модель:
-        // до первой пересадки Current не совпадает по ссылке с карточкой аренды
+        // до первой пересадки Current не совпадает по ссылке с витриной аренды
         private static bool IsCurrent(FleetService fleet, ShipConfig config)
         {
             if (fleet.Current == config)
@@ -1348,7 +1328,7 @@ namespace SpaceTaxi.UI
                 && fleet.Current != null && fleet.Current.IsRental;
         }
 
-        // затенение миниатюры по тиру: Т1 — приглушённая, Т5 — яркая
+        // затенение заглушки по тиру: Т1 — приглушённая, Т5 — яркая
         private static Color TierShade(int tier)
         {
             float t = Mathf.Clamp01((tier - 1) / 4f);
@@ -1357,18 +1337,35 @@ namespace SpaceTaxi.UI
             return Color.Lerp(dim, OnboardComputerFactory.BrightColor, t);
         }
 
-        // правила покупки — в FleetService.TryBuy: не-аренда, Price > 0, не куплен;
-        // после оплаты TryBuy сразу пересаживает (полные HP/бак), ShipChanged
-        // перерисует карточки сам
-        private void BuyShip(ShipConfig config)
+        // единственная кнопка витрины: покупка показанного варианта или
+        // пересадка в свой/арендный корабль. Правила покупки — в
+        // FleetService.TryBuy: не-аренда, Price > 0, не куплен; после оплаты
+        // TryBuy сразу пересаживает (полные HP/бак), ShipChanged перерисует сам
+        private void ConfirmShopAction()
         {
-            if (session == null || session.Fleet == null || config == null || !CanOpen())
+            if (session == null || session.Fleet == null || showcaseShip == null || !CanOpen())
                 return;
+            var config = showcaseShip;
+            if (session.Fleet.IsOwned(config) || config.IsRental)
+            {
+                SitIn(config);
+                return;
+            }
             int price = config.Price;
-            if (!session.Fleet.TryBuy(config, session.Wallet))
+            if (price <= 0)
+                return; // «НЕТ В ПРОДАЖЕ» — кнопка серая, но поток проверяет сам
+            // покупка в показанном варианте: индекс витрины = индекс покраски
+            int paintIndex = ShopStockService.DisplayPaintIndex(config, ShopStockService.CurrentSlot(Time.time));
+            if (!session.Fleet.TryBuy(config, session.Wallet, paintIndex))
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
             ShowToast($"Куплен «{config.DisplayName}» (−{price} кр)", emphasized: true);
+            shopStatus.text = paintIndex == 0
+                ? $"Куплен «{config.DisplayName}» в заводской расцветке"
+                : $"Куплен «{config.DisplayName}», покраска вариант {paintIndex}";
+            // купленной модели «нет в продаже» — витрина листается дальше,
+            // сама модель остаётся в списке серой с меткой «В ангаре»
+            FlipShowcase(1);
         }
 
         private void SitIn(ShipConfig config)

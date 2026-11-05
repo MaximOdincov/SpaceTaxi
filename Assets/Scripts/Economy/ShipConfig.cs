@@ -27,6 +27,9 @@ namespace SpaceTaxi.Economy
         [Tooltip("Спрайт модели (арт А1/А2, 512×512 PPU 32, нос вправо); пусто — заглушка")]
         public Sprite ShipSprite;
 
+        [Tooltip("Покрашенные варианты модели (владелец кладёт отдельные PNG); индекс покраски 0 — базовый ShipSprite, i — PaintVariants[i-1]")]
+        public Sprite[] PaintVariants;
+
         [Header("Магазин")]
         public int Price;     // 0 = не продаётся
         public bool IsRental; // арендный — всегда сток
@@ -34,6 +37,23 @@ namespace SpaceTaxi.Economy
         public string Description;
 
         private static ShipConfig eggRentalFallback;
+
+        // число дополнительных покрасок (без базовой)
+        public int PaintVariantCount => PaintVariants != null ? PaintVariants.Length : 0;
+
+        // Спрайт покраски: 0 — базовый ShipSprite, 1..N — PaintVariants.
+        // Кривой индекс или пустой слот — базовый (витрина и корабль не должны
+        // остаться вовсе без спрайта)
+        public Sprite GetPaintSprite(int paintIndex)
+        {
+            if (paintIndex > 0 && PaintVariants != null && paintIndex <= PaintVariants.Length)
+            {
+                Sprite variant = PaintVariants[paintIndex - 1];
+                if (variant != null)
+                    return variant;
+            }
+            return ShipSprite;
+        }
 
         // Фолбэк на арендное «Яйцо», если ShipConfig в GameSession отключён
         public static ShipConfig EggRentalFallback
