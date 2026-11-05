@@ -30,6 +30,7 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 2
     HasRepair: 1
+    RepairTier: 3
     IsHub: 1
     Sector: 0
     LandingRingRadius: 0
@@ -85,6 +86,7 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 1
     HasRepair: 1
+    RepairTier: 1
     IsHub: 0
     Sector: 1
     LandingRingRadius: 0
@@ -177,6 +179,7 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 3
     HasRepair: 1
+    RepairTier: 3
     IsHub: 0
     Sector: 2
     LandingRingRadius: 0
@@ -195,6 +198,7 @@ MonoBehaviour:
       SpinSpeed: 0
     HasFuel: 0
     HasRepair: 1
+    RepairTier: 2
     IsHub: 0
     Sector: 2
     LandingRingRadius: 0
@@ -322,6 +326,7 @@ MonoBehaviour:
       SpinSpeed: 0
     HasFuel: 0
     HasRepair: 1
+    RepairTier: 1
     IsHub: 0
     Sector: 3
     LandingRingRadius: 0
@@ -377,6 +382,7 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 4
     HasRepair: 1
+    RepairTier: 2
     IsHub: 0
     Sector: 3
     LandingRingRadius: 0

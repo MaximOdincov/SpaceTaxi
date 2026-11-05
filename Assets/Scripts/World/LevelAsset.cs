@@ -59,6 +59,8 @@ namespace SpaceTaxi.World
         [Min(0)] public int FuelTier;
         [Tooltip("Планета с мастерской: платный ремонт корпуса (экран [B])")]
         public bool HasRepair;
+        [Tooltip("Тир сети ремонта 1..3: макс. пакет и потолок визита из PricingConfig; 0 — не задан, чинит полностью (хаб = 3)")]
+        [Min(0)] public int RepairTier;
         [Tooltip("Хаб МТО: заправка + мастерская + магазин кораблей и улучшения")]
         public bool IsHub;
         [Tooltip("Класс района: влияет на оплату заказов на это тело")]

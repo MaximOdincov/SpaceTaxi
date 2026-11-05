@@ -39,3 +39,15 @@ MonoBehaviour:
   - 0.7
   - 1
   - 1
+  RepairPackFraction:
+  - 0.25
+  - 0.6
+  - 1
+  RepairPackPriceMul:
+  - 0.8
+  - 1
+  - 1.2
+  RepairTierCapByTier:
+  - 0.3
+  - 0.7
+  - 1
