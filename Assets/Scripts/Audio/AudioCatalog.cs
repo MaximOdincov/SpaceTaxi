@@ -46,5 +46,16 @@ namespace SpaceTaxi.Audio
             }
             return map.TryGetValue(id, out SoundEntry entry) ? entry : null;
         }
+
+        // обход записей группы в порядке каталога (плейлист плеера П9.3);
+        // без дублей по Id
+        public List<SoundId> IdsOfGroup(AudioGroup group)
+        {
+            var ids = new List<SoundId>();
+            foreach (SoundEntry e in entries)
+                if (e != null && e.Group == group && !ids.Contains(e.Id))
+                    ids.Add(e.Id);
+            return ids;
+        }
     }
 }
