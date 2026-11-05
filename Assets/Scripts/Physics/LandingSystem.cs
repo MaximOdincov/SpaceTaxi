@@ -6,7 +6,9 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Physics
 {
-    // Мягкое касание — посадка, жёсткое — урон; звезда — гибель
+    // Мягкое касание — посадка, жёсткое — урон; звезда — гибель.
+    // После ShipController: кэш скорости до шага физики должен включать его тягу/гравитацию
+    [DefaultExecutionOrder(200)]
     public class LandingSystem : MonoBehaviour
     {
         private Ship ship;
@@ -14,6 +16,21 @@ namespace SpaceTaxi.Physics
 
         // лениво: HullSystem может быть добавлен позже Awake (WorldBuilder)
         private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
+
+        // скорость корабля до текущего шага физики. collision.relativeVelocity в
+        // OnCollisionEnter2D ненадёжен: солвер к моменту коллбэка уже погасил
+        // нормальную составляющую удара — лобовой удар читался как ~0 и «без урона»
+        private Vector2 preSolveVelocity;
+
+        // один контакт за шаг физики: несколько пар в один шаг (планета+астероид,
+        // две планеты) не должны бить и сажать дважды
+        private bool touchHandled;
+
+        private void FixedUpdate()
+        {
+            touchHandled = false; // каждый шаг физики предшествует своей пачке коллбэков
+            preSolveVelocity = ship != null && ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
+        }
 
         private void Awake()
         {
@@ -30,7 +47,10 @@ namespace SpaceTaxi.Physics
             Star star = collision.collider.GetComponentInParent<Star>();
             Asteroid asteroid = collision.collider.GetComponentInParent<Asteroid>();
             Comet comet = collision.collider.GetComponentInParent<Comet>();
-            float v = collision.relativeVelocity.magnitude;
+
+            // скорость удара по нормали + тангенсу: relativeVelocity добиваем
+            // кэшем до шага физики (планеты/астероиды статичны — это полная скорость)
+            float v = Mathf.Max(collision.relativeVelocity.magnitude, preSolveVelocity.magnitude);
 
             if (star != null)
             {
@@ -52,7 +72,7 @@ namespace SpaceTaxi.Physics
                 return;
             }
 
-            if (planet == null)
+            if (planet == null || touchHandled)
                 return;
 
             if (v < ship.Config.LandSpeed)
@@ -82,6 +102,7 @@ namespace SpaceTaxi.Physics
         // выжившему на посадке станция чинит и заправляет под ноль
         private void Land(Planet planet, Collision2D collision)
         {
+            touchHandled = true; // касание обработано — параллельные пары в этом шаге молчат
             Vector2 normal = collision.contactCount > 0
                 ? collision.contacts[0].normal
                 : (Vector2)(transform.position - planet.transform.position).normalized;
@@ -123,34 +144,58 @@ namespace SpaceTaxi.Physics
         // контактный удар с уроном — для штрафа выплаты (жар звезды НЕ считается)
         public event Action CrashImpact;
 
+        // урон контактного удара: 0 при v ≤ LandSpeed, плавный вход до полной
+        // линейности к v = LandSpeed+30 (без ступени min(5,…)), кап 30 —
+        // планеты и астероиды считают одинаково
+        private float CrashDamage(float v)
+        {
+            float delta = v - ship.Config.LandSpeed;
+            if (delta <= 0f)
+                return 0f;
+            float ramp = Mathf.Clamp01(delta / 30f);
+            return Mathf.Min(30f, delta * 0.9f * ramp);
+        }
+
         private void Crash(Planet planet, Collision2D collision, float v)
         {
+            float damage = CrashDamage(v);
+            if (damage <= 0f)
+            {
+                // пороговая скорость — урона нет, это просто посадка
+                Land(planet, collision);
+                return;
+            }
+
+            touchHandled = true;
             CrashImpact?.Invoke();
 
             // урон сразу; выжил — считается посадкой
-            float damage = Mathf.Max(5f, (v - ship.Config.LandSpeed) * 0.9f);
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f)); // вариация по силе удара
             CameraFollow.AddShake(Mathf.Clamp01(damage / 45f) * 0.7f); // от «бумкнул» до «въехал»
-            Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0}");
+            Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0.0}");
 
             if (ship.Hp > 0f)
                 Land(planet, collision);
         }
 
         // астероид пояса: посадки нет, State не меняется — корабль отскакивает физикой;
-        // медленное касание бесплатно, удар сжимает корпус и считается столкновением заказа
+        // медленное касание бесплатно (и флаг не тратит), удар сжимает корпус
+        // и считается столкновением заказа
         private void HitAsteroid(float v)
         {
-            if (v < ship.Config.LandSpeed)
+            if (touchHandled)
+                return;
+            float damage = CrashDamage(v);
+            if (damage <= 0f)
                 return;
 
-            float damage = Mathf.Min(30f, (v - ship.Config.LandSpeed) * 0.9f);
+            touchHandled = true;
             CrashImpact?.Invoke();
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
-            Debug.Log($"[Landing] удар об астероид: v={v:0}, урон={damage:0}");
+            Debug.Log($"[Landing] удар об астероид: v={v:0}, урон={damage:0.0}");
         }
     }
 }
