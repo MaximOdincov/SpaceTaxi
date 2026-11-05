@@ -33,7 +33,7 @@ namespace SpaceTaxi.Orders
         // ручных профилей всё равно может давать офферы
         public bool CanGenerate => GetPools() != null;
 
-        // пулы для чтения данных архетипов вне генерации (П8.2: щедрость);
+        // пулы для восстановления пассажира из сейва (SaveSystem);
         // лениво тот же, что и для Generate
         public PassengerPools Pools => GetPools();
 

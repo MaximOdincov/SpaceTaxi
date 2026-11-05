@@ -24,7 +24,8 @@ namespace SpaceTaxi.Orders
         public int DropoffIndex;   // планета Б
         public float ExpiresAt;    // время смерти карточки (Time.time)
         public int Price;          // цена предложения, считается при спавне
-        public PassengerTask Task; // задание пассажира (П5.3); null — архетип без задания
+        public float TipsFraction; // доля чаевых заказа (Н-14): случайные 10–25%, бросок при спавне
+        public PassengerTask Task; // задание пассажира (П5.3); null — задания нет
         public OrderState State = OrderState.Offered;
     }
 
@@ -260,7 +261,7 @@ namespace SpaceTaxi.Orders
             offer.State = OrderState.Active;
             Active = offer;
             CollisionsOfActive = 0; // новый заказ — счёт с нуля
-            offer.Task?.StartDeadline(Time.time); // дедлайн Торопыги пошёл (П5.3)
+            offer.Task?.StartDeadline(Time.time); // дедлайн пошёл (П5.3)
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
@@ -340,7 +341,8 @@ namespace SpaceTaxi.Orders
                 Active.Task.Failed = true;
         }
 
-        // платный сервис (заправка/ремонт) на станции при пассажире — Барыга против
+        // платный сервис (заправка/ремонт) на станции при пассажире — задание
+        // «без заправки» провалено
         private void OnStationServiced(string station)
         {
             if (Active != null && Active.State == OrderState.Aboard
@@ -509,9 +511,8 @@ namespace SpaceTaxi.Orders
 
         // исход задания при доставке (П5.3): успех — +0.10 рейтинга и тост с
         // благодарностью, провал — жалоба (−0.10); заказ при провале задания
-        // НЕ проваливается. Чаевые за успех считает GameSession (П8.2).
-        // Точка интереса (П8.1) требует заработанного трекингом успеха —
-        // довёз, не выполнив, = жалоба
+        // НЕ проваливается. Точка интереса (П8.1) требует заработанного
+        // трекингом успеха — довёз, не выполнив, = жалоба
         private void SettleTask(OrderOffer delivered)
         {
             PassengerTask task = delivered.Task;
@@ -570,14 +571,18 @@ namespace SpaceTaxi.Orders
             int basePrice = OrderPricing.ComputePrice(Pricing,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex));
             offer.Price = PriceWithRatingBonus(basePrice);
-            // задание пассажира (П5.3): по архетипу; дедлайну нужна дальность
-            // маршрута, точкам интереса (П8.1) — концы маршрута и контекст уровня
-            offer.Task = PassengerTasks.Create(passenger.Archetype, RouteDistance(offer),
+            // чаевые (Н-14): случайные 10–25% на заказ, бросок один раз при спавне —
+            // число живёт до выплаты и не «перебрасывается»
+            offer.TipsFraction = UnityEngine.Random.Range(0.10f, 0.25f);
+            // задание пассажира (П5.3): случайный тип с шансом 50% (Н-14); дедлайну
+            // нужна дальность маршрута, точкам интереса (П8.1) — концы маршрута
+            // и контекст уровня
+            offer.Task = PassengerTasks.CreateRandom(RouteDistance(offer),
                 pickup, offer.DropoffIndex, level, CometsAvailable());
             offers.Add(offer);
             OffersChanged?.Invoke();
             OfferAdded?.Invoke();
-            Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
+            Debug.Log($"[Orders] предложение: {passenger.DisplayName}, " +
                       $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр");
         }
 

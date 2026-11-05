@@ -14,9 +14,6 @@ namespace SpaceTaxi.Orders
         [Tooltip("Имя, которое видит игрок")]
         public string DisplayName = "Гость системы";
 
-        [Tooltip("Архетип: Торопыга, Барыга, Турист, Тихоня, Чудик")]
-        public string Archetype = "Турист";
-
         [TextArea(2, 4)]
         [Tooltip("Короткое описание для карточки заказа")]
         public string Description;

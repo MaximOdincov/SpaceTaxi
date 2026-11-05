@@ -7,19 +7,19 @@ namespace SpaceTaxi.Orders
     public enum PassengerTaskKind
     {
         None = 0,     // задания нет
-        Deadline,     // Торопыга: доставить за отведённое время
-        NoRefuel,     // Барыга: без заправки на станциях в пути
-        NoCollision,  // Барыга/Тихоня: без столкновений
-        SpeedLimit,   // Тихоня: не быстрее лимита весь полёт
-        CometFlyby,   // Турист (П8.1): пролететь близко к комете
-        RingVisit,    // Турист: зайти в capture-кольцо планеты
-        StarBackside, // Турист: побывать за звездой относительно центра мира
-        HoleFlyby,    // Чудик: пролететь близко к чёрной дыре
-        WaitOnPlanet, // Чудик: суммарно постоять на планете
+        Deadline,     // доставить за отведённое время
+        NoRefuel,     // без заправки на станциях в пути
+        NoCollision,  // без столкновений
+        SpeedLimit,   // не быстрее лимита весь полёт
+        CometFlyby,   // пролететь близко к комете (П8.1)
+        RingVisit,    // зайти в capture-кольцо планеты
+        StarBackside, // побывать за звездой относительно центра мира
+        HoleFlyby,    // пролететь близко к чёрной дыре
+        WaitOnPlanet, // суммарно постоять на планете
     }
 
-    // Задание пассажира (П5.3, §3.6): одно на заказ, тип задаёт архетип.
-    // Успех — +0.10 рейтинга и чаевые (П8.2), провал — жалоба (−0.10).
+    // Задание пассажира (П5.3): одно на заказ, тип выбирается случайно (Н-14).
+    // Успех — +0.10 рейтинга, провал — жалоба (−0.10).
     public sealed class PassengerTask
     {
         public PassengerTaskKind Kind;
@@ -57,22 +57,50 @@ namespace SpaceTaxi.Orders
     // Каталог заданий: тексты утверждены (§3.6), числа — решение координатора
     public static class PassengerTasks
     {
+        private const float TaskChance = 0.5f;        // шанс задания у заказа (Н-14)
         private const float DeadlineSpeedUnit = 150f; // юн/с — знаменатель формулы T
         private const float DeadlineSlack = 45f;      // с — прибавка к чистому времени
-        private const float QuietSpeedLimit = 250f;   // юн/с — лимит Тихони
+        private const float QuietSpeedLimit = 250f;   // юн/с — лимит скорости
         private const float CometFlybyDistance = 400f;  // юн — подлететь к комете (§3.6)
         private const float HoleFlybyDistance = 800f;   // юн — подлететь к дыре (§3.6)
         private const float WaitOnPlanetSeconds = 10f;  // с — сидеть на планете (§3.6)
 
-        // null — у архетипа задания нет. Точкам интереса (П8.1) нужен уровень:
-        // цель ищется по типу тела; объекта нет — замена доступным типом того же
-        // архетипа, совсем нечего — задания нет
-        public static PassengerTask Create(string archetype, float routeDistance,
+        // Равномерный случайный тип из доступных (Н-14); шанс задания вообще — 50%,
+        // иначе null (UI трактует как «задания нет»). Точкам интереса (П8.1) нужен
+        // уровень: цель ищется по типу тела; объекта нет — тип выпадает из выбора,
+        // ядро условий (Deadline/NoRefuel/NoCollision/SpeedLimit) доступно всегда
+        public static PassengerTask CreateRandom(float routeDistance,
             int pickupIndex, int dropoffIndex, LevelAsset level, bool cometsAvailable)
         {
-            switch (archetype)
+            if (UnityEngine.Random.value >= TaskChance)
+                return null;
+
+            int planet = RandomBodyIndex(level, BodyType.Planet, pickupIndex, dropoffIndex);
+            int star = RandomBodyIndex(level, BodyType.Star);
+            int hole = RandomBodyIndex(level, BodyType.BlackHole);
+
+            var kinds = new List<PassengerTaskKind>(9)
             {
-                case "Торопыга":
+                PassengerTaskKind.Deadline,
+                PassengerTaskKind.NoRefuel,
+                PassengerTaskKind.NoCollision,
+                PassengerTaskKind.SpeedLimit,
+            };
+            if (cometsAvailable)
+                kinds.Add(PassengerTaskKind.CometFlyby);
+            if (planet >= 0)
+            {
+                kinds.Add(PassengerTaskKind.RingVisit);
+                kinds.Add(PassengerTaskKind.WaitOnPlanet);
+            }
+            if (star >= 0)
+                kinds.Add(PassengerTaskKind.StarBackside);
+            if (hole >= 0)
+                kinds.Add(PassengerTaskKind.HoleFlyby);
+
+            switch (kinds[UnityEngine.Random.Range(0, kinds.Count)])
+            {
+                case PassengerTaskKind.Deadline:
                 {
                     float t = routeDistance / DeadlineSpeedUnit + DeadlineSlack;
                     return new PassengerTask
@@ -82,50 +110,32 @@ namespace SpaceTaxi.Orders
                         DeadlineSeconds = t,
                     };
                 }
-                case "Барыга":
-                    return UnityEngine.Random.value < 0.5f
-                        ? new PassengerTask
-                        {
-                            Kind = PassengerTaskKind.NoRefuel,
-                            Text = "Не заправляемся в пути — станции пропускайте.",
-                        }
-                        : NoCollision("Бережёный груз: ни одного столкновения.");
-                case "Тихоня":
-                    return UnityEngine.Random.value < 0.5f
-                        ? new PassengerTask
-                        {
-                            Kind = PassengerTaskKind.SpeedLimit,
-                            Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с весь полёт.",
-                            SpeedLimit = QuietSpeedLimit,
-                        }
-                        : NoCollision("Без трясок, пожалуйста.");
-                case "Турист":
-                    return TouristTask(pickupIndex, dropoffIndex, level, cometsAvailable);
-                case "Чудик":
-                    return OddballTask(pickupIndex, dropoffIndex, level);
-                default:
-                    return null;
-            }
-        }
-
-        // Турист (§3.6): комета / кольцо случайной планеты (не А/Б) / тыл звезды
-        private static PassengerTask TouristTask(int pickupIndex, int dropoffIndex,
-            LevelAsset level, bool cometsAvailable)
-        {
-            int planet = RandomBodyIndex(level, BodyType.Planet, pickupIndex, dropoffIndex);
-            int star = RandomBodyIndex(level, BodyType.Star);
-            var kinds = new List<PassengerTaskKind>(3);
-            if (cometsAvailable)
-                kinds.Add(PassengerTaskKind.CometFlyby);
-            if (planet >= 0)
-                kinds.Add(PassengerTaskKind.RingVisit);
-            if (star >= 0)
-                kinds.Add(PassengerTaskKind.StarBackside);
-            if (kinds.Count == 0)
-                return null;
-
-            switch (kinds[UnityEngine.Random.Range(0, kinds.Count)])
-            {
+                case PassengerTaskKind.NoRefuel:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.NoRefuel,
+                        Text = "Не заправляемся в пути — станции пропускайте.",
+                    };
+                case PassengerTaskKind.NoCollision:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.NoCollision,
+                        Text = "Ни одного столкновения, пожалуйста.",
+                    };
+                case PassengerTaskKind.SpeedLimit:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.SpeedLimit,
+                        Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с весь полёт.",
+                        SpeedLimit = QuietSpeedLimit,
+                    };
+                case PassengerTaskKind.CometFlyby:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.CometFlyby,
+                        Text = $"Покажите комету! Пролетите в {CometFlybyDistance:0} юн от неё.",
+                        DistanceThreshold = CometFlybyDistance,
+                    };
                 case PassengerTaskKind.RingVisit:
                     return new PassengerTask
                     {
@@ -140,43 +150,22 @@ namespace SpaceTaxi.Orders
                         Text = $"С теневой стороны звезды {level.Bodies[star].DisplayName} — говорят, вид необыкновенный.",
                         TargetBodyIndex = star,
                     };
-                default: // CometFlyby — система комет есть всегда (WorldBuilder)
+                case PassengerTaskKind.HoleFlyby:
                     return new PassengerTask
                     {
-                        Kind = PassengerTaskKind.CometFlyby,
-                        Text = $"Покажите комету! Пролетите в {CometFlybyDistance:0} юн от неё.",
-                        DistanceThreshold = CometFlybyDistance,
+                        Kind = PassengerTaskKind.HoleFlyby,
+                        Text = $"Мимо бездны! Пролетите в {HoleFlybyDistance:0} юн от чёрной дыры — и живыми.",
+                        DistanceThreshold = HoleFlybyDistance,
+                    };
+                default: // WaitOnPlanet
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.WaitOnPlanet,
+                        Text = $"Посидим перед стартом на {level.Bodies[planet].DisplayName} минут десять. Тишина — тоже путешествие.",
+                        TargetBodyIndex = planet,
+                        WaitSeconds = WaitOnPlanetSeconds,
                     };
             }
-        }
-
-        // Чудик (§3.6): мимо чёрной дыры / посидеть на планете (не А/Б)
-        private static PassengerTask OddballTask(int pickupIndex, int dropoffIndex, LevelAsset level)
-        {
-            int hole = RandomBodyIndex(level, BodyType.BlackHole);
-            int planet = RandomBodyIndex(level, BodyType.Planet, pickupIndex, dropoffIndex);
-            var kinds = new List<PassengerTaskKind>(2);
-            if (hole >= 0)
-                kinds.Add(PassengerTaskKind.HoleFlyby);
-            if (planet >= 0)
-                kinds.Add(PassengerTaskKind.WaitOnPlanet);
-            if (kinds.Count == 0)
-                return null;
-
-            if (kinds[UnityEngine.Random.Range(0, kinds.Count)] == PassengerTaskKind.HoleFlyby)
-                return new PassengerTask
-                {
-                    Kind = PassengerTaskKind.HoleFlyby,
-                    Text = $"Мимо бездны! Пролетите в {HoleFlybyDistance:0} юн от чёрной дыры — и живыми.",
-                    DistanceThreshold = HoleFlybyDistance,
-                };
-            return new PassengerTask
-            {
-                Kind = PassengerTaskKind.WaitOnPlanet,
-                Text = $"Посидим перед стартом на {level.Bodies[planet].DisplayName} минут десять. Тишина — тоже путешествие.",
-                TargetBodyIndex = planet,
-                WaitSeconds = WaitOnPlanetSeconds,
-            };
         }
 
         // П8.1: успех точки интереса фиксируется только трекингом — в отличие
@@ -207,11 +196,6 @@ namespace SpaceTaxi.Orders
                     return i;
             }
             return -1; // недостижимо: count посчитан по тому же фильтру
-        }
-
-        private static PassengerTask NoCollision(string text)
-        {
-            return new PassengerTask { Kind = PassengerTaskKind.NoCollision, Text = text };
         }
     }
 }

@@ -388,7 +388,7 @@ namespace SpaceTaxi.UI
             columnLe.preferredWidth = 1f;
 
             var nameRow = H("NameRow", column.transform);
-            TMP_Text name = Text(nameRow, "Имя · архетип", 17f, BrightColor, "Name");
+            TMP_Text name = Text(nameRow, "Имя", 17f, BrightColor, "Name");
             Flexible(name.gameObject);
             name.alignment = TextAlignmentOptions.Left;
             TMP_Text price = Text(nameRow, "0 кр", 16f, TaxiColor, "Price");
@@ -440,7 +440,7 @@ namespace SpaceTaxi.UI
             columnLe.minWidth = 100f;
             columnLe.preferredWidth = 1f;
 
-            Text(column, "Имя · архетип", 20f, BrightColor, "Name");
+            Text(column, "Имя", 20f, BrightColor, "Name");
             Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 18f, TaxiColor, "Route");
             Text(column, "статус", 15f, LabelColor, "OrderStatus");
             Text(column, "«пожелание»", 15f, LabelColor, "Wish");
