@@ -66,22 +66,21 @@ namespace SpaceTaxi.Physics
                 return;
             }
 
+            // планета — до астероида: Enter для пары не повторяется, и если
+            // первым придёт астероид (ставит touchHandled), контакт планеты
+            // проглотится навсегда — корабль «лежит» на планете без посадки
+            if (planet != null && !touchHandled)
+            {
+                if (v < ship.Config.LandSpeed)
+                    Land(planet, collision);
+                else
+                    Crash(planet, collision, v);
+                return;
+            }
+
             if (asteroid != null)
             {
                 HitAsteroid(v);
-                return;
-            }
-
-            if (planet == null || touchHandled)
-                return;
-
-            if (v < ship.Config.LandSpeed)
-            {
-                Land(planet, collision);
-            }
-            else
-            {
-                Crash(planet, collision, v);
             }
         }
 

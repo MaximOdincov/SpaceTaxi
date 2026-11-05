@@ -258,7 +258,8 @@ namespace SpaceTaxi.UI
                 return;
             float tick = Mathf.Clamp01((now - tickStartAt) / TickSeconds);
             float tickEased = 1f - Mathf.Pow(1f - tick, 3f); // easeOutCubic
-            totalRow.Text.text = $"ИТОГО +{Mathf.RoundToInt(tickTarget * tickEased)} кр";
+            int shown = Mathf.RoundToInt(tickTarget * tickEased);
+            totalRow.Text.text = $"ИТОГО {(shown < 0 ? "−" : "+")}{Mathf.Abs(shown)} кр";
             if (tick >= 1f)
                 tickRunning = false;
         }
