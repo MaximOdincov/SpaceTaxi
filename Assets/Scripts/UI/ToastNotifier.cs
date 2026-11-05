@@ -118,6 +118,11 @@ namespace SpaceTaxi.UI
             rect.anchoredPosition = Vector2.zero;
             rect.sizeDelta = NormalSize;
 
+            // вью ждёт в пуле невидимым — иначе три плашки висят на экране
+            // с первого кадра сцены до первого прогона через цикл фейда
+            go.SetActive(false);
+            group.alpha = 0f;
+
             return new ToastView { Go = go, Rect = rect, Label = label, Group = group };
         }
 
