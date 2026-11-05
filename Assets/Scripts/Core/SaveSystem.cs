@@ -107,7 +107,10 @@ namespace SpaceTaxi.Core
                 || session.Debt == null || session.Rating == null
                 || session.Fleet == null || session.Ship == null
                 || session.Orders == null
-                || session.Debt.UnpaidAccidents >= 3)
+                || session.Debt.UnpaidAccidents >= 3
+                // окно респавна: корабль мёртв на месте гибели — не сохраняем,
+                // иначе continue поднимет его и Abandon списал бы свой корабль
+                || session.Ship.State == ShipState.Respawning)
                 return;
 
             var data = new SaveData

@@ -51,7 +51,10 @@ namespace SpaceTaxi.Economy
         // сейвом не сохраняется — Save его пропускает
         public void Restore(int restoredBalance, int restoredAccidents)
         {
-            balance = Math.Max(0, restoredBalance);
+            int clamped = Math.Max(0, restoredBalance);
+            if (clamped == balance && Math.Max(0, restoredAccidents) == unpaidAccidents)
+                return; // как Wallet.Restore: без события — иначе ложный тон долга при загрузке
+            balance = clamped;
             unpaidAccidents = Math.Max(0, restoredAccidents);
             DebtChanged?.Invoke(balance);
         }
