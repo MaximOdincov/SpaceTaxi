@@ -168,7 +168,8 @@ namespace SpaceTaxi.Physics
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 60;
 
-            ps.emission.rateOverTime = 0f;
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
 
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Sphere;
