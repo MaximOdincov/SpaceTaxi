@@ -29,6 +29,15 @@ namespace SpaceTaxi.UI
 
             group = gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
+            // П11.1: HUD при панелях гасится корневой группой — тост живёт внутри
+            // HUD, но должен читаться поверх панелей: своя альфа без родителей
+            group.ignoreParentGroups = true;
+
+            // поверх карты/паузы (один канвас) и станции/модала завершения
+            // (100/110), под увольнением (200)
+            var topCanvas = gameObject.AddComponent<Canvas>();
+            topCanvas.overrideSorting = true;
+            topCanvas.sortingOrder = 120;
 
             var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
             textGo.transform.SetParent(transform, false);
