@@ -266,6 +266,19 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
+            // Взлёт — только на живом кадре: Update и Input System живут в
+            // реальном времени, timeScale=0 (пауза, модал завершения заказа)
+            // их не останавливает. Space = Thrust и «продолжить» в UI — без
+            // гейта закрывающий модал клик взлетал тем же кадром, и камера
+            // уходила с места доставки (Н-9)
+            if (Time.timeScale <= 0f)
+            {
+                ThrustOn = false;
+                BrakeOn = false;
+                StrafeLevel = 0f;
+                return;
+            }
+
             // с пустым баком взлёт невозможен
             if (ship.State == ShipState.Landed && ship.Fuel > 0f
                 && thrustAction != null && thrustAction.WasPressedThisFrame())
