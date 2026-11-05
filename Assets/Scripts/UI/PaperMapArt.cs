@@ -131,8 +131,9 @@ namespace SpaceTaxi.UI
                 d += wob;
                 return d >= 0.86f && d <= 0.96f;
             });
-            s = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f);
-            s.border = new Vector4(16f, 16f, 16f, 16f); // 9-slice: 16+16 < высота кнопки 40
+            // border задаётся только при создании (Sprite.border — read only)
+            s = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f,
+                0, SpriteMeshType.FullRect, new Vector4(16f, 16f, 16f, 16f)); // 9-slice: 16+16 < высота кнопки 40
             cache["inkframe"] = s;
             return s;
         }
