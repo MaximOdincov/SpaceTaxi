@@ -14,6 +14,8 @@ namespace SpaceTaxi.World
         public bool HasFuel { get; private set; }
         public bool HasRepair { get; private set; }
         public bool IsHub { get; private set; }
+        // топливная сеть (Н-4): тир планеты — цена/ед и запас визита из PricingConfig
+        public int FuelTier { get; private set; }
 
         protected Physics.PhysicsConfig config;
 
@@ -38,6 +40,7 @@ namespace SpaceTaxi.World
             HasFuel = data.HasFuel;
             HasRepair = data.HasRepair;
             IsHub = data.IsHub;
+            FuelTier = data.FuelTier;
             spinSpeed = data.Visuals != null ? data.Visuals.SpinSpeed : 0f;
             landingRingOverride = data.LandingRingRadius;
             captureRingOverride = data.CaptureRingRadius;

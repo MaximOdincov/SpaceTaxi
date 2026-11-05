@@ -45,6 +45,15 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель чаевых на «Меридиане» — перк «комфорт-салон» (16 §3.3)")]
         public float MeridianTipsBonusMul = 1.1f;
 
+        [Header("Топливные сети (21 §3.7): индекс = тир сети − 1")]
+        [Tooltip("Цена кр/ед по тиру сети: 1 — дёшево и мало, 4 — люкс (полный бак, оверпрайс)")]
+        public float[] FuelPricePerUnitByTier = { 0.8f, 1f, 1.3f, 1.8f };
+        [Tooltip("Запас топлива сети за один визит, доля бака корабля")]
+        public float[] FuelStockFractionByTier = { 0.35f, 0.7f, 1f, 1f };
+
+        // базовая сеть: планеты без проставленного FuelTier и старые ассеты карт
+        public const int BaseFuelTier = 2;
+
         public float GetSectorMultiplier(Sector sector)
         {
             switch (sector)
@@ -56,6 +65,32 @@ namespace SpaceTaxi.Economy
                 case Sector.Far: return SectorFarMul;
                 default: return 1f;
             }
+        }
+
+        // цена единицы топлива сети; тир 0/некорректный → базовая сеть (1 кр/ед)
+        public float GetFuelPricePerUnit(int tier)
+        {
+            var prices = FuelPricePerUnitByTier;
+            int index = FuelTierIndex(tier, prices != null ? prices.Length : 0);
+            return index >= 0 ? prices[index] : 1f;
+        }
+
+        // запас сети за визит, доля бака; тир 0/некорректный → базовая сеть
+        public float GetFuelStockFraction(int tier)
+        {
+            var fractions = FuelStockFractionByTier;
+            int index = FuelTierIndex(tier, fractions != null ? fractions.Length : 0);
+            return index >= 0 ? fractions[index] : 1f;
+        }
+
+        // индекс массива 0..n-1: незаданный тир считаем базовым, верхний кламп — на короткий массив
+        private static int FuelTierIndex(int tier, int length)
+        {
+            if (length <= 0)
+                return -1;
+            if (tier <= 0)
+                tier = BaseFuelTier;
+            return Mathf.Clamp(tier, 1, length) - 1;
         }
 
         private static PricingConfig fallback;

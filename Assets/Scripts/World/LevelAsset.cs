@@ -55,6 +55,8 @@ namespace SpaceTaxi.World
         public BodyVisuals Visuals = new BodyVisuals();
         [Tooltip("Планета с заправкой: платная дозаправка топлива (экран [B])")]
         public bool HasFuel;
+        [Tooltip("Тир топливной сети 1..4 (цена/ед и запас визита из PricingConfig); 0 — тир не задан, считается базовой сетью")]
+        [Min(0)] public int FuelTier;
         [Tooltip("Планета с мастерской: платный ремонт корпуса (экран [B])")]
         public bool HasRepair;
         [Tooltip("Хаб МТО: заправка + мастерская + магазин кораблей и улучшения")]

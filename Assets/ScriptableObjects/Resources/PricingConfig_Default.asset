@@ -29,3 +29,13 @@ MonoBehaviour:
   LowRatingSpawnThreshold: 2
   LowRatingSpawnSlowdown: 1.3
   MeridianTipsBonusMul: 1.1
+  FuelPricePerUnitByTier:
+  - 0.8
+  - 1
+  - 1.3
+  - 1.8
+  FuelStockFractionByTier:
+  - 0.35
+  - 0.7
+  - 1
+  - 1
