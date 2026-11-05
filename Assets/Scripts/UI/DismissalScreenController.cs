@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 
@@ -60,6 +61,7 @@ namespace SpaceTaxi.UI
             if (shown)
                 return;
             shown = true;
+            Sound.Play(SoundId.DismissalTone); // П9.3: тон увольнения до глушения экранов
 
             if (screen == null)
                 screen = BuildScreen();

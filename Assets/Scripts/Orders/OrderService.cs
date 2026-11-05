@@ -74,6 +74,7 @@ namespace SpaceTaxi.Orders
 
         // события для UI
         public event Action OffersChanged;
+        public event Action OfferAdded; // новая карточка (П9.3) — пинг заказа; OffersChanged не годится: он и на протухание
         public event Action ActiveOrderChanged;
         public event Action<OrderOffer> PassengerBoarded;
         public event Action<OrderOffer> OrderDelivered;
@@ -488,6 +489,7 @@ namespace SpaceTaxi.Orders
                 pickup, offer.DropoffIndex, level, CometsAvailable());
             offers.Add(offer);
             OffersChanged?.Invoke();
+            OfferAdded?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName} ({passenger.Archetype}), " +
                       $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр");
         }
