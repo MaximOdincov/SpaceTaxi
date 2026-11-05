@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,30 +10,67 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Тосты событий заказов и корабля
+    // Тосты событий заказов и корабля: вертикальный стек до 3 с шагом,
+    // очередь со стаггером и дедупом, аварийные (emphasized) поверх очереди
     public class ToastNotifier : MonoBehaviour
     {
-        [Tooltip("Сколько секунд висит тост")]
+        [Tooltip("Сколько секунд висит обычный тост")]
         public float duration = 3.5f;
 
-        private TMP_Text label;
-        private CanvasGroup group;
-        private float hideAt;
+        private const int MaxVisible = 3;        // слотов в стеке; старейший вытесняется
+        private const float EmphasizedDuration = 5f;
+        private const float Stagger = 0.15f;     // пауза между показами тостов одного кадра
+        private const float DedupWindow = 10f;   // одинаковый текст — не чаще раза в 10 с
+        private const float EvictAfter = 1.5f;   // старейший вытесняется, прожив столько
+        private const float FadeInTime = 0.15f;
+        private const float FadeOutTime = 0.2f;
+        private const float RowStep = 8f;        // вертикальный зазор между тостами
+        private const float SlideSpeed = 900f;   // скорость сдвига стека, ед/с
+        private const float EntryDrop = 20f;     // въезд нового тоста сверху
+        private const int DedupCacheLimit = 32;
+
+        private static readonly Vector2 NormalSize = new Vector2(700f, 44f);
+        private static readonly Vector2 EmphasizedSize = new Vector2(900f, 58f);
+
+        private readonly struct Item
+        {
+            public readonly string Message;
+            public readonly bool Emphasized;
+
+            public Item(string message, bool emphasized)
+            {
+                Message = message;
+                Emphasized = emphasized;
+            }
+        }
+
+        private sealed class ToastView
+        {
+            public GameObject Go;
+            public RectTransform Rect;
+            public TMP_Text Label;
+            public CanvasGroup Group;
+            public float ShownAt;
+            public float HideAt;
+            public float TargetY; // верх тоста относительно верха контейнера (вниз = минус)
+        }
+
+        private readonly List<Item> pending = new List<Item>();          // [0] — следующий
+        private readonly List<ToastView> active = new List<ToastView>(); // [0] — новейший, верх стека
+        private readonly List<ToastView> fading = new List<ToastView>(); // уходят, слот не занимают
+        private readonly List<ToastView> pool = new List<ToastView>();
+        private readonly Dictionary<string, float> lastShownAt = new Dictionary<string, float>();
+        private float nextShowAt; // гейт стаггера (unscaledTime)
+
         private bool bound;
-        private readonly System.Collections.Generic.Queue<(string message, bool emphasized)> queue
-            = new System.Collections.Generic.Queue<(string, bool)>();
 
         private void Awake()
         {
-            var image = gameObject.AddComponent<Image>();
-            image.color = new Color(0.031f, 0.078f, 0.047f, 0.92f);
-            image.raycastTarget = false;
-
-            group = gameObject.AddComponent<CanvasGroup>();
-            group.blocksRaycasts = false;
             // П11.1: HUD при панелях гасится корневой группой — тост живёт внутри
             // HUD, но должен читаться поверх панелей: своя альфа без родителей
-            group.ignoreParentGroups = true;
+            var rootGroup = gameObject.AddComponent<CanvasGroup>();
+            rootGroup.blocksRaycasts = false;
+            rootGroup.ignoreParentGroups = true;
 
             // поверх карты/паузы (один канвас) и станции/модала завершения
             // (100/110), под увольнением (200)
@@ -40,51 +78,147 @@ namespace SpaceTaxi.UI
             topCanvas.overrideSorting = true;
             topCanvas.sortingOrder = 120;
 
+            // корень — невидимый контейнер стека (позиция задана сценой: top-center)
+            var self = (RectTransform)transform;
+            self.sizeDelta = new Vector2(EmphasizedSize.x, MaxVisible * (EmphasizedSize.y + RowStep));
+
+            for (int i = 0; i < MaxVisible; i++)
+                pool.Add(CreateView());
+        }
+
+        private ToastView CreateView()
+        {
+            var go = new GameObject("Toast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+            go.transform.SetParent(transform, false);
+
+            var image = go.GetComponent<Image>();
+            image.color = new Color(0.031f, 0.078f, 0.047f, 0.92f);
+            image.raycastTarget = false;
+
+            var group = go.GetComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+
             var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textGo.transform.SetParent(transform, false);
-            label = textGo.GetComponent<TextMeshProUGUI>();
+            textGo.transform.SetParent(go.transform, false);
+            var label = textGo.GetComponent<TextMeshProUGUI>();
             label.fontSize = 22f;
             label.color = new Color(0.66f, 1f, 0.8f);
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
-            var rect = label.rectTransform;
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(18f, 8f);
-            rect.offsetMax = new Vector2(-18f, -8f);
+            var labelRect = label.rectTransform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(18f, 8f);
+            labelRect.offsetMax = new Vector2(-18f, -8f);
 
-            var self = (RectTransform)transform;
-            self.sizeDelta = new Vector2(700f, 44f);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = NormalSize;
 
-            // объект всегда активен (иначе Update не подпишется на события), прячем альфой
-            group.alpha = 0f;
+            return new ToastView { Go = go, Rect = rect, Label = label, Group = group };
         }
 
         public void Show(string message, bool emphasized = false)
         {
-            queue.Enqueue((message, emphasized)); // события в один кадр — по очереди
+            if (string.IsNullOrEmpty(message) || IsDuplicate(message))
+                return;
+            var item = new Item(message, emphasized);
+            if (emphasized)
+            {
+                // поверх очереди: после уже ждущих аварийных, но впереди обычных
+                int index = 0;
+                while (index < pending.Count && pending[index].Emphasized)
+                    index++;
+                pending.Insert(index, item);
+            }
+            else
+            {
+                pending.Add(item);
+            }
         }
 
-        private void Display(string message, bool emphasized)
+        private bool IsDuplicate(string message)
         {
-            label.text = message;
-            group.alpha = 1f;
-            hideAt = Time.unscaledTime + (emphasized ? 5f : duration);
+            float now = Time.unscaledTime;
+            if (lastShownAt.TryGetValue(message, out float shown) && now - shown < DedupWindow)
+                return true;
+            for (int i = 0; i < pending.Count; i++)
+            {
+                if (pending[i].Message == message)
+                    return true; // уже ждёт показ — второй раз не ставим
+            }
+            if (lastShownAt.Count > DedupCacheLimit)
+                PruneDedupCache(now);
+            return false;
+        }
 
-            // важные события — крупнее и шире
-            label.fontSize = emphasized ? 30f : 22f;
-            ((RectTransform)transform).sizeDelta = emphasized ? new Vector2(900f, 58f) : new Vector2(700f, 44f);
+        private void PruneDedupCache(float now)
+        {
+            List<string> stale = null;
+            foreach (var pair in lastShownAt)
+            {
+                if (now - pair.Value >= DedupWindow)
+                {
+                    if (stale == null)
+                        stale = new List<string>();
+                    stale.Add(pair.Key);
+                }
+            }
+            if (stale != null)
+                foreach (var key in stale)
+                    lastShownAt.Remove(key);
         }
 
         private void Update()
         {
-            if (group.alpha > 0f && Time.unscaledTime >= hideAt)
-                group.alpha = 0f;
+            float now = Time.unscaledTime;
+            float dt = Time.unscaledDeltaTime;
 
-            if (group.alpha <= 0f && queue.Count > 0)
+            // истёкшие — в затухание, слот освобождается сразу
+            for (int i = active.Count - 1; i >= 0; i--)
             {
-                var next = queue.Dequeue();
-                Display(next.message, next.emphasized);
+                var view = active[i];
+                view.Group.alpha = Mathf.Min(1f, view.Group.alpha + dt / FadeInTime);
+                if (now >= view.HideAt)
+                    Retire(i);
+            }
+
+            // очередь ждёт, слотов нет — вытесняем старейший прожитый тост
+            if (pending.Count > 0 && active.Count >= MaxVisible
+                && now - active[active.Count - 1].ShownAt >= EvictAfter)
+                Retire(active.Count - 1);
+
+            // добор из очереди: стаггер между тостами одного кадра, аварийные — без задержки
+            while (pending.Count > 0 && active.Count < MaxVisible
+                && (now >= nextShowAt || pending[0].Emphasized))
+            {
+                Display(pending[0]);
+                pending.RemoveAt(0);
+            }
+
+            // плавный сдвиг стека при появлении/уходе соседей
+            for (int i = 0; i < active.Count; i++)
+            {
+                var view = active[i];
+                float y = view.Rect.anchoredPosition.y;
+                if (!Mathf.Approximately(y, view.TargetY))
+                    view.Rect.anchoredPosition = new Vector2(0f, Mathf.MoveTowards(y, view.TargetY, SlideSpeed * dt));
+            }
+
+            // затухание ушедших на месте
+            for (int i = fading.Count - 1; i >= 0; i--)
+            {
+                var view = fading[i];
+                view.Group.alpha -= dt / FadeOutTime;
+                if (view.Group.alpha <= 0f)
+                {
+                    view.Go.SetActive(false);
+                    fading.RemoveAt(i);
+                    pool.Add(view);
+                }
             }
 
             if (bound)
@@ -155,6 +289,49 @@ namespace SpaceTaxi.UI
                 comets.CometIncoming += (entry, direction) => Show("Комета приближается!", true);
 
             bound = true;
+        }
+
+        private void Display(Item item)
+        {
+            if (pool.Count == 0)
+                pool.Add(CreateView()); // страховка, слот обязан быть свободен
+            var view = pool[pool.Count - 1];
+            pool.RemoveAt(pool.Count - 1);
+
+            view.Label.text = item.Message;
+            // важные события — крупнее и шире
+            view.Label.fontSize = item.Emphasized ? 30f : 22f;
+            view.Rect.sizeDelta = item.Emphasized ? EmphasizedSize : NormalSize;
+            view.ShownAt = Time.unscaledTime;
+            view.HideAt = view.ShownAt + (item.Emphasized ? EmphasizedDuration : duration);
+            view.TargetY = 0f;
+            view.Rect.anchoredPosition = new Vector2(0f, -EntryDrop);
+            view.Group.alpha = 0f;
+            view.Go.SetActive(true);
+
+            active.Insert(0, view); // новейший — в верхний слот, остальные сдвигаются вниз
+            Relayout();
+
+            lastShownAt[item.Message] = view.ShownAt;
+            nextShowAt = view.ShownAt + Stagger;
+        }
+
+        private void Retire(int index)
+        {
+            fading.Add(active[index]);
+            active.RemoveAt(index);
+            Relayout();
+        }
+
+        private void Relayout()
+        {
+            float offset = 0f;
+            for (int i = 0; i < active.Count; i++)
+            {
+                var view = active[i];
+                view.TargetY = -offset;
+                offset += view.Rect.sizeDelta.y + RowStep;
+            }
         }
 
         private static string Prefix(string phrase)
