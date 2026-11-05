@@ -221,6 +221,8 @@ namespace SpaceTaxi.World
                 go.AddComponent<EngineEffects>();
             if (go.GetComponent<SpeedTrail>() == null)
                 go.AddComponent<SpeedTrail>();
+            if (go.GetComponent<DamageEffects>() == null)
+                go.AddComponent<DamageEffects>();
 
             go.SetActive(true);
             return ship;
