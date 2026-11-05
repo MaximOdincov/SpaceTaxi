@@ -199,6 +199,10 @@ namespace SpaceTaxi.Audio
         // иначе две корутины воюют за один канал и могут застопать свежую музыку
         private readonly List<Coroutine> musicFades = new List<Coroutine>();
 
+        // число ещё не завершённых кроссфейдов (счётчик, а не musicFades.Count:
+        // хэндлы из списка не удаляются до StopAllMusicFades)
+        private int activeMusicFades;
+
         private void StopAllMusicFades()
         {
             foreach (Coroutine fade in musicFades)
@@ -327,6 +331,21 @@ namespace SpaceTaxi.Audio
 
         private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
         {
+            activeMusicFades++;
+            try
+            {
+                yield return RunCrossfade(fadeIn, fadeOut, targetVolume);
+            }
+            finally
+            {
+                // finally отработает и при остановке корутины — иначе счётчик
+                // залипает и ApplyMusicVolume навсегда игнорирует слайдер
+                activeMusicFades--;
+            }
+        }
+
+        private IEnumerator RunCrossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
+        {
             float t = 0f;
             while (t < MusicFadeTime)
             {
@@ -365,7 +384,7 @@ namespace SpaceTaxi.Audio
         // кроссфейда цель пересчитывает сама корутина (см. Crossfade)
         private void ApplyMusicVolume()
         {
-            if (musicFades.Count > 0)
+            if (activeMusicFades > 0)
                 return;
             float target = CurrentMusicVolume();
             if (musicA != null && musicA.isPlaying)

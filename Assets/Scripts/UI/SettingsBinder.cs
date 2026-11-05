@@ -26,6 +26,10 @@ namespace SpaceTaxi.UI
         private const float LabelX = 100f;
         private const float SliderX = 360f;
         private const float ValueX = 730f;
+        // префаб раскладывал элементы от верхнего левого края панели —
+        // отрицательный y считается вниз от верха
+        private static readonly Vector2 TopAnchor = new Vector2(0f, 1f);
+        private static readonly Vector2 TopPivot = new Vector2(0f, 1f);
 
         private static readonly Color LabelGreen = new Color(0.357f, 0.788f, 0.561f, 1f);
         private static readonly Color TrackDark = new Color(0.059f, 0.2f, 0.125f, 0.82f);
@@ -95,7 +99,7 @@ namespace SpaceTaxi.UI
 
             // шапка
             Point(panel.Find("Title"), 0f, -40f, 420f, 46f, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-            Point(panel.Find("SoundTitle"), LabelX, -100f, 320f, 32f, Vector2.zero, Vector2.zero);
+            Point(panel.Find("SoundTitle"), LabelX, -100f, 320f, 32f, TopAnchor, TopPivot);
             SetStyle(panel.Find("SoundTitle"), fontSource, 28f);
 
             // строки громкости: подпись слева, слайдер по центру, значение справа
@@ -106,29 +110,29 @@ namespace SpaceTaxi.UI
             LayoutFullscreenRow(panel, RowTop0 - RowStep * SliderNames.Length, fontSource);
 
             // управление: две колонки, в префабе они перекрывались
-            Point(panel.Find("Div1"), LabelX, -420f, 760f, 2f, Vector2.zero, Vector2.zero);
-            Point(panel.Find("ControlsTitle"), LabelX, -450f, 400f, 32f, Vector2.zero, Vector2.zero);
+            Point(panel.Find("Div1"), LabelX, -420f, 760f, 2f, TopAnchor, TopPivot);
+            Point(panel.Find("ControlsTitle"), LabelX, -450f, 400f, 32f, TopAnchor, TopPivot);
             SetStyle(panel.Find("ControlsTitle"), fontSource, 28f);
-            Point(panel.Find("Controls1"), LabelX, -490f, 370f, 150f, Vector2.zero, Vector2.zero);
-            Point(panel.Find("Controls2"), 530f, -490f, 380f, 112f, Vector2.zero, Vector2.zero);
+            Point(panel.Find("Controls1"), LabelX, -490f, 370f, 150f, TopAnchor, TopPivot);
+            Point(panel.Find("Controls2"), 530f, -490f, 380f, 112f, TopAnchor, TopPivot);
 
             // кнопки одним нижним рядом
-            Point(panel.Find("Button_Back"), 200f, -688f, 260f, 56f, Vector2.zero, Vector2.zero);
-            Point(panel.Find("Button_Apply"), 500f, -688f, 260f, 56f, Vector2.zero, Vector2.zero);
+            Point(panel.Find("Button_Back"), 200f, -688f, 260f, 56f, TopAnchor, TopPivot);
+            Point(panel.Find("Button_Apply"), 500f, -688f, 260f, 56f, TopAnchor, TopPivot);
         }
 
         private void LayoutSliderRow(Transform panel, string sliderName, float rowTop, TMP_Text fontSource)
         {
             float centerY = rowTop - 16f;
 
-            Point(panel.Find(sliderName + "Label"), LabelX, centerY, 230f, 32f, Vector2.zero, new Vector2(0f, 0.5f));
+            Point(panel.Find(sliderName + "Label"), LabelX, centerY, 230f, 32f, TopAnchor, new Vector2(0f, 0.5f));
             SetStyle(panel.Find(sliderName + "Label"), fontSource, 28f);
 
             RectTransform slider = panel.Find(sliderName) as RectTransform;
-            Point(slider, SliderX, centerY, 360f, 26f, Vector2.zero, new Vector2(0f, 0.5f));
+            Point(slider, SliderX, centerY, 360f, 26f, TopAnchor, new Vector2(0f, 0.5f));
             FixSliderInternals(slider);
 
-            Point(panel.Find(sliderName + "Value"), ValueX, centerY, 100f, 32f, Vector2.zero, new Vector2(0f, 0.5f));
+            Point(panel.Find(sliderName + "Value"), ValueX, centerY, 100f, 32f, TopAnchor, new Vector2(0f, 0.5f));
             SetStyle(panel.Find(sliderName + "Value"), fontSource, 28f);
         }
 
@@ -164,13 +168,13 @@ namespace SpaceTaxi.UI
                 label.font = fontSource.font;
                 label.fontSharedMaterial = fontSource.fontSharedMaterial;
             }
-            SetRect(label.rectTransform, Vector2.zero, Vector2.zero, new Vector2(0f, 0.5f),
+            SetRect(label.rectTransform, TopAnchor, TopAnchor, new Vector2(0f, 0.5f),
                 new Vector2(LabelX, centerY), new Vector2(230f, 32f));
 
             // тумблер в колонке слайдеров: тёмная плашка + галочка, стилистика треков
             var toggleGo = new GameObject("ToggleFullscreen", typeof(RectTransform), typeof(Image), typeof(Toggle));
             toggleGo.transform.SetParent(panel, false);
-            SetRect(toggleGo.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(0f, 0.5f),
+            SetRect(toggleGo.GetComponent<RectTransform>(), TopAnchor, TopAnchor, new Vector2(0f, 0.5f),
                 new Vector2(SliderX, centerY), new Vector2(34f, 26f));
             Image bg = toggleGo.GetComponent<Image>();
             bg.color = TrackDark;
