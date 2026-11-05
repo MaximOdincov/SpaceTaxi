@@ -45,5 +45,15 @@ namespace SpaceTaxi.Economy
             if (balance == 0)
                 unpaidAccidents = 0;
         }
+
+        // восстановление из сейва (П10.1): баланс и счётчик аварий целиком.
+        // Dismissal на загрузке не файрим: терминальное состояние (3 аварии)
+        // сейвом не сохраняется — Save его пропускает
+        public void Restore(int restoredBalance, int restoredAccidents)
+        {
+            balance = Math.Max(0, restoredBalance);
+            unpaidAccidents = Math.Max(0, restoredAccidents);
+            DebtChanged?.Invoke(balance);
+        }
     }
 }

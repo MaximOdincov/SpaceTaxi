@@ -135,6 +135,32 @@ namespace SpaceTaxi.Economy
             SetCurrent(ShipConfig.EggRentalFallback);
         }
 
+        // восстановление парка из сейва (П10.1): владение, уровни, текущая модель.
+        // Конфиги резолвит вызывающий (SaveSystem) из каталога Resources/Ships;
+        // кривой текущий id — аренда (фолбэк), чужие в списке владения пропускаются.
+        // SetCurrent пересобирает Eff живого корпуса с полными HP/баком («пересадка»),
+        // поэтому сохранённые HP/топливо сейва применяются ПОСЛЕ этого метода
+        public void RestoreState(ShipConfig restoredCurrent, IReadOnlyList<ShipConfig> restoredOwned,
+            IReadOnlyDictionary<string, int[]> restoredLevels)
+        {
+            owned.Clear();
+            if (restoredOwned != null)
+                foreach (ShipConfig config in restoredOwned)
+                    if (config != null && !config.IsRental && !owned.Contains(config))
+                        owned.Add(config);
+
+            upgradeLevels.Clear();
+            if (restoredLevels != null)
+                foreach (KeyValuePair<string, int[]> pair in restoredLevels)
+                    if (!string.IsNullOrEmpty(pair.Key))
+                        upgradeLevels[pair.Key] = ShipStats.NormalizeLevels(pair.Value);
+
+            if (restoredCurrent == null
+                || (!restoredCurrent.IsRental && !owned.Contains(restoredCurrent)))
+                restoredCurrent = ShipConfig.EggRentalFallback;
+            SetCurrent(restoredCurrent);
+        }
+
         // запись уровней создаётся лениво — нулевая (сток); без Id хранить некуда
         private int[] LevelsOf(string id)
         {

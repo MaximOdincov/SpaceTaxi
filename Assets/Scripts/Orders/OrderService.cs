@@ -240,6 +240,28 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
+        // восстановление счётчиков из сейва (П10.1)
+        public void RestoreCounters(int restoredDeliveries, int restoredFailures)
+        {
+            Deliveries = Math.Max(0, restoredDeliveries);
+            Failures = Math.Max(0, restoredFailures);
+        }
+
+        // восстановление активного заказа из сейва (П10.1): оффер построен
+        // вызывающим (пассажир и задание уже собраны, дедлайн стартует у него же).
+        // Минует Accept — тосты/звук принятия при загрузке не нужны
+        public void RestoreActive(OrderOffer restored)
+        {
+            if (restored == null || Active != null)
+                return;
+            restored.State = restored.State == OrderState.Aboard
+                ? OrderState.Aboard
+                : OrderState.Active;
+            Active = restored;
+            CollisionsOfActive = 0; // удары до сейва не доезжают — счёт с нуля
+            ActiveOrderChanged?.Invoke();
+        }
+
         // жёсткое касание с уроном; жар звезды до сюда не доходит.
         // Один обработчик на оба потребителя CrashImpact: счётчик выплаты (П4.2)
         // считает удары в Active И Aboard, задание «без столкновений» — только Aboard
