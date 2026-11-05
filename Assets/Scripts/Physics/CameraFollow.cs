@@ -46,7 +46,12 @@ namespace SpaceTaxi.Physics
         {
             if (ship == null)
                 return;
-            float dt = Time.deltaTime;
+            // Пауза (модал завершения, меню ESC) ставит timeScale=0, но
+            // LateUpdate живёт в реальном времени: в scaled-времени камера
+            // замирала со смещением lookahead и после закрытия модала видимо
+            // «уплывала» доседать на корабль (Н-9). На unscaled — стоит на
+            // корабле уже во время модала, после закрытия догонять нечего
+            float dt = Time.timeScale > 0f ? Time.deltaTime : Time.unscaledDeltaTime;
 
             // взгляд вперёд по курсу
             Vector2 velocity = ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
@@ -61,10 +66,11 @@ namespace SpaceTaxi.Physics
             pos.y += (target.y - pos.y) * Mathf.Min(1f, 3.5f * dt);
             AnchorPosition = pos;
 
-            // дрожь — шум Перлина вместо рваного рандома
+            // дрожь — шум Перлина вместо рваного рандома; гаснет и шумит в
+            // реальном времени — на паузе не висит застывшим смещением
             trauma = Mathf.Max(0f, trauma - ShakeDecay * dt);
             float shake = trauma * trauma;
-            float t = Time.time;
+            float t = Time.unscaledTime;
             Vector2 shakeOffset = new Vector2(
                 Mathf.PerlinNoise(noiseSeed, t * 14f) * 2f - 1f,
                 Mathf.PerlinNoise(noiseSeed + 31f, t * 14f) * 2f - 1f)
