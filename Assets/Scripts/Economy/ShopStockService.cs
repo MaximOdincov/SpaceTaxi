@@ -12,6 +12,9 @@ namespace SpaceTaxi.Economy
     {
         private const int SlotMinutes = 120;   // ротация раз в 2 игровых часа
         private const int StartMinutes = 842;  // 14:02 — старт борткомпа
+        // соль слота (константа Кнута): без unchecked это long (> int.MaxValue),
+        // и умножение уводит хэш в long — CS1503
+        private const int SlotSalt = unchecked((int)0x9E3779B9);
 
         // номер текущего слота ротации (монотонно растёт с игровым временем)
         public static int CurrentSlot(float time)
@@ -29,7 +32,7 @@ namespace SpaceTaxi.Economy
             int variants = config.PaintVariantCount;
             if (variants == 0)
                 return 0;
-            return Mod(StableHash(config.Id) ^ (slot * 0x9E3779B9), variants + 1);
+            return Mod(StableHash(config.Id) ^ (slot * SlotSalt), variants + 1);
         }
 
         // FNV-1a: строковый GetHashCode рандомизирован между сессиями Unity
