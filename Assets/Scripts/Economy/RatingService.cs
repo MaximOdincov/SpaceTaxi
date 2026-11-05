@@ -39,6 +39,15 @@ namespace SpaceTaxi.Economy
 
         public void FailWithLoss() => Move(-FailWithLossPenalty);
 
+        // восстановление из сейва (П10.1): прямое присвоение — дельты не суммируются,
+        // LastDelta сбрасывается (на экране завершения показывать нечего)
+        public void Restore(float restored)
+        {
+            Value = Math.Clamp(restored, 0f, 5f);
+            LastDelta = 0f;
+            RatingChanged?.Invoke(Value);
+        }
+
         private void Move(float delta)
         {
             float before = Value;

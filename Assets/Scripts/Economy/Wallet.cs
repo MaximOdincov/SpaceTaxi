@@ -25,5 +25,16 @@ namespace SpaceTaxi.Economy
             CreditsChanged?.Invoke(Credits);
             return true;
         }
+
+        // восстановление из сейва (П10.1): прямой присёт баланса — Add только
+        // плюсует, TrySpend не умеет ставить произвольное значение
+        public void Restore(int credits)
+        {
+            credits = Math.Max(0, credits);
+            if (credits == Credits)
+                return;
+            Credits = credits;
+            CreditsChanged?.Invoke(Credits);
+        }
     }
 }
