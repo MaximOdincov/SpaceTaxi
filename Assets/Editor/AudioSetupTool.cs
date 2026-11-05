@@ -185,9 +185,8 @@ namespace SpaceTaxi.Audio.Tools
                 shipAudio = ship.gameObject.AddComponent<ShipAudio>();
             if (ship.GetComponent<HeatAudio>() == null)
                 ship.gameObject.AddComponent<HeatAudio>();
-            var so = new SerializedObject(shipAudio);
-            so.FindProperty("input").objectReferenceValue = input;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // поле input у ShipAudio удалено (ввод берётся из ShipController) —
+            // сериализовать нечего, SerializedObject падал бы NRE
         }
 
         // --- Хелперы сборки каталога ---

@@ -128,6 +128,8 @@ namespace SpaceTaxi.Audio
         {
             if (!loops.TryGetValue(id, out LoopVoice voice))
                 return;
+            if (voice.FadingOut)
+                return; // затухание уже идёт: пер-кадровые повторы не роняют корутину
             if (voice.Fade != null) StopCoroutine(voice.Fade);
             voice.FadingOut = true;
             voice.Fade = StartCoroutine(FadeLoop(voice, 0f, removeWhenDone: true));
@@ -161,10 +163,13 @@ namespace SpaceTaxi.Audio
         {
             // dir: 1 — до рабочих параметров, 0 — до тишины
             float from = voice.Source.volume;
-            float targetFull = FullLoopVolume(voice);
-            float target = dir > 0f ? targetFull : 0f;
+            float target = dir > 0f ? FullLoopVolume(voice) : 0f;
             for (float t = 0f; t < LoopFadeTime; t += Time.unscaledDeltaTime)
             {
+                // цель пересчитывается каждый кадр: SetLoopIntensity мог
+                // сменить Intensity в том же кадре — иначе слышимый памп
+                if (dir > 0f)
+                    target = FullLoopVolume(voice);
                 voice.Source.volume = Mathf.Lerp(from, target, t / LoopFadeTime);
                 yield return null;
             }
@@ -220,6 +225,7 @@ namespace SpaceTaxi.Audio
 
             StopAllMusicFades();
             musicFades.Add(StartCoroutine(Crossfade(fadeIn, fadeOut, entry.Volume * GroupFactor(AudioGroup.Music))));
+            MusicStateChanged?.Invoke(); // подписчики узнают о смене трека (меню↔игра)
         }
 
         public void StopMusic()
