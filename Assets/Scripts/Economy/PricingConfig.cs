@@ -51,8 +51,20 @@ namespace SpaceTaxi.Economy
         [Tooltip("Запас топлива сети за один визит, доля бака корабля")]
         public float[] FuelStockFractionByTier = { 0.35f, 0.7f, 1f, 1f };
 
+        [Header("Пакеты ремонта (Н-5): индекс = пакет − 1 (мелкий/средний/полный)")]
+        [Tooltip("Доля недостающего HP, которую восстанавливает пакет")]
+        public float[] RepairPackFraction = { 0.25f, 0.6f, 1f };
+        [Tooltip("Множитель базовой цены 1 кр/HP для пакета")]
+        public float[] RepairPackPriceMul = { 0.8f, 1f, 1.2f };
+
+        [Header("Сеть ремонта (Н-5): индекс = тир сети − 1")]
+        [Tooltip("Потолок ремонта за визит, доля НУЖНОГО (недостающего) HP: бедная станция может взять не весь пакет")]
+        public float[] RepairTierCapByTier = { 0.3f, 0.7f, 1f };
+
         // базовая сеть: планеты без проставленного FuelTier и старые ассеты карт
         public const int BaseFuelTier = 2;
+        // незаданный тир ремонта — мастерская чинит полностью (как до Н-5)
+        public const int BaseRepairTier = 3;
 
         public float GetSectorMultiplier(Sector sector)
         {
@@ -84,13 +96,43 @@ namespace SpaceTaxi.Economy
         }
 
         // индекс массива 0..n-1: незаданный тир считаем базовым, верхний кламп — на короткий массив
-        private static int FuelTierIndex(int tier, int length)
+        private static int TierIndex(int tier, int length, int baseTier)
         {
             if (length <= 0)
                 return -1;
             if (tier <= 0)
-                tier = BaseFuelTier;
+                tier = baseTier;
             return Mathf.Clamp(tier, 1, length) - 1;
+        }
+
+        private static int FuelTierIndex(int tier, int length) => TierIndex(tier, length, BaseFuelTier);
+
+        private static int RepairTierIndex(int tier, int length) => TierIndex(tier, length, BaseRepairTier);
+
+        // значение по индексу с фолбэком — для битых/коротких массивов в ассете
+        private static float ArrayAt(float[] array, int index, float fallback)
+        {
+            return array != null && index >= 0 && index < array.Length ? array[index] : fallback;
+        }
+
+        // доля недостающего HP, которую берёт пакет (0..PackCount-1)
+        public float GetRepairPackFraction(int packIndex)
+        {
+            return ArrayAt(RepairPackFraction, packIndex, 1f);
+        }
+
+        // множитель базовой цены 1 кр/HP для пакета
+        public float GetRepairPackPriceMul(int packIndex)
+        {
+            return ArrayAt(RepairPackPriceMul, packIndex, 1f);
+        }
+
+        // потолок ремонта за визит, доля нужного HP; тир 0/некорректный — базовая сеть (полный)
+        public float GetRepairTierCap(int tier)
+        {
+            var caps = RepairTierCapByTier;
+            int index = RepairTierIndex(tier, caps != null ? caps.Length : 0);
+            return index >= 0 ? caps[index] : 1f;
         }
 
         private static PricingConfig fallback;
