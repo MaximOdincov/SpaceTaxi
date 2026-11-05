@@ -109,7 +109,7 @@ namespace SpaceTaxi.UI
 
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
-            landing.StationHint += () => Show("Станция: [B] — сервис, магазин");
+            landing.StationHint += planet => Show("Станция: [B] — " + StationServices(planet));
 
             var hull = ship.GetComponent<HullSystem>();
             hull.Respawned += () => Show("Респавн на планете старта");
@@ -148,6 +148,20 @@ namespace SpaceTaxi.UI
         private static string Prefix(string phrase)
         {
             return string.IsNullOrEmpty(phrase) ? "" : " — «" + phrase + "»";
+        }
+
+        // перечень услуг станции по флагам планеты (Н-3): комбинации «есть заправка»/
+        // «есть мастерская», у хаба плюс магазин
+        private static string StationServices(World.Planet planet)
+        {
+            var parts = new System.Collections.Generic.List<string>(3);
+            if (planet.HasFuel)
+                parts.Add("заправка");
+            if (planet.HasRepair)
+                parts.Add("мастерская");
+            if (planet.IsHub)
+                parts.Add("магазин");
+            return string.Join(", ", parts);
         }
     }
 }

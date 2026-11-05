@@ -120,17 +120,21 @@ namespace SpaceTaxi.Physics
             Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);
 
-            // станция на планете: сервис платный (экран [B]) — здесь только подсказка
-            if (planet.HasStation && (ship.Fuel < ship.Eff.FuelMax || ship.Hp < ship.Eff.HpMax))
-                StationHint?.Invoke();
+            // сервис платный (экран [B]) — подсказка, только если планета имеет нужное:
+            // на чистой заправке не зовём [B] ради ремонта и наоборот
+            bool needFuel = planet.HasFuel && ship.Fuel < ship.Eff.FuelMax;
+            bool needRepair = planet.HasRepair && ship.Hp < ship.Eff.HpMax;
+            if (needFuel || needRepair)
+                StationHint?.Invoke(planet);
 
-            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasStation ? " (станция: сервис за кредиты, [B])" : ""));
+            Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasFuel || planet.HasRepair ? " (станция: сервис за кредиты, [B])" : ""));
         }
 
         public event Action<string> StationServiced;
 
-        // посадка на станцию с неполным баком/корпусом — подсказка про [B] (ToastNotifier)
-        public event Action StationHint;
+        // посадка на станцию с неполным баком/корпусом — подсказка про [B] (ToastNotifier);
+        // планета в аргументе — текст подсказки собирается по её флагам услуг
+        public event Action<World.Planet> StationHint;
 
         // платный сервис выполнен на экране станции — тот же тост-поток
         public void ReportServiced(string stationName)
