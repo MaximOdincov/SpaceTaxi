@@ -80,7 +80,7 @@ namespace SpaceTaxi.Physics
 
             if (asteroid != null)
             {
-                HitAsteroid(v);
+                HitAsteroid(v, collision);
             }
         }
 
@@ -147,6 +147,16 @@ namespace SpaceTaxi.Physics
         // контактный удар с уроном — для штрафа выплаты (жар звезды НЕ считается)
         public event Action CrashImpact;
 
+        // точка контактного удара в мире — для вспышки эффектов (Н-7)
+        public event Action<Vector2> CrashImpactAt;
+
+        private Vector2 ContactPoint(Collision2D collision)
+        {
+            return collision.contactCount > 0
+                ? collision.contacts[0].point
+                : (Vector2)transform.position;
+        }
+
         // урон контактного удара: 0 при v ≤ LandSpeed, плавный вход до полной
         // линейности к v = LandSpeed+30 (без ступени min(5,…)), кап 30 —
         // планеты и астероиды считают одинаково
@@ -171,6 +181,7 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
+            CrashImpactAt?.Invoke(ContactPoint(collision));
 
             // урон сразу; выжил — считается посадкой
             Hull.ApplyDamage(damage);
@@ -185,7 +196,7 @@ namespace SpaceTaxi.Physics
         // астероид пояса: посадки нет, State не меняется — корабль отскакивает физикой;
         // медленное касание бесплатно (и флаг не тратит), удар сжимает корпус
         // и считается столкновением заказа
-        private void HitAsteroid(float v)
+        private void HitAsteroid(float v, Collision2D collision)
         {
             if (touchHandled)
                 return;
@@ -195,6 +206,7 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
+            CrashImpactAt?.Invoke(ContactPoint(collision));
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
