@@ -8,80 +8,62 @@ using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
-using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Бортовой компьютер: панель на автоматических layout-группах
+    // Бортовой компьютер: панель на автоматических layout-группах. Каркас всегда
+    // строится фабрикой (в рантайме — поверх старого мокапа префаба: Frame и
+    // Background сохраняются, остальное сносится), живые данные — по ссылкам
+    // из OnboardRefs и событиям систем.
     public class OnboardBinder : MonoBehaviour
     {
-        private TMP_FontAsset font;
-
         private TMP_Text clock;
-        private TMP_Text shipState1, shipState2, shipState3;
-        private TMP_Text sysState2, sysState3;
-        private Button abandonButton;
-
-        private RectTransform orderArea; // контейнер зоны заказа
-        private GameObject econSection;
-        private TMP_Text econCounters;
         private TMP_Text moneyValue, ratingValue;
+        private Image moneyIconImage, ratingIconImage;
+        private GameObject activeSection;
+        private RectTransform activeArea; // блок активного заказа + кнопка отмены
+        private RectTransform orderArea;  // контент скролла входящих
+        private TMP_Text econCounters, debtValue;
+        private Button abandonButton;
+        private Button cancelButton;
+        private OrderOffer builtActiveOffer; // блок перестраивается только при смене заказа
 
         [SerializeField] private Sprite cashIcon;
         [SerializeField] private Sprite ratingIcon;
 
-        [Tooltip("Единый шрифт панели: применяется ко всем текстам (каркас и карточки). Пусто — шрифт часов")]
+        [Tooltip("Единый шрифт панели: применяется ко всем текстам каркаса и карточек. Пусто — шрифт часов старого каркаса")]
         [SerializeField] private TMP_FontAsset panelFont;
 
-        [Header("Префабы карточек (пусто — собрать кодом)")]
-        [SerializeField] private GameObject offerCardPrefab;
-        [SerializeField] private GameObject activeOrderPrefab;
-        private TMP_Text orderPay;
-        private Button cancelButton;
-
         private Ship ship;
-        private GravityField gravity;
         private OrderService orders;
         private HullSystem hull;
         private Wallet wallet;
         private DebtService debt;
-        private TMP_Text debtValue;
         private float nextSlowUpdate;
         private bool bound;
-        private readonly List<GameObject> orderAreaChildren = new List<GameObject>();
+        private readonly List<GameObject> activeAreaChildren = new List<GameObject>();
 
-        // плеер «// ЭФИР» (П9.3)
+        // плеер «ЭФИР»
         private Button playerPrev, playerPlay, playerNext;
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
         private bool musicBound;
 
-        private const float MoneyValueWidth = 110f;  // «1000 кр» шире заводских 64
         private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
+        // §3.2: увольнение после третьей непогашенной аварии (как в StationScreenController)
+        private const int MaxUnpaidAccidents = 3;
 
         private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
-        private static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);      // #A8FFCB
-        private static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);        // #FFD44D
-        private static readonly Color PanelColor = new Color(0.031f, 0.078f, 0.047f, 0.92f);
         private static readonly Color DangerColor = new Color(1f, 0.478f, 0.361f);
 
         private void Awake()
         {
             ApplyPanelFont();
-            bool fromPrefab = transform.Find("Stack") != null;
-            if (fromPrefab)
-            {
-                BindExisting();
-            }
-            else
-            {
-                // фолбэк для старой сцены: строим каркас кодом
-                BindRefs(OnboardComputerFactory.Build(transform));
-            }
-            EnsureDebtRow();
-            WidenMoneyValue();
-            SetupMusicPlayer(fromPrefab);
+            // каркас всегда кодом: и для старых сцен, и поверх мокапа префаба
+            BindRefs(OnboardComputerFactory.Build(transform, fontOverride: panelFont));
+            BindIcons();
+            SetupMusicPlayer();
         }
 
         private void OnDestroy()
@@ -91,99 +73,89 @@ namespace SpaceTaxi.UI
                 audioManager.MusicStateChanged -= RefreshMusicPlayer;
         }
 
-        // шрифт панели: panelFont или шрифт часов
+        // шрифт панели: panelFont или шрифт часов стоящего каркаса — старого
+        // (префаб) или нового (после редакторной перестройки)
         private void ApplyPanelFont()
         {
             if (panelFont == null)
             {
                 var clockText = transform.Find("Stack/Header/TitleRow/Clock");
+                if (clockText == null)
+                    clockText = transform.Find("Stack/Header/Clock");
                 if (clockText != null)
                     panelFont = clockText.GetComponent<TMP_Text>().font;
             }
-            if (panelFont == null)
-                return;
-            OnboardComputerFactory.SetFont(panelFont);
-            foreach (TMP_Text text in GetComponentsInChildren<TMP_Text>(true))
-                text.font = panelFont;
         }
 
-        private void BindExisting()
+        // иконки денег/рейтинга: спрайты сериализованы на биндере (в билде
+        // AssetDatabase недоступен — фабрика грузит их только в редакторе)
+        private void BindIcons()
         {
-            clock = FindT("Stack/Header/TitleRow/Clock");
-            shipState1 = FindT("Stack/StateSection/ShipState1");
-            shipState2 = FindT("Stack/StateSection/ShipState2");
-            shipState3 = FindT("Stack/StateSection/ShipState3");
-            sysState2 = FindT("Stack/StateSection/SysState2");
-            sysState3 = FindT("Stack/StateSection/SysState3");
-            econCounters = FindT("Stack/EconSection/EconRow/EconCounters");
-            orderPay = FindT("Stack/OrderSection/OrderPay");
-            moneyValue = FindT("Stack/Header/StatsRow/MoneyValue/Value");
-            ratingValue = FindT("Stack/Header/StatsRow/RatingValue/Value");
-            var abandon = transform.Find("Stack/StateSection/AbandonButton");
-            abandonButton = abandon != null ? abandon.GetComponent<Button>() : null;
-            // префабная кнопка: хук здесь, потому что фабрика её не строила
-            UiSfx.Hook(abandonButton);
-            var area = transform.Find("Stack/OrderSection/OrderArea");
-            orderArea = (RectTransform)area;
-            if (clock != null)
-                OnboardComputerFactory.SetFont(clock.font);
+            if (cashIcon != null && moneyIconImage != null)
+                moneyIconImage.sprite = cashIcon;
+            if (ratingIcon != null && ratingIconImage != null)
+                ratingIconImage.sprite = ratingIcon;
         }
 
         private void BindRefs(OnboardRefs refs)
         {
             clock = refs.Clock;
-            shipState1 = refs.ShipState1;
-            shipState2 = refs.ShipState2;
-            shipState3 = refs.ShipState3;
-            sysState2 = refs.SysState2;
-            sysState3 = refs.SysState3;
-            econCounters = refs.EconCounters;
-            orderPay = refs.OrderPay;
             moneyValue = refs.MoneyValue;
             ratingValue = refs.RatingValue;
-            abandonButton = refs.AbandonButton;
+            moneyIconImage = refs.MoneyIcon;
+            ratingIconImage = refs.RatingIcon;
+            activeSection = refs.ActiveSection;
+            activeArea = refs.ActiveArea;
             orderArea = refs.OrderArea;
+            econCounters = refs.EconCounters;
+            debtValue = refs.DebtValue;
+            abandonButton = refs.AbandonButton;
+            playerPrev = refs.PlayerPrev;
+            playerPlay = refs.PlayerPlay;
+            playerNext = refs.PlayerNext;
+            trackTitle = refs.TrackTitle;
+            progressFill = refs.ProgressFill;
         }
 
-        private TMP_Text FindT(string path)
+        private static void SetText(GameObject root, string path, string value)
         {
-            var t = transform.Find(path);
-            return t != null ? t.GetComponent<TMP_Text>() : null;
+            var t = root.transform.Find(path);
+            if (t != null)
+                t.GetComponent<TMP_Text>().text = value;
         }
 
-        // --- Зона заказа: активный или список входящих ---
+        // --- Зона заказа: активный блок + список входящих ---
 
         private void RefreshOrder()
         {
-            foreach (GameObject child in orderAreaChildren)
-                Destroy(child);
-            orderAreaChildren.Clear();
-
             bool hasActive = orders.Active != null;
-            orderPay.gameObject.SetActive(hasActive);
-            cancelButton = null;
+            if (activeSection != null)
+                activeSection.SetActive(hasActive);
 
-            if (hasActive)
+            // блок активного заказа перестраивается только при смене заказа —
+            // иначе каждое OffersChanged (протухание карточек) перезапускало бы фейд
+            if (!hasActive || orders.Active != builtActiveOffer)
             {
-                foreach (var card in cardMap.Values)
-                    Destroy(card);
-                cardMap.Clear();
-                BuildActiveOrder();
+                foreach (GameObject child in activeAreaChildren)
+                    Destroy(child);
+                activeAreaChildren.Clear();
+                cancelButton = null;
+                if (hasActive)
+                    BuildActiveOrder();
+                builtActiveOffer = hasActive ? orders.Active : null;
             }
-            else
-                BuildIncoming();
+
+            BuildIncoming();
+            UpdateAcceptButtons();
         }
 
         private void BuildActiveOrder()
         {
             OrderOffer offer = orders.Active;
 
-            GameObject row = activeOrderPrefab != null
-                ? Instantiate(activeOrderPrefab, orderArea)
-                : OnboardComputerFactory.BuildActiveOrderBlock();
-            if (activeOrderPrefab == null)
-                row.transform.SetParent(orderArea, false);
-            orderAreaChildren.Add(row);
+            GameObject row = OnboardComputerFactory.BuildActiveOrderBlock();
+            row.transform.SetParent(activeArea, false);
+            activeAreaChildren.Add(row);
             StartCoroutine(FadeIn(row));
 
             var photo = row.transform.Find("Photo");
@@ -198,32 +170,24 @@ namespace SpaceTaxi.UI
 
             SetText(row, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
             SetText(row, "Info/Route",
-                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
-            // П5.3: вместо пожелания — текст задания, если архетип его дал
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
+            // П5.3: вместо пожелания — текст задания, если архетип его дал;
+            // таймер дедлайна дописывается в SlowUpdate
             PassengerTask task = offer.Task;
             string wish = task != null && task.Kind != PassengerTaskKind.None
                 ? task.Text
                 : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
             SetText(row, "Info/Wish", string.IsNullOrEmpty(wish) ? "" : "«" + wish + "»");
 
-            var cancel = OnboardComputerFactory.Button(orderArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.25f),
-                OnboardComputerFactory.LabelColor, 17f);
+            var cancel = OnboardComputerFactory.Button(activeArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
+                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 15f);
             var cancelLe = cancel.AddComponent<LayoutElement>();
-            cancelLe.minHeight = 32f;
+            cancelLe.minHeight = 30f;
             cancelLe.flexibleWidth = 1f;
             cancelButton = cancel.GetComponent<Button>();
             cancelButton.onClick.AddListener(() => orders.CancelActive());
-            orderAreaChildren.Add(cancel);
-
-            orderPay.text = Col("Счёт", orders.Deliveries + " доставок · " + orders.Failures + " провалов");
-        }
-
-        private static void SetText(GameObject root, string path, string value)
-        {
-            var t = root.transform.Find(path);
-            if (t != null)
-                t.GetComponent<TMP_Text>().text = value;
+            activeAreaChildren.Add(cancel);
         }
 
         private readonly Dictionary<OrderOffer, GameObject> cardMap = new Dictionary<OrderOffer, GameObject>();
@@ -254,6 +218,17 @@ namespace SpaceTaxi.UI
                 }
                 card.transform.SetSiblingIndex(index);
                 index++;
+            }
+        }
+
+        // входящие видны всегда; при активном заказе кнопка «взять» неактивна
+        private void UpdateAcceptButtons()
+        {
+            foreach (GameObject card in cardMap.Values)
+            {
+                Transform accept = card.transform.Find("Accept");
+                if (accept != null)
+                    accept.GetComponent<Button>().interactable = orders.Active == null;
             }
         }
 
@@ -302,44 +277,11 @@ namespace SpaceTaxi.UI
                 Destroy(go);
         }
 
-        // скроллбар справа; скрыт, когда контент помещается
-        private void CreateScrollbar(GameObject scrollObject, ScrollRect scroll)
-        {
-            var barGo = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
-            barGo.transform.SetParent(scrollObject.transform, false);
-            var barRect = (RectTransform)barGo.transform;
-            barRect.anchorMin = new Vector2(1f, 0f);
-            barRect.anchorMax = new Vector2(1f, 1f);
-            barRect.pivot = new Vector2(1f, 0.5f);
-            barRect.sizeDelta = new Vector2(8f, 0f);
-            barGo.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
-
-            var bar = barGo.GetComponent<Scrollbar>();
-            bar.direction = Scrollbar.Direction.BottomToTop;
-
-            var sliding = new GameObject("SlidingArea", typeof(RectTransform));
-            sliding.transform.SetParent(barGo.transform, false);
-            var slidingRect = (RectTransform)sliding.transform;
-            OnboardComputerFactory.Stretch(slidingRect);
-
-            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-            handle.transform.SetParent(sliding.transform, false);
-            OnboardComputerFactory.Stretch((RectTransform)handle.transform);
-            handle.GetComponent<Image>().color = OnboardComputerFactory.LabelColor;
-            bar.handleRect = (RectTransform)handle.transform;
-            bar.targetGraphic = handle.GetComponent<Image>();
-
-            scroll.verticalScrollbar = bar;
-        }
-
-        // карточка входящего: префаб или код, данные по именам узлов
+        // карточка входящего: [аватар | имя+цена / маршрут+задание | ✓ | ✕]
         private GameObject BuildCard(OrderOffer offer)
         {
-            GameObject card = offerCardPrefab != null
-                ? Instantiate(offerCardPrefab, orderArea)
-                : OnboardComputerFactory.BuildOfferCard();
-            if (offerCardPrefab == null)
-                card.transform.SetParent(orderArea, false);
+            GameObject card = OnboardComputerFactory.BuildOfferCard();
+            card.transform.SetParent(orderArea, false);
 
             var avatar = card.transform.Find("Avatar");
             var avatarImage = avatar != null ? avatar.GetComponent<Image>() : null;
@@ -351,36 +293,32 @@ namespace SpaceTaxi.UI
                 avatarImage.color = offer.Passenger.PortraitTint;
             }
 
-            SetText(card, "Info/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
-            SetText(card, "Info/Route",
-                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
-            TMP_Text price = EnsurePriceNode(card);
-            if (price != null)
-                price.text = PriceTag(offer.Price);
-            // П5.3: задание пассажира вместо пожелания; текст статичен — на карточке оффера таймер не нужен
+            SetText(card, "Info/NameRow/Name", offer.Passenger.DisplayName + " · " + offer.Passenger.Archetype);
+            var priceNode = card.transform.Find("Info/NameRow/Price");
+            if (priceNode != null)
+                priceNode.GetComponent<TMP_Text>().text = offer.Price + " кр";
+
+            // строка 2: маршрут + дистанция + задание/пожелание; при переполнении
+            // строка переносится — карточка растёт, каркас не ломается
+            string route = orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
+                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн";
+            // П5.3: задание пассажира; таймер на входящем не нужен — карточка статична
             PassengerTask task = offer.Task;
             string wishPhrase = task != null && task.Kind != PassengerTaskKind.None
                 ? task.Text
                 : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            string wishPrefix = task != null && task.Kind != PassengerTaskKind.None ? "задание: " : "доп.: ";
-            SetText(card, "Info/Wish", string.IsNullOrEmpty(wishPhrase) ? "" : wishPrefix + "«" + wishPhrase + "»");
+            string wishPrefix = task != null && task.Kind != PassengerTaskKind.None ? "задание" : "доп.";
+            if (!string.IsNullOrEmpty(wishPhrase))
+                route += " · " + wishPrefix + " «" + wishPhrase + "»";
+            SetText(card, "Info/Route", route);
 
             OrderOffer captured = offer;
-            var accept = card.transform.Find("Buttons/Accept");
+            var accept = card.transform.Find("Accept");
             if (accept != null)
-            {
-                Button acceptButton = accept.GetComponent<Button>();
-                UiSfx.Hook(acceptButton); // префабная кнопка — фабрика не хукала
-                acceptButton.onClick.AddListener(() => orders.Accept(captured));
-            }
-            var decline = card.transform.Find("Buttons/Decline");
+                accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
+            var decline = card.transform.Find("Decline");
             if (decline != null)
-            {
-                Button declineButton = decline.GetComponent<Button>();
-                UiSfx.Hook(declineButton);
-                declineButton.onClick.AddListener(() => orders.Decline(captured));
-            }
+                decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
 
             return card;
         }
@@ -403,7 +341,6 @@ namespace SpaceTaxi.UI
             {
                 var session = FindAnyObjectByType<GameSession>();
                 ship = FindAnyObjectByType<Ship>();
-                gravity = FindAnyObjectByType<GravityField>();
                 if (session == null || session.Orders == null || ship == null || ship.Config == null)
                     return;
                 orders = session.Orders;
@@ -443,16 +380,8 @@ namespace SpaceTaxi.UI
             int minutes = 14 * 60 + 2 + (int)Time.time / 3;
             clock.text = minutes / 60 + ":" + (minutes % 60).ToString("00");
 
-            shipState1.text = Col("Корпус", Mathf.RoundToInt(ship.HpFraction * 100f) + "%");
-            shipState2.text = Col("Топливо", Mathf.RoundToInt(ship.FuelFraction * 100f) + "%");
-            shipState3.text = Col("Статус", ship.State == ShipState.Landed ? "посадка"
-                : ship.Fuel <= 0f ? "дрейф без топлива" : "полёт");
-
-            NearestBody(out string name, out float dist, out bool heat);
-            sysState2.text = Col("Ближний объект", name + " (" + dist.ToString("0") + " юн)");
-            sysState3.text = heat ? "⚠ жаровая зона" : "";
-
-            econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов";
+            econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов"
+                + (debt != null ? " · аварий: " + debt.UnpaidAccidents + "/" + MaxUnpaidAccidents : "");
             if (debt != null)
                 RefreshDebt(debt.Balance); // страховка от пропущенного события
             // прогресс трека плеера (П9.3): доля clip position/length, опрос в SlowUpdate
@@ -463,14 +392,14 @@ namespace SpaceTaxi.UI
                 cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed);
 
-            var statusText = FindText(orderArea, "ActiveOrder/Info/OrderStatus");
+            var statusText = FindText(activeArea, "ActiveOrder/Info/OrderStatus");
             if (orders.Active != null && statusText != null)
                 statusText.text = orders.Active.State == OrderState.Aboard
                     ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price)
                     : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price);
 
             // остаток дедлайна Торопыги (П5.3): строка задания, обновление раз в SlowUpdate
-            var wishText = FindText(orderArea, "ActiveOrder/Info/Wish");
+            var wishText = FindText(activeArea, "ActiveOrder/Info/Wish");
             if (orders.Active != null && wishText != null)
             {
                 PassengerTask task = orders.Active.Task;
@@ -503,21 +432,6 @@ namespace SpaceTaxi.UI
             return "#" + ColorUtility.ToHtmlStringRGB(color);
         }
 
-        // узел цены есть у каркасной карточки; в префабе OfferCard его нет — достраиваем рядом с Info/Route
-        private static TMP_Text EnsurePriceNode(GameObject card)
-        {
-            Transform info = card.transform.Find("Info");
-            if (info == null)
-                return null;
-            Transform price = info.Find("Price");
-            if (price != null)
-                return price.GetComponent<TMP_Text>();
-            TMP_Text text = OnboardComputerFactory.Text(info.gameObject, "", 17f, OnboardComputerFactory.BrightColor, "Price");
-            Transform route = info.Find("Route");
-            text.transform.SetSiblingIndex(route != null ? route.GetSiblingIndex() + 1 : info.childCount);
-            return text;
-        }
-
         // кредит обновляется событием, без опроса в SlowUpdate
         private void ShowCredits(int credits)
         {
@@ -532,18 +446,6 @@ namespace SpaceTaxi.UI
                 ratingValue.text = value.ToString("0.0", CultureInfo.InvariantCulture);
         }
 
-        // строка долга в секции // СМЕНА: каркас её не содержит, достраиваем кодом
-        private void EnsureDebtRow()
-        {
-            if (debtValue != null)
-                return;
-            var econSection = transform.Find("Stack/EconSection");
-            if (econSection == null)
-                return;
-            debtValue = OnboardComputerFactory.Text(econSection.gameObject, "", 20f, BrightColor, "DebtValue");
-            OnboardComputerFactory.FixedHeight(debtValue.gameObject, 24f);
-        }
-
         // при нуле строка пуста; долг — цветом тревоги фабрики
         private void RefreshDebt(int value)
         {
@@ -554,94 +456,18 @@ namespace SpaceTaxi.UI
                 : "";
         }
 
-        // --- Плеер «// ЭФИР» (П9.3) ---
+        // --- Плеер «ЭФИР» ---
 
-        // каркас фабрики содержит все узлы; в старом префабе ряд был мокапом
-        // [|<][MTO RADIO][>|] без play-кнопки и заливки — недостающее достраиваем
-        // (стиль EnsureDebtRow). fromPrefab: runtime-хуки фабрики в префаб не
-        // сериализуются — вешаем UiClick сами; у построенных фабрикой в рантайме
-        // хук уже есть (двойной дал бы двойной щелчок)
-        private void SetupMusicPlayer(bool fromPrefab)
+        // узлы построены фабрикой (звуковой хук уже внутри Button); менеджер
+        // живёт между сценами — разрешается на клике
+        private void SetupMusicPlayer()
         {
-            Transform row = transform.Find("Stack/PlayerSection/PlayerRow");
-            if (row == null)
-                return;
-            playerPrev = EnsurePlayerButton(row, "PlayerPrev", fromPrefab);
-            playerNext = EnsurePlayerButton(row, "PlayerNext", fromPrefab);
-
-            Transform play = row.Find("PlayerPlay");
-            if (play == null)
-            {
-                // старый префаб: play-кнопки нет — строим фабрикой (хук внутри)
-                // и вставляем между |< и названием трека
-                play = OnboardComputerFactory.Button(row, "▶",
-                    new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                        OnboardComputerFactory.LabelColor.b, 0.22f),
-                    OnboardComputerFactory.BrightColor, 15f, "PlayerPlay").transform;
-                play.SetSiblingIndex(1);
-                OnboardComputerFactory.FixedSize(play.gameObject, 26f, 26f);
-            }
-            else if (fromPrefab)
-            {
-                UiSfx.Hook(play.GetComponent<Button>()); // сериализованная кнопка без runtime-хуков
-            }
-            playerPlay = play.GetComponent<Button>();
-
-            Transform track = row.Find("Track");
-            if (track == null)
-                track = row.Find("Station"); // имя узла мокапа в старом префабе
-            if (track == null)
-            {
-                TMP_Text created = OnboardComputerFactory.Text(row.gameObject, "", 22f, BrightColor, "Track");
-                created.alignment = TextAlignmentOptions.Center;
-                created.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-                track = created.transform;
-            }
-            trackTitle = track.GetComponent<TMP_Text>();
-
-            Transform progress = transform.Find("Stack/PlayerSection/Progress");
-            if (progress == null)
-            {
-                var progressGo = new GameObject("Progress", typeof(RectTransform), typeof(Image));
-                progressGo.transform.SetParent(transform.Find("Stack/PlayerSection"), false);
-                progressGo.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
-                OnboardComputerFactory.FixedHeight(progressGo, 4f);
-                progress = progressGo.transform;
-            }
-            Transform fill = progress.Find("Fill");
-            if (fill == null)
-            {
-                var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-                fillGo.transform.SetParent(progress, false);
-                Image fillImage = fillGo.GetComponent<Image>();
-                fillImage.color = BrightColor;
-                fillImage.raycastTarget = false;
-                var rect = (RectTransform)fillGo.transform;
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = new Vector2(0f, 1f); // правый край двигает SlowUpdate
-                rect.offsetMin = Vector2.zero;
-                rect.offsetMax = Vector2.zero;
-            }
-            progressFill = (RectTransform)fill;
-
-            // AudioManager.Instance — синглтон между сценами, разрешается на клике
             if (playerPrev != null)
                 playerPrev.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(-1));
             if (playerPlay != null)
                 playerPlay.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicPause());
             if (playerNext != null)
                 playerNext.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(1));
-        }
-
-        private Button EnsurePlayerButton(Transform row, string name, bool fromPrefab)
-        {
-            Transform node = row.Find(name);
-            if (node == null)
-                return null;
-            Button button = node.GetComponent<Button>();
-            if (fromPrefab)
-                UiSfx.Hook(button);
-            return button;
         }
 
         // имя трека и глиф ▶/⏸ по состоянию менеджера; событие MusicStateChanged
@@ -680,43 +506,11 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // поле денег из фабрики/префаба узкое — суммы не влезают
-        private void WidenMoneyValue()
-        {
-            if (moneyValue == null)
-                return;
-            var layout = moneyValue.gameObject.GetComponent<LayoutElement>();
-            if (layout == null)
-                return;
-            layout.minWidth = MoneyValueWidth;
-            layout.preferredWidth = MoneyValueWidth;
-        }
-
-        private void NearestBody(out string name, out float dist, out bool heat)
-        {
-            name = "—";
-            dist = 0f;
-            heat = false;
-            float best = float.MaxValue;
-            Vector2 pos = ship.transform.position;
-            foreach (CelestialBody body in gravity.Bodies)
-            {
-                float d = Vector2.Distance(body.transform.position, pos) - body.Radius;
-                if (d < best)
-                {
-                    best = d;
-                    name = body.DisplayName;
-                }
-                if (body is Star star && star.IsInHeatZone(pos))
-                    heat = true;
-            }
-            dist = Mathf.Max(0f, best);
-        }
-
         private static string Col(string label, string value)
         {
             return $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.LabelColor)}>{label}:</color> {value}";
         }
+
         private static TMP_Text FindText(RectTransform parent, string name)
         {
             var found = parent.Find(name);

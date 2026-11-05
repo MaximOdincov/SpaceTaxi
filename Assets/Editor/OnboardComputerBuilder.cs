@@ -47,7 +47,8 @@ namespace SpaceTaxi.Tools
             Object.DestroyImmediate(canvasGo);
         }
 
-        // префабы карточек — правятся в префаб-режиме, binder только заполняет данные
+        // бейк текущих карточек фабрики — превью в префаб-режиме; в рантайме
+        // биндер строит карточки кодом и префабы не читает
         [MenuItem("Space Taxi/Create Order UI Prefabs")]
         public static void CreateOrderPrefabs()
         {
@@ -66,22 +67,8 @@ namespace SpaceTaxi.Tools
             PrefabUtility.SaveAsPrefabAsset(block, "Assets/Prefabs/UI/ActiveOrder.prefab");
             Object.DestroyImmediate(block);
 
-            // сразу привязать к binder, если он в сцене
-            var binder = Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardBinder>();
-            if (binder != null)
-            {
-                var so = new SerializedObject(binder);
-                so.FindProperty("offerCardPrefab").objectReferenceValue =
-                    AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/OfferCard.prefab");
-                so.FindProperty("activeOrderPrefab").objectReferenceValue =
-                    AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/ActiveOrder.prefab");
-                so.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(binder.gameObject);
-                EditorSceneManager.MarkSceneDirty(binder.gameObject.scene);
-            }
-
             AssetDatabase.SaveAssets();
-            Debug.Log("[OnboardComputerBuilder] префабы карточек созданы и привязаны");
+            Debug.Log("[OnboardComputerBuilder] префабы карточек созданы");
         }
     }
 }
