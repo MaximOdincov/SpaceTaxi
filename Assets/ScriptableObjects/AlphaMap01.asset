@@ -27,7 +27,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 1
+    HasFuel: 1
+    HasRepair: 1
+    IsHub: 0
     Sector: 0
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -43,7 +45,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 1
+    HasFuel: 1
+    HasRepair: 1
+    IsHub: 0
     Sector: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -59,7 +63,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -75,7 +81,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -91,7 +99,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -107,7 +117,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 1
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -123,7 +135,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 0.990566, g: 0.97654855, b: 0.97654855, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 2
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -139,7 +153,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 2
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -155,7 +171,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 1
+    HasFuel: 1
+    HasRepair: 1
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -171,7 +189,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -187,7 +207,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 2
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -203,7 +225,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -219,7 +243,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 1
+    HasFuel: 1
+    HasRepair: 1
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -235,7 +261,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 2
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -251,7 +279,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -267,7 +297,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -283,7 +315,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 4
     LandingRingRadius: 0
     CaptureRingRadius: 0
@@ -299,7 +333,9 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasStation: 0
+    HasFuel: 0
+    HasRepair: 0
+    IsHub: 0
     Sector: 3
     LandingRingRadius: 0
     CaptureRingRadius: 0

@@ -165,10 +165,14 @@ namespace SpaceTaxi.Tools
                 : star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f);
             Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
             Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName + " · " + body.Sector);
-            if (body.HasStation)
+            if (body.Type == BodyType.Planet && (body.HasFuel || body.HasRepair))
             {
+                // подпись услуг: хаб / заправка / мастерская / их комбинация
+                string services = body.IsHub ? "хаб МТО"
+                    : body.HasFuel && body.HasRepair ? "станция"
+                    : body.HasFuel ? "заправка" : "мастерская";
                 Handles.color = new Color(1f, 0.84f, 0.3f);
-                Handles.Label(center + Vector3.up * (body.Radius + 34f), "станция",
+                Handles.Label(center + Vector3.up * (body.Radius + 34f), services,
                     new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = new Color(1f, 0.84f, 0.3f) } });
             }
 

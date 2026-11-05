@@ -157,10 +157,14 @@ namespace SpaceTaxi.Tools
                 string name = element.FindPropertyRelative("DisplayName").stringValue;
                 var type = (BodyType)element.FindPropertyRelative("Type").intValue;
                 float radius = element.FindPropertyRelative("Radius").floatValue;
-                bool station = element.FindPropertyRelative("HasStation").boolValue;
+                bool fuel = element.FindPropertyRelative("HasFuel").boolValue;
+                bool repair = element.FindPropertyRelative("HasRepair").boolValue;
+                bool hub = element.FindPropertyRelative("IsHub").boolValue;
                 bool selected = i == selectedIndex;
 
-                string icon = (type == BodyType.Star ? "★" : type == BodyType.BlackHole ? "◉" : type == BodyType.AsteroidBelt ? "◌" : "●") + (station ? "⛽" : "");
+                // услуги планеты: ⌂ хаб, ⛽ заправка, 🔧 мастерская
+                string services = hub ? "⌂" : (fuel ? "⛽" : "") + (repair ? "🔧" : "");
+                string icon = (type == BodyType.Star ? "★" : type == BodyType.BlackHole ? "◉" : type == BodyType.AsteroidBelt ? "◌" : "●") + services;
                 GUIStyle style = selected ? EditorStyles.helpBox : EditorStyles.label;
                 if (GUILayout.Button($"{icon}  {name}  (r={radius:0})", style))
                 {
@@ -198,8 +202,14 @@ namespace SpaceTaxi.Tools
                     new GUIContent("Астероидов (24–40)"));
             }
             if (type == BodyType.Planet)
-                EditorGUILayout.PropertyField(element.FindPropertyRelative("HasStation"),
-                    new GUIContent("Станция (заправка+ремонт)"));
+            {
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("HasFuel"),
+                    new GUIContent("Заправка (топливо за кредиты)"));
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("HasRepair"),
+                    new GUIContent("Мастерская (ремонт за кредиты)"));
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("IsHub"),
+                    new GUIContent("Хаб МТО (магазин + улучшения)"));
+            }
             EditorGUILayout.PropertyField(element.FindPropertyRelative("Sector"),
                 new GUIContent("Сектор (оплата)"));
 
@@ -481,12 +491,12 @@ namespace SpaceTaxi.Tools
                     warnings.Add($"Радиус «{body.DisplayName}» вне нормы звёзд 46–64 ({body.Radius:0}).");
             }
 
-            // достижимость: планета без станции — в пределах запаса хода тира своего сектора (П7.1);
+            // достижимость: планета без услуг — в пределах запаса хода тира своего сектора (П7.1);
             // у Хаба порога нет (сам старт), Дальний сознательно без станций
             var stations = new Dictionary<Sector, List<CelestialBodyData>>();
             foreach (var body in bodies)
             {
-                if (body.Type != BodyType.Planet || !body.HasStation)
+                if (body.Type != BodyType.Planet || !(body.HasFuel || body.HasRepair))
                     continue;
                 if (!stations.TryGetValue(body.Sector, out var list))
                     stations[body.Sector] = list = new List<CelestialBodyData>();
@@ -494,7 +504,7 @@ namespace SpaceTaxi.Tools
             }
             foreach (var body in bodies)
             {
-                if (body.Type != BodyType.Planet || body.HasStation)
+                if (body.Type != BodyType.Planet || body.HasFuel || body.HasRepair)
                     continue;
                 float reach = StationReachOf(body.Sector);
                 if (reach <= 0f)

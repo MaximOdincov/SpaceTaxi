@@ -53,8 +53,12 @@ namespace SpaceTaxi.World
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
         public BodyVisuals Visuals = new BodyVisuals();
-        [Tooltip("На планете станция: посадка = заправка и ремонт")]
-        public bool HasStation;
+        [Tooltip("Планета с заправкой: платная дозаправка топлива (экран [B])")]
+        public bool HasFuel;
+        [Tooltip("Планета с мастерской: платный ремонт корпуса (экран [B])")]
+        public bool HasRepair;
+        [Tooltip("Хаб МТО: заправка + мастерская + магазин кораблей и улучшения")]
+        public bool IsHub;
         [Tooltip("Класс района: влияет на оплату заказов на это тело")]
         public Sector Sector = Sector.Near;
 

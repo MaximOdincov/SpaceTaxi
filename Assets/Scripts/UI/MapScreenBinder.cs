@@ -178,10 +178,10 @@ namespace SpaceTaxi.UI
             circle.anchoredPosition = WorldToMap(body.Position);
             markers[body] = circle;
 
-            // Станция: жёлтая точка на краю.
-            if (body.HasStation)
+            // Станция: жёлтая точка на краю; хаб МТО — крупнее.
+            if (body.HasFuel || body.HasRepair)
             {
-                RectTransform station = CreateCircle(body.DisplayName + "Station", 10f, TaxiColor);
+                RectTransform station = CreateCircle(body.DisplayName + "Station", body.IsHub ? 13f : 10f, TaxiColor);
                 station.SetParent(circle, false);
                 station.anchoredPosition = new Vector2(size * 0.5f, size * 0.5f);
             }
