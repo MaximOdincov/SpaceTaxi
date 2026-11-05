@@ -24,6 +24,16 @@ namespace SpaceTaxi.UI
         private bool bound;
         private Color speedBaseColor;
 
+        // гашение HUD при открытых панелях (П11.1): тост внутри HUD не гаснет —
+        // у него своя группа с ignoreParentGroups
+        private const float DimmedAlpha = 0.35f;
+        private const float DimFadeSeconds = 0.15f;
+        private CanvasGroup dimGroup;
+        private MapScreenController mapScreen;
+        private OnboardComputerPanel onboard;
+        private StationScreenController station;
+        private float currentAlpha = 1f;
+
         private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
@@ -31,6 +41,10 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
+            dimGroup = GetComponent<CanvasGroup>();
+            if (dimGroup == null)
+                dimGroup = gameObject.AddComponent<CanvasGroup>();
+
             speedValue = transform.Find("SpeedValue").GetComponent<TMP_Text>();
             hullValue = transform.Find("HullValue").GetComponent<TMP_Text>();
             for (int i = 0; i < fuelSegments.Length; i++)
@@ -83,6 +97,24 @@ namespace SpaceTaxi.UI
                 UpdateWarning();
                 UpdateGoalHint();
             }
+
+            UpdateDim();
+        }
+
+        // опрос панелей каждый кадр, кэш контроллеров ленивый — стиль биндера;
+        // unscaledDeltaTime: панели открываются и в паузе
+        private void UpdateDim()
+        {
+            if (mapScreen == null) mapScreen = FindAnyObjectByType<MapScreenController>();
+            if (onboard == null) onboard = FindAnyObjectByType<OnboardComputerPanel>();
+            if (station == null) station = FindAnyObjectByType<StationScreenController>();
+
+            bool panelOpen = (mapScreen != null && mapScreen.IsOpened)
+                || (onboard != null && onboard.IsShown)
+                || (station != null && station.IsOpened);
+            float target = panelOpen ? DimmedAlpha : 1f;
+            currentAlpha = Mathf.MoveTowards(currentAlpha, target, Time.unscaledDeltaTime / DimFadeSeconds);
+            dimGroup.alpha = currentAlpha;
         }
 
         // в посадочном кольце: зелёная — сядем, красная — разобьёмся
