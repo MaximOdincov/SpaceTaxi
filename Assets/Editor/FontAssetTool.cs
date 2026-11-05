@@ -4,6 +4,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
+using UnityEngine.TextCore.LowLevel;
 using SpaceTaxi.UI;
 
 namespace SpaceTaxi.Core.Tools
