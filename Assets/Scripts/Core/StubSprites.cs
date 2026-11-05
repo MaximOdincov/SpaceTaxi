@@ -7,6 +7,8 @@ namespace SpaceTaxi.Core
     {
         private static readonly Dictionary<int, Sprite> circles = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> rings = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> softDots = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> blobs = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
         private static Sprite line;
         public static Sprite Circle(float diameter)
@@ -35,6 +37,33 @@ namespace SpaceTaxi.Core
                 });
                 sprite = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f / diameter);
                 rings[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // мягкая точка без тёмной окантовки: пыль, далёкие светила. core — доля
+        // радиуса с полной альфой (0 = полностью мягкая, 0.7 = горячее ядро)
+        public static Sprite SoftDot(float diameter, float core = 0f)
+        {
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter)) * 100 + Mathf.RoundToInt(core * 10f);
+            if (!softDots.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateSoftDotTexture(64, core);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f / diameter);
+                softDots[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // неровная мягкая клякса (туманность): пачка смещённых кругов с плавным
+        // краем; сид фиксирует форму — раскладка слоёв одинакова между запусками
+        public static Sprite Blob(int seed)
+        {
+            if (!blobs.TryGetValue(seed, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateBlobTexture(128, seed);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f / 16f);
+                blobs[seed] = sprite;
             }
             return sprite;
         }
@@ -104,6 +133,71 @@ namespace SpaceTaxi.Core
                     float x = (ix + 0.5f) / size * 2f - 1f;
                     float y = (iy + 0.5f) / size * 2f - 1f;
                     pixels[iy * size + ix] = inside(x, y) ? fill : new Color32(0, 0, 0, 0);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        public static Texture2D CreateSoftDotTexture(int size, float core)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var pixels = new Color32[size * size];
+            float edge = Mathf.Clamp01(1f - core);
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float dist = Mathf.Sqrt(x * x + y * y);
+                    float t = Mathf.Clamp01((1f - dist) / Mathf.Max(0.001f, edge));
+                    byte a = (byte)(Mathf.SmoothStep(0f, 1f, t) * 255f);
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        public static Texture2D CreateBlobTexture(int size, int seed)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var rng = new System.Random(seed);
+            int count = 6 + rng.Next(3); // 6..8 кругов: ядро + неровные лепестки
+            var xs = new float[count];
+            var ys = new float[count];
+            var rs = new float[count];
+            xs[0] = 0f;
+            ys[0] = 0f;
+            rs[0] = 0.52f; // центральное ядро — клякса не распадается
+            for (int i = 1; i < count; i++)
+            {
+                float ang = (float)(rng.NextDouble() * System.Math.PI * 2.0);
+                float dist = 0.12f + (float)rng.NextDouble() * 0.30f;
+                xs[i] = Mathf.Cos(ang) * dist;
+                ys[i] = Mathf.Sin(ang) * dist;
+                rs[i] = 0.24f + (float)rng.NextDouble() * 0.26f;
+            }
+            var pixels = new Color32[size * size];
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float alpha = 0f;
+                    for (int i = 0; i < count; i++)
+                    {
+                        float dx = x - xs[i];
+                        float dy = y - ys[i];
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        alpha = Mathf.Max(alpha, Mathf.Clamp01((rs[i] - d) / 0.16f + 0.5f));
+                    }
+                    byte a = (byte)(alpha * 255f);
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, a);
                 }
             }
             tex.SetPixels32(pixels);
