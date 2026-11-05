@@ -45,9 +45,12 @@ namespace SpaceTaxi.Core
             Wallet = new Wallet();
             // новая игра: арендное «Яйцо», своих кораблей нет
             Fleet = new FleetService();
-            // улучшения: ассет сцены, при отсутствии — кодовый инстанс
-            // с числами плана (никаких NRE)
-            Fleet.BindUpgrades(upgradeConfig != null ? upgradeConfig : UpgradeConfig.Default);
+            // улучшения: ассет сцены → ассет из Resources (инспектор правит числа)
+            // → кодовый инстанс с числами плана (никаких NRE)
+            UpgradeConfig upgrades = upgradeConfig;
+            if (upgrades == null)
+                upgrades = Resources.Load<UpgradeConfig>("UpgradeConfig_Default");
+            Fleet.BindUpgrades(upgrades != null ? upgrades : UpgradeConfig.Default);
             Debt = new DebtService();
             Payout = new PayoutService();
             Payout.Bind(Wallet, Debt);
@@ -99,7 +102,13 @@ namespace SpaceTaxi.Core
             Orders.TaskSucceeded += _ => Sound.Play(SoundId.TaskSuccess);
             Orders.TaskFailed += _ => Sound.Play(SoundId.TaskFail);
 
-            // тон долга — только на рост (авария); гашения тонов не дают
+            // продолжение забега (П10.1): мир построен по умолчанию — поверх
+            // применяется состояние сейва (без флага «продолжить» — тихий выход)
+            SaveSystem.ApplyTo(this);
+
+            // тон долга — только на рост (авария); гашения тонов не дают.
+            // ПОСЛЕ ApplyTo: иначе восстановленный из сейва долг сыграл бы
+            // ложный «аварийный» тон при каждом Continue
             int prevDebt = Debt.Balance;
             Debt.DebtChanged += value =>
             {
@@ -107,10 +116,6 @@ namespace SpaceTaxi.Core
                     Sound.Play(SoundId.DebtTone);
                 prevDebt = value;
             };
-
-            // продолжение забега (П10.1): мир построен по умолчанию — поверх
-            // применяется состояние сейва (без флага «продолжить» — тихий выход)
-            SaveSystem.ApplyTo(this);
         }
 
         private void OnOrderDelivered(OrderOffer offer)

@@ -64,8 +64,21 @@ namespace SpaceTaxi.Orders
         // столкновения активного заказа (Active или Aboard); сброс при его закрытии/смене
         public int CollisionsOfActive { get; private set; }
 
-        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2)
-        public PricingConfig Pricing => pricingConfig != null ? pricingConfig : PricingConfig.Default;
+        private PricingConfig resourcesPricing; // кэш попытки Resources.Load
+
+        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2).
+        // Цепочка: поле сцены → ассет из Resources (инспектор правит числа) → кодовый дефолт
+        public PricingConfig Pricing
+        {
+            get
+            {
+                if (pricingConfig != null)
+                    return pricingConfig;
+                if (resourcesPricing == null)
+                    resourcesPricing = Resources.Load<PricingConfig>("PricingConfig_Default");
+                return resourcesPricing != null ? resourcesPricing : PricingConfig.Default;
+            }
+        }
 
         // рейтинг таксиста (П4.3): наценка к цене и замедление спавна — без FindAnyObjectByType
         public void Bind(RatingService ratingService)
@@ -554,7 +567,7 @@ namespace SpaceTaxi.Orders
                 ExpiresAt = Time.time + offerLifetime,
             };
             // цена фиксируется в момент спавна карточки и дальше не меняется
-            int basePrice = OrderPricing.ComputePrice(pricingConfig != null ? pricingConfig : PricingConfig.Default,
+            int basePrice = OrderPricing.ComputePrice(Pricing,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex));
             offer.Price = PriceWithRatingBonus(basePrice);
             // задание пассажира (П5.3): по архетипу; дедлайну нужна дальность

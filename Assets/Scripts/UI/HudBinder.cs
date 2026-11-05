@@ -131,9 +131,13 @@ namespace SpaceTaxi.UI
             }
         }
 
+        private SpaceTaxi.Core.GameSession cachedSession; // кэш — поиск каждый кадр не нужен
+
         private void UpdateGoalHint()
         {
-            var session = FindAnyObjectByType<SpaceTaxi.Core.GameSession>();
+            if (cachedSession == null)
+                cachedSession = FindAnyObjectByType<SpaceTaxi.Core.GameSession>();
+            var session = cachedSession;
             var orders = session != null ? session.Orders : null;
             var active = orders != null ? orders.Active : null;
 
