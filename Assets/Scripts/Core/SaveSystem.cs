@@ -111,7 +111,10 @@ namespace SpaceTaxi.Core
                 || session.Debt.UnpaidAccidents >= 3
                 // окно респавна: корабль мёртв на месте гибели — не сохраняем,
                 // иначе continue поднимет его и Abandon списал бы свой корабль
-                || session.Ship.State == ShipState.Respawning)
+                || session.Ship.State == ShipState.Respawning
+                // проглочен дырой (Н-10): continue должен поднять корабль вне воронки,
+                // а не сразу в болтании за горизонтом
+                || session.Ship.State == ShipState.Swallowed)
                 return;
 
             var data = new SaveData

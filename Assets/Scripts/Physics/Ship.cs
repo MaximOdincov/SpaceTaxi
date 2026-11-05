@@ -10,6 +10,7 @@ namespace SpaceTaxi.Physics
         Flying = 0,
         Landed = 1,
         Respawning = 2,
+        Swallowed = 3, // затянуло за горизонт дыры (Н-10): болтается без управления до отключения
     }
 
     [RequireComponent(typeof(Rigidbody2D))]
