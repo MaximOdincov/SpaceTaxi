@@ -55,7 +55,10 @@ namespace SpaceTaxi.Audio
                 groupVolumes[g] = LoadVolume(g);
                 groupDuck[g] = 1f;
             }
-            AudioListener.volume = LoadVolume("Master");
+            // та же квадратичная кривая, что в SetMasterVolume — иначе на старте
+            // слайдер показывает одно (sqrt), а слышится другое (линейное)
+            float master = LoadVolume("Master");
+            AudioListener.volume = master * master;
 
             musicA = CreateVoice("MusicA");
             musicB = CreateVoice("MusicB");
@@ -329,7 +332,14 @@ namespace SpaceTaxi.Audio
             {
                 t += Time.unscaledDeltaTime;
                 float k = t / MusicFadeTime;
-                if (fadeIn != null) fadeIn.volume = Mathf.Lerp(0f, targetVolume, k);
+                if (fadeIn != null)
+                {
+                    // цель пересчитывается каждый кадр: слайдер музыки мог
+                    // поехать посреди кроссфейда — иначе застынет старое значение
+                    if (fadeIn == musicActive)
+                        targetVolume = CurrentMusicVolume();
+                    fadeIn.volume = Mathf.Lerp(0f, targetVolume, k);
+                }
                 if (fadeOut != null) fadeOut.volume = Mathf.Lerp(fadeOut.volume, 0f, k);
                 yield return null;
             }
@@ -346,7 +356,30 @@ namespace SpaceTaxi.Audio
         {
             groupVolumes[group] = Mathf.Clamp01(linear01);
             SaveVolume(group.ToString(), groupVolumes[group]);
+            if (group == AudioGroup.Music)
+                ApplyMusicVolume(); // слайдер должен менять и уже играющий трек
             RefreshLoops();
+        }
+
+        // громкость музыки применяется к живым каналам сразу; во время
+        // кроссфейда цель пересчитывает сама корутина (см. Crossfade)
+        private void ApplyMusicVolume()
+        {
+            if (musicFades.Count > 0)
+                return;
+            float target = CurrentMusicVolume();
+            if (musicA != null && musicA.isPlaying)
+                musicA.volume = target;
+            if (musicB != null && musicB.isPlaying)
+                musicB.volume = target;
+        }
+
+        private float CurrentMusicVolume()
+        {
+            if (currentMusic == SoundId.None)
+                return 0f;
+            SoundEntry entry = GetEntry(currentMusic);
+            return (entry != null ? entry.Volume : 1f) * GroupFactor(AudioGroup.Music);
         }
 
         public float GetGroupVolume(AudioGroup group) => groupVolumes.TryGetValue(group, out float v) ? v : 1f;
