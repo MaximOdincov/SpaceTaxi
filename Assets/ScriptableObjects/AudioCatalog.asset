@@ -24,9 +24,9 @@ MonoBehaviour:
     Sequential: 0
   - Id: 2
     Clips:
-    - {fileID: 8300000, guid: 33ce4bcf6539941449c45f008085cd22, type: 3}
+    - {fileID: 8300000, guid: 8940fdfd48bf049f7aa2a6b6f69e3cd1, type: 3}
     Group: 0
-    Volume: 0.36
+    Volume: 0.42
     Pitch: 1
     PitchJitter: 0.04
     Loop: 1

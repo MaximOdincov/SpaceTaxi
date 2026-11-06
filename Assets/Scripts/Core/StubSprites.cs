@@ -8,7 +8,8 @@ namespace SpaceTaxi.Core
         private static readonly Dictionary<int, Sprite> circles = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> rings = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> softDots = new Dictionary<int, Sprite>();
-        private static readonly Dictionary<int, Sprite> blobs = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> sparkles = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> clusters = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
         private static Sprite line;
         public static Sprite Circle(float diameter)
@@ -55,15 +56,28 @@ namespace SpaceTaxi.Core
             return sprite;
         }
 
-        // неровная мягкая клякса (туманность): пачка смещённых кругов с плавным
-        // краем; сид фиксирует форму — раскладка слоёв одинакова между запусками
-        public static Sprite Blob(int seed)
+        // звезда с крестом-бликом: чёткое ядро + 4 сужающихся луча (не клякса)
+        public static Sprite StarSparkle(float diameter)
         {
-            if (!blobs.TryGetValue(seed, out Sprite sprite) || sprite == null)
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
+            if (!sparkles.TryGetValue(key, out Sprite sprite) || sprite == null)
             {
-                var tex = CreateBlobTexture(128, seed);
-                sprite = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f / 16f);
-                blobs[seed] = sprite;
+                var tex = CreateSparkleTexture(128);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f / diameter);
+                sparkles[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // компактное скопление из 3-5 чётких звёзд; сид фиксирует раскладку
+        public static Sprite StarCluster(float diameter, int seed)
+        {
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter)) * 1000 + (seed & 1023);
+            if (!clusters.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateClusterTexture(128, seed);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f / diameter);
+                clusters[key] = sprite;
             }
             return sprite;
         }
@@ -162,24 +176,57 @@ namespace SpaceTaxi.Core
             return tex;
         }
 
-        public static Texture2D CreateBlobTexture(int size, int seed)
+        public static Texture2D CreateSparkleTexture(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var pixels = new Color32[size * size];
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float ax = Mathf.Abs(x);
+                    float ay = Mathf.Abs(y);
+
+                    // ядро: компактная горячая точка с мягким краем
+                    float dist = Mathf.Sqrt(x * x + y * y);
+                    float core = Mathf.Clamp01((0.30f - dist) / 0.14f);
+                    core = Mathf.SmoothStep(0f, 1f, core);
+
+                    // лучи: тонкие сужающиеся крестовины
+                    float armH = ay <= 0.05f ? Mathf.Clamp01(1f - ax) : 0f;
+                    float armV = ax <= 0.05f ? Mathf.Clamp01(1f - ay) : 0f;
+                    float arm = Mathf.Max(armH, armV);
+                    arm *= arm; // сужение к концам
+
+                    float a = Mathf.Clamp01(Mathf.Max(core, arm * 0.9f));
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        public static Texture2D CreateClusterTexture(int size, int seed)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
             var rng = new System.Random(seed);
-            int count = 6 + rng.Next(3); // 6..8 кругов: ядро + неровные лепестки
+            int count = 3 + rng.Next(3); // 3..5 звёзд в группе
             var xs = new float[count];
             var ys = new float[count];
             var rs = new float[count];
             xs[0] = 0f;
             ys[0] = 0f;
-            rs[0] = 0.52f; // центральное ядро — клякса не распадается
+            rs[0] = 0.16f; // самая яркая — в центре
             for (int i = 1; i < count; i++)
             {
                 float ang = (float)(rng.NextDouble() * System.Math.PI * 2.0);
-                float dist = 0.12f + (float)rng.NextDouble() * 0.30f;
+                float dist = 0.30f + (float)rng.NextDouble() * 0.45f;
                 xs[i] = Mathf.Cos(ang) * dist;
                 ys[i] = Mathf.Sin(ang) * dist;
-                rs[i] = 0.24f + (float)rng.NextDouble() * 0.26f;
+                rs[i] = 0.06f + (float)rng.NextDouble() * 0.09f;
             }
             var pixels = new Color32[size * size];
             for (int iy = 0; iy < size; iy++)
@@ -191,13 +238,14 @@ namespace SpaceTaxi.Core
                     float alpha = 0f;
                     for (int i = 0; i < count; i++)
                     {
+                        // чёткая точка: плоский диск + узкий мягкий край
                         float dx = x - xs[i];
                         float dy = y - ys[i];
                         float d = Mathf.Sqrt(dx * dx + dy * dy);
-                        alpha = Mathf.Max(alpha, Mathf.Clamp01((rs[i] - d) / 0.16f + 0.5f));
+                        float a = Mathf.Clamp01((rs[i] + 0.05f - d) / 0.05f);
+                        alpha = Mathf.Max(alpha, Mathf.Min(a, 1f));
                     }
-                    byte a = (byte)(alpha * 255f);
-                    pixels[iy * size + ix] = new Color32(255, 255, 255, a);
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(alpha * 255f));
                 }
             }
             tex.SetPixels32(pixels);
