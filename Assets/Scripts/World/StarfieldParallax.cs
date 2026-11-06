@@ -6,7 +6,7 @@ using SpaceTaxi.Physics;
 namespace SpaceTaxi.World
 {
     // Параллакс: три слоя, дрейфуют с долей скорости камеры. Палитра слоя —
-    // набор спрайтов (звёзды, пыль, кляксы-туманности, далёкие солнца, декор),
+    // набор спрайтов (звёзды, скопления, пыль, яркие sparkle-звёзды, декор),
     // выбор предмета и его масштаб/альфа — по сиду слоя (раскладка стабильна).
     [DefaultExecutionOrder(50)] // LateUpdate после CameraFollow — камера уже встала
     public class StarfieldParallax : MonoBehaviour
@@ -52,13 +52,6 @@ namespace SpaceTaxi.World
             new Color(1f, 0.93f, 0.82f),
         };
 
-        private static readonly Color[] NebulaTints =
-        {
-            new Color(0.62f, 0.42f, 0.95f), // сирень
-            new Color(0.30f, 0.72f, 0.78f), // бирюза
-            new Color(0.42f, 0.55f, 1.00f), // синева
-        };
-
         private static readonly Color SunTint = new Color(1f, 0.82f, 0.55f);
 
         private void Awake()
@@ -71,7 +64,7 @@ namespace SpaceTaxi.World
             tileY = Mathf.Max(950f, 2f * 250f + 450f);
 
             Sprite[] decor = LoadDecor();
-            Build(0.12f, 90, FarPalette(decor));  // дальняя пыль + туманности + далёкие солнца
+            Build(0.12f, 90, FarPalette(decor));  // дальние звёзды + скопления + далёкие солнца
             Build(0.35f, 60, MidPalette(decor));  // средний слой
             Build(0.65f, 36, NearPalette(decor)); // ближние звёзды
         }
@@ -177,15 +170,17 @@ namespace SpaceTaxi.World
             return Mathf.Max(size.x, size.y);
         }
 
-        // палитры слоёв: звёзды и пыль везде, туманности и далёкие солнца — вдали
+        // палитры слоёв: звёзды/скопления/пыль везде, яркие sparkle и далёкие
+        // солнца — преимущественно вдали
         private static Kind[] FarPalette(Sprite[] decor)
         {
             var kinds = new List<Kind>
             {
-                Dust(1.5f, 0.4f, 56),
-                StarKind(2.4f, 0.42f, 30),
+                Dust(1.5f, 0.4f, 50),
+                StarKind(2.4f, 0.42f, 34),
+                Cluster(9f, 0.4f, 8),
+                Sparkle(4.5f, 0.55f, 8),
             };
-            kinds.AddRange(NebulaKinds(new[] { 11, 23, 37 }, 30f, 0.16f, 5));
             kinds.Add(Sun(7f, 3));
             AddDecor(kinds, decor, 0, 3, 34f, 0.3f);
             return kinds.ToArray();
@@ -195,10 +190,11 @@ namespace SpaceTaxi.World
         {
             var kinds = new List<Kind>
             {
-                Dust(1.4f, 0.4f, 20),
-                StarKind(2.8f, 0.6f, 66),
+                Dust(1.4f, 0.4f, 18),
+                StarKind(2.8f, 0.6f, 62),
+                Cluster(8f, 0.5f, 8),
+                Sparkle(5.5f, 0.7f, 12),
             };
-            kinds.AddRange(NebulaKinds(new[] { 41, 53 }, 12f, 0.12f, 3));
             AddDecor(kinds, decor, 1, 6, 16f, 0.35f);
             return kinds.ToArray();
         }
@@ -207,8 +203,9 @@ namespace SpaceTaxi.World
         {
             var kinds = new List<Kind>
             {
-                Dust(1.2f, 0.35f, 16),
-                StarKind(4.2f, 0.85f, 80),
+                Dust(1.2f, 0.35f, 14),
+                StarKind(4.2f, 0.85f, 72),
+                Sparkle(7f, 0.9f, 14),
             };
             AddDecor(kinds, decor, 2, 3, 8f, 0.45f);
             return kinds.ToArray();
@@ -231,21 +228,26 @@ namespace SpaceTaxi.World
             Weight = weight,
         };
 
-        private static IEnumerable<Kind> NebulaKinds(int[] seeds, float units, float alpha, int weight)
+        // яркая звезда с крестом-бликом и гало
+        private static Kind Sparkle(float units, float alpha, int weight) => new Kind
         {
-            for (int i = 0; i < seeds.Length; i++)
-                yield return new Kind
-                {
-                    Sprite = StubSprites.Blob(seeds[i]),
-                    Units = units,
-                    Alpha = alpha,
-                    Weight = weight,
-                    Glow = true, // туманность светится: ядро ярче + широкий ореол
-                    GlowScale = 1.75f,
-                    GlowAlpha = 0.26f,
-                    TintOverride = NebulaTints[i % NebulaTints.Length],
-                };
-        }
+            Sprite = StubSprites.StarSparkle(6f),
+            Units = units,
+            Alpha = alpha,
+            Weight = weight,
+            Glow = true,
+            GlowScale = 1.6f,
+            GlowAlpha = 0.3f,
+        };
+
+        // компактная группа из 3-5 чётких звёзд (сид — форма группы)
+        private static Kind Cluster(float units, float alpha, int weight) => new Kind
+        {
+            Sprite = StubSprites.StarCluster(6f, seed: 7),
+            Units = units,
+            Alpha = alpha,
+            Weight = weight,
+        };
 
         private static Kind Sun(float units, int weight) => new Kind
         {
