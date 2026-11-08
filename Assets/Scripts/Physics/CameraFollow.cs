@@ -5,8 +5,8 @@ namespace SpaceTaxi.Physics
     // Следование за кораблём с опережением по курсу, зум по скорости, дрожь от ударов
     public class CameraFollow : MonoBehaviour
     {
-        private const float FlightViewHeight = 320f;  // обычный полёт
-        private const float FastViewHeight = 470f;    // отъезд на максималке
+        private const float FlightViewHeight = 260f;  // медленный полёт — ближе
+        private const float FastViewHeight = 560f;    // отъезд на максималке
         private const float LandingViewHeight = 190f; // посадка/ретро
         private const float LookaheadSeconds = 0.45f; // взгляд вперёд
         private const float LookaheadMax = 130f;      // предел смещения

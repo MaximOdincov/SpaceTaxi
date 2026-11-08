@@ -130,6 +130,14 @@ namespace SpaceTaxi.Physics
             if (modelVisual != null)
             {
                 modelVisual.Apply(shipConfig, PaintIndex);
+                // корпус другой — габарит другой: на стоянке переставить на
+                // поверхность, иначе новый корпус «заползает» в планету
+                if (State == ShipState.Landed && LandedOn != null)
+                {
+                    Vector2 dir = ((Vector2)transform.position - (Vector2)LandedOn.transform.position).normalized;
+                    transform.position = (Vector2)LandedOn.transform.position
+                        + dir * (LandedOn.Radius + modelVisual.HalfExtent);
+                }
                 return;
             }
             var spriteRenderer = GetComponent<SpriteRenderer>();

@@ -258,7 +258,8 @@ namespace SpaceTaxi.Physics
 
         private void UpdateHeading(Vector2 velocity, float v, Planet planet, float planetDist)
         {
-            if (Time.time < headingHoldUntil)
+            // grace снимается боковой тягой: игрок сам просит повернуть
+            if (Time.time < headingHoldUntil && Mathf.Abs(StrafeLevel) < 0.1f)
                 return;
             bool inLandingRing = planet != null && planetDist < planet.LandingRing;
             bool finalApproach = inLandingRing
