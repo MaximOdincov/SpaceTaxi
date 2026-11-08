@@ -96,12 +96,10 @@ namespace SpaceTaxi.World
             {
                 renderer.sprite = rock;
                 renderer.color = Color.white;
-                float dim = Mathf.Max(rock.bounds.size.x, rock.bounds.size.y);
-                if (dim > 0.0001f)
-                {
-                    float s = CometRadius * 2f / dim; // габарит = физике
-                    go.transform.localScale = new Vector3(s, s, 1f);
-                }
+                // контент арта → габарит 2r; коллайдер компенсирует масштаб
+                float s = SpriteArt.ScaleForWorldSize(rock, CometRadius * 2f, 1f);
+                go.transform.localScale = new Vector3(s, s, 1f);
+                collider.radius = CometRadius / s;
             }
             else
             {

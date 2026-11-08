@@ -90,13 +90,11 @@ namespace SpaceTaxi.World
             {
                 renderer.sprite = rock;
                 renderer.color = asteroidColor; // white, если карте не задан свой тон
-                // любая картинка → круг диаметром 2r (габарит = физике)
-                float dim = Mathf.Max(rock.bounds.size.x, rock.bounds.size.y);
-                if (dim > 0.0001f)
-                {
-                    float s = radius * 2f / dim;
-                    go.transform.localScale = new Vector3(s, s, 1f);
-                }
+                // контент арта → габарит 2r (габарит = физике); коллайдер в
+                // локальных осях компенсирует масштаб
+                float s = SpriteArt.ScaleForWorldSize(rock, radius * 2f, 1f);
+                go.transform.localScale = new Vector3(s, s, 1f);
+                collider.radius = radius / s;
             }
             else
             {

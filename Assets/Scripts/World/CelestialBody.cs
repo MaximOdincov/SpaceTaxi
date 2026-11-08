@@ -53,7 +53,10 @@ namespace SpaceTaxi.World
             var renderer = GetComponent<SpriteRenderer>();
             if (renderer != null && renderer.sprite != null)
             {
-                float d = Mathf.Max(renderer.sprite.bounds.size.x, renderer.sprite.bounds.size.y);
+                // по контенту арта (альфа-границы), не по канве: видимый шар
+                // должен совпадать с логическим радиусом и коллайдером
+                Vector2 content = Core.SpriteArt.ContentSize(renderer.sprite);
+                float d = Mathf.Max(content.x, content.y);
                 if (d > 0.0001f)
                 {
                     float s = Radius * 2f / d;

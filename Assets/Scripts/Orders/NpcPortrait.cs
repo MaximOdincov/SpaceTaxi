@@ -9,7 +9,6 @@ namespace SpaceTaxi.Orders
     // PortraitSeed (SaveSystem), цвета запечены в текстуру.
     public static class NpcPortrait
     {
-        private const int Frame = 512;
         private const float ReadyChance = 0.5f;
         private const string DispatcherName = "dispetcher";
 
@@ -62,19 +61,25 @@ namespace SpaceTaxi.Orders
             Sprite eyesSprite = Pick(ref eyes, "Art/npc/eyes", rnd);
             Sprite mouthSprite = Pick(ref mouths, "Art/npc/mouth", rnd);
 
-            var tex = new Texture2D(Frame, Frame, TextureFormat.RGBA32, false);
-            var dst = new Color32[Frame * Frame];
+            // канва = нативный размер слоёв (все нарезаны одним кадром):
+            // пиксель в пиксель, никаких масштабирований
+            Texture2D baseTex = body.texture;
+            int w = baseTex.width, h = baseTex.height;
+            var dst = new Color32[w * h];
             Blit(body, BodyTints[rnd.Next(BodyTints.Length)], dst);
             Blit(clothesSprite, ClothesTints[rnd.Next(ClothesTints.Length)], dst);
             Blit(eyesSprite, Color.white, dst); // глаза и рот не красим
             Blit(mouthSprite, Color.white, dst);
 
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
             tex.SetPixels32(dst);
             tex.Apply(false, false);
-            return Sprite.Create(tex, new Rect(0f, 0f, Frame, Frame), new Vector2(0.5f, 0.5f), Frame);
+            return Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), w);
         }
 
-        // слой поверх dst: rgb с тином, обычная альфа-композиция «over»
+        // слой поверх dst пиксель-в-пиксель (размер канвы = размеру слоёв),
+        // rgb с тином, обычная альфа-композиция «over»; слой другого размера
+        // пропускается — масштабировать слои нельзя, нарезка фиксированная
         private static void Blit(Sprite layer, Color tint, Color32[] dst)
         {
             if (layer == null)
@@ -82,32 +87,26 @@ namespace SpaceTaxi.Orders
             Texture2D tex = layer.texture;
             if (!tex.isReadable)
                 return;
-            Color32[] src = tex.GetPixels32();
-            Rect rect = layer.textureRect;
-            int rx = Mathf.RoundToInt(rect.x), ry = Mathf.RoundToInt(rect.y);
-            int rw = Mathf.RoundToInt(rect.width), rh = Mathf.RoundToInt(rect.height);
-            if (rw <= 0 || rh <= 0)
-                return;
-
-            for (int y = 0; y < Frame; y++)
+            if (tex.width * tex.height != dst.Length)
             {
-                int sy = Mathf.Min(ry + y * rh / Frame, tex.height - 1);
-                for (int x = 0; x < Frame; x++)
-                {
-                    Color32 c = src[sy * tex.width + Mathf.Min(rx + x * rw / Frame, tex.width - 1)];
-                    if (c.a == 0)
-                        continue;
-                    float sa = c.a / 255f;
-                    int i = y * Frame + x;
-                    float da = dst[i].a / 255f;
-                    float oa = sa + da * (1f - sa);
-                    if (oa <= 0f)
-                        continue;
-                    byte r = (byte)((c.r * tint.r * sa + dst[i].r * da * (1f - sa)) / oa);
-                    byte g = (byte)((c.g * tint.g * sa + dst[i].g * da * (1f - sa)) / oa);
-                    byte b = (byte)((c.b * tint.b * sa + dst[i].b * da * (1f - sa)) / oa);
-                    dst[i] = new Color32(r, g, b, (byte)(oa * 255f));
-                }
+                Debug.LogWarning($"[NPC] Слой «{layer.name}» {tex.width}×{tex.height} не совпадает с канвой — пропущен");
+                return;
+            }
+            Color32[] src = tex.GetPixels32();
+            for (int i = 0; i < src.Length; i++)
+            {
+                Color32 c = src[i];
+                if (c.a == 0)
+                    continue;
+                float sa = c.a / 255f;
+                float da = dst[i].a / 255f;
+                float oa = sa + da * (1f - sa);
+                if (oa <= 0f)
+                    continue;
+                byte r = (byte)((c.r * tint.r * sa + dst[i].r * da * (1f - sa)) / oa);
+                byte g = (byte)((c.g * tint.g * sa + dst[i].g * da * (1f - sa)) / oa);
+                byte b = (byte)((c.b * tint.b * sa + dst[i].b * da * (1f - sa)) / oa);
+                dst[i] = new Color32(r, g, b, (byte)(oa * 255f));
             }
         }
 
