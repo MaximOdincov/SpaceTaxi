@@ -91,11 +91,13 @@ namespace SpaceTaxi.Core
 
         // указатель цели у края экрана: классическая навигационная стрелка
         // с выемкой в хвосте (квадрат-заглушка ShipTriangle читался как «трапеция»)
+        private static Sprite chevron;
+
         public static Sprite TargetChevron()
         {
-            if (cache.TryGetValue("chevron", out Sprite s) && s != null)
-                return s;
-            s = Sprite.Create(CreateMaskTexture(128, (x, y) =>
+            if (chevron != null)
+                return chevron;
+            chevron = Sprite.Create(CreateMaskTexture(128, (x, y) =>
             {
                 // треугольник (0,0.9)-(−0.75,−0.7)-(0.75,−0.7) минус хвостовая выемка
                 bool body = y <= 0.9f && y >= -0.7f
@@ -104,8 +106,7 @@ namespace SpaceTaxi.Core
                              && Mathf.Abs(x) < 0.22f * (y + 0.7f) / 0.55f;
                 return body && !notch;
             }), new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f / 3f);
-            cache["chevron"] = s;
-            return s;
+            return chevron;
         }
 
         public static Sprite Line()
