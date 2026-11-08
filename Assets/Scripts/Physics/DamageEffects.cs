@@ -53,6 +53,10 @@ namespace SpaceTaxi.Physics
                 hull.HpChanged -= OnHpChanged;
             if (landing != null)
                 landing.CrashImpactAt -= OnImpact;
+            foreach (Flash flash in flashes)
+                if (flash.Renderer != null)
+                    Destroy(flash.Renderer.gameObject);
+            flashes.Clear();
         }
 
         private void Update()
@@ -66,10 +70,13 @@ namespace SpaceTaxi.Physics
             lowHp = ship != null && ship.HpFraction < SparksHpFraction;
         }
 
+        private const float FlashHardLifetime = 1.2f; // страховка: вспышка живёт не дольше
+
         private void OnImpact(Vector2 point)
         {
             var go = new GameObject("CrashFlash");
             go.transform.position = point;
+            Object.Destroy(go, FlashHardLifetime);
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = StubSprites.Circle(6f);
@@ -93,8 +100,9 @@ namespace SpaceTaxi.Physics
             if (sparks == null || ship == null)
                 return;
 
-            // искры на живом корабле; в респавне/пасти дыры — тишина
-            bool want = lowHp && (ship.State == ShipState.Flying || ship.State == ShipState.Landed);
+            // искры только в полёте: у стоящего на планете пачки искр выглядят
+            // как вечный «шарик» под корпусом (жалоба плейтеста)
+            bool want = lowHp && ship.State == ShipState.Flying;
             if (want)
             {
                 if (!sparks.isEmitting)

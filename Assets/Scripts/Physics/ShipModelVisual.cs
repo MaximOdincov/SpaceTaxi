@@ -37,8 +37,14 @@ namespace SpaceTaxi.Physics
         // до ShipConfig.VisualLength
         public void Apply(ShipConfig config, int paintIndex)
         {
-            if (visual != null)
-                DestroyImmediate(visual.gameObject); // смена модели стоит в паузе экрана станции
+            // сносим ВСЕ ModelVisual, а не только tracked: после смерти/респавна
+            // двойной визуал = наложенные корпуса (баг «корабли накладываются»)
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = transform.GetChild(i);
+                if (child != null && child.name == "ModelVisual")
+                    DestroyImmediate(child.gameObject);
+            }
             visual = null;
             contentHeight = 0f;
 
