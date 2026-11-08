@@ -20,6 +20,14 @@ MonoBehaviour:
   MaxV: 330
   FuelMax: 100
   HpMax: 100
+  ShipSprite: {fileID: 21300000, guid: 076b6059574350869d4f3b08ff4eaa9b, type: 3}
+  PaintVariants:
+  - {fileID: 21300000, guid: 412c9fb74c845483909b576befbf21e1, type: 3}
+  - {fileID: 21300000, guid: 3df7470fd2a357c18d39faa839e224fd, type: 3}
+  - {fileID: 21300000, guid: adf2cef1bf115882b3d872b12934bb9f, type: 3}
+  - {fileID: 21300000, guid: 26599b4f948e5a968a684857deecf084, type: 3}
+  - {fileID: 21300000, guid: 2ffee7f325bc519a9d42bdbf9c3e8c7d, type: 3}
+  - {fileID: 21300000, guid: 9f7d9bf993ca5611a65a8d6bea3b2192, type: 3}
   Price: 0
   IsRental: 1
   Description: "\u0410\u0440\u0435\u043D\u0434\u043D\u044B\u0439 \u043A\u043E\u0440\u0430\u0431\u043B\u044C \u043A\u043E\u043C\u043F\u0430\u043D\u0438\u0438, \u0432\u0441\u0435\u0433\u0434\u0430 \u0441\u0442\u043E\u043A"

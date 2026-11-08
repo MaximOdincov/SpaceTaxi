@@ -1,0 +1,438 @@
+{
+ "Assets/Resources/Art/planets/1.png": {
+  "guid": "c29a581068215e6d8e7e2364c413a0e4",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/2.png": {
+  "guid": "26d3c079d79e5f63a1ecb05e9d25c6b7",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/3.png": {
+  "guid": "0cc8c436acee5ac4ac09192d0a3b65bb",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/4.png": {
+  "guid": "4e733b4b313f5d328b8352fbcb9d7ea7",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/5.png": {
+  "guid": "bd91dc6279775ad1a3fcea836a14825d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/6.png": {
+  "guid": "697923a239f15419aa5a1314d528c14e",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/7.png": {
+  "guid": "8dc73a5fb1b05fd38fc131173fc86ce4",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/8.png": {
+  "guid": "ec1a690f8d395785afa5a05bf36e26b2",
+  "readable": 0
+ },
+ "Assets/Resources/Art/planets/9.png": {
+  "guid": "c91a8c0bc2c0589ab4ad05dc5b2b3ec8",
+  "readable": 0
+ },
+ "Assets/Resources/Art/stations/gas_poor.png": {
+  "guid": "6d78e510cd1753c7b63d85228d8407d5",
+  "readable": 0
+ },
+ "Assets/Resources/Art/stations/gas_norm.png": {
+  "guid": "b440d664e1425658a7ee25c6cf37dca4",
+  "readable": 0
+ },
+ "Assets/Resources/Art/stations/gas_rich.png": {
+  "guid": "7fa8be00fec359d6bd161abc1d9576e8",
+  "readable": 0
+ },
+ "Assets/Resources/Art/stations/gas_high.png": {
+  "guid": "0d69cffae0fc5474b43f8fdde8f05f71",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main1.png": {
+  "guid": "afb706ae865b588abc721a752695a417",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main2.png": {
+  "guid": "ac95e125c5905651a95b26dd76a603fa",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main3.png": {
+  "guid": "4aefc33377a45f6f96ea648d03404047",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main4.png": {
+  "guid": "5de31ed8444856c388a05eb8ca227b7d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main5.png": {
+  "guid": "20bb642f3ff95712a50813a456977c17",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main6.png": {
+  "guid": "d3c7905acf3f5ffbb98dfd2b278d6cf0",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main7.png": {
+  "guid": "4d0c71e3caa75458b60246a9e0ea6129",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main8.png": {
+  "guid": "e2d0ff5bb76759adbe05840e3353189d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/asteroids/main9.png": {
+  "guid": "f9f18d0f68c65422beee30f3a8597af5",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон1.png": {
+  "guid": "17edfad08bd95d649bbe582482a376ec",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон2.png": {
+  "guid": "ad41dec36fe45a4a90f90e109efe081b",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон3.png": {
+  "guid": "2c69ccf8306f55108e08a6d4c98ac625",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон4.png": {
+  "guid": "bb7f4beba5375671b8d085d917bd7217",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон5.png": {
+  "guid": "90cf27738526585fba13bd352ac1105e",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон6.png": {
+  "guid": "3659f3279a3c548abf90d480df672ab1",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/барон/барон7.png": {
+  "guid": "cc57b64261ae5cd9864bc5240f4bdad4",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/дельта/дельта1.png": {
+  "guid": "e9ff3662364e5cc7859ba23df038154d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/дельта/дельта2.png": {
+  "guid": "157d6561487a56a29d19da85f8a21227",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/дельта/дельта3.png": {
+  "guid": "61f8cc2e313f52f1a1abc98d1669b4b3",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/дельта/дельта4.png": {
+  "guid": "a445f048d8625a749721b368b1f8a254",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/дельта/дельта5.png": {
+  "guid": "6d1e3e0499425b208992ec0d78765944",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла1.png": {
+  "guid": "3fbfc20bf1935515a685733c77a164b9",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла2.png": {
+  "guid": "c738af7c37c75bb799fc8236100b8fd7",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла3.png": {
+  "guid": "c0c104fb31225fa6910246abd5dfc38f",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла4.png": {
+  "guid": "7918fe228d5256658b6cf797647b59b8",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла5.png": {
+  "guid": "bfdb87b691ca582baa7a2c047038ae16",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/игла/игла6.png": {
+  "guid": "9e422e9d194b51a1940bb8a8255ffbc4",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/кабан/кабан1.png": {
+  "guid": "ab29402a001f519ca192cb96b0ae46f6",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/кабан/кабан2.png": {
+  "guid": "ea786129e2b85e95907fee0c5ba05010",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/кабан/кабан3.png": {
+  "guid": "bfb08cdf2f6a5890b6295e7c77ddb4df",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/кабан/кабан4.png": {
+  "guid": "850cc9bf954853538e48a379a5e7a105",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/кабан/кабан5.png": {
+  "guid": "32a2d3f988fd56108880ca371f58eff7",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан1.png": {
+  "guid": "cd659bcae0b05828a509b0c8ceb154bf",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан2.png": {
+  "guid": "dfb05a0397e75d6fb46e6a44bd13dc66",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан3.png": {
+  "guid": "50674005457f5715a945174f1c4b9e0d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан4.png": {
+  "guid": "7627df89632e5fdc9fd90abcee3437cc",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан5.png": {
+  "guid": "1cc506a6196858e4b6027b60a048a7c0",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан6.png": {
+  "guid": "5e2596ac3e1d5cf6a119b1b134335b37",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/меридиан/меридиан7.png": {
+  "guid": "f9ca518d1de85fd7b614d1053b161b5e",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка1.png": {
+  "guid": "2dff5a012ec05c9bad4a594e6b365004",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка2.png": {
+  "guid": "2b775f08ab0b5f1894b1b99c9481495c",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка3.png": {
+  "guid": "696d9d9cb6545044a4df4d830d404b2d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка4.png": {
+  "guid": "abe65ea331fd561799a1a76937697915",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка5.png": {
+  "guid": "b6b0741cdb495efabd62aad2939b3c19",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/скрепка/скрепка6.png": {
+  "guid": "c3d82f67aac85484b5c47e9690d23826",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела1.png": {
+  "guid": "33a447cf01105c23b7b9dbaebe78fdf7",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела2.png": {
+  "guid": "cd4bb12358285c688393b98e7cebc0ba",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела3.png": {
+  "guid": "1b799386c7375064beb1d78175486cbd",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела4.png": {
+  "guid": "a01a8599612058b082c9fdb8859fea42",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела5.png": {
+  "guid": "4329b225b97d52d1850f9396eef2dd45",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/стрела/стрела6.png": {
+  "guid": "e28af09a395155adac434d31ad67cd30",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо1.png": {
+  "guid": "076b6059574350869d4f3b08ff4eaa9b",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо2.png": {
+  "guid": "412c9fb74c845483909b576befbf21e1",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо3.png": {
+  "guid": "3df7470fd2a357c18d39faa839e224fd",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо4.png": {
+  "guid": "adf2cef1bf115882b3d872b12934bb9f",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо5.png": {
+  "guid": "26599b4f948e5a968a684857deecf084",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо6.png": {
+  "guid": "2ffee7f325bc519a9d42bdbf9c3e8c7d",
+  "readable": 0
+ },
+ "Assets/Resources/Art/ships/яйцо/яйцо7.png": {
+  "guid": "9f7d9bf993ca5611a65a8d6bea3b2192",
+  "readable": 0
+ },
+ "Assets/Resources/Art/npc/ready/dispetcher.png": {
+  "guid": "33f34e8fce5e5ffeaab6c6494276f921",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/1.png": {
+  "guid": "258bce82390a5aa5b8ff4c1b06cd5fcd",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/2.png": {
+  "guid": "0c59f51134dc5c5d9240dc23bff3c392",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/3.png": {
+  "guid": "b70d8fca56b6542d9eb2f008a9eaecd8",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/4.png": {
+  "guid": "b3db3764a40f52edad21c892b1f91676",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/5.png": {
+  "guid": "13094f06d2105ae9b8052fc90b1b401e",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/6.png": {
+  "guid": "07600e37bdbb51b89df6741bd058b1e6",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/7.png": {
+  "guid": "249a23e4cd645279b15b8500319a2201",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/8.png": {
+  "guid": "e00ff60bc23151819b9e9d6d4ebdc391",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/9.png": {
+  "guid": "5e52bb7679005c9386afae8c5a80e805",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/10.png": {
+  "guid": "0d98770cc10a5bbba5e1d8a585349945",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/ready/11.png": {
+  "guid": "ade411fdd9cc5be7b399bf2fcc17dd9c",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/body/тело в виде цветочка.png": {
+  "guid": "69fb4491962d5782889fca26cf7176c4",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/body/тело губки боба.png": {
+  "guid": "4ab27b23a5d75382b6e7769940c1917d",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/body/человек тело.png": {
+  "guid": "4fd6f84b2a2d5aa8afbc6d3b20dc4692",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/body/шаблон тела, квадрат.png": {
+  "guid": "5ddcf0669b5057f39cf0d7d9cfec8d70",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/clothes/бабочка.png": {
+  "guid": "02e01964ba29585193d67801df9f0183",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/clothes/галстук.png": {
+  "guid": "177f076933845f8ab4fc132bd5895687",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/clothes/рубашка.png": {
+  "guid": "d74acbd6b90d5a88956ccacfaf4c7953",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/eyes/глаза с ресничками.png": {
+  "guid": "efd24aaf2d6955718d455773c949664c",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/eyes/два глаза.png": {
+  "guid": "34e3bd3778de55c4a6f5227911c9c8e2",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/mouth/рот в шоке.png": {
+  "guid": "649a0eb68f335508a9162d045822e2db",
+  "readable": 1
+ },
+ "Assets/Resources/Art/npc/mouth/рот губки боба.png": {
+  "guid": "84c7de8a19915041a2e7c9883bd0305d",
+  "readable": 1
+ },
+ "Assets/Sprites/icons/Group 1000011322(1).png": {
+  "guid": "6278b3d7e50755aaa1507122ff0929b0",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/Group 1000011328.png": {
+  "guid": "b412e950972c58c5a7f741d029cf82ff",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/Group 1000011329.png": {
+  "guid": "b19c0d747e8e5854af1335dc1b33eede",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/Group 1000011330.png": {
+  "guid": "d094eaf0e0105c13867a6c0a373a25d9",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/Star 2.png": {
+  "guid": "d2e17faa3f595e6a82cb721c562fd3fa",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/asteroid's_tail_icon.png": {
+  "guid": "fc08b72ddc4e589a86f19faab5e8e256",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/black_hole_icon.png": {
+  "guid": "8e577a6369c75524b6ebfa76aec6687d",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/chain.png": {
+  "guid": "488ee963c7c757ee9148aed6969400c9",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/comet_icon.png": {
+  "guid": "fff5b86480865ab69b2bec7b745249af",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/danger_png.png": {
+  "guid": "49a46d156e1c5f948d009fb52c5c82c8",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/gas.png": {
+  "guid": "07dfd42a2f6951418d7483239ade9fe5",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/knock.png": {
+  "guid": "f83b2e658a5b522c8ce934cc82b2490b",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/planet_icon.png": {
+  "guid": "98f3bbb336365c55bc9f5a3ee5d04711",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/shield.png": {
+  "guid": "9a6c35781db353f295d8c9c880f4384b",
+  "readable": 0
+ },
+ "Assets/Sprites/icons/sun_icon.png": {
+  "guid": "5ff0cde6cc445f318c2490e027dd9e2b",
+  "readable": 0
+ }
+}
