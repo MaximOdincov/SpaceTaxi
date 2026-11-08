@@ -47,7 +47,7 @@ namespace SpaceTaxi.Physics
             {
                 Transform child = transform.GetChild(i);
                 if (child != null && child.name == "ModelVisual")
-                    DestroyImmediate(child.gameObject);
+                    Destroy(child.gameObject); // DestroyImmediate запрещён в физика-коллбеках смерти
             }
             visual = null;
             contentHeight = 0f;

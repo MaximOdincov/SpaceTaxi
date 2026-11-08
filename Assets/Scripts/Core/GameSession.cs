@@ -69,8 +69,9 @@ namespace SpaceTaxi.Core
             // (ещё один подписчик тех же событий, что и OrderService)
             hull.Died += OnShipLost;
             hull.ShipLost += _ => OnShipLost();
-            // инцидент закрыт: после респавна следующая потеря — новый случай
-            hull.Respawned += () => accidentRegistered = false;
+            // долг и замена корпуса — ПОСЛЕ респавна: подмена спрайта в момент
+            // удара выглядела как мгновенная пересадка в аренду (жалоба плейтеста)
+            hull.Respawned += OnRespawned;
 
             var follow = Camera.main.gameObject.AddComponent<CameraFollow>();
             follow.SetTarget(Ship);
@@ -155,12 +156,20 @@ namespace SpaceTaxi.Core
         // как у OrderService.FailActive, снимается на респавне
         private void OnShipLost()
         {
+            // Died и ShipLost при одном инциденте не должны сработать оба — guard
             if (accidentRegistered)
                 return;
             accidentRegistered = true;
+        }
+
+        private void OnRespawned()
+        {
+            if (!accidentRegistered)
+                return;
             if (!Fleet.IsOwned(Fleet.Current))
                 Debt.RegisterAccident();
             Fleet.NotifyShipLost();
+            accidentRegistered = false; // следующая потеря — новый инцидент
         }
     }
 }

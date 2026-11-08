@@ -29,4 +29,5 @@ MonoBehaviour:
   VisualLength: 42
   Price: 3000
   IsRental: 0
+  Retro: 68
   Description: "\u0422\u0430\u043D\u043A-\u0431\u0430\u0440\u0436\u0430: \u043C\u0435\u0434\u043B\u0435\u043D\u043D\u0430\u044F, \u043E\u0433\u0440\u043E\u043C\u043D\u044B\u0439 \u0431\u0430\u043A"

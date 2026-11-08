@@ -65,12 +65,14 @@ namespace SpaceTaxi.Core
                 else
                 {
                     float ppu = sprite.pixelsPerUnit;
-                    // центр контента относительно центра канвы; пивот канвы — центр,
-                    // bounds.center трогать нельзя: у Tight-меша он уже смещён
-                    // к контенту, второе слагаемое давало двойной сдвиг корпуса
+                    // центр контента относительно центра спрайт-rect (он же локальный
+                    // ноль пивота 0.5/0.5). Скан идёт в координатах ректа, поэтому
+                    // x0/y0 в вычитании не участвуют: лишний сдвиг на x0 разворачивал
+                    // корпус вправо-вниз у всех спрайтов с обрезанным texRect
+                    // (у яйца/скрепки texRect.x = 0 — потому они были ровными)
                     Vector2 center = new Vector2(
-                        (minX + maxX + 1) * 0.5f - (x0 + w * 0.5f),
-                        (minY + maxY + 1) * 0.5f - (y0 + h * 0.5f)) / ppu;
+                        (minX + maxX + 1) * 0.5f - w * 0.5f,
+                        (minY + maxY + 1) * 0.5f - h * 0.5f) / ppu;
                     Vector2 size = new Vector2(maxX - minX + 1, maxY - minY + 1) / ppu;
                     rect = new Rect(center - size * 0.5f, size);
                 }

@@ -14,6 +14,7 @@ namespace SpaceTaxi.Economy
         public float FuelDrain;    // расход топлива в секунду
         public float GravityBoost; // буст качели на входе в кольцо захвата
         public float HeatMul;      // множитель урона от жара (1 = без защиты)
+        public float Retro;        // торможение (модельный, иначе глобальный)
     }
 
     // Уровни улучшений -> статы. Чистая функция без состояния: ур.1 = 1/3,
@@ -35,6 +36,9 @@ namespace SpaceTaxi.Economy
                 FuelDrain = physics != null ? physics.FuelDrainPerSecond : 0f,
                 GravityBoost = physics != null ? physics.GravityBoost : 1f,
                 HeatMul = 1f,
+                Retro = ship != null && ship.Retro > 0f
+                    ? ship.Retro
+                    : physics != null ? physics.Retro : 80f,
             };
             if (ship == null || physics == null || upgrades == null)
                 return stats; // без конфига улучшений — сток

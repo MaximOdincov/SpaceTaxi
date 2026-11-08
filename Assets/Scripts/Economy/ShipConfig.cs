@@ -39,6 +39,9 @@ namespace SpaceTaxi.Economy
         [Tooltip("Одна строка для карточки магазина")]
         public string Description;
 
+        [Tooltip("Торможение корабля, ед/с (0 — глобальный PhysicsConfig.Retro)")]
+        public float Retro = 0f;
+
         private static ShipConfig eggRentalFallback;
 
         // число дополнительных покрасок (без базовой)
@@ -78,6 +81,7 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;
                 eggRentalFallback.VisualLength = 27f;
+        eggRentalFallback.Retro = 60f;
                 eggRentalFallback.Description = "Арендный корабль компании, всегда сток";
                 return eggRentalFallback;
             }

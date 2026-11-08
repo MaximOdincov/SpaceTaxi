@@ -41,6 +41,9 @@ namespace SpaceTaxi.Physics
         public bool BrakeOn { get; private set; }
         public float StrafeLevel { get; private set; }
 
+        // сохранённый курс: на остановке по нему разворачиваемся и стартуем
+        private Vector2 headingDir = Vector2.up;
+
         public bool InLandingRing { get; private set; }
 
         // 1 обычно, EngineMultiplier у поверхности
@@ -199,12 +202,13 @@ namespace SpaceTaxi.Physics
             // Все ускорения — к вектору скорости
             if (v > config.MinControlSpeed)
             {
+                headingDir = velocity / v; // курс живёт, пока корабль движется
                 Vector2 dir = velocity / v;
                 if (thrustOn && v < shipConfig.MaxV)
                     velocity += dir * (ship.Eff.Thrust * engMul * dt);
                 if (brakeOn)
                 {
-                    float nv = Mathf.Max(0f, v - config.Retro * engMul * dt);
+                    float nv = Mathf.Max(0f, v - ship.Eff.Retro * engMul * dt);
                     velocity *= nv / v;
                 }
                 if (Mathf.Abs(strafe) > 0f)
@@ -214,6 +218,28 @@ namespace SpaceTaxi.Physics
                     float strafeAcc = Mathf.Min(ship.Eff.Strafe, v * maxTurn);
                     velocity += perp * (strafe * strafeAcc * engMul * dt);
                 }
+            }
+            else
+            {
+                // остановившийся корабль: A/D — разворот на месте, SPACE — толчок
+                // по носу (старое поведение «кнопки мертвы до разгона»
+                // выглядело нелогично — жалоба плейтеста)
+                if (Mathf.Abs(strafe) > 0f)
+                {
+                    float turn = -strafe * config.StrafeMaxTurnRate * Mathf.Deg2Rad * engMul * dt;
+                    headingDir = new Vector2(
+                        headingDir.x * Mathf.Cos(turn) - headingDir.y * Mathf.Sin(turn),
+                        headingDir.x * Mathf.Sin(turn) + headingDir.y * Mathf.Cos(turn));
+                    float nose = Mathf.Atan2(headingDir.y, headingDir.x) * Mathf.Rad2Deg - spriteNoseAngle;
+                    float current = ship.Body.rotation;
+                    float step = Mathf.Clamp(
+                        Mathf.DeltaAngle(current, nose) * config.HeadingTurnRate * dt,
+                        -config.HeadingMaxTurnSpeed * dt,
+                        config.HeadingMaxTurnSpeed * dt);
+                    ship.Body.MoveRotation(current + step);
+                }
+                if (thrustOn)
+                    velocity = headingDir * (ship.Eff.Thrust * engMul * dt); // старт с места
             }
 
             ship.Body.linearVelocity = velocity;
