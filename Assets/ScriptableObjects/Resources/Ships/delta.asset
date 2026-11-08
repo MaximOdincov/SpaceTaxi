@@ -26,6 +26,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 61f8cc2e313f52f1a1abc98d1669b4b3, type: 3}
   - {fileID: 21300000, guid: a445f048d8625a749721b368b1f8a254, type: 3}
   - {fileID: 21300000, guid: 6d1e3e0499425b208992ec0d78765944, type: 3}
+  VisualLength: 15.5
   Price: 3400
   IsRental: 0
   Description: "\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B: \u0431\u0430\u043B\u0430\u043D\u0441 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0438 \u0431\u0440\u043E\u043D\u0438"

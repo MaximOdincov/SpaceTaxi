@@ -162,7 +162,9 @@ namespace SpaceTaxi.World
             if (data.Visuals != null && data.Visuals.Sprite != null)
                 return;
 
-            if (data.HasFuel)
+            // хаб (HasFuel + магазин/улучшения) — отдельный арт позже; механика
+            // станции сохранена, спрайт заправки на него не вешаем
+            if (data.HasFuel && !data.IsHub)
             {
                 Sprite gas = WorldSprites.GasStation(data.FuelTier);
                 if (gas != null)
@@ -221,21 +223,24 @@ namespace SpaceTaxi.World
             if (renderer != null && renderer.sprite == null)
                 renderer.sprite = StubSprites.ShipTriangle();
 
+            // визуал модели (Resources/Ships/<Id>): спрайт покраски + слоты сопел.
+            // Apply до расчёта позиции — точка спавна зависит от HalfExtent контента
+            var modelVisual = go.GetComponent<ShipModelVisual>();
+            if (modelVisual == null)
+                modelVisual = go.AddComponent<ShipModelVisual>();
+            modelVisual.Apply(shipConfig, 0);
+
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
-            go.transform.position = start.Position + dir * (start.Radius + ShipOffset);
+            // корма на поверхности планеты; ShipOffset — фолбэк без визуала
+            float spawnOffset = modelVisual.HasVisual ? modelVisual.HalfExtent : ShipOffset;
+            go.transform.position = start.Position + dir * (start.Radius + spawnOffset);
             float nose = controller != null ? controller.SpriteNoseAngle : 0f;
             go.transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
 
             ship.Init(config, shipConfig);
             ship.State = ShipState.Landed;
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet;
-
-            // визуал модели (Resources/Ships/<Id>): спрайт покраски + слоты сопел
-            var modelVisual = go.GetComponent<ShipModelVisual>();
-            if (modelVisual == null)
-                modelVisual = go.AddComponent<ShipModelVisual>();
-            modelVisual.Apply(shipConfig, 0);
 
             if (controller != null)
                 controller.SetInput(input);

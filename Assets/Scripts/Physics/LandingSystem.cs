@@ -13,9 +13,16 @@ namespace SpaceTaxi.Physics
     {
         private Ship ship;
         private HullSystem hull;
+        private ShipModelVisual modelVisual;
 
-        // лениво: HullSystem может быть добавлен позже Awake (WorldBuilder)
+        // снап без визуала модели (HalfExtent ShipModelVisual возвращает то же)
+        private const float DefaultHalfExtent = 7f;
+
+        // лениво: HullSystem и ShipModelVisual добавляются позже Awake (WorldBuilder)
         private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
+        private ShipModelVisual Visual => modelVisual != null
+            ? modelVisual
+            : (modelVisual = GetComponent<ShipModelVisual>());
 
         // скорость корабля до текущего шага физики. collision.relativeVelocity в
         // OnCollisionEnter2D ненадёжен: солвер к моменту коллбэка уже погасил
@@ -36,6 +43,7 @@ namespace SpaceTaxi.Physics
         {
             ship = GetComponent<Ship>();
             hull = GetComponent<HullSystem>();
+            modelVisual = GetComponent<ShipModelVisual>();
         }
 
         private void OnCollisionEnter2D(Collision2D collision)
@@ -106,8 +114,10 @@ namespace SpaceTaxi.Physics
                 ? collision.contacts[0].normal
                 : (Vector2)(transform.position - planet.transform.position).normalized;
 
-            // снап на поверхность, скорость в ноль, нос от центра
-            Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + 7f);
+            // снап на поверхность, скорость в ноль, нос от центра; отступ —
+            // половина высоты контента визуала: корма касается, а не канва спрайта
+            float extent = Visual != null ? Visual.HalfExtent : DefaultHalfExtent;
+            Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + extent);
             transform.position = pos;
             ship.Body.linearVelocity = Vector2.zero;
             float nose = GetComponent<ShipController>() != null ? GetComponent<ShipController>().SpriteNoseAngle : 0f;
