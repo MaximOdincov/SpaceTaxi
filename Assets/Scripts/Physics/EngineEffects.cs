@@ -1,13 +1,15 @@
+using System.Collections.Generic;
 using UnityEngine;
 using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
     // Выхлоп двигателя: child-слоты ExhaustMain (за кормой) и ExhaustRetro (спереди) —
-    // точки подключения частиц. Слот с PS из префаба используется как есть (дефолт
-    // не создаётся), пустой слот — резерв владельца, дефолт тоже не мешаем; слота
-    // нет вовсе — строим слот и дефолтное пламя кодом. Управление: play/stop по
-    // тяге/тормозу, эмиссия и размер — от EnginePower (у поверхности пламя гуще).
+    // точки подключения частиц. Слоты берутся из визуала модели (ShipModelVisual,
+    // префаб в Resources/Ships/<Id>) или с корня корабля, если визуала нет. PS на
+    // слоте (в т.ч. вложенная глубже) используется как есть, пустой слот — дефолтное
+    // пламя ребёнком слота, слота нет вовсе — строим слот и пламя кодом. Управление:
+    // play/stop по тяге/тормозу, эмиссия и размер — от EnginePower.
     public class EngineEffects : MonoBehaviour
     {
         public const string MainSlotName = "ExhaustMain";
@@ -15,6 +17,7 @@ namespace SpaceTaxi.Physics
 
         private Ship ship;
         private ShipController controller;
+        private ShipModelVisual model;
 
         private ParticleSystem mainJet;
         private ParticleSystem retroJet;
@@ -23,14 +26,34 @@ namespace SpaceTaxi.Physics
         private bool mainAuthored;
         private bool retroAuthored;
 
+        // слоты/пламя, созданные кодом: при Rebind (смена модели) сносятся
+        private readonly List<Transform> createdSlots = new List<Transform>();
+
         private void Awake()
         {
             ship = GetComponent<Ship>();
             controller = GetComponent<ShipController>();
+            Rebind();
+        }
+
+        // перечитать слоты: визуал модели пересоздаётся при смене корпуса/покраски
+        public void Rebind()
+        {
+            foreach (Transform slot in createdSlots)
+                if (slot != null)
+                    Destroy(slot.gameObject);
+            createdSlots.Clear();
+            mainJet = null;
+            retroJet = null;
+            mainAuthored = false;
+            retroAuthored = false;
+
+            model = GetComponent<ShipModelVisual>();
+            Transform root = model != null && model.HasVisual ? model.VisualRoot : transform;
 
             Vector2 nose = NoseDir();
-            mainJet = ResolveSlot(MainSlotName, -nose * 6f, -nose, isMain: true);
-            retroJet = ResolveSlot(RetroSlotName, nose * 7f, nose, isMain: false);
+            mainJet = ResolveSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true);
+            retroJet = ResolveSlot(root, RetroSlotName, nose * 7f, nose, isMain: false);
         }
 
         private void Update()
@@ -59,26 +82,39 @@ namespace SpaceTaxi.Physics
             return new Vector2(Mathf.Cos(a), Mathf.Sin(a));
         }
 
-        private ParticleSystem ResolveSlot(string slotName, Vector3 localPos, Vector2 exhaustDir, bool isMain)
+        private ParticleSystem ResolveSlot(Transform root, string slotName, Vector3 localPos, Vector2 exhaustDir, bool isMain)
         {
-            Transform slot = transform.Find(slotName);
+            Transform slot = root.Find(slotName);
             if (slot != null)
             {
-                ParticleSystem authored = slot.GetComponent<ParticleSystem>();
-                if (authored == null)
-                    return null; // слот зарезервирован в префабе без PS — ждём авторские частицы
-                if (isMain)
-                    mainAuthored = true;
-                else
-                    retroAuthored = true;
-                return authored;
+                // авторский PS на слоте или вложенный глубже (GetComponentInChildren
+                // проверяет и сам слот) — дефолт не создаём
+                ParticleSystem authored = slot.GetComponentInChildren<ParticleSystem>();
+                if (authored != null)
+                {
+                    if (isMain)
+                        mainAuthored = true;
+                    else
+                        retroAuthored = true;
+                    return authored;
+                }
+
+                // пустой слот префаба — дефолтное пламя ребёнком, позицию держит слот
+                var flameGo = new GameObject("DefaultFlame");
+                flameGo.transform.SetParent(slot, false);
+                flameGo.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
+                CreateDefaultFlame(flameGo, isMain);
+                createdSlots.Add(flameGo.transform);
+                return flameGo.GetComponent<ParticleSystem>();
             }
 
+            // слота нет вовсе — строим слот и дефолтное пламя (корневой фолбэк)
             var go = new GameObject(slotName);
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(root, false);
             go.transform.localPosition = localPos;
             go.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
             CreateDefaultFlame(go, isMain);
+            createdSlots.Add(go.transform);
             return go.GetComponent<ParticleSystem>();
         }
 

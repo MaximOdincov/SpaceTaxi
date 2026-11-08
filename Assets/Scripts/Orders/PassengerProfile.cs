@@ -25,6 +25,9 @@ namespace SpaceTaxi.Orders
         [Tooltip("Оттенок портрета: один спрайт — разные «люди»")]
         public Color PortraitTint = Color.white;
 
+        [Tooltip("Сид портрета генератора NPC (восстановление из сейва); 0 — нет")]
+        public int PortraitSeed;
+
         [Header("Фразы (покажется случайная из списка)")]
         [TextArea(2, 4)]
         [Tooltip("Пассажир сел на борт")]

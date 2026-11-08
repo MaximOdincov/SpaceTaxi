@@ -91,8 +91,23 @@ namespace SpaceTaxi.World
             collider.radius = CometRadius; // физический, не триггер
 
             var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = StubSprites.Circle(CometRadius * 2f);
-            renderer.color = Comet.CometColor;
+            Sprite rock = WorldSprites.RandomAsteroid(); // общий пул с астероидами
+            if (rock != null)
+            {
+                renderer.sprite = rock;
+                renderer.color = Color.white;
+                float dim = Mathf.Max(rock.bounds.size.x, rock.bounds.size.y);
+                if (dim > 0.0001f)
+                {
+                    float s = CometRadius * 2f / dim; // габарит = физике
+                    go.transform.localScale = new Vector3(s, s, 1f);
+                }
+            }
+            else
+            {
+                renderer.sprite = StubSprites.Circle(CometRadius * 2f);
+                renderer.color = Comet.CometColor;
+            }
             renderer.sortingOrder = 1;
 
             AddTrail(go, renderer);

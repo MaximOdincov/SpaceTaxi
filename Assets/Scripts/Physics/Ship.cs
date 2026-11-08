@@ -118,15 +118,32 @@ namespace SpaceTaxi.Physics
             ApplyModelSprite(ShipConfig);
         }
 
-        // спрайт модели (арт А1/А2): покраска → базовый → заглушка, чужой
-        // корпус оставлять нельзя (пересадка должна быть видна)
+        // спрайт модели (арт А1/А2): визуал-префаб модели (ShipModelVisual) или
+        // корневой SpriteRenderer; чужой корпус оставлять нельзя (пересадка
+        // должна быть видна)
+        private ShipModelVisual modelVisual;
+
         private void ApplyModelSprite(ShipConfig shipConfig)
         {
+            if (modelVisual == null)
+                modelVisual = GetComponent<ShipModelVisual>();
+            if (modelVisual != null)
+            {
+                modelVisual.Apply(shipConfig, PaintIndex);
+                return;
+            }
             var spriteRenderer = GetComponent<SpriteRenderer>();
             if (spriteRenderer == null)
                 return;
             Sprite sprite = shipConfig.GetPaintSprite(PaintIndex);
             spriteRenderer.sprite = sprite != null ? sprite : StubSprites.ShipTriangle();
+        }
+
+        // применить визуал текущей модели (WorldBuilder после Init)
+        public void ApplyModelVisual()
+        {
+            if (ShipConfig != null)
+                ApplyModelSprite(ShipConfig);
         }
 
         private void RecomputeEff()

@@ -71,6 +71,7 @@ namespace SpaceTaxi.Core
             public int State; // OrderState: 1 = ждём пассажира, 2 = на борту
             public string PassengerName;
             public Color PortraitTint;
+            public int PortraitSeed; // сид портрета NPC: 0 — нет (старые сейвы)
             public float TipsFraction; // доля чаевых заказа (Н-14), фиксируется при спавне
             public string TaskKind; // имя PassengerTaskKind; пусто — задания нет
             public string TaskText;
@@ -187,6 +188,7 @@ namespace SpaceTaxi.Core
             {
                 save.PassengerName = offer.Passenger.DisplayName;
                 save.PortraitTint = offer.Passenger.PortraitTint;
+                save.PortraitSeed = offer.Passenger.PortraitSeed;
             }
             save.TipsFraction = offer.TipsFraction;
             if (offer.Task != null)
@@ -496,6 +498,8 @@ namespace SpaceTaxi.Core
                 ? "Гость системы"
                 : save.PassengerName;
             profile.PortraitTint = save.PortraitTint;
+            if (save.PortraitSeed != 0)
+                profile.Portrait = NpcPortrait.Generate(save.PortraitSeed); // тот же облик, что до сейва
 
             PassengerPools pools = session.Passengers != null ? session.Passengers.Pools : null;
             if (pools != null)

@@ -4,19 +4,75 @@ namespace SpaceTaxi.Orders
 {
     // Генератор пассажиров (П5.2): свежий профиль на каждый заказ из пулов П5.1.
     // Профили — runtime-инстансы (CreateInstance), живут со сценой, Destroy не нужен.
+    // Портрет и имя — полный рандом: готовый NPC или сборка из слоёв (NpcPortrait,
+    // детерминирован по PortraitSeed — сейв восстанавливает портрет), имя —
+    // «прилагательное + существительное» с согласованием родов.
     public static class PassengerGenerator
     {
-        // Спокойные тёплые/холодные тона — визуальное разнообразие портретов-заглушек до арта А5
-        private static readonly Color32[] PortraitTints =
+        // формы прилагательного: мужской | женский | средний
+        private static readonly string[] Adjectives =
         {
-            new Color32(0xE8, 0xB2, 0x7D, 0xFF), // песочный
-            new Color32(0xD9, 0x8C, 0x6B, 0xFF), // терракота
-            new Color32(0xC9, 0x6B, 0x7E, 0xFF), // пыльная роза
-            new Color32(0xE6, 0xC8, 0x6E, 0xFF), // тёплый жёлтый
-            new Color32(0x7D, 0xA9, 0xD9, 0xFF), // небесно-голубой
-            new Color32(0x7D, 0xC9, 0xB4, 0xFF), // мятный
-            new Color32(0xA0, 0x8C, 0xD9, 0xFF), // лавандовый
-            new Color32(0x8F, 0xA3, 0xB8, 0xFF), // серо-голубой
+            "весенний|весенняя|весеннее",
+            "крутой|крутая|крутое",
+            "ржавый|ржавая|ржавое",
+            "звёздный|звёздная|звёздное",
+            "медовый|медовая|медовое",
+            "жестяной|жестяная|жестяное",
+            "пугливый|пугливая|пугливое",
+            "упрямый|упрямая|упрямое",
+            "хрустящий|хрустящая|хрустящее",
+            "торжественный|торжественная|торжественное",
+            "сонный|сонная|сонное",
+            "электрический|электрическая|электрическое",
+            "картофельный|картофельная|картофельное",
+            "туманный|туманная|туманное",
+            "поющий|поющая|поющее",
+            "бодрый|бодрая|бодрое",
+            "штурманский|штурманская|штурманское",
+            "лунный|лунная|лунное",
+            "бархатный|бархатная|бархатное",
+            "честный|честная|честное",
+            "мыльный|мыльная|мыльное",
+            "героический|героическая|героическое",
+            "тихий|тихая|тихое",
+            "космический|космическая|космическое",
+            "дрессированный|дрессированная|дрессированное",
+            "бортовой|бортовая|бортовое",
+            "рассеянный|рассеянная|рассеянное",
+            "важный|важная|важное",
+        };
+
+        // существительное | род: m/f/n
+        private static readonly string[] Nouns =
+        {
+            "утка|f",
+            "волшебник|m",
+            "капитан|m",
+            "трактор|m",
+            "огурец|m",
+            "балерина|f",
+            "пингвин|m",
+            "телескоп|m",
+            "бухгалтер|m",
+            "самовар|m",
+            "комета|f",
+            "морж|m",
+            "гармонист|m",
+            "чемодан|m",
+            "сосиска|f",
+            "инженер|m",
+            "медуза|f",
+            "градусник|m",
+            "пианистка|f",
+            "карп|m",
+            "садовник|m",
+            "гвоздь|m",
+            "директриса|f",
+            "турбина|f",
+            "навигатор|m",
+            "прокурор|m",
+            "кассирша|f",
+            "спутник|m",
         };
 
         // null-пулы → null (фолбэк на старый каталог — на стороне вызывающего)
@@ -27,11 +83,12 @@ namespace SpaceTaxi.Orders
 
             var profile = ScriptableObject.CreateInstance<PassengerProfile>();
             profile.RuntimeInstance = true; // оффер протухнет — профиль отдаст OrderService
-            profile.PortraitTint = PortraitTints[UnityEngine.Random.Range(0, PortraitTints.Length)];
 
-            string fullName = BuildName(pools);
-            if (!string.IsNullOrEmpty(fullName))
-                profile.DisplayName = fullName;
+            int seed = Random.Range(1, int.MaxValue);
+            profile.PortraitSeed = seed;
+            profile.Portrait = NpcPortrait.Generate(seed);
+            profile.PortraitTint = Color.white; // цвета запечены в портрет
+            profile.DisplayName = BuildFunnyName();
 
             // общие пулы фраз (Н-14): полные копии массивов — реплика выбирается
             // случайно при показе (PickPhrase), офферы не делят состояние
@@ -42,16 +99,19 @@ namespace SpaceTaxi.Orders
             return profile;
         }
 
-        // «Имя Фамилия»; пустые списки — оставляем дефолтное DisplayName профиля
-        private static string BuildName(PassengerPools pools)
+        // «Весенняя утка», «Крутой волшебник»: прилагательное согласуется с родом
+        private static string BuildFunnyName()
         {
-            string name = pools.PickName();
-            string surname = pools.PickSurname();
-            if (string.IsNullOrEmpty(name))
-                return surname;
-            if (string.IsNullOrEmpty(surname))
-                return name;
-            return name + " " + surname;
+            string adjective = Adjectives[Random.Range(0, Adjectives.Length)];
+            string noun = Nouns[Random.Range(0, Nouns.Length)];
+
+            string[] nounParts = noun.Split('|');
+            string word = nounParts[0];
+            int gender = nounParts.Length > 1 && nounParts[1] == "f" ? 1 : 0; // n — средний род
+
+            string[] forms = adjective.Split('|');
+            string form = forms[Mathf.Clamp(gender, 0, forms.Length - 1)];
+            return char.ToUpper(form[0]) + form.Substring(1) + " " + word;
         }
 
         // полные копии массивов: реплика выбирается случайно при показе (PickPhrase)

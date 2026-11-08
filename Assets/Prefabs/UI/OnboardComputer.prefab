@@ -565,7 +565,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -1087995082467479703, guid: 3ee6e4f795a3a4279b5e7f89de28a3f0, type: 3}
+  m_Sprite: {fileID: -1087995082467479703, guid: d2e17faa3f595e6a82cb721c562fd3fa, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -2093,7 +2093,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.OnboardBinder
   cashIcon: {fileID: 6926361368378116079, guid: 083a70906c59e405fb48017324c17138, type: 3}
-  ratingIcon: {fileID: -1087995082467479703, guid: 3ee6e4f795a3a4279b5e7f89de28a3f0, type: 3}
+  ratingIcon: {fileID: -1087995082467479703, guid: d2e17faa3f595e6a82cb721c562fd3fa, type: 3}
   panelFont: {fileID: 0}
   offerCardPrefab: {fileID: 6187429944149485563, guid: 7fb1b67e8cf064c5dbace884b7e34c35, type: 3}
   activeOrderPrefab: {fileID: 9123597889779040835, guid: 667c2a9cf3c294258b2c742f9327a2e2, type: 3}

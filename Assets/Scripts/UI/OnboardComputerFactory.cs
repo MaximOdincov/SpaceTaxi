@@ -35,7 +35,8 @@ namespace SpaceTaxi.UI
         public const float MoneyValueWidth = 180f; // «999 999 кр» при 30 pt моноширинного
 
         private const string CashIconPath = "Assets/Sprites/cash.png";
-        private const string RatingIconPath = "Assets/Sprites/zvezda.png";
+        private const string RatingIconPath = "Assets/Sprites/icons/Star 2.png";
+        private const string DebtIconPath = "Assets/Sprites/icons/chain.png";
 
         public static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
         public static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);
@@ -194,8 +195,8 @@ namespace SpaceTaxi.UI
             refs.EconCounters = Text(system, "", 17f, LabelColor, "EconCounters");
             FixedHeight(refs.EconCounters.gameObject, 22f);
             refs.EconCounters.alignment = TextAlignmentOptions.Left;
-            refs.DebtValue = Text(system, "", 18f, BrightColor, "DebtValue");
-            FixedHeight(refs.DebtValue.gameObject, 22f);
+            refs.DebtValue = IconStat(system.transform, DebtIconPath, "DebtValue",
+                18f, 200f, BrightColor, out _); // цепь — строка долга (текст красит биндер)
             var abandon = Button(system.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
                 new Color(0.05f, 0.02f, 0.03f), 18f, "AbandonButton");
             var abandonLe = abandon.AddComponent<LayoutElement>();

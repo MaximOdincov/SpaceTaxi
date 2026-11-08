@@ -54,6 +54,7 @@ namespace SpaceTaxi.World
         {
             axisRadius = data.Radius;
             halfWidth = Mathf.Max(0f, data.BeltWidth) * 0.5f;
+            asteroidColor = Color.white; // спрайты астероидов уже покрашены
             if (data.Visuals != null && data.Visuals.UseColor)
                 asteroidColor = data.Visuals.Color;
 
@@ -78,13 +79,30 @@ namespace SpaceTaxi.World
             float distance = Random.Range(axisRadius - halfWidth, axisRadius + halfWidth);
             float angle = PickClearAngle(radius, distance);
             go.transform.localPosition = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
+            go.transform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(0f, 360f));
 
             var collider = go.AddComponent<CircleCollider2D>();
             collider.radius = radius; // физический, не триггер
 
             var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = StubSprites.Circle(radius * 2f);
-            renderer.color = asteroidColor;
+            Sprite rock = WorldSprites.RandomAsteroid();
+            if (rock != null)
+            {
+                renderer.sprite = rock;
+                renderer.color = asteroidColor; // white, если карте не задан свой тон
+                // любая картинка → круг диаметром 2r (габарит = физике)
+                float dim = Mathf.Max(rock.bounds.size.x, rock.bounds.size.y);
+                if (dim > 0.0001f)
+                {
+                    float s = radius * 2f / dim;
+                    go.transform.localScale = new Vector3(s, s, 1f);
+                }
+            }
+            else
+            {
+                renderer.sprite = StubSprites.Circle(radius * 2f);
+                renderer.color = AsteroidColor; // серо-коричневая заглушка без арта
+            }
             renderer.sortingOrder = 1;
 
             go.AddComponent<Asteroid>().Init(radius);

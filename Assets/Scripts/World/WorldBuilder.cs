@@ -96,6 +96,7 @@ namespace SpaceTaxi.World
             if (renderer == null)
                 renderer = go.AddComponent<SpriteRenderer>();
             ApplyVisuals(renderer, data.Visuals);
+            ApplyPlanetArt(renderer, data);
 
             CelestialBody body;
             if (data.Type == BodyType.Star)
@@ -150,6 +151,36 @@ namespace SpaceTaxi.World
                 renderer.color = visuals.Color;
         }
 
+        // пользовательский арт планет: заправка — планета со станцией по тиру
+        // топливной сети (poor/norm/rich/high), остальные — случайный спрайт из 9
+        // со случайным цветом (оба стабильны по имени тела). Спрайт из данных
+        // LevelAsset (будущий хаб-арт) главнее
+        private static void ApplyPlanetArt(SpriteRenderer renderer, CelestialBodyData data)
+        {
+            if (renderer == null || data.Type != BodyType.Planet)
+                return;
+            if (data.Visuals != null && data.Visuals.Sprite != null)
+                return;
+
+            if (data.HasFuel)
+            {
+                Sprite gas = WorldSprites.GasStation(data.FuelTier);
+                if (gas != null)
+                {
+                    renderer.sprite = gas;
+                    renderer.color = Color.white; // спрайт заправки уже покрашен
+                }
+                return;
+            }
+
+            Sprite planet = WorldSprites.Planet(data.DisplayName);
+            if (planet != null)
+            {
+                renderer.sprite = planet;
+                renderer.color = WorldSprites.PlanetTint(data.DisplayName);
+            }
+        }
+
         private Ship CreateShip(List<CelestialBody> bodies)
         {
             CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
@@ -187,15 +218,8 @@ namespace SpaceTaxi.World
             }
 
             var renderer = go.GetComponent<SpriteRenderer>();
-            if (renderer != null)
-            {
-                // спрайт модели из ShipConfig (арт А1/А2); пусто — что было
-                // в префабе, в последнюю очередь — заглушка-треугольник
-                if (shipConfig != null && shipConfig.ShipSprite != null)
-                    renderer.sprite = shipConfig.ShipSprite;
-                else if (renderer.sprite == null)
-                    renderer.sprite = StubSprites.ShipTriangle();
-            }
+            if (renderer != null && renderer.sprite == null)
+                renderer.sprite = StubSprites.ShipTriangle();
 
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
@@ -206,6 +230,12 @@ namespace SpaceTaxi.World
             ship.Init(config, shipConfig);
             ship.State = ShipState.Landed;
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet;
+
+            // визуал модели (Resources/Ships/<Id>): спрайт покраски + слоты сопел
+            var modelVisual = go.GetComponent<ShipModelVisual>();
+            if (modelVisual == null)
+                modelVisual = go.AddComponent<ShipModelVisual>();
+            modelVisual.Apply(shipConfig, 0);
 
             if (controller != null)
                 controller.SetInput(input);
