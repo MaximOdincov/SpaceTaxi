@@ -28,8 +28,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 90cf27738526585fba13bd352ac1105e, type: 3}
   - {fileID: 21300000, guid: 3659f3279a3c548abf90d480df672ab1, type: 3}
   - {fileID: 21300000, guid: cc57b64261ae5cd9864bc5240f4bdad4, type: 3}
-  VisualLength: 50
+  VisualLength: 75
   Price: 12000
   IsRental: 0
-  Retro: 75
   Description: "\u0424\u043B\u0430\u0433\u043C\u0430\u043D: \u043B\u0443\u0447\u0448\u0438\u0439 \u0431\u0430\u043B\u0430\u043D\u0441 \u0438 \u0434\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C"
+  Retro: 75
