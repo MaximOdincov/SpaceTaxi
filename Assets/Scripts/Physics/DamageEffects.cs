@@ -4,8 +4,9 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
-    // Мелкие эффекты повреждений: периодические искры у корпуса при HP < 40%
-    // и короткая вспышка в точке контактного удара (LandingSystem.CrashImpactAt).
+    // Мелкие эффекты повреждений: периодические искры у корпуса при HP < 40%.
+    // Вспышку удара снесли (CrashImpactAt): бежевая точка в месте касания
+    // читалась как мусор, полезной нагрузки в ней не было.
     public class DamageEffects : MonoBehaviour
     {
         private const float SparksHpFraction = 0.4f;
@@ -19,17 +20,6 @@ namespace SpaceTaxi.Physics
         private bool lowHp;
         private float sparkTimer;
 
-        private readonly List<Flash> flashes = new List<Flash>();
-
-        private struct Flash
-        {
-            public SpriteRenderer Renderer;
-            public float Time;
-            public float Duration;
-            public float FromScale;
-            public float ToScale;
-        }
-
         private void Awake()
         {
             ship = GetComponent<Ship>();
@@ -40,9 +30,6 @@ namespace SpaceTaxi.Physics
                 hull.HpChanged += OnHpChanged;
                 lowHp = ship != null && ship.HpFraction < SparksHpFraction;
             }
-            if (landing != null)
-                landing.CrashImpactAt += OnImpact;
-
             effectMaterial = CreateEffectMaterial();
             sparks = CreateSparks();
         }
@@ -51,48 +38,16 @@ namespace SpaceTaxi.Physics
         {
             if (hull != null)
                 hull.HpChanged -= OnHpChanged;
-            if (landing != null)
-                landing.CrashImpactAt -= OnImpact;
-            foreach (Flash flash in flashes)
-                if (flash.Renderer != null)
-                    Destroy(flash.Renderer.gameObject);
-            flashes.Clear();
         }
 
         private void Update()
         {
             UpdateSparks();
-            UpdateFlashes();
         }
 
         private void OnHpChanged()
         {
             lowHp = ship != null && ship.HpFraction < SparksHpFraction;
-        }
-
-        private const float FlashHardLifetime = 1.2f; // страховка: вспышка живёт не дольше
-
-        private void OnImpact(Vector2 point)
-        {
-            var go = new GameObject("CrashFlash");
-            go.transform.position = point;
-            Object.Destroy(go, FlashHardLifetime);
-
-            var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = StubSprites.Circle(6f);
-            renderer.sharedMaterial = effectMaterial;
-            renderer.sortingOrder = 5;
-            renderer.color = new Color(1f, 0.9f, 0.6f, 0.95f);
-
-            // разлёт: растёт и гаснет за 0.22 с
-            flashes.Add(new Flash
-            {
-                Renderer = renderer,
-                Time = 0f,
-                Duration = 0.22f,
-                FromScale = 0.6f,
-                ToScale = 3.4f,
-            });
         }
 
         private void UpdateSparks()
@@ -118,31 +73,6 @@ namespace SpaceTaxi.Physics
             {
                 sparkTimer = 0f;
                 sparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            }
-        }
-
-        private void UpdateFlashes()
-        {
-            float dt = Time.deltaTime;
-            for (int i = flashes.Count - 1; i >= 0; i--)
-            {
-                Flash f = flashes[i];
-                if (f.Renderer == null)
-                {
-                    flashes.RemoveAt(i);
-                    continue;
-                }
-                f.Time += dt;
-                float t = Mathf.Clamp01(f.Time / f.Duration);
-                f.Renderer.transform.localScale = Vector3.one * Mathf.Lerp(f.FromScale, f.ToScale, t);
-                Color c = f.Renderer.color;
-                c.a = 0.95f * (1f - t) * (1f - t);
-                f.Renderer.color = c;
-                if (t >= 1f)
-                {
-                    Destroy(f.Renderer.gameObject);
-                    flashes.RemoveAt(i);
-                }
             }
         }
 

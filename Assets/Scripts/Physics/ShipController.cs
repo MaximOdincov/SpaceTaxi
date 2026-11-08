@@ -302,6 +302,24 @@ namespace SpaceTaxi.Physics
             if (ship == null)
                 return;
 
+            // на стоянке корпус заморожен: капсула касается планеты, солвер
+            // раскручивал корабль вокруг оси, выравнивание приходило с разгоном
+            if (ship.Body != null)
+            {
+                if (ship.State == ShipState.Landed)
+                {
+                    if (!ship.Body.freezeRotation)
+                    {
+                        ship.Body.angularVelocity = 0f;
+                        ship.Body.freezeRotation = true;
+                    }
+                }
+                else if (ship.Body.freezeRotation)
+                {
+                    ship.Body.freezeRotation = false;
+                }
+            }
+
             // Взлёт — только на живом кадре: Update и Input System живут в
             // реальном времени, timeScale=0 (пауза, модал завершения заказа)
             // их не останавливает. Space = Thrust и «продолжить» в UI — без

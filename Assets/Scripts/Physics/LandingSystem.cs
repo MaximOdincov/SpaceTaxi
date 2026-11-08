@@ -127,6 +127,7 @@ namespace SpaceTaxi.Physics
 
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
+            ship.Body.angularVelocity = 0f; // касание капсулой не должно оставлять вращение
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);
@@ -158,15 +159,6 @@ namespace SpaceTaxi.Physics
         // контактный удар с уроном — для штрафа выплаты (жар звезды НЕ считается)
         public event Action CrashImpact;
 
-        // точка контактного удара в мире — для вспышки эффектов (Н-7)
-        public event Action<Vector2> CrashImpactAt;
-
-        private Vector2 ContactPoint(Collision2D collision)
-        {
-            return collision.contactCount > 0
-                ? collision.contacts[0].point
-                : (Vector2)transform.position;
-        }
 
         // урон контактного удара: 0 при v ≤ LandSpeed, плавный вход до полной
         // линейности к v = LandSpeed+30 (без ступени min(5,…)), кап 30 —
@@ -175,9 +167,6 @@ namespace SpaceTaxi.Physics
         // средняя скорость — ощутимо, полная — смерть любому корпусу
         // (старый кап 30 делал 100 и 330 км/ч одинаково больно)
         private const float CrashDamagePerSpeedSq = 0.003f;
-
-        // визуальная вспышка удара — порог урона (мягкие касания без «шара»)
-        private const float FlashDamageThreshold = 20f;
 
         private float CrashDamage(float v)
         {
@@ -197,10 +186,6 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
-            // вспышка — только на ощутимом ударе: на мягких касаниях «бежевый
-            // шар» в точке контакта читался как мусор (жалоба плейтеста)
-            if (damage >= FlashDamageThreshold)
-                CrashImpactAt?.Invoke(ContactPoint(collision));
 
             // урон сразу; выжил — считается посадкой
             Hull.ApplyDamage(damage);
@@ -225,10 +210,6 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
-            // вспышка — только на ощутимом ударе: на мягких касаниях «бежевый
-            // шар» в точке контакта читался как мусор (жалоба плейтеста)
-            if (damage >= FlashDamageThreshold)
-                CrashImpactAt?.Invoke(ContactPoint(collision));
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
