@@ -135,6 +135,7 @@ namespace SpaceTaxi.UI
 
             // цифровое значение — внутрь циферблата, по центру у низа
             speedValue.transform.SetParent(gaugeRect, false);
+            var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
             speedRect.sizeDelta = new Vector2(140f, 44f);
