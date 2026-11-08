@@ -224,10 +224,15 @@ namespace SpaceTaxi.Audio
             musicFlip++;
             musicActive = fadeIn;
 
-            fadeIn.clip = ChooseClip(entry, 1f);
-            fadeIn.loop = true;
+            bool station = System.Array.IndexOf(Stations, id) >= 0;
+            stationClipIndex = 0;
+            if (station && entry.Clips != null && entry.Clips.Length > 0)
+                fadeIn.clip = entry.Clips[0]; // станция играет свои треки по очереди
+            else
+                fadeIn.clip = ChooseClip(entry, 1f);
+            fadeIn.loop = !station;
             fadeIn.pitch = entry.Pitch;
-            fadeIn.mute = musicPaused; // пауза плеера переживает смену трека
+            fadeIn.mute = musicPaused || MusicMuted; // пауза/мьют переживают смену трека
             fadeIn.Play();
 
             StopAllMusicFades();
@@ -252,6 +257,22 @@ namespace SpaceTaxi.Audio
         private bool musicPaused;         // пауза = mute канала, НЕ Time.timeScale
 
         // смена трека/паузы — имя и состояние для UI плеера
+        private void Update()
+        {
+            // конец трека станции — следующий клип этой же станции по кругу
+            if (musicActive != null && !musicPaused && !musicActive.loop
+                && musicActive.clip != null && !musicActive.isPlaying)
+            {
+                SoundEntry entry = GetEntry(currentMusic);
+                if (entry != null && entry.Clips != null && entry.Clips.Length > 0)
+                {
+                    stationClipIndex = (stationClipIndex + 1) % entry.Clips.Length;
+                    musicActive.clip = entry.Clips[stationClipIndex];
+                    musicActive.Play();
+                }
+            }
+        }
+
         public event System.Action MusicStateChanged;
 
         public SoundId CurrentTrack => currentMusic;
@@ -278,6 +299,44 @@ namespace SpaceTaxi.Audio
                 }
                 return playlist;
             }
+        }
+
+        // --- Радиостанции (переключение плеером) ---
+        // станция = SoundId из каталога с пачкой клипов; треки внутри станции
+        // играют по очереди (Update докручивает), prev/next листают станции
+        public static readonly SoundId[] Stations =
+        {
+            SoundId.MusicFlight, SoundId.MusicStation1,
+            SoundId.MusicStation2, SoundId.MusicStation3, SoundId.MusicStation4,
+        };
+
+        private int stationClipIndex;
+
+        public int CurrentStation
+        {
+            get
+            {
+                int index = System.Array.IndexOf(Stations, currentMusic);
+                return index >= 0 ? index : 0;
+            }
+        }
+
+        public void PlayStation(int index)
+        {
+            if (Stations.Length == 0)
+                return;
+            PlayMusic(Stations[((index % Stations.Length) + Stations.Length) % Stations.Length]);
+        }
+
+        // мьют радио: трек продолжает идти (не пауза), звука нет
+        public bool MusicMuted { get; private set; }
+
+        public void ToggleMusicMuted()
+        {
+            MusicMuted = !MusicMuted;
+            if (musicActive != null)
+                musicActive.mute = MusicMuted || musicPaused;
+            MusicStateChanged?.Invoke();
         }
 
         // dir: +1 — следующий трек, −1 — предыдущий, по кругу; ничего не играет —

@@ -33,6 +33,11 @@ namespace SpaceTaxi.Audio
         // музыки сдвинула бы числовые значения сериализованных полей
         // (SceneMusic.music в сценах, SoundEntry.Id в каталоге) и сломала бы их
         LowFuel,          // сигнал «топливо кончается» (пороги 25%/10%)
+        Alarm,            // луп тревоги HUD (жар/пустой бак)
+        MusicStation1,    // радиостанции: треки раскладываются файлами
+        MusicStation2,    // music_station1_*.ogg ... music_station4_*.ogg
+        MusicStation3,
+        MusicStation4,
         LowHull,          // пульс «корпус повреждён» (последние 25% HP)
         BlackHoleHum,     // гул притяжения дыры, громче к горизонту
         BlackHoleSwallow, // затянуло за горизонт (Н-10) — «провал», гибели на горизонте больше нет

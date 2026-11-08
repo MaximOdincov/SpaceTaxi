@@ -1,6 +1,8 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using SpaceTaxi.Audio;
+using SpaceTaxi.Core;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
 
@@ -15,6 +17,9 @@ namespace SpaceTaxi.UI
         private GameObject warningBanner;
         private TMP_Text warningText;
         private TMP_Text goalHint;
+        private SpeedometerGauge gauge;
+        private Image sirenLeft, sirenRight;
+        private bool alarmOn;
 
         [SerializeField] private TMP_FontAsset font; // JetBrains Mono из сцены
 
@@ -51,6 +56,7 @@ namespace SpaceTaxi.UI
                 fuelSegments[i] = transform.Find($"FuelTrack/FuelSeg_{i + 1:00}").GetComponent<Image>();
             warningBanner = transform.Find("WarningBanner").gameObject;
             warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
+            warningText.fontSize = 36f; // тревога должна пугать издалека
             speedBaseColor = speedValue.color;
 
             // подсказка текущей цели
@@ -66,6 +72,113 @@ namespace SpaceTaxi.UI
             hintRect.anchorMax = new Vector2(0.5f, 1f);
             hintRect.sizeDelta = new Vector2(900f, 30f);
             hintRect.anchoredPosition = new Vector2(0f, -156f); // ниже тоста
+
+            BuildSpeedometer();
+            BuildShieldIcon();
+            BuildSirens();
+        }
+
+        // спидометр вокруг цифрового значения: диск + стрелка; арт меняется
+        // в префабе Assets/Prefabs/Resources/UI/Speedometer.prefab (Dial/Needle),
+        // пустые спрайты подменяются процедурными заглушками
+        private void BuildSpeedometer()
+        {
+            GameObject prefab = Resources.Load<GameObject>("UI/Speedometer");
+            GameObject gaugeGo = prefab != null
+                ? Object.Instantiate(prefab)
+                : new GameObject("Speedometer", typeof(RectTransform), typeof(SpeedometerGauge));
+            gaugeGo.name = "Speedometer";
+            gaugeGo.transform.SetParent(speedValue.transform.parent, false);
+            var gaugeRect = (RectTransform)gaugeGo.transform;
+            gaugeRect.localScale = Vector3.one;
+
+            var speedRect = speedValue.rectTransform;
+            gaugeRect.anchorMin = speedRect.anchorMin;
+            gaugeRect.anchorMax = speedRect.anchorMax;
+            gaugeRect.anchoredPosition = speedRect.anchoredPosition + new Vector2(0f, -26f);
+            gaugeRect.pivot = new Vector2(0.5f, 0.5f);
+            gaugeRect.sizeDelta = new Vector2(150f, 150f);
+
+            // заглушки арта: пустой диск/стрелка префаба -> процедурные
+            Transform dial = gaugeGo.transform.Find("Dial");
+            if (dial != null)
+            {
+                var dialImage = dial.GetComponent<Image>();
+                if (dialImage != null && dialImage.sprite == null)
+                {
+                    dialImage.sprite = StubSprites.Ring(160f);
+                    dialImage.color = new Color(0.66f, 1f, 0.8f, 0.5f);
+                }
+            }
+            Transform needle = gaugeGo.transform.Find("Needle");
+            if (needle != null)
+            {
+                var needleImage = needle.GetComponent<Image>();
+                if (needleImage != null && needleImage.sprite == null)
+                {
+                    needleImage.sprite = StubSprites.ShipTriangle();
+                    needleImage.color = new Color(1f, 0.42f, 0.3f, 0.95f);
+                }
+            }
+
+            // цифровое значение — внутрь циферблата, по центру у низа
+            speedValue.transform.SetParent(gaugeRect, false);
+            speedRect.anchorMin = new Vector2(0.5f, 0.5f);
+            speedRect.anchorMax = new Vector2(0.5f, 0.5f);
+            speedRect.sizeDelta = new Vector2(140f, 44f);
+            speedRect.anchoredPosition = new Vector2(0f, -30f);
+            speedValue.fontSize = 34f;
+            speedValue.alignment = TextAlignmentOptions.Center;
+
+            gauge = gaugeGo.GetComponent<SpeedometerGauge>();
+            if (gauge != null && needle != null)
+                gauge.Setup((RectTransform)needle);
+        }
+
+        // щит у показателя корпуса (арт владельца из набора icons)
+        private void BuildShieldIcon()
+        {
+            Sprite shield = Resources.Load<Sprite>("Art/icons/shield");
+            if (shield == null || hullValue == null)
+                return;
+            var go = new GameObject("ShieldIcon", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(hullValue.transform.parent, false);
+            var img = go.GetComponent<Image>();
+            img.sprite = shield;
+            img.raycastTarget = false;
+            img.color = new Color(0.66f, 1f, 0.8f, 0.9f);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = hullValue.rectTransform.anchorMin;
+            rt.anchorMax = hullValue.rectTransform.anchorMax;
+            rt.sizeDelta = new Vector2(30f, 30f);
+            rt.anchoredPosition = hullValue.rectTransform.anchoredPosition
+                + new Vector2(-hullValue.rectTransform.rect.width * 0.5f - 22f, 0f);
+        }
+
+        // сирены по бокам экрана: мигают красным при тревоге
+        private void BuildSirens()
+        {
+            Sprite danger = Resources.Load<Sprite>("Art/icons/danger");
+            if (danger == null)
+                return;
+            sirenLeft = MakeSiren("SirenLeft", new Vector2(0.03f, 0.72f), danger);
+            sirenRight = MakeSiren("SirenRight", new Vector2(0.97f, 0.72f), danger);
+        }
+
+        private Image MakeSiren(string name, Vector2 anchor, Sprite danger)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(transform, false);
+            var img = go.GetComponent<Image>();
+            img.sprite = danger;
+            img.raycastTarget = false;
+            img.color = new Color(1f, 0.2f, 0.15f, 0f);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = anchor;
+            rt.anchorMax = anchor;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(64f, 58f);
+            return img;
         }
 
         private void Update()
@@ -93,6 +206,8 @@ namespace SpaceTaxi.UI
             {
                 float speed = ship.Body.linearVelocity.magnitude;
                 speedValue.text = ((int)speed).ToString();
+                if (gauge != null && ship.ShipConfig != null && ship.ShipConfig.MaxV > 0f)
+                    gauge.SetFraction(speed / ship.ShipConfig.MaxV);
                 UpdateSpeedColor(speed);
                 UpdateWarning();
                 UpdateGoalHint();
@@ -174,7 +289,8 @@ namespace SpaceTaxi.UI
                 fuelSegments[i].color = i < lit ? SegmentOn : SegmentOff;
         }
 
-        // один баннер, приоритет: пустой бак > жар > мало топлива
+        // один баннер, приоритет: пустой бак > жар > мало топлива.
+        // Тревога: крупный пульсирующий текст + сирены по бокам + звук
         private void UpdateWarning()
         {
             string message = null;
@@ -188,11 +304,36 @@ namespace SpaceTaxi.UI
             if (message == null)
             {
                 warningBanner.SetActive(false);
+                SetAlarm(false);
                 return;
             }
             warningBanner.SetActive(true);
             if (warningText.text != message)
                 warningText.text = message;
+            SetAlarm(true);
+
+            // мигание: текст и сирены пульсируют в противофазе — заметно периферией
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 7f);
+            warningText.color = Color.Lerp(SpeedDanger, Color.white, pulse * 0.6f);
+            float sirenAlpha = 0.25f + 0.75f * (1f - pulse);
+            if (sirenLeft != null)
+            {
+                var c = sirenLeft.color;
+                c.a = sirenAlpha;
+                sirenLeft.color = c;
+                sirenRight.color = c;
+            }
+        }
+
+        private void SetAlarm(bool on)
+        {
+            if (alarmOn == on)
+                return;
+            alarmOn = on;
+            if (on)
+                Sound.StartLoop(SoundId.Alarm);
+            else
+                Sound.StopLoop(SoundId.Alarm);
         }
 
         private bool IsInHeat()

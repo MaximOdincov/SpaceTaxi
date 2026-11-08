@@ -9,7 +9,7 @@ namespace SpaceTaxi.Core
     // читаемые (isReadable в метах).
     public static class SpriteArt
     {
-        private const byte AlphaThreshold = 24;
+        private const byte AlphaThreshold = 8; // почти нулевая альфа: хвост касается видимого края
 
         private static readonly Dictionary<Sprite, Rect> cache = new Dictionary<Sprite, Rect>();
 

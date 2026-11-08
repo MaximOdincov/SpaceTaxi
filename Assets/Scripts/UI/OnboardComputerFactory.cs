@@ -16,6 +16,7 @@ namespace SpaceTaxi.UI
         public TMP_Text EconCounters, DebtValue;
         public Button AbandonButton;
         public Button PlayerPrev, PlayerPlay, PlayerNext;
+        public Button RadioMute;
         public TMP_Text TrackTitle;
         public RectTransform ProgressFill;
         public TMP_FontAsset Font;
@@ -36,7 +37,7 @@ namespace SpaceTaxi.UI
 
         private const string CashIconPath = "Assets/Sprites/cash.png";
         private const string RatingIconPath = "Assets/Sprites/icons/Star 2.png";
-        private const string DebtIconPath = "Assets/Sprites/icons/chain.png";
+        public static readonly Color RatingGreen = new Color(0.357f, 0.9f, 0.56f);
 
         public static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
         public static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);
@@ -87,16 +88,21 @@ namespace SpaceTaxi.UI
             // --- Статус-строка: часы | деньги (крупно) | рейтинг ---
             var header = H("Header", root.transform);
             FixedHeight(header, 44f);
-            refs.Clock = Text(header, "14:02", 26f, BrightColor, "Clock");
-            FixedWidth(refs.Clock.gameObject, 84f);
+            refs.Clock = Text(header, "14:02", 36f, BrightColor, "Clock");
+            FixedWidth(refs.Clock.gameObject, 118f);
             refs.Clock.alignment = TextAlignmentOptions.Left;
             var spacer = Text(header, "", 18f, LabelColor, "Spacer");
             spacer.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            refs.MoneyValue = IconStat(header.transform, CashIconPath, "MoneyValue",
-                30f, MoneyValueWidth, TaxiColor, out refs.MoneyIcon);
+            // деньги без иконки: символ валюты прямо в тексте (¤ 10k) —
+            // ширина строки теперь предсказуема
+            refs.MoneyValue = Text(header, "¤ 0", 30f, TaxiColor, "MoneyValue");
+            FixedWidth(refs.MoneyValue.gameObject, 118f);
             refs.MoneyValue.alignment = TextAlignmentOptions.Right;
             refs.RatingValue = IconStat(header.transform, RatingIconPath, "RatingValue",
-                22f, 56f, BrightColor, out refs.RatingIcon);
+                28f, 78f, BrightColor, out refs.RatingIcon);
+            // звезда рейтинга — зелёная и крупная (красит биндер при падении)
+            if (refs.RatingIcon != null)
+                refs.RatingIcon.color = RatingGreen;
             refs.RatingValue.alignment = TextAlignmentOptions.Left;
 
             // --- АКТИВНЫЙ ЗАКАЗ: блок и кнопку отмены строит биндер ---
@@ -161,14 +167,21 @@ namespace SpaceTaxi.UI
             playerLayout.childControlHeight = true;
             playerLayout.childForceExpandWidth = true;
             playerLayout.childForceExpandHeight = false;
+            // шапка эфира: метка + мьют (перечёркнутая — радио молчит, трек идёт)
+            var radioHeader = H("RadioHeader", player.transform);
+            FixedHeight(radioHeader, 26f);
+            var radioLabel = Text(radioHeader, "ЭФИР", 15f, LabelColor, "RadioLabel");
+            radioLabel.alignment = TextAlignmentOptions.Left;
+            Flexible(radioLabel.gameObject);
+            var muteGo = Button(radioHeader.transform, "ЗВУК: ВКЛ",
+                new Color(0.06f, 0.2f, 0.13f, 0.9f), BrightColor, 13f, "RadioMute");
+            FixedWidth(muteGo, 92f);
+            refs.RadioMute = muteGo.GetComponent<Button>();
             var playerRow = H("PlayerRow", player.transform);
             FixedHeight(playerRow, 30f);
-            var radio = Text(playerRow, "ЭФИР", 15f, LabelColor, "RadioLabel");
-            FixedWidth(radio.gameObject, 44f);
-            radio.alignment = TextAlignmentOptions.Left;
             refs.PlayerPrev = PlayerButton(playerRow.transform, "|<", "PlayerPrev");
             refs.PlayerPlay = PlayerButton(playerRow.transform, "▶", "PlayerPlay"); // глиф ведёт биндер: ▶/||
-            refs.TrackTitle = Text(playerRow, "МУЗЫКА · —", 19f, BrightColor, "Track");
+            refs.TrackTitle = Text(playerRow, "—", 19f, BrightColor, "Track");
             refs.TrackTitle.alignment = TextAlignmentOptions.Center;
             refs.TrackTitle.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             refs.PlayerNext = PlayerButton(playerRow.transform, ">|", "PlayerNext");
@@ -195,8 +208,8 @@ namespace SpaceTaxi.UI
             refs.EconCounters = Text(system, "", 17f, LabelColor, "EconCounters");
             FixedHeight(refs.EconCounters.gameObject, 22f);
             refs.EconCounters.alignment = TextAlignmentOptions.Left;
-            refs.DebtValue = IconStat(system.transform, DebtIconPath, "DebtValue",
-                18f, 200f, BrightColor, out _); // цепь — строка долга (текст красит биндер)
+            refs.DebtValue = Text(system, "", 18f, BrightColor, "DebtValue");
+            FixedHeight(refs.DebtValue.gameObject, 22f);
             var abandon = Button(system.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
                 new Color(0.05f, 0.02f, 0.03f), 18f, "AbandonButton");
             var abandonLe = abandon.AddComponent<LayoutElement>();
@@ -364,16 +377,16 @@ namespace SpaceTaxi.UI
             layout.childForceExpandHeight = false;
             card.GetComponent<Image>().color = PanelColor;
             var le = card.AddComponent<LayoutElement>();
-            le.minHeight = 56f;
+            le.minHeight = 96f;
             le.flexibleWidth = 1f;
-            ((RectTransform)card.transform).sizeDelta = new Vector2(440f, 62f); // стартовый размер для префаб-режима
+            ((RectTransform)card.transform).sizeDelta = new Vector2(440f, 96f); // стартовый размер для префаб-режима
 
             var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
             avatar.transform.SetParent(card.transform, false);
             var avatarImage = avatar.GetComponent<Image>();
             avatarImage.preserveAspect = true;
             avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
-            FixedSize(avatar, 40f, 40f);
+            FixedSize(avatar, 64f, 64f);
 
             var column = new GameObject("Info", typeof(RectTransform));
             column.transform.SetParent(card.transform, false);
@@ -389,18 +402,38 @@ namespace SpaceTaxi.UI
             columnLe.preferredWidth = 1f;
 
             var nameRow = H("NameRow", column.transform);
-            TMP_Text name = Text(nameRow, "Имя", 17f, BrightColor, "Name");
+            TMP_Text name = Text(nameRow, "Имя", 20f, BrightColor, "Name");
             Flexible(name.gameObject);
             name.alignment = TextAlignmentOptions.Left;
-            TMP_Text price = Text(nameRow, "0 кр", 16f, TaxiColor, "Price");
-            FixedWidth(price.gameObject, 88f);
+            TMP_Text price = Text(nameRow, "¤ 0", 19f, TaxiColor, "Price");
+            FixedWidth(price.gameObject, 96f);
             price.alignment = TextAlignmentOptions.Right;
-            Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б · 0 юн", 14f, LabelColor, "Route");
+            Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 15f, LabelColor, "Route");
+            var distRow = H("DistRow", column.transform);
+            TMP_Text dist = Text(distRow, "до пассажира: 0 юн", 15f, LabelColor, "Dist");
+            Flexible(dist.gameObject);
+            dist.alignment = TextAlignmentOptions.Left;
+            // блок деталей: скрыт, раскрывается кликом по карточке (ведёт биндер)
+            var details = new GameObject("Details", typeof(RectTransform));
+            details.transform.SetParent(column.transform, false);
+            var detailsLayout = details.AddComponent<VerticalLayoutGroup>();
+            detailsLayout.spacing = 2;
+            detailsLayout.childControlWidth = true;
+            detailsLayout.childControlHeight = true;
+            detailsLayout.childForceExpandWidth = true;
+            detailsLayout.childForceExpandHeight = false;
+            details.SetActive(false);
+            TMP_Text sector = Text(details, "Район: —", 14f, LabelColor, "Sector");
+            sector.alignment = TextAlignmentOptions.Left;
+            TMP_Text routeLen = Text(details, "Маршрут: 0 юн", 14f, LabelColor, "RouteLen");
+            routeLen.alignment = TextAlignmentOptions.Left;
+            var taskText = Text(details, "", 15f, BrightColor, "Task");
+            taskText.alignment = TextAlignmentOptions.Left;
 
-            var accept = Button(card.transform, "✓", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 20f, "Accept");
-            FixedSize(accept, 36f, 36f);
-            var decline = Button(card.transform, "✕", new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 20f, "Decline");
-            FixedSize(decline, 36f, 36f);
+            var accept = Button(card.transform, "ВЗЯТЬ", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 15f, "Accept");
+            FixedSize(accept, 74f, 34f);
+            var decline = Button(card.transform, "НЕТ", new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 15f, "Decline");
+            FixedSize(decline, 62f, 34f);
 
             return card;
         }

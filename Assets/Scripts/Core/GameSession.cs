@@ -88,7 +88,12 @@ namespace SpaceTaxi.Core
             // события (Active уже обнулён) — отдельный доступ не нужен
             Orders.OrderDelivered += OnOrderDelivered;
             // дельты рейтинга (§3.7): отказ и гибель; доставка — внутри OnOrderDelivered
-            Orders.OrderCancelled += _ => Rating.FailNoDeath();
+            // отказ от заказа, пока пассажир не на борту, — без штрафа рейтингу
+            Orders.OrderCancelled += offer =>
+            {
+                if (offer.State == SpaceTaxi.Orders.OrderState.Aboard)
+                    Rating.FailNoDeath();
+            };
             Orders.OrderFailed += _ => Rating.FailWithLoss();
             // столкновение при активном заказе — минус рейтинг. Рейтинг слушает
             // CrashImpact напрямую; штраф выплаты считает счётчик OrderService —

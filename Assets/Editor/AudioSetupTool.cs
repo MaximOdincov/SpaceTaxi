@@ -113,6 +113,13 @@ namespace SpaceTaxi.Audio.Tools
                 Entry(SoundId.AmbientSpace, AudioGroup.Music,  0.16f, pitch: 0.45f, loop: true,  clips: "ambient_space_loop"),
                 Entry(SoundId.MusicMenu, AudioGroup.Music,  0.50f, loop: true,  clips: "music_menu"),
                 Entry(SoundId.MusicFlight, AudioGroup.Music, 0.55f, loop: true, clips: "Candidates/theme_01_magic_space"),
+                // радиостанции: файлы music_stationN_*.ogg — по несколько на станцию,
+                // треки станции играют по очереди (loop: false — ведёт AudioManager)
+                Entry(SoundId.MusicStation1, AudioGroup.Music, 0.5f, loop: false, clips: "music_station1"),
+                Entry(SoundId.MusicStation2, AudioGroup.Music, 0.5f, loop: false, clips: "music_station2"),
+                Entry(SoundId.MusicStation3, AudioGroup.Music, 0.5f, loop: false, clips: "music_station3"),
+                Entry(SoundId.MusicStation4, AudioGroup.Music, 0.5f, loop: false, clips: "music_station4"),
+                Entry(SoundId.Alarm, AudioGroup.Sfx, 0.22f, loop: true, clips: "sfx_alarm"),
             };
 
             SerializedObject so = new SerializedObject(catalog);

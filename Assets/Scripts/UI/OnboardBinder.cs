@@ -20,6 +20,9 @@ namespace SpaceTaxi.UI
         private TMP_Text clock;
         private TMP_Text moneyValue, ratingValue;
         private Image moneyIconImage, ratingIconImage;
+        // анимация рейтинга: показанное значение догоняет целевое, цвет — динамика
+        private float ratingShown = -1f;
+        private bool ratingDropping;
         private GameObject activeSection;
         private RectTransform activeArea; // блок активного заказа + кнопка отмены
         private RectTransform orderArea;  // контент скролла входящих
@@ -45,6 +48,8 @@ namespace SpaceTaxi.UI
 
         // плеер «ЭФИР»
         private Button playerPrev, playerPlay, playerNext;
+        private Button radioMute;
+        private GameSession session; // для районов карточек (уровень)
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
@@ -109,10 +114,12 @@ namespace SpaceTaxi.UI
             orderArea = refs.OrderArea;
             econCounters = refs.EconCounters;
             debtValue = refs.DebtValue;
+            session = FindAnyObjectByType<GameSession>();
             abandonButton = refs.AbandonButton;
             playerPrev = refs.PlayerPrev;
             playerPlay = refs.PlayerPlay;
             playerNext = refs.PlayerNext;
+            radioMute = refs.RadioMute;
             trackTitle = refs.TrackTitle;
             progressFill = refs.ProgressFill;
         }
@@ -277,7 +284,8 @@ namespace SpaceTaxi.UI
                 Destroy(go);
         }
 
-        // карточка входящего: [аватар | имя+цена / маршрут+задание | ✓ | ✕]
+        // карточка входящего: [аватар | имя+цена / маршрут / дистанция | ВЗЯТЬ | НЕТ],
+        // клик по карточке раскрывает детали (район, длина маршрута, задание)
         private GameObject BuildCard(OrderOffer offer)
         {
             GameObject card = OnboardComputerFactory.BuildOfferCard();
@@ -296,21 +304,26 @@ namespace SpaceTaxi.UI
             SetText(card, "Info/NameRow/Name", offer.Passenger.DisplayName);
             var priceNode = card.transform.Find("Info/NameRow/Price");
             if (priceNode != null)
-                priceNode.GetComponent<TMP_Text>().text = offer.Price + " кр";
+                priceNode.GetComponent<TMP_Text>().text = "¤ " + FormatCredits(offer.Price);
 
-            // строка 2: маршрут + дистанция + задание/пожелание; при переполнении
-            // строка переносится — карточка растёт, каркас не ломается
-            string route = orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн";
-            // П5.3: задание пассажира; таймер на входящем не нужен — карточка статична
+            SetText(card, "Info/Route",
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
+            float toPassenger = orders.DistanceToPlanet(offer.PickupIndex, ship.transform.position);
+            SetText(card, "Info/DistRow/Dist", "до пассажира: " + toPassenger.ToString("0") + " юн");
+
+            // детали (скрыты до раскрытия): район, длина маршрута, задание
             PassengerTask task = offer.Task;
+            string taskText = task != null && task.Kind != PassengerTaskKind.None
+                ? "Задание: " + task.Text
+                : "";
             string wishPhrase = task != null && task.Kind != PassengerTaskKind.None
-                ? task.Text
+                ? ""
                 : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            string wishPrefix = task != null && task.Kind != PassengerTaskKind.None ? "задание" : "доп.";
-            if (!string.IsNullOrEmpty(wishPhrase))
-                route += " · " + wishPrefix + " «" + wishPhrase + "»";
-            SetText(card, "Info/Route", route);
+            SetText(card, "Info/Details/Sector", "Район: " + SectorName(offer.PickupIndex));
+            SetText(card, "Info/Details/RouteLen", "Длина маршрута: " + orders.RouteDistance(offer).ToString("0") + " юн");
+            SetText(card, "Info/Details/Task", string.IsNullOrEmpty(taskText) && !string.IsNullOrEmpty(wishPhrase)
+                ? "Пожелание: «" + wishPhrase + "»"
+                : taskText);
 
             OrderOffer captured = offer;
             var accept = card.transform.Find("Accept");
@@ -320,7 +333,54 @@ namespace SpaceTaxi.UI
             if (decline != null)
                 decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
 
+            // раскрытие: клик по карточке (кнопки внутри съедают свои клики сами)
+            var cardButton = card.GetComponent<Button>();
+            if (cardButton != null)
+            {
+                var details = card.transform.Find("Info/Details");
+                var le = card.GetComponent<LayoutElement>();
+                cardButton.onClick.AddListener(() =>
+                {
+                    bool opening = details != null && !details.gameObject.activeSelf;
+                    if (details != null)
+                        details.gameObject.SetActive(opening);
+                    StartCoroutine(TweenCardHeight(le, opening ? 176f : 96f));
+                });
+            }
             return card;
+        }
+
+        // плавное изменение высоты карточки (раскрытие/сворачивание заказа)
+        private System.Collections.IEnumerator TweenCardHeight(LayoutElement le, float target)
+        {
+            if (le == null)
+                yield break;
+            float start = le.minHeight;
+            float t = 0f;
+            while (t < 1f)
+            {
+                t += Time.unscaledDeltaTime / 0.18f;
+                le.minHeight = Mathf.Lerp(start, target, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t)));
+                yield return null;
+            }
+            le.minHeight = target;
+        }
+
+        // район планеты для карточки (сектора карты П1.3)
+        private string SectorName(int index)
+        {
+            var level = session != null ? session.Level : null;
+            if (level == null || index < 0 || index >= level.Bodies.Count)
+                return "—";
+            switch (level.Bodies[index].Sector)
+            {
+                case SpaceTaxi.World.Sector.Hub: return "хаб";
+                case SpaceTaxi.World.Sector.Near: return "ближний";
+                case SpaceTaxi.World.Sector.Mid1: return "средний-1";
+                case SpaceTaxi.World.Sector.Mid2: return "средний-2";
+                case SpaceTaxi.World.Sector.Far: return "дальний";
+                default: return "—";
+            }
         }
 
         // --- Живые данные ---
@@ -336,6 +396,8 @@ namespace SpaceTaxi.UI
                 musicBound = true;
                 RefreshMusicPlayer(); // музыка могла стартовать до бинда (SceneMusic)
             }
+
+            AnimateRating();
 
             if (!bound)
             {
@@ -436,14 +498,51 @@ namespace SpaceTaxi.UI
         private void ShowCredits(int credits)
         {
             if (moneyValue != null)
-                moneyValue.text = credits + " кр";
+                moneyValue.text = "¤ " + FormatCredits(credits);
         }
 
-        // одна десятая всегда (даже 0.0); точка-разделитель, как в плане §3.7
+        // компактный формат: 10000 -> 10k, 1 400 000 -> 1.4m — размер строки предсказуем
+        public static string FormatCredits(int value)
+        {
+            if (value >= 1_000_000)
+                return (value / 1_000_000f).ToString("0.#", CultureInfo.InvariantCulture) + "m";
+            if (value >= 1000)
+                return (value / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
+            return value.ToString();
+        }
+
+        // рейтинг догоняет целевое значение, цвет — динамика (красный/зелёный)
         private void ShowRating(float value)
         {
-            if (ratingValue != null)
-                ratingValue.text = value.ToString("0.0", CultureInfo.InvariantCulture);
+            if (ratingValue == null)
+                return;
+            if (ratingShown < 0f)
+                ratingShown = value;
+            ratingDropping = value < ratingShown - 0.001f;
+            ratingValue.text = ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+        }
+
+        private void AnimateRating()
+        {
+            var s2 = FindAnyObjectByType<GameSession>();
+            var orders = s2 != null ? s2.Orders : null;
+            if (orders == null || s2.Rating == null || ratingValue == null)
+                return;
+            float target = s2.Rating.Value;
+            if (ratingShown < 0f)
+                ratingShown = target;
+            if (Mathf.Approximately(ratingShown, target))
+                return;
+            ratingDropping = target < ratingShown;
+            ratingShown = Mathf.MoveTowards(ratingShown, target, Time.unscaledDeltaTime * 3.5f);
+            if (Mathf.Abs(target - ratingShown) < 0.05f)
+                ratingShown = target;
+            ratingValue.text = ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+            ratingValue.color = ratingDropping
+                ? OnboardComputerFactory.DangerColor
+                : OnboardComputerFactory.RatingGreen;
+            if (Mathf.Approximately(ratingShown, target))
+                ratingValue.color = Color.white;
         }
 
         // при нуле строка пуста; долг — цветом тревоги фабрики
@@ -468,6 +567,8 @@ namespace SpaceTaxi.UI
                 playerPlay.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicPause());
             if (playerNext != null)
                 playerNext.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(1));
+            if (radioMute != null)
+                radioMute.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicMuted());
         }
 
         // имя трека и глиф ▶/⏸ по состоянию менеджера; событие MusicStateChanged
@@ -475,16 +576,19 @@ namespace SpaceTaxi.UI
         {
             if (trackTitle == null)
                 return; // биндер разрушен, менеджер живёт между сценами
+            if (radioMute != null)
+            {
+                TMP_Text muteLabel = radioMute.GetComponentInChildren<TMP_Text>();
+                if (muteLabel != null)
+                    muteLabel.text = audioManager != null && audioManager.MusicMuted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
+            }
             if (audioManager == null || audioManager.MusicPlaylist.Count == 0)
             {
-                trackTitle.text = "МУЗЫКА · треки не найдены";
+                trackTitle.text = "ЭФИР · треки не найдены";
             }
             else
             {
-                SoundId track = audioManager.CurrentTrack;
-                trackTitle.text = track == SoundId.None
-                    ? "МУЗЫКА · —"
-                    : "МУЗЫКА · " + TrackTitle(track);
+                trackTitle.text = "СТАНЦИЯ · " + StationName(audioManager.CurrentTrack);
             }
             if (playerPlay != null)
             {
@@ -496,13 +600,17 @@ namespace SpaceTaxi.UI
 
         // у SoundEntry DisplayName нет — карта известных треков,
         // незнакомые — имя enum
-        private static string TrackTitle(SoundId id)
+        // названия радиостанций (SoundId станции -> имя в эфире)
+        private static string StationName(SoundId id)
         {
             switch (id)
             {
-                case SoundId.MusicFlight: return "Полёт";
-                case SoundId.MusicMenu: return "Меню";
-                default: return id.ToString();
+                case SoundId.MusicFlight: return "Дорожная волна";
+                case SoundId.MusicStation1: return "Космо-классика";
+                case SoundId.MusicStation2: return "Ретро-волна";
+                case SoundId.MusicStation3: return "Механика драйв";
+                case SoundId.MusicStation4: return "Ночная частота";
+                default: return "—";
             }
         }
 
