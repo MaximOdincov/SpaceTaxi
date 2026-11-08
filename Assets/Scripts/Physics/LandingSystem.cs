@@ -175,6 +175,9 @@ namespace SpaceTaxi.Physics
         // (старый кап 30 делал 100 и 330 км/ч одинаково больно)
         private const float CrashDamagePerSpeedSq = 0.003f;
 
+        // визуальная вспышка удара — порог урона (мягкие касания без «шара»)
+        private const float FlashDamageThreshold = 20f;
+
         private float CrashDamage(float v)
         {
             float delta = v - ship.Config.LandSpeed;
@@ -193,7 +196,10 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
-            CrashImpactAt?.Invoke(ContactPoint(collision));
+            // вспышка — только на ощутимом ударе: на мягких касаниях «бежевый
+            // шар» в точке контакта читался как мусор (жалоба плейтеста)
+            if (damage >= FlashDamageThreshold)
+                CrashImpactAt?.Invoke(ContactPoint(collision));
 
             // урон сразу; выжил — считается посадкой
             Hull.ApplyDamage(damage);
@@ -218,7 +224,10 @@ namespace SpaceTaxi.Physics
 
             touchHandled = true;
             CrashImpact?.Invoke();
-            CrashImpactAt?.Invoke(ContactPoint(collision));
+            // вспышка — только на ощутимом ударе: на мягких касаниях «бежевый
+            // шар» в точке контакта читался как мусор (жалоба плейтеста)
+            if (damage >= FlashDamageThreshold)
+                CrashImpactAt?.Invoke(ContactPoint(collision));
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);

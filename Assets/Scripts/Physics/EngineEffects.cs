@@ -114,6 +114,10 @@ namespace SpaceTaxi.Physics
         private ParticleSystem rcsLeft;
         private ParticleSystem rcsRight;
 
+        // дополнительные сопла ExhaustMain (1)/(2)/... — у каждого своё пламя
+        private readonly List<ParticleSystem> extraMains = new List<ParticleSystem>();
+        private readonly List<bool> extraMainsAuthored = new List<bool>();
+
         // слоты/пламя, созданные кодом: при Rebind (смена модели) сносятся
         private readonly List<Transform> createdSlots = new List<Transform>();
 
@@ -138,6 +142,8 @@ namespace SpaceTaxi.Physics
             retroJet = null;
             mainSparks = null;
             retroSparks = null;
+            extraMains.Clear();
+            extraMainsAuthored.Clear();
             mainAuthored = false;
             retroAuthored = false;
 
@@ -146,10 +152,47 @@ namespace SpaceTaxi.Physics
             tune = root != transform ? root.GetComponentInChildren<ExhaustTune>() : GetComponent<ExhaustTune>();
 
             Vector2 nose = NoseDir();
-            mainJet = ResolveSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true, allowDefault: true, dying);
-            // ретро-слот: только авторский PS; дефолтного «пламени из носа» больше нет
-            retroJet = ResolveSlot(root, RetroSlotName, nose * 7f, nose, isMain: false, allowDefault: false, dying);
+
+            // все слоты ExhaustMain* — владелец вешает несколько сопел, каждое
+            // со своим пламенем; первое — главный, остальные в extraMains
+            bool first = true;
+            foreach (Transform slot in SlotsNamed(root, MainSlotName, dying))
+            {
+                ParticleSystem ps = ResolveOne(slot, -nose, isMain: true, allowDefault: true);
+                if (ps == null)
+                    continue;
+                if (first)
+                {
+                    mainJet = ps;
+                    first = false;
+                }
+                else
+                {
+                    extraMains.Add(ps);
+                    extraMainsAuthored.Add(mainAuthored);
+                    mainAuthored = false; // сброс для следующего слота
+                }
+            }
+            if (mainJet == null) // слотов нет вовсе — корневой фолбэк, как раньше
+                mainJet = BuildRootSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true, allowDefault: true);
+            // ретро: только авторский PS; дефолтного «пламени из носа» больше нет
+            foreach (Transform slot in SlotsNamed(root, RetroSlotName, dying))
+            {
+                ParticleSystem ps = ResolveOne(slot, nose, isMain: false, allowDefault: false);
+                if (ps != null && retroJet == null)
+                    retroJet = ps;
+            }
             ResolveRcs(mainJet);
+        }
+
+        // живые слоты модели с именем-префиксом (умирающие от прошлого Rebind — мимо)
+        private static List<Transform> SlotsNamed(Transform root, string prefix, List<Transform> dying)
+        {
+            var found = new List<Transform>();
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+                if (t != root && t.name.StartsWith(prefix) && !dying.Contains(t))
+                    found.Add(t);
+            return found;
         }
 
         // пара RCS у хвоста: точка подключения — слот главного сопла (позиция
@@ -186,6 +229,8 @@ namespace SpaceTaxi.Physics
             bool mainOn = flying && controller.ThrustOn;
             bool retroOn = flying && controller.BrakeOn;
             Drive(mainJet, mainOn, power, scaleFlame: !mainAuthored);
+            for (int i = 0; i < extraMains.Count; i++)
+                Drive(extraMains[i], mainOn, power, scaleFlame: !extraMainsAuthored[i]);
             Drive(mainSparks, mainOn, power, scaleFlame: false); // у искр только эмиссия ×power
             Drive(retroJet, retroOn, power, scaleFlame: !retroAuthored);
             Drive(retroSparks, retroOn, power, scaleFlame: false);
@@ -210,42 +255,39 @@ namespace SpaceTaxi.Physics
             return new Vector2(Mathf.Cos(a), Mathf.Sin(a));
         }
 
-        private ParticleSystem ResolveSlot(Transform root, string slotName, Vector3 localPos,
-            Vector2 exhaustDir, bool isMain, bool allowDefault, List<Transform> dying)
+        private ParticleSystem ResolveOne(Transform slot, Vector2 exhaustDir, bool isMain, bool allowDefault)
         {
-            Transform slot = root.Find(slotName);
-            if (slot != null && !dying.Contains(slot))
+            // авторский PS на слоте или вложенный глубже (GetComponentInChildren
+            // проверяет и сам слот) — дефолт не создаём
+            ParticleSystem authored = slot.GetComponentInChildren<ParticleSystem>();
+            if (authored != null)
             {
-                // авторский PS на слоте или вложенный глубже (GetComponentInChildren
-                // проверяет и сам слот) — дефолт не создаём
-                ParticleSystem authored = slot.GetComponentInChildren<ParticleSystem>();
-                if (authored != null)
-                {
-                    if (isMain)
-                        mainAuthored = true;
-                    else
-                        retroAuthored = true;
-                    return authored;
-                }
-
-                // пустой слот префаба: главный — дефолтное пламя ребёнком, ретро —
-                // пустой резерв (владелец добавит свой PS)
-                if (!allowDefault)
-                {
-                    createdSlots.Add(slot);
-                    return null;
-                }
-                Material mat = MakeParticleMaterial(slot);
-                var flameGo = new GameObject("DefaultFlame");
-                flameGo.transform.SetParent(slot, false);
-                flameGo.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
-                CreateDefaultFlame(flameGo, isMain, mat);
-                CreateSparks(flameGo, isMain, mat);
-                createdSlots.Add(flameGo.transform);
-                return flameGo.GetComponent<ParticleSystem>();
+                if (isMain)
+                    mainAuthored = true;
+                else
+                    retroAuthored = true;
+                return authored;
             }
 
-            // слота нет вовсе — строим слот; дефолтное пламя только главному
+            // пустой слот префаба: главный — дефолтное пламя ребёнком, ретро —
+            // пустой резерв (владелец добавит свой PS). Слоты префаба в
+            // createdSlots НЕ попадают — они не «созданы кодом»
+            if (!allowDefault)
+                return null;
+            Material mat = MakeParticleMaterial(slot);
+            var flameGo = new GameObject("DefaultFlame");
+            flameGo.transform.SetParent(slot, false);
+            flameGo.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
+            CreateDefaultFlame(flameGo, isMain, mat);
+            CreateSparks(flameGo, isMain, mat);
+            createdSlots.Add(flameGo.transform);
+            return flameGo.GetComponent<ParticleSystem>();
+        }
+
+        // слота нет вовсе — строим слот; дефолтное пламя только главному
+        private ParticleSystem BuildRootSlot(Transform root, string slotName, Vector3 localPos,
+            Vector2 exhaustDir, bool isMain, bool allowDefault)
+        {
             Material rootMat = MakeParticleMaterial(root);
             var go = new GameObject(slotName);
             go.transform.SetParent(root, false);

@@ -12,12 +12,13 @@ namespace SpaceTaxi.Physics
     public class ShipModelVisual : MonoBehaviour
     {
         // длина модели без ShipConfig (как заглушка ShipTriangle 192px = 14)
-        private const float FallbackLength = 28f;
-        // радиус коллайдера корпуса = доля визуальной длины: контакт по носу/борту,
-        // а не по старой заглушке (иначе у больших корпусов нос утопает в планете)
-        private const float ShipColliderFraction = 0.42f;
+        private const float FallbackLength = 35f;
+        // капсула по габаритам корпуса (высота ~0.96 длины, ширина по контенту):
+        // круг-коллайдер давал контакт «в воздухе» у носа и утопание хвоста в планете
+        private const float CapsuleHeightFraction = 0.96f;
+        private const float CapsuleWidthFraction = 0.9f;
         // половина высоты контента без визуала — прежний снап посадки/спавна
-        private const float FallbackHalfExtent = 14f;
+        private const float FallbackHalfExtent = 17.5f;
 
         private static readonly Dictionary<string, GameObject> prefabCache =
             new Dictionary<string, GameObject>();
@@ -97,9 +98,17 @@ namespace SpaceTaxi.Physics
                     visual.localPosition = -(content.center * s);
                     contentHeight = content.height * s;
 
-                    var collider = GetComponent<CircleCollider2D>();
-                    if (collider != null)
-                        collider.radius = length * ShipColliderFraction / parentScale;
+                    var circle = GetComponent<CircleCollider2D>();
+                    if (circle != null)
+                        circle.enabled = false; // корпус длинный — круг бьёт мимо силуэта
+                    var capsule = GetComponent<CapsuleCollider2D>();
+                    if (capsule == null)
+                        capsule = gameObject.AddComponent<CapsuleCollider2D>();
+                    capsule.direction = CapsuleDirection2D.Vertical;
+                    capsule.offset = Vector2.zero;
+                    // габариты в локальных осях корня (родительский масштаб применится сам)
+                    capsule.size = new Vector2(content.width * s * CapsuleWidthFraction / parentScale,
+                                               content.height * s * CapsuleHeightFraction / parentScale);
                 }
             }
 
