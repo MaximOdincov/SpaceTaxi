@@ -57,6 +57,12 @@ namespace SpaceTaxi.UI
             warningBanner = transform.Find("WarningBanner").gameObject;
             warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
             warningText.fontSize = 36f; // тревога должна пугать издалека
+            warningText.enableAutoSizing = true; // текст не вылезает из подложки
+            warningText.fontSizeMin = 20f;
+            warningText.fontSizeMax = 36f;
+            var bannerRect = warningBanner.transform as RectTransform;
+            if (bannerRect != null)
+                bannerRect.sizeDelta = new Vector2(bannerRect.sizeDelta.x * 1.3f, bannerRect.sizeDelta.y * 1.25f);
             speedBaseColor = speedValue.color;
 
             // подсказка текущей цели
@@ -92,12 +98,18 @@ namespace SpaceTaxi.UI
             var gaugeRect = (RectTransform)gaugeGo.transform;
             gaugeRect.localScale = Vector3.one;
 
-            var speedRect = speedValue.rectTransform;
-            gaugeRect.anchorMin = speedRect.anchorMin;
-            gaugeRect.anchorMax = speedRect.anchorMax;
-            gaugeRect.anchoredPosition = speedRect.anchoredPosition + new Vector2(0f, -26f);
+            // место — старая иконка скорости, если она есть в сцене (иначе цифры);
+            // старая иконка прячется — её заменяет диск
+            var speedIcon = transform.Find("SpeedIcon");
+            Transform poseSource = speedIcon != null ? speedIcon : speedValue.transform;
+            var poseRect = (RectTransform)poseSource;
+            gaugeRect.anchorMin = poseRect.anchorMin;
+            gaugeRect.anchorMax = poseRect.anchorMax;
+            gaugeRect.anchoredPosition = poseRect.anchoredPosition;
             gaugeRect.pivot = new Vector2(0.5f, 0.5f);
             gaugeRect.sizeDelta = new Vector2(150f, 150f);
+            if (speedIcon != null)
+                speedIcon.gameObject.SetActive(false);
 
             // заглушки арта: пустой диск/стрелка префаба -> процедурные
             Transform dial = gaugeGo.transform.Find("Dial");
@@ -126,8 +138,8 @@ namespace SpaceTaxi.UI
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
             speedRect.sizeDelta = new Vector2(140f, 44f);
-            speedRect.anchoredPosition = new Vector2(0f, -30f);
-            speedValue.fontSize = 34f;
+            speedRect.anchoredPosition = new Vector2(0f, -6f);
+            speedValue.fontSize = 30f;
             speedValue.alignment = TextAlignmentOptions.Center;
 
             gauge = gaugeGo.GetComponent<SpeedometerGauge>();
@@ -135,24 +147,20 @@ namespace SpaceTaxi.UI
                 gauge.Setup((RectTransform)needle);
         }
 
-        // щит у показателя корпуса (арт владельца из набора icons)
+        // щит корпуса: в сцене есть старая иконка HullIcon — меняем её спрайт
+        // на красивую из набора icons, ничего лишнего не рисуем
         private void BuildShieldIcon()
         {
             Sprite shield = Resources.Load<Sprite>("Art/icons/shield");
-            if (shield == null || hullValue == null)
+            var hullIcon = transform.Find("HullIcon");
+            if (shield == null || hullIcon == null)
                 return;
-            var go = new GameObject("ShieldIcon", typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(hullValue.transform.parent, false);
-            var img = go.GetComponent<Image>();
-            img.sprite = shield;
-            img.raycastTarget = false;
-            img.color = new Color(0.66f, 1f, 0.8f, 0.9f);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = hullValue.rectTransform.anchorMin;
-            rt.anchorMax = hullValue.rectTransform.anchorMax;
-            rt.sizeDelta = new Vector2(30f, 30f);
-            rt.anchoredPosition = hullValue.rectTransform.anchoredPosition
-                + new Vector2(-hullValue.rectTransform.rect.width * 0.5f - 22f, 0f);
+            var img = hullIcon.GetComponent<Image>();
+            if (img != null)
+            {
+                img.sprite = shield;
+                img.color = new Color(0.66f, 1f, 0.8f, 0.95f);
+            }
         }
 
         // сирены по бокам экрана: мигают красным при тревоге
@@ -305,6 +313,13 @@ namespace SpaceTaxi.UI
             {
                 warningBanner.SetActive(false);
                 SetAlarm(false);
+                if (sirenLeft != null)
+                {
+                    var c0 = sirenLeft.color;
+                    c0.a = 0f;
+                    sirenLeft.color = c0;
+                    sirenRight.color = c0;
+                }
                 return;
             }
             warningBanner.SetActive(true);

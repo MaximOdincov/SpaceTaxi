@@ -36,6 +36,39 @@ namespace SpaceTaxi.Tools
             Debug.Log("[OnboardComputerBuilder] каркас построен: " + refs.Clock.text);
         }
 
+        // пересборка ПРЕФАБА борткомпа под актуальную фабрику (headless-дружелюбно):
+        // инстанс -> Build поверх старого дерева -> сохранить обратно в ассет
+        [MenuItem("Space Taxi/Rebuild Onboard Computer Prefab")]
+        public static void RebuildPrefab()
+        {
+            const string path = "Assets/Prefabs/UI/OnboardComputer.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[OnboardComputerBuilder] нет префаба " + path);
+                return;
+            }
+            var go = Object.Instantiate(prefab);
+            var binder = go.GetComponent<SpaceTaxi.UI.OnboardBinder>();
+            if (binder == null)
+            {
+                Debug.LogWarning("[OnboardComputerBuilder] в префабе нет OnboardBinder");
+                Object.DestroyImmediate(go);
+                return;
+            }
+            var panel = binder.transform;
+            for (int i = panel.childCount - 1; i >= 0; i--)
+            {
+                string n = panel.GetChild(i).name;
+                if (n != "Frame" && n != "Background")
+                    Object.DestroyImmediate(panel.GetChild(i).gameObject);
+            }
+            SpaceTaxi.UI.OnboardComputerFactory.Build(panel, destroyImmediate: true);
+            PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            Debug.Log("[OnboardComputerBuilder] префаб пересобран под новую фабрику");
+        }
+
         // без Canvas layout-группы не применяются
         private static void RebuildLayout(RectTransform root)
         {

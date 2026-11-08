@@ -180,7 +180,7 @@ namespace SpaceTaxi.UI
             var playerRow = H("PlayerRow", player.transform);
             FixedHeight(playerRow, 30f);
             refs.PlayerPrev = PlayerButton(playerRow.transform, "|<", "PlayerPrev");
-            refs.PlayerPlay = PlayerButton(playerRow.transform, "▶", "PlayerPlay"); // глиф ведёт биндер: ▶/||
+            // паузу убрали по просьбе владельца: радио всегда играет, мьют в шапке
             refs.TrackTitle = Text(playerRow, "—", 19f, BrightColor, "Track");
             refs.TrackTitle.alignment = TextAlignmentOptions.Center;
             refs.TrackTitle.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
@@ -318,7 +318,12 @@ namespace SpaceTaxi.UI
         {
             var go = new GameObject(name ?? label, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
-            go.GetComponent<Image>().color = background;
+            var bg = go.GetComponent<Image>();
+            bg.color = background;
+            // рамка и светлый верх — силуэт кнопки читается сразу
+            var outline = go.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.55f);
+            outline.effectDistance = new Vector2(2f, -2f);
             var text = Text(go, label, size, textColor);
             Stretch(text.rectTransform);
             text.alignment = TextAlignmentOptions.Center;
@@ -366,7 +371,7 @@ namespace SpaceTaxi.UI
         // [аватар | имя … цена / маршрут · задание | ✓ | ✕]
         public static GameObject BuildOfferCard()
         {
-            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image));
+            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image), typeof(Button));
             var layout = card.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(8, 8, 8, 8);
             layout.spacing = 8;
