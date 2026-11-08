@@ -30,6 +30,9 @@ namespace SpaceTaxi.Economy
         [Tooltip("Покрашенные варианты модели (владелец кладёт отдельные PNG); индекс покраски 0 — базовый ShipSprite, i — PaintVariants[i-1]")]
         public Sprite[] PaintVariants;
 
+        [Tooltip("Видимая длина корабля в мировых юнитах; масштаб визуала подгоняется по контенту арта")]
+        public float VisualLength = 14f;
+
         [Header("Магазин")]
         public int Price;     // 0 = не продаётся
         public bool IsRental; // арендный — всегда сток
@@ -74,6 +77,7 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;
+                eggRentalFallback.VisualLength = 13.5f;
                 eggRentalFallback.Description = "Арендный корабль компании, всегда сток";
                 return eggRentalFallback;
             }

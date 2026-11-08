@@ -13,6 +13,15 @@ namespace SpaceTaxi.Physics
         private GravityField gravity;
         private LevelAsset level;
         private Vector3 initialScale = Vector3.one; // респавн откатывает сжатие дырой
+        private ShipModelVisual modelVisual;
+
+        // снап респавна без визуала модели (HalfExtent ShipModelVisual возвращает то же)
+        private const float DefaultHalfExtent = 7f;
+
+        // лениво с кэшем: ShipModelVisual добавляется позже Awake (WorldBuilder)
+        private ShipModelVisual Visual => modelVisual != null
+            ? modelVisual
+            : (modelVisual = GetComponent<ShipModelVisual>());
 
         public event Action HpChanged;
         public event Action Died;
@@ -32,6 +41,7 @@ namespace SpaceTaxi.Physics
         private void Awake()
         {
             ship = GetComponent<Ship>();
+            modelVisual = GetComponent<ShipModelVisual>();
             initialScale = transform.localScale;
             // пересадка на другой корпус — HP стал полным, HUD должен увидеть
             ship.Reconfigured += OnShipReconfigured;
@@ -137,7 +147,9 @@ namespace SpaceTaxi.Physics
                 CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
                 float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
                 Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-                transform.position = start.Position + dir * (start.Radius + 7f);
+                // тот же отступ, что у посадки: корма на поверхности, а не канва спрайта
+                float extent = Visual != null ? Visual.HalfExtent : DefaultHalfExtent;
+                transform.position = start.Position + dir * (start.Radius + extent);
                 float nose = GetComponent<ShipController>() != null ? GetComponent<ShipController>().SpriteNoseAngle : 0f;
                 transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
             }

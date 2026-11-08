@@ -11,27 +11,35 @@ namespace SpaceTaxi.Core
     {
         private const byte AlphaThreshold = 24;
 
-        private static readonly Dictionary<Sprite, Vector2> cache = new Dictionary<Sprite, Vector2>();
+        private static readonly Dictionary<Sprite, Rect> cache = new Dictionary<Sprite, Rect>();
 
         // размер контента в юнитах спрайта (PPU); нечитаемая текстура — фолбэк на bounds
         public static Vector2 ContentSize(Sprite sprite)
         {
+            return ContentRect(sprite).size;
+        }
+
+        // прямоугольник контента в юнитах спрайта: позиция — относительно центра
+        // bounds (у центрированного арта это (0,0)), размер — габариты по альфе;
+        // нечитаемая текстура или пустой спрайт — фолбэк на всю канву
+        public static Rect ContentRect(Sprite sprite)
+        {
             if (sprite == null)
-                return Vector2.zero;
-            if (cache.TryGetValue(sprite, out Vector2 cached))
+                return Rect.zero;
+            if (cache.TryGetValue(sprite, out Rect cached))
                 return cached;
 
-            Vector2 size;
+            Rect rect;
             Texture2D tex = sprite.texture;
             if (tex == null || !tex.isReadable)
             {
-                size = sprite.bounds.size;
+                rect = new Rect(Vector2.zero, sprite.bounds.size);
             }
             else
             {
-                Rect rect = sprite.textureRect;
-                int x0 = Mathf.RoundToInt(rect.x), y0 = Mathf.RoundToInt(rect.y);
-                int w = Mathf.RoundToInt(rect.width), h = Mathf.RoundToInt(rect.height);
+                Rect frame = sprite.textureRect;
+                int x0 = Mathf.RoundToInt(frame.x), y0 = Mathf.RoundToInt(frame.y);
+                int w = Mathf.RoundToInt(frame.width), h = Mathf.RoundToInt(frame.height);
                 Color32[] pixels = tex.GetPixels32();
                 int minX = w, maxX = -1, minY = h, maxY = -1;
                 for (int y = 0; y < h; y++)
@@ -48,13 +56,23 @@ namespace SpaceTaxi.Core
                     }
                 }
                 if (maxX < minX || maxY < minY)
-                    size = sprite.bounds.size; // пустой спрайт — как было
+                {
+                    rect = new Rect(Vector2.zero, sprite.bounds.size); // пустой спрайт — как было
+                }
                 else
-                    size = new Vector2(maxX - minX + 1, maxY - minY + 1) / sprite.pixelsPerUnit;
+                {
+                    float ppu = sprite.pixelsPerUnit;
+                    // центр канвы сидит в bounds.center (пивот может быть не по центру)
+                    Vector2 center = new Vector2(
+                        (minX + maxX + 1) * 0.5f - (x0 + w * 0.5f),
+                        (minY + maxY + 1) * 0.5f - (y0 + h * 0.5f)) / ppu + sprite.bounds.center;
+                    Vector2 size = new Vector2(maxX - minX + 1, maxY - minY + 1) / ppu;
+                    rect = new Rect(center - size * 0.5f, size);
+                }
             }
 
-            cache[sprite] = size;
-            return size;
+            cache[sprite] = rect;
+            return rect;
         }
 
         // масштаб, при котором контент спрайта занимает заданную мировую ширину

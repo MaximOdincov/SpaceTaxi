@@ -11,24 +11,36 @@ namespace SpaceTaxi.Physics
     // Префаба нет — спрайт рисует корневой SpriteRenderer (старое поведение).
     public class ShipModelVisual : MonoBehaviour
     {
-        // длина корабля в мировых юнитах (как заглушка ShipTriangle 192px = 14)
-        private const float WorldLength = 14f;
+        // длина модели без ShipConfig (как заглушка ShipTriangle 192px = 14)
+        private const float FallbackLength = 14f;
+        // половина высоты контента без визуала — прежний снап посадки/спавна
+        private const float FallbackHalfExtent = 7f;
 
         private static readonly Dictionary<string, GameObject> prefabCache =
             new Dictionary<string, GameObject>();
 
         private Transform visual;
+        private float contentHeight; // высота контента в юнитах корня (после масштаба визуала)
 
         public bool HasVisual => visual != null;
         public Transform VisualRoot => visual;
 
+        // половина высоты контента в мире: корабли нарисованы носом вверх, при
+        // посадке нос от планеты и корма касается поверхности; визуала нет —
+        // прежний снап (фолбэк на корневой SpriteRenderer)
+        public float HalfExtent => visual != null
+            ? contentHeight * 0.5f * Mathf.Abs(transform.lossyScale.y)
+            : FallbackHalfExtent;
+
         // пересоздаёт визуал под модель и покраску; валидный спрайт решает
-        // ShipConfig.GetPaintSprite, размер нормализуется до WorldLength
+        // ShipConfig.GetPaintSprite, контент арта (не канва) растягивается
+        // до ShipConfig.VisualLength
         public void Apply(ShipConfig config, int paintIndex)
         {
             if (visual != null)
                 DestroyImmediate(visual.gameObject); // смена модели стоит в паузе экрана станции
             visual = null;
+            contentHeight = 0f;
 
             GameObject prefab = LoadPrefab(config != null ? config.Id : null);
             var rootRenderer = GetComponent<SpriteRenderer>();
@@ -61,13 +73,20 @@ namespace SpaceTaxi.Physics
             {
                 if (sprite != null)
                     renderer.sprite = sprite;
-                float dim = Mathf.Max(renderer.sprite.bounds.size.x, renderer.sprite.bounds.size.y);
+                // масштаб по контенту арта (альфа-границы): прозрачные поля канвы
+                // раздували бы корабль, а смещённый контент уводил корму от посадки
+                Rect content = SpriteArt.ContentRect(renderer.sprite);
+                float dim = Mathf.Max(content.width, content.height);
                 float parentScale = Mathf.Max(Mathf.Abs(transform.lossyScale.x), 0.0001f);
                 if (dim > 0.0001f)
                 {
-                    // любая картинка → WorldLength в мире (корень масштабирует x3)
-                    float s = WorldLength / (dim * parentScale);
+                    float length = config != null ? config.VisualLength : FallbackLength;
+                    float s = length / (dim * parentScale);
                     visual.localScale = new Vector3(s, s, 1f);
+                    // центр контента на оси корабля (localPosition в осях корня,
+                    // родительский масштаб применится сам)
+                    visual.localPosition = -(content.center * s);
+                    contentHeight = content.height * s;
                 }
             }
 
