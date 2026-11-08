@@ -33,7 +33,10 @@ namespace SpaceTaxi.Core
             Texture2D tex = sprite.texture;
             if (tex == null || !tex.isReadable)
             {
-                rect = new Rect(Vector2.zero, sprite.bounds.size);
+                // центр канвы = ноль относительно пивота (спрайт рисуется по центру);
+                // Rect(0,0,size) давал content.center = size/2 — корпус уезжал влево-вниз
+                Vector2 size = sprite.bounds.size;
+                rect = new Rect(-size * 0.5f, size);
             }
             else
             {
