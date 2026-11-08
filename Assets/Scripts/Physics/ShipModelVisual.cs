@@ -12,9 +12,12 @@ namespace SpaceTaxi.Physics
     public class ShipModelVisual : MonoBehaviour
     {
         // длина модели без ShipConfig (как заглушка ShipTriangle 192px = 14)
-        private const float FallbackLength = 14f;
+        private const float FallbackLength = 28f;
+        // радиус коллайдера корпуса = доля визуальной длины: контакт по носу/борту,
+        // а не по старой заглушке (иначе у больших корпусов нос утопает в планете)
+        private const float ShipColliderFraction = 0.42f;
         // половина высоты контента без визуала — прежний снап посадки/спавна
-        private const float FallbackHalfExtent = 7f;
+        private const float FallbackHalfExtent = 14f;
 
         private static readonly Dictionary<string, GameObject> prefabCache =
             new Dictionary<string, GameObject>();
@@ -93,6 +96,10 @@ namespace SpaceTaxi.Physics
                     // родительский масштаб применится сам)
                     visual.localPosition = -(content.center * s);
                     contentHeight = content.height * s;
+
+                    var collider = GetComponent<CircleCollider2D>();
+                    if (collider != null)
+                        collider.radius = length * ShipColliderFraction / parentScale;
                 }
             }
 

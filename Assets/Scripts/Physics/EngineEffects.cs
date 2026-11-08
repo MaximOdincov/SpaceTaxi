@@ -24,11 +24,11 @@ namespace SpaceTaxi.Physics
         private const float MainSpeedMax = 80f;
         private const float MainLifeMin = 0.25f;
         private const float MainLifeMax = 0.4f;
-        private const float MainSizeMin = 1.7f;
-        private const float MainSizeMax = 2.7f;
+        private const float MainSizeMin = 2.6f;
+        private const float MainSizeMax = 4.4f;
         private const float MainConeAngle = 13f;      // конус сопла (было 10)
         private const float MainConeRadius = 0.45f;
-        private const float MainRate = 110f;          // эмиссия, частиц/с
+        private const float MainRate = 150f;          // эмиссия, частиц/с
         private const int MainMaxParticles = 300;
 
         // ретро: холодный пых — короче и шире главного
@@ -107,6 +107,13 @@ namespace SpaceTaxi.Physics
         private bool mainAuthored;
         private bool retroAuthored;
 
+        // тюн модели (ExhaustTune на корне префаба модели): множители дефолтного пламени
+        private ExhaustTune tune;
+        // RCS-пыхи торможения у хвоста: верхнее (носовое) ретро-пламя убрали —
+        // торможение читается боковыми струйками, слот ExhaustRetro остался автору
+        private ParticleSystem rcsLeft;
+        private ParticleSystem rcsRight;
+
         // слоты/пламя, созданные кодом: при Rebind (смена модели) сносятся
         private readonly List<Transform> createdSlots = new List<Transform>();
 
@@ -136,10 +143,36 @@ namespace SpaceTaxi.Physics
 
             model = GetComponent<ShipModelVisual>();
             Transform root = model != null && model.HasVisual ? model.VisualRoot : transform;
+            tune = root != transform ? root.GetComponentInChildren<ExhaustTune>() : GetComponent<ExhaustTune>();
 
             Vector2 nose = NoseDir();
-            mainJet = ResolveSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true, dying);
-            retroJet = ResolveSlot(root, RetroSlotName, nose * 7f, nose, isMain: false, dying);
+            mainJet = ResolveSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true, allowDefault: true, dying);
+            // ретро-слот: только авторский PS; дефолтного «пламени из носа» больше нет
+            retroJet = ResolveSlot(root, RetroSlotName, nose * 7f, nose, isMain: false, allowDefault: false, dying);
+            ResolveRcs(mainJet);
+        }
+
+        // пара RCS у хвоста: точка подключения — слот главного сопла (позиция
+        // сопла уже выверена владельцем), струйки вбок-вперёд
+        private void ResolveRcs(ParticleSystem main)
+        {
+            if (main == null)
+                return;
+            Transform anchor = main.transform;
+            Material mat = MakeParticleMaterial(anchor);
+            rcsLeft = MakeRcs(anchor, "RcsLeft", new Vector2(-1.1f, 1.2f), new Vector2(-1f, 0.45f), mat);
+            rcsRight = MakeRcs(anchor, "RcsRight", new Vector2(1.1f, 1.2f), new Vector2(1f, 0.45f), mat);
+        }
+
+        private ParticleSystem MakeRcs(Transform anchor, string name, Vector2 localPos, Vector2 dir, Material mat)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(anchor, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, dir.normalized);
+            CreateRcsPuff(go, mat);
+            createdSlots.Add(go.transform);
+            return go.GetComponent<ParticleSystem>();
         }
 
         private void Update()
@@ -157,6 +190,11 @@ namespace SpaceTaxi.Physics
             Drive(retroJet, retroOn, power, scaleFlame: !retroAuthored);
             Drive(retroSparks, retroOn, power, scaleFlame: false);
 
+            // торможение/посадочный разворот — боковые RCS-пыхи у хвоста
+            bool rcsOn = flying && (controller.BrakeOn || controller.LandingRetro);
+            Drive(rcsLeft, rcsOn, 1f, scaleFlame: false);
+            Drive(rcsRight, rcsOn, 1f, scaleFlame: false);
+
             // в посадочном развороте струя ретро к планете; авторский слот не трогаем
             if (retroJet != null && !retroAuthored)
             {
@@ -173,7 +211,7 @@ namespace SpaceTaxi.Physics
         }
 
         private ParticleSystem ResolveSlot(Transform root, string slotName, Vector3 localPos,
-            Vector2 exhaustDir, bool isMain, List<Transform> dying)
+            Vector2 exhaustDir, bool isMain, bool allowDefault, List<Transform> dying)
         {
             Transform slot = root.Find(slotName);
             if (slot != null && !dying.Contains(slot))
@@ -190,7 +228,13 @@ namespace SpaceTaxi.Physics
                     return authored;
                 }
 
-                // пустой слот префаба — дефолтное пламя ребёнком, позицию держит слот
+                // пустой слот префаба: главный — дефолтное пламя ребёнком, ретро —
+                // пустой резерв (владелец добавит свой PS)
+                if (!allowDefault)
+                {
+                    createdSlots.Add(slot);
+                    return null;
+                }
                 Material mat = MakeParticleMaterial(slot);
                 var flameGo = new GameObject("DefaultFlame");
                 flameGo.transform.SetParent(slot, false);
@@ -201,16 +245,19 @@ namespace SpaceTaxi.Physics
                 return flameGo.GetComponent<ParticleSystem>();
             }
 
-            // слота нет вовсе — строим слот и дефолтное пламя (корневой фолбэк)
+            // слота нет вовсе — строим слот; дефолтное пламя только главному
             Material rootMat = MakeParticleMaterial(root);
             var go = new GameObject(slotName);
             go.transform.SetParent(root, false);
             go.transform.localPosition = localPos;
             go.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
-            CreateDefaultFlame(go, isMain, rootMat);
-            CreateSparks(go, isMain, rootMat);
+            if (allowDefault)
+            {
+                CreateDefaultFlame(go, isMain, rootMat);
+                CreateSparks(go, isMain, rootMat);
+            }
             createdSlots.Add(go.transform);
-            return go.GetComponent<ParticleSystem>();
+            return allowDefault ? go.GetComponent<ParticleSystem>() : null;
         }
 
         private static void Drive(ParticleSystem ps, bool on, float power, bool scaleFlame)
@@ -245,6 +292,53 @@ namespace SpaceTaxi.Physics
             }
         }
 
+        // множители ExhaustTune текущей модели (нет компонента — единицы)
+        private float FlameSizeMul => tune != null ? tune.FlameSize : 1f;
+        private float FlamePowerMul => tune != null ? tune.FlamePower : 1f;
+        private float TrailWidthMul => tune != null ? tune.TrailWidth : 1f;
+        private float SparkPowerMul => tune != null ? tune.SparkPower : 1f;
+
+        // RCS-пых: короткий холодный «пшш» вбок
+        private void CreateRcsPuff(GameObject go, Material mat)
+        {
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = false;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.12f, 0.22f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(28f, 44f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.7f, 1.3f);
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.maxParticles = 40;
+
+            var emission = ps.emission;
+            emission.rateOverTime = 26f;
+
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 20f;
+            shape.radius = 0.2f;
+
+            var color = ps.colorOverLifetime;
+            color.enabled = true;
+            color.color = new ParticleSystem.MinMaxGradient(RetroFlameGradient());
+
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
+                new Keyframe(0f, 1f),
+                new Keyframe(1f, 0.2f)));
+
+            ApplyTrails(ps, 0.9f, TrailLifeRetro, TrailWidthRetro);
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.material = mat;
+            renderer.trailMaterial = mat;
+            renderer.sortingOrder = SortOrderFlame;
+        }
+
         // материал частиц: шейдер SpriteRenderer корабля (или Sprites/Default) +
         // кружок-заглушка; Repeat нужен для тайлинга вдоль шлейфа (как в SpeedTrail)
         private static Material MakeParticleMaterial(Transform spriteHost)
@@ -260,7 +354,7 @@ namespace SpaceTaxi.Physics
 
         // дефолтное пламя: белое-в-желту ядро → оранж/красный → дымный хвост;
         // конус от сопла, у части частиц тонкий Trail-след
-        private static void CreateDefaultFlame(GameObject go, bool isMain, Material mat)
+        private void CreateDefaultFlame(GameObject go, bool isMain, Material mat)
         {
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -273,12 +367,13 @@ namespace SpaceTaxi.Physics
             main.startSpeed = new ParticleSystem.MinMaxCurve(
                 isMain ? MainSpeedMin : RetroSpeedMin, isMain ? MainSpeedMax : RetroSpeedMax);
             main.startSize = new ParticleSystem.MinMaxCurve(
-                isMain ? MainSizeMin : RetroSizeMin, isMain ? MainSizeMax : RetroSizeMax);
+                (isMain ? MainSizeMin : RetroSizeMin) * FlameSizeMul,
+                (isMain ? MainSizeMax : RetroSizeMax) * FlameSizeMul);
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
             main.maxParticles = isMain ? MainMaxParticles : RetroMaxParticles;
 
             var emission = ps.emission;
-            emission.rateOverTime = isMain ? MainRate : RetroRate;
+            emission.rateOverTime = (isMain ? MainRate : RetroRate) * (isMain ? FlamePowerMul : 1f);
 
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;
@@ -301,7 +396,7 @@ namespace SpaceTaxi.Physics
             ApplyTrails(ps,
                 isMain ? TrailRatioMain : TrailRatioRetro,
                 isMain ? TrailLifeMain : TrailLifeRetro,
-                isMain ? TrailWidthMain : TrailWidthRetro);
+                isMain ? TrailWidthMain * TrailWidthMul : TrailWidthRetro);
 
             var renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.material = mat;
@@ -329,7 +424,7 @@ namespace SpaceTaxi.Physics
             main.maxParticles = SparkMaxParticles;
 
             var emission = ps.emission;
-            emission.rateOverTime = isMain ? SparkRateMain : SparkRateRetro;
+            emission.rateOverTime = (isMain ? SparkRateMain : SparkRateRetro) * SparkPowerMul;
 
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;

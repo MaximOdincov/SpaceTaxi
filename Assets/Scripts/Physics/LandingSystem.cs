@@ -170,13 +170,15 @@ namespace SpaceTaxi.Physics
         // урон контактного удара: 0 при v ≤ LandSpeed, плавный вход до полной
         // линейности к v = LandSpeed+30 (без ступени min(5,…)), кап 30 —
         // планеты и астероиды считают одинаково
+        // квадратичный рост без капа: мягкое касание почти бесплатно,
+        // средняя скорость — ощутимо, полная — смерть любому корпусу
+        // (старый кап 30 делал 100 и 330 км/ч одинаково больно)
+        private const float CrashDamagePerSpeedSq = 0.003f;
+
         private float CrashDamage(float v)
         {
             float delta = v - ship.Config.LandSpeed;
-            if (delta <= 0f)
-                return 0f;
-            float ramp = Mathf.Clamp01(delta / 30f);
-            return Mathf.Min(30f, delta * 0.9f * ramp);
+            return delta <= 0f ? 0f : CrashDamagePerSpeedSq * delta * delta;
         }
 
         private void Crash(Planet planet, Collision2D collision, float v)

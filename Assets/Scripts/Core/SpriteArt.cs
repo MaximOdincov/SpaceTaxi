@@ -62,10 +62,12 @@ namespace SpaceTaxi.Core
                 else
                 {
                     float ppu = sprite.pixelsPerUnit;
-                    // центр канвы сидит в bounds.center (пивот может быть не по центру)
+                    // центр контента относительно центра канвы; пивот канвы — центр,
+                    // bounds.center трогать нельзя: у Tight-меша он уже смещён
+                    // к контенту, второе слагаемое давало двойной сдвиг корпуса
                     Vector2 center = new Vector2(
                         (minX + maxX + 1) * 0.5f - (x0 + w * 0.5f),
-                        (minY + maxY + 1) * 0.5f - (y0 + h * 0.5f)) / ppu + (Vector2)sprite.bounds.center;
+                        (minY + maxY + 1) * 0.5f - (y0 + h * 0.5f)) / ppu;
                     Vector2 size = new Vector2(maxX - minX + 1, maxY - minY + 1) / ppu;
                     rect = new Rect(center - size * 0.5f, size);
                 }

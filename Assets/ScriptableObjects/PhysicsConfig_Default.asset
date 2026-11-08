@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9746210878ef941f5b1b5bdf24f402d1, type: 3}
   m_Name: PhysicsConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
-  Retro: 80
+  Retro: 62
   StrafeMaxTurnRate: 60
-  LandSpeed: 55
+  LandSpeed: 75
   TakeoffV: 85
   EngineMultiplier: 3.2
   LandingRingOffset: 90

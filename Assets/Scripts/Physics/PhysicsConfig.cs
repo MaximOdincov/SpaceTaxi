@@ -7,12 +7,12 @@ namespace SpaceTaxi.Physics
     public sealed class PhysicsConfig : ScriptableObject
     {
         [Header("Скорость")]
-        public float Retro = 80f;             // торможение (было 115 — слишком резко)
+        public float Retro = 62f;             // торможение: мягче, не гасит скорость в ноль
         [Tooltip("Предел угловой скорости разворота")]
         public float StrafeMaxTurnRate = 60f; // град/с
 
         [Header("Посадка")]
-        public float LandSpeed = 55f;         // безопасная скорость касания (было 38)
+        public float LandSpeed = 75f;         // безопасная скорость касания (посадка прощает больше)
         public float TakeoffV = 85f;          // импульс взлёта от центра планеты
         public float EngineMultiplier = 3.2f; // множитель тяги в посадочном кольце
         public float LandingRingOffset = 90f; // кольцо: поверхность + это расстояние

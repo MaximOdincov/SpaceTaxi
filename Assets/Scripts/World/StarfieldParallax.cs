@@ -179,7 +179,7 @@ namespace SpaceTaxi.World
                 Dust(1.5f, 0.4f, 50),
                 StarKind(2.4f, 0.42f, 34),
                 Cluster(9f, 0.4f, 8),
-                Sparkle(4.5f, 0.55f, 8),
+                Sparkle(3.5f, 0.45f, 8),
             };
             kinds.Add(Sun(7f, 3));
             AddDecor(kinds, decor, 0, 3, 34f, 0.3f);
@@ -193,7 +193,7 @@ namespace SpaceTaxi.World
                 Dust(1.4f, 0.4f, 18),
                 StarKind(2.8f, 0.6f, 62),
                 Cluster(8f, 0.5f, 8),
-                Sparkle(5.5f, 0.7f, 12),
+                Sparkle(4f, 0.55f, 12),
             };
             AddDecor(kinds, decor, 1, 6, 16f, 0.35f);
             return kinds.ToArray();
@@ -205,7 +205,7 @@ namespace SpaceTaxi.World
             {
                 Dust(1.2f, 0.35f, 14),
                 StarKind(4.2f, 0.85f, 72),
-                Sparkle(7f, 0.9f, 14),
+                Sparkle(4.5f, 0.7f, 14),
             };
             AddDecor(kinds, decor, 2, 3, 8f, 0.45f);
             return kinds.ToArray();
@@ -235,9 +235,9 @@ namespace SpaceTaxi.World
             Units = units,
             Alpha = alpha,
             Weight = weight,
-            Glow = true,
-            GlowScale = 1.6f,
-            GlowAlpha = 0.3f,
+            // без гало и холодный: тёплая звезда с ореолом у остановившейся
+            // камеры читалась как «бежевый шар рядом с кораблём» (жалоба плейтеста)
+            TintOverride = new Color(0.9f, 0.96f, 1f),
         };
 
         // компактная группа из 3-5 чётких звёзд (сид — форма группы)

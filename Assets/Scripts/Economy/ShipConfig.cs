@@ -77,7 +77,7 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;
-                eggRentalFallback.VisualLength = 13.5f;
+                eggRentalFallback.VisualLength = 27f;
                 eggRentalFallback.Description = "Арендный корабль компании, всегда сток";
                 return eggRentalFallback;
             }
