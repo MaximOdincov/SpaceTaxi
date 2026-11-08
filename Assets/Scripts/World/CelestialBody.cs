@@ -37,7 +37,12 @@ namespace SpaceTaxi.World
         {
             DisplayName = data.DisplayName;
             Type = data.Type;
-            Radius = data.Radius;
+            // пользовательские планеты крупнее (не все): множитель по имени —
+            // гравитация/кольца/посадка считают от увеличенного радиуса согласованно;
+            // звёзды и дыры не растут (их зоны жара/горизонт в данных точные)
+            Radius = data.Type == BodyType.Planet
+                ? data.Radius * Core.WorldSprites.PlanetSizeMul(data.DisplayName)
+                : data.Radius;
             Mass = data.MassMultiplier;
             HasFuel = data.HasFuel;
             HasRepair = data.HasRepair;

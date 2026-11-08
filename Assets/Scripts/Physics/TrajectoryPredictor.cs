@@ -70,21 +70,37 @@ namespace SpaceTaxi.Physics
                 refWidth = 2f * 160f * mainCam.aspect;
         }
 
+        // прогноз тает плавно: полный на 30 ед/с, нулевой на 5 — резкое
+        // исчезновение на пороге выглядело как поломка (жалоба плейтеста)
+        private const float FadeSpeedFull = 30f;
+        private const float FadeSpeedZero = 5f;
+
+        private float fadeAlpha;
+
         private void Update()
         {
-            // прячем не в полёте, в ретро и у нулевой скорости
+            // прячем не в полёте и в ретро-посадке (там траектория управления не показывает)
             if (ship == null || ship.Config == null || gravity == null
                 || ship.State != ShipState.Flying
-                || (controller != null && controller.LandingRetro)
-                || ship.Body.linearVelocity.sqrMagnitude < 900f) // < 30 ед/с
+                || (controller != null && controller.LandingRetro))
             {
+                HideAll();
+                smoothDir = Vector2.zero;
+                smoothSpacing = 0f;
+                fadeAlpha = 0f;
+                return;
+            }
+
+            float speed = ship.Body.linearVelocity.magnitude;
+            fadeAlpha = Mathf.Clamp01((speed - FadeSpeedZero) / (FadeSpeedFull - FadeSpeedZero));
+            if (fadeAlpha <= 0f)
+            {
+                // почти стоит: направление не определено, прогноз схлопнулся в ноль
                 HideAll();
                 smoothDir = Vector2.zero;
                 smoothSpacing = 0f;
                 return;
             }
-
-            float speed = ship.Body.linearVelocity.magnitude;
             float target = Mathf.Clamp(HorizonScreens * refWidth / Mathf.Max(speed, 1f), HorizonMin, HorizonMax);
             horizon += (target - horizon) * Mathf.Min(1f, 4f * Time.deltaTime);
 
@@ -180,6 +196,7 @@ namespace SpaceTaxi.Physics
             for (int i = 0; i < dashIndex; i++)
             {
                 Color c = lineColor;
+                c.a *= fadeAlpha; // медленный корабль — прогноз бледнее, до нуля
                 c.a *= Mathf.Lerp(1f, 1f - endFade, i / (float)dashes.Count);
                 renderers[i].color = c;
             }

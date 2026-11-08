@@ -113,6 +113,7 @@ namespace SpaceTaxi.Physics
             }
 
             GetComponent<EngineEffects>()?.Rebind(); // слоты переехали в новый визуал
+            GetComponent<SpeedTrail>()?.Rebuild(); // шлейфы — по setup новой модели
         }
 
         private static GameObject LoadPrefab(string id)

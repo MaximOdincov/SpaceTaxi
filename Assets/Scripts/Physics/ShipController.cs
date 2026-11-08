@@ -43,6 +43,8 @@ namespace SpaceTaxi.Physics
 
         // сохранённый курс: на остановке по нему разворачиваемся и стартуем
         private Vector2 headingDir = Vector2.up;
+        // grace после взлёта: корабль поднимается в той ориентации, в которой стоял
+        private float headingHoldUntil;
 
         public bool InLandingRing { get; private set; }
 
@@ -248,8 +250,16 @@ namespace SpaceTaxi.Physics
         }
 
         // Нос: обычно по вектору скорости, на посадке — ретро или вертикально от планеты
+        // взлёт: не разворачивать нос сразу — подъём «низом вперёд», как стоял
+        public void HoldHeading(float seconds)
+        {
+            headingHoldUntil = Time.time + seconds;
+        }
+
         private void UpdateHeading(Vector2 velocity, float v, Planet planet, float planetDist)
         {
+            if (Time.time < headingHoldUntil)
+                return;
             bool inLandingRing = planet != null && planetDist < planet.LandingRing;
             bool finalApproach = inLandingRing
                 && planetDist < planet.Radius + 40f

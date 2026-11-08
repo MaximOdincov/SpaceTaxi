@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 200000}
   - component: {fileID: 300000}
   - component: {fileID: 800000}
+  - component: {fileID: 900000}
   m_Layer: 0
   m_Name: delta
   m_TagString: Untagged
@@ -173,3 +174,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 200000}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &900000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99593ac77d3c5d989f78c98f2ccdb87d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trails:
+  - offset: {x: 0.00, y: -2.20}
+    width: 1.20
+    color: {r: 0.700, g: 0.880, b: 1.000, a: 0.450}
+    time: 0.38
+    minSpeed: 65
+    strength: 1

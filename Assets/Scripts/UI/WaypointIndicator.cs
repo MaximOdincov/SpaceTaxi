@@ -408,7 +408,7 @@ namespace SpaceTaxi.UI
             tip.sizeDelta = new Vector2(56f, 56f);
             tip.anchoredPosition = new Vector2(0f, 12f);
             Image tipImage = tipGo.GetComponent<Image>();
-            tipImage.sprite = StubSprites.ShipTriangle();
+            tipImage.sprite = StubSprites.TargetChevron();
             tipImage.color = color;
             tipImage.raycastTarget = false;
 

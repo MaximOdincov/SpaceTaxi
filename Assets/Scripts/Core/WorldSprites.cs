@@ -72,6 +72,14 @@ namespace SpaceTaxi.Core
             return field.Length > 0 ? field : null;
         }
 
+        // множитель размера планеты по имени: не все растут (жалоба «мелкие»),
+        // треть остаётся как есть, треть x1.5, треть x2 — облик стабилен между сессиями
+        public static float PlanetSizeMul(string seedName)
+        {
+            float[] muls = { 1f, 1.5f, 2f };
+            return muls[StableIndex(seedName + ":size", muls.Length)];
+        }
+
         // FNV-1a: строковый GetHashCode рандомизирован между сессиями Unity
         private static int StableIndex(string seed, int count)
         {

@@ -103,6 +103,7 @@ namespace SpaceTaxi.Physics
             ship.State = ShipState.Flying;
             Sound.Play(SoundId.Takeoff);
             CameraFollow.AddShake(0.25f); // толчок старта
+            GetComponent<ShipController>()?.HoldHeading(1.5f); // подъём низом вперёд
             Debug.Log($"[Landing] взлёт: v={ship.Body.linearVelocity.magnitude}");
         }
 
