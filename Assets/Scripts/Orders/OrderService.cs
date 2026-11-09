@@ -567,9 +567,11 @@ namespace SpaceTaxi.Orders
                 DropoffIndex = RandomPlanetIndex(pickup),
                 ExpiresAt = Time.time + offerLifetime,
             };
-            // цена фиксируется в момент спавна карточки и дальше не меняется
+            // цена фиксируется в момент спавна карточки и дальше не меняется;
+            // премиальность — по тиру корабля-таксиста (Н3.1), без корабля — тир арендного Яйца
+            int taxiTier = ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
             int basePrice = OrderPricing.ComputePrice(Pricing,
-                RouteDistance(offer), SectorOf(offer.DropoffIndex));
+                RouteDistance(offer), SectorOf(offer.DropoffIndex), taxiTier);
             offer.Price = PriceWithRatingBonus(basePrice);
             // чаевые (Н-14): случайные 10–25% на заказ, бросок один раз при спавне —
             // число живёт до выплаты и не «перебрасывается»
