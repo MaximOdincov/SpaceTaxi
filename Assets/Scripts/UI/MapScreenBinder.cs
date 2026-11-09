@@ -78,6 +78,7 @@ namespace SpaceTaxi.UI
         private LevelAsset level;
         private GameSession session;
         private Ship ship;
+        private GravityField gravity; // для живых радиусов тел на hover (лениво)
         private RectTransform mapRect;
         private TMP_FontAsset font;
         private bool built;
@@ -724,6 +725,21 @@ namespace SpaceTaxi.UI
             return stamps.Count;
         }
 
+        // живое тело по имени — как в MinimapBinder.FindLiveBody
+        private CelestialBody FindLiveBody(string displayName)
+        {
+            if (string.IsNullOrEmpty(displayName))
+                return null;
+            if (gravity == null)
+                gravity = FindAnyObjectByType<GravityField>();
+            if (gravity == null)
+                return null;
+            foreach (CelestialBody body in gravity.Bodies)
+                if (body.DisplayName == displayName)
+                    return body;
+            return null;
+        }
+
         // hover по телу: круги радиусов посадки/захвата + подпись крупнее
         private void ShowHoverRings(CelestialBodyData body, bool on)
         {
@@ -740,8 +756,13 @@ namespace SpaceTaxi.UI
                 }
                 return;
             }
-            float capture = (body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * 3.3f + 30f) * 2f * scale;
-            float landing = (body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + 90f) * 2f * scale;
+            // радиусы берём у живого тела (там переопределения уровня + PhysicsConfig),
+            // дата-фолбэк — только если тело ещё не заспавнено
+            CelestialBody live = FindLiveBody(body.DisplayName);
+            float capture = (live != null ? live.CaptureRing
+                : body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * 3.3f + 30f) * 2f * scale;
+            float landing = (live != null ? live.LandingRing
+                : body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + 90f) * 2f * scale;
             hoverCaptureRing.sizeDelta = Vector2.one * capture;
             hoverCaptureRing.anchoredPosition = WorldToMap(body.Position);
             hoverLandingRing.sizeDelta = Vector2.one * landing;
@@ -799,10 +820,11 @@ namespace SpaceTaxi.UI
                     if (!hit)
                     {
                         chosen = c;
-                        placed.Add(r);
                         break;
                     }
                 }
+                // даже fallback-позицию регистрируем, иначе плотный кластер наложится
+                placed.Add(new Rect(chosen.x - halfW, chosen.y - h * 0.5f - pad, ml.Width + pad * 2f, h + pad * 2f));
                 ml.Rect.anchoredPosition = chosen;
             }
         }
