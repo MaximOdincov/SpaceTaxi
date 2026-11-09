@@ -43,6 +43,8 @@ namespace SpaceTaxi.UI
         private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SpeedDanger = new Color(1f, 0.35f, 0.3f, 1f);
+        // зелёный HUD-иконок — BrightColor каркаса борткомпа (принятый зелёный)
+        private static readonly Color IconGreen = OnboardComputerFactory.BrightColor;
 
         private void Awake()
         {
@@ -84,68 +86,148 @@ namespace SpaceTaxi.UI
             BuildSirens();
         }
 
-        // спидометр вокруг цифрового значения: диск + стрелка; арт меняется
-        // в префабе Assets/Prefabs/Resources/UI/Speedometer.prefab (Dial/Needle),
-        // пустые спрайты подменяются процедурными заглушками
+        // ————— геометрия спидометра (каркас строится кодом, префаб удалён) —————
+
+        private const float GaugeSize = 150f;     // сторона квадрата спидометра
+        private const float NeedleScale = 1.5f;   // масштаб спрайта стрелки
+        private const float GaugeTopGap = 3f;     // зазор между шкалой и строкой топлива
+        private const float GaugeHullGap = 6f;    // зазор между стрелкой и строкой корпуса
+        // Ход стрелки: 240° из допустимых брифом 180..270. Хвост arrow.png в z=0
+        // смотрит вправо-вниз (≈ −12°), −78° ставит его строго вниз; дальше — по
+        // часовой: вниз → влево → вверх → до упора вправо-вверх у MaxV.
+        private const float NeedleAngleAtZero = -78f;
+        private const float NeedleSweep = 240f;
+        // Хаб стрелки (центр белого шара) в пикселях arrow.png 41×28 — вокруг
+        // него делаем пивот, шар сидит на оси шкалы
+        private static readonly Vector2 NeedleHubPx = new Vector2(13.5f, 13.5f);
+        private static readonly Vector2 NeedleSpritePx = new Vector2(41f, 28f);
+
+        // спидометр: шкала speed.png (полукруг) + стрелка arrow.png ПОД ней,
+        // вращается по скорости; цифры — внутри шкалы. Место: слева между строкой
+        // топлива и строкой корпуса — корпус сдвигается вниз, старая иконка
+        // скорости прячется (Н4.2.1: код вместо битого префаба UI/Speedometer)
         private void BuildSpeedometer()
         {
-            GameObject prefab = Resources.Load<GameObject>("UI/Speedometer");
-            GameObject gaugeGo = prefab != null
-                ? Object.Instantiate(prefab)
-                : new GameObject("Speedometer", typeof(RectTransform), typeof(SpeedometerGauge));
-            gaugeGo.name = "Speedometer";
+            var gaugeGo = new GameObject("Speedometer", typeof(RectTransform), typeof(SpeedometerGauge));
             gaugeGo.transform.SetParent(speedValue.transform.parent, false);
             var gaugeRect = (RectTransform)gaugeGo.transform;
             gaugeRect.localScale = Vector3.one;
-
-            // место — старая иконка скорости, если она есть в сцене (иначе цифры);
-            // старая иконка прячется — её заменяет диск
-            var speedIcon = transform.Find("SpeedIcon");
-            Transform poseSource = speedIcon != null ? speedIcon : speedValue.transform;
-            var poseRect = (RectTransform)poseSource;
-            gaugeRect.anchorMin = poseRect.anchorMin;
-            gaugeRect.anchorMax = poseRect.anchorMax;
-            gaugeRect.anchoredPosition = poseRect.anchoredPosition;
+            gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(0.5f, 0.5f);
             gaugeRect.pivot = new Vector2(0.5f, 0.5f);
-            gaugeRect.sizeDelta = new Vector2(150f, 150f);
-            if (speedIcon != null)
-                speedIcon.gameObject.SetActive(false);
+            gaugeRect.sizeDelta = new Vector2(GaugeSize, GaugeSize);
+            gaugeRect.anchoredPosition = GaugeCenter();
 
-            // заглушки арта: пустой диск/стрелка префаба -> процедурные
-            Transform dial = gaugeGo.transform.Find("Dial");
-            if (dial != null)
-            {
-                var dialImage = dial.GetComponent<Image>();
-                if (dialImage != null && dialImage.sprite == null)
-                {
-                    dialImage.sprite = StubSprites.Ring(160f);
-                    dialImage.color = new Color(0.66f, 1f, 0.8f, 0.5f);
-                }
-            }
-            Transform needle = gaugeGo.transform.Find("Needle");
-            if (needle != null)
-            {
-                var needleImage = needle.GetComponent<Image>();
-                if (needleImage != null && needleImage.sprite == null)
-                {
-                    needleImage.sprite = StubSprites.ShipTriangle();
-                    needleImage.color = new Color(1f, 0.42f, 0.3f, 0.95f);
-                }
-            }
+            // стрелка — нижний слой: хаб в центре шкалы, вращается вокруг него
+            var needleGo = new GameObject("Needle", typeof(RectTransform), typeof(Image));
+            needleGo.transform.SetParent(gaugeRect, false);
+            var needleImage = needleGo.GetComponent<Image>();
+            Sprite arrow = Resources.Load<Sprite>("Art/icons/arrow");
+            if (arrow == null)
+                Debug.LogWarning("[Hud] Art/icons/arrow не найден — спидометр без стрелки");
+            needleImage.sprite = arrow;
+            needleImage.raycastTarget = false;
+            var needleRect = (RectTransform)needleGo.transform;
+            needleRect.anchorMin = needleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            needleRect.pivot = new Vector2(NeedleHubPx.x / NeedleSpritePx.x, 1f - NeedleHubPx.y / NeedleSpritePx.y);
+            needleRect.sizeDelta = Vector2.Scale(NeedleSpritePx, Vector2.one * NeedleScale);
+            needleRect.anchoredPosition = Vector2.zero;
 
-            // цифровое значение — внутрь циферблата, по центру у низа
+            // шкала — поверх стрелки: полукруг 2:1, центр дуги — в центре спидометра
+            var dialGo = new GameObject("Dial", typeof(RectTransform), typeof(Image));
+            dialGo.transform.SetParent(gaugeRect, false);
+            var dialImage = dialGo.GetComponent<Image>();
+            dialImage.sprite = Resources.Load<Sprite>("Art/icons/speed");
+            dialImage.color = IconGreen; // зелёный HUD, как иконки щита/топлива
+            dialImage.raycastTarget = false;
+            var dialRect = (RectTransform)dialGo.transform;
+            dialRect.anchorMin = dialRect.anchorMax = new Vector2(0.5f, 0.5f);
+            float dialHeight = GaugeSize * 0.5f; // арт speed.png 184×92
+            dialRect.sizeDelta = new Vector2(GaugeSize, dialHeight);
+            dialRect.anchoredPosition = new Vector2(0f, dialHeight * 0.5f); // плоская сторона — к центру
+
+            // цифровое значение — внутрь шкалы над хабом; 42, не 40: строка
+            // 30pt ≈ 39.6 — Ellipsis при меньшей высоте режет текст по вертикали
             speedValue.transform.SetParent(gaugeRect, false);
             var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
-            speedRect.sizeDelta = new Vector2(140f, 44f);
-            speedRect.anchoredPosition = new Vector2(0f, -6f);
+            speedRect.sizeDelta = new Vector2(110f, 42f);
+            speedRect.anchoredPosition = new Vector2(0f, GaugeSize * 0.25f);
             speedValue.fontSize = 30f;
             speedValue.alignment = TextAlignmentOptions.Center;
 
             gauge = gaugeGo.GetComponent<SpeedometerGauge>();
-            if (gauge != null && needle != null)
-                gauge.Setup((RectTransform)needle);
+            gauge.Setup(needleRect, NeedleAngleAtZero, NeedleSweep);
+
+            // старая иконка скорости больше не нужна — её место заняла шкала
+            var speedIcon = transform.Find("SpeedIcon");
+            if (speedIcon != null)
+                speedIcon.gameObject.SetActive(false);
+
+            ShiftHullRow(GaugeHullTop());
+        }
+
+        // центр спидометра: х шкалы — по левому краю строки топлива (пивот 0),
+        // иначе шкала вылезает за экран; у — под низомFuelIcon (он ниже FuelTrack,
+        // дуга не должна его задевать). Всё в координатах родителя (точечные
+        // якоря), углы — от его верха-лева
+        private Vector2 GaugeCenter()
+        {
+            var track = transform.Find("FuelTrack");
+            var fuelIcon = transform.Find("FuelIcon");
+            var speedIcon = transform.Find("SpeedIcon");
+            Transform poseSource = speedIcon != null ? speedIcon : speedValue.transform;
+            Vector2 center = RectCenter((RectTransform)poseSource.transform);
+            float dialHalf = GaugeSize * 0.5f;
+            if (track != null)
+                center.x = ((RectTransform)track).anchoredPosition.x; // пивот x=0 → левый край
+            else
+                center.x = Mathf.Max(center.x, dialHalf);
+            if (fuelIcon != null || track != null)
+            {
+                var rowRect = (RectTransform)(fuelIcon != null ? fuelIcon : track);
+                center.y = Mathf.Min(center.y, RowBottom(rowRect) - GaugeTopGap - dialHalf);
+            }
+            return center;
+        }
+
+        // верх строки корпуса, чтобы не задевать висящую вниз стрелку покоя
+        private float GaugeHullTop()
+        {
+            var hullIcon = transform.Find("HullIcon");
+            if (hullIcon == null)
+                return float.MinValue; // двигать нечего
+            var hullRect = (RectTransform)hullIcon;
+            float needleLen = (NeedleSpritePx.x - NeedleHubPx.x) * NeedleScale;
+            return GaugeCenter().y - needleLen - GaugeHullGap;
+        }
+
+        // сдвиг строки корпуса (иконка + значение) вниз под спидометр
+        private void ShiftHullRow(float newTopY)
+        {
+            var hullIcon = transform.Find("HullIcon");
+            var hullValue = transform.Find("HullValue");
+            if (hullIcon == null || hullValue == null)
+                return;
+            var hullRect = (RectTransform)hullIcon;
+            float delta = newTopY - hullRect.anchoredPosition.y;
+            if (delta >= 0f)
+                return; // место и так есть — сцену не трогаем
+            hullRect.anchoredPosition += Vector2.up * delta;
+            ((RectTransform)hullValue).anchoredPosition += Vector2.up * delta;
+        }
+
+        // низ узла по его пивоту: FuelIcon (пивот 0,1) → −87, FuelTrack (0, 0.5) → −69
+        private static float RowBottom(RectTransform rect)
+        {
+            return rect.anchoredPosition.y - rect.pivot.y * rect.sizeDelta.y;
+        }
+
+        // центр точечно-заякоренного узла в координатах родителя
+        private static Vector2 RectCenter(RectTransform rect)
+        {
+            return rect.anchoredPosition
+                + Vector2.Scale(rect.sizeDelta, new Vector2(0.5f - rect.pivot.x, 0.5f - rect.pivot.y));
         }
 
         // щит корпуса: в сцене есть старая иконка HullIcon — меняем её спрайт

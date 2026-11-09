@@ -2,23 +2,32 @@ using UnityEngine;
 
 namespace SpaceTaxi.UI
 {
-    // Спидометр: диск + стрелка вокруг цифрового значения. Арт меняется в
-    // префабе Assets/Prefabs/Resources/UI/Speedometer.prefab (Dial/Needle) —
-    // при пустых спрайтах HUD подставляет процедурные заглушки.
+    // Спидометр: полукруглая шкала speed.png поверх стрелки arrow.png; стрелка
+    // вращается вокруг центра шкалы, цифры — TMP внутри шкалы. Каркас строит
+    // HudBinder кодом (битый префаб UI/Speedometer удалён, Н4.2.1), углы задаёт
+    // он же при Setup.
     public class SpeedometerGauge : MonoBehaviour
     {
-        [SerializeField] private RectTransform needle;
+        private RectTransform needle;
+        private float angleAtZero;
+        private float sweepDegrees;
 
-        public void Setup(RectTransform needleRect)
+        // angleAtZero — локальный поворот стрелки при скорости 0 (остриё вниз),
+        // sweepDegrees — полный ход стрелки до MaxV. Ход по часовой (в Unity +z —
+        // против часовой, поэтому вычитаем): 0 юн/с — вниз, у MaxV — на 240° дальше.
+        public void Setup(RectTransform needleRect, float angleAtZero, float sweepDegrees)
         {
             needle = needleRect;
+            this.angleAtZero = angleAtZero;
+            this.sweepDegrees = sweepDegrees;
         }
 
         // f: 0..1 доля от максимальной скорости модели
         public void SetFraction(float fraction)
         {
             if (needle != null)
-                needle.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-120f, 120f, Mathf.Clamp01(fraction)));
+                needle.localRotation = Quaternion.Euler(0f, 0f,
+                    angleAtZero - sweepDegrees * Mathf.Clamp01(fraction));
         }
     }
 }
