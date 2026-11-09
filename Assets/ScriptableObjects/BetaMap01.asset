@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ca1042bad44ab4065bb95d40c109612c, type: 3}
   m_Name: BetaMap01
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.World.LevelAsset
-  LevelName: "\u0411\u0415\u0422\u0410: \u0441\u0438\u0441\u0442\u0435\u043c\u0430 \u041c\u0422\u041e"
+  LevelName: "\u0411\u0415\u0422\u0410: \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u041C\u0422\u041E"
   WorldRadius: 8300
   Bodies:
-  - DisplayName: "\u0413\u0430\u0432\u0430\u043d\u044c"
+  - DisplayName: "\u0413\u0430\u0432\u0430\u043D\u044C"
     Type: 0
     Position: {x: 0, y: 0}
     Radius: 30
@@ -33,9 +33,11 @@ MonoBehaviour:
     RepairTier: 3
     IsHub: 1
     Sector: 0
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041a\u043e\u043b\u044b\u0431\u0435\u043b\u044c"
+  - DisplayName: "\u041A\u043E\u043B\u044B\u0431\u0435\u043B\u044C"
     Type: 0
     Position: {x: 430, y: 160}
     Radius: 20
@@ -48,12 +50,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041c\u0438\u0448\u0435\u043d\u044c"
+  - DisplayName: "\u041C\u0438\u0448\u0435\u043D\u044C"
     Type: 0
     Position: {x: 240, y: -400}
     Radius: 18
@@ -66,12 +72,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0422\u0438\u0445\u0430\u044f"
+  - DisplayName: "\u0422\u0438\u0445\u0430\u044F"
     Type: 0
     Position: {x: -330, y: -330}
     Radius: 22
@@ -89,9 +99,11 @@ MonoBehaviour:
     RepairTier: 1
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041b\u0443\u0433"
+  - DisplayName: "\u041B\u0443\u0433"
     Type: 0
     Position: {x: -460, y: 120}
     Radius: 24
@@ -106,11 +118,14 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 1
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0424\u043e\u043d\u0430\u0440\u044c"
+  - DisplayName: "\u0424\u043E\u043D\u0430\u0440\u044C"
     Type: 0
     Position: {x: -180, y: 440}
     Radius: 16
@@ -123,12 +138,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041e\u0434\u0443\u0432\u0430\u043d\u0447\u0438\u043a"
+  - DisplayName: "\u041E\u0434\u0443\u0432\u0430\u043D\u0447\u0438\u043A"
     Type: 0
     Position: {x: 250, y: 420}
     Radius: 20
@@ -141,12 +160,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0423\u0442\u0440\u0435\u043d\u043d\u044f\u044f"
+  - DisplayName: "\u0423\u0442\u0440\u0435\u043D\u043D\u044F\u044F"
     Type: 1
     Position: {x: 920, y: 880}
     Radius: 52
@@ -159,9 +182,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 1
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0412\u0435\u0441\u0442\u0430"
@@ -182,9 +209,11 @@ MonoBehaviour:
     RepairTier: 3
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041a\u0443\u0437\u043d\u044f"
+  - DisplayName: "\u041A\u0443\u0437\u043D\u044F"
     Type: 0
     Position: {x: 1950, y: 750}
     Radius: 32
@@ -197,13 +226,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 1
     RepairTier: 2
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u042f\u043d\u0442\u0430\u0440\u044c"
+  - DisplayName: "\u042F\u043D\u0442\u0430\u0440\u044C"
     Type: 0
     Position: {x: 2450, y: 150}
     Radius: 24
@@ -216,12 +248,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0413\u0440\u0430\u043d\u044c"
+  - DisplayName: "\u0413\u0440\u0430\u043D\u044C"
     Type: 0
     Position: {x: 2150, y: -550}
     Radius: 30
@@ -236,11 +272,14 @@ MonoBehaviour:
     HasFuel: 1
     FuelTier: 3
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0421\u0438\u0442\u043e"
+  - DisplayName: "\u0421\u0438\u0442\u043E"
     Type: 0
     Position: {x: 1450, y: -900}
     Radius: 22
@@ -253,12 +292,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0422\u043e\u043b\u043e\u043a\u0430"
+  - DisplayName: "\u0422\u043E\u043B\u043E\u043A\u0430"
     Type: 0
     Position: {x: 850, y: -250}
     Radius: 26
@@ -271,12 +314,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0424\u0430\u043a\u0435\u043b"
+  - DisplayName: "\u0424\u0430\u043A\u0435\u043B"
     Type: 1
     Position: {x: 2900, y: -1500}
     Radius: 54
@@ -289,9 +336,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0411\u0443\u0439"
@@ -307,12 +358,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041f\u043e\u043b\u044b\u043d\u044c"
+  - DisplayName: "\u041F\u043E\u043B\u044B\u043D\u044C"
     Type: 0
     Position: {x: 900, y: 3100}
     Radius: 26
@@ -325,10 +380,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 1
     RepairTier: 1
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0421\u0442\u0443\u0436\u0430"
@@ -343,13 +401,17 @@ MonoBehaviour:
       UseColor: 0
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
-    HasFuel: 0
+    HasFuel: 1
+    FuelTier: 2
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0413\u043d\u0435\u0437\u0434\u043e"
+  - DisplayName: "\u0413\u043D\u0435\u0437\u0434\u043E"
     Type: 0
     Position: {x: -650, y: 4000}
     Radius: 24
@@ -362,12 +424,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0412\u043e\u0440\u043e\u043d"
+  - DisplayName: "\u0412\u043E\u0440\u043E\u043D"
     Type: 0
     Position: {x: -1500, y: 3400}
     Radius: 34
@@ -385,9 +451,11 @@ MonoBehaviour:
     RepairTier: 2
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0422\u043e\u043d\u043d\u0435\u043b\u044c"
+  - DisplayName: "\u0422\u043E\u043D\u043D\u0435\u043B\u044C"
     Type: 0
     Position: {x: -900, y: 2600}
     Radius: 26
@@ -400,12 +468,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041f\u043e\u043b\u044f\u0440\u043d\u0430\u044f"
+  - DisplayName: "\u041F\u043E\u043B\u044F\u0440\u043D\u0430\u044F"
     Type: 1
     Position: {x: 1500, y: 3800}
     Radius: 58
@@ -418,12 +490,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041c-14"
+  - DisplayName: "\u041C-14"
     Type: 0
     Position: {x: -2800, y: 3900}
     Radius: 18
@@ -436,9 +512,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
-    HasRepair: 0
+    FuelTier: 0
+    HasRepair: 1
+    RepairTier: 1
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0414-2"
@@ -454,9 +534,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0414-4/\u0411\u0438\u0441"
@@ -472,12 +556,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041a-77"
+  - DisplayName: "\u041A-77"
     Type: 0
     Position: {x: -5300, y: 3400}
     Radius: 28
@@ -490,9 +578,13 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
   - DisplayName: "\u0421-9"
@@ -508,12 +600,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0413\u043e\u0440\u043d"
+  - DisplayName: "\u0413\u043E\u0440\u043D"
     Type: 1
     Position: {x: -4300, y: 3700}
     Radius: 62
@@ -526,12 +622,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 4
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u0427\u0451\u0440\u043d\u0430\u044f \u0434\u044b\u0440\u0430"
+  - DisplayName: "\u0427\u0451\u0440\u043D\u0430\u044F \u0434\u044B\u0440\u0430"
     Type: 10
     Position: {x: -2200, y: 4600}
     Radius: 55
@@ -544,12 +644,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
+    BeltWidth: 40
+    BeltAsteroidCount: 30
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041f\u043e\u044f\u0441 \u0422\u043e\u043b\u043e\u043a\u0430-\u0421\u0438\u0442\u043e"
+  - DisplayName: "\u041F\u043E\u044F\u0441 \u0422\u043E\u043B\u043E\u043A\u0430-\u0421\u0438\u0442\u043E"
     Type: 11
     Position: {x: 1150, y: -575}
     Radius: 442.3
@@ -562,14 +666,16 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 2
     BeltWidth: 80
     BeltAsteroidCount: 32
     LandingRingRadius: 0
     CaptureRingRadius: 0
-  - DisplayName: "\u041f\u043e\u044f\u0441 \u0411\u0443\u0439-\u041f\u043e\u043b\u044b\u043d\u044c"
+  - DisplayName: "\u041F\u043E\u044F\u0441 \u0411\u0443\u0439-\u041F\u043E\u043B\u044B\u043D\u044C"
     Type: 11
     Position: {x: 1200, y: 2500}
     Radius: 670.8
@@ -582,7 +688,9 @@ MonoBehaviour:
       Color: {r: 1, g: 1, b: 1, a: 1}
       SpinSpeed: 0
     HasFuel: 0
+    FuelTier: 0
     HasRepair: 0
+    RepairTier: 0
     IsHub: 0
     Sector: 3
     BeltWidth: 80
