@@ -9,13 +9,13 @@ namespace SpaceTaxi.UI
     public sealed class OnboardRefs
     {
         public TMP_Text Clock, MoneyValue, RatingValue;
-        public Image MoneyIcon, RatingIcon;
+        public Image RatingIcon;
         public GameObject ActiveSection;   // секция целиком — скрывается без активного заказа
         public RectTransform ActiveArea;   // блок активного заказа + кнопка отмены (ведёт биндер)
         public RectTransform OrderArea;    // контент скролла входящих карточек (ведёт биндер)
         public TMP_Text EconCounters, DebtValue;
         public Button AbandonButton;
-        public Button PlayerPrev, PlayerPlay, PlayerNext;
+        public Button PlayerPrev, PlayerNext;
         public Button RadioMute;
         public TMP_Text TrackTitle;
         public RectTransform ProgressFill;

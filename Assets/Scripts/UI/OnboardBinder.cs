@@ -19,7 +19,7 @@ namespace SpaceTaxi.UI
     {
         private TMP_Text clock;
         private TMP_Text moneyValue, ratingValue;
-        private Image moneyIconImage, ratingIconImage;
+        private Image ratingIconImage;
         // анимация рейтинга: показанное значение догоняет целевое, цвет — динамика
         private float ratingShown = -1f;
         private bool ratingDropping;
@@ -31,7 +31,6 @@ namespace SpaceTaxi.UI
         private Button cancelButton;
         private OrderOffer builtActiveOffer; // блок перестраивается только при смене заказа
 
-        [SerializeField] private Sprite cashIcon;
         [SerializeField] private Sprite ratingIcon;
 
         [Tooltip("Единый шрифт панели: применяется ко всем текстам каркаса и карточек. Пусто — шрифт часов старого каркаса")]
@@ -47,7 +46,7 @@ namespace SpaceTaxi.UI
         private readonly List<GameObject> activeAreaChildren = new List<GameObject>();
 
         // плеер «ЭФИР»
-        private Button playerPrev, playerPlay, playerNext;
+        private Button playerPrev, playerNext;
         private Button radioMute;
         private GameSession session; // для районов карточек (уровень)
         private TMP_Text trackTitle;
@@ -96,8 +95,6 @@ namespace SpaceTaxi.UI
         // AssetDatabase недоступен — фабрика грузит их только в редакторе)
         private void BindIcons()
         {
-            if (cashIcon != null && moneyIconImage != null)
-                moneyIconImage.sprite = cashIcon;
             if (ratingIcon != null && ratingIconImage != null)
                 ratingIconImage.sprite = ratingIcon;
         }
@@ -107,7 +104,6 @@ namespace SpaceTaxi.UI
             clock = refs.Clock;
             moneyValue = refs.MoneyValue;
             ratingValue = refs.RatingValue;
-            moneyIconImage = refs.MoneyIcon;
             ratingIconImage = refs.RatingIcon;
             activeSection = refs.ActiveSection;
             activeArea = refs.ActiveArea;
@@ -117,7 +113,6 @@ namespace SpaceTaxi.UI
             session = FindAnyObjectByType<GameSession>();
             abandonButton = refs.AbandonButton;
             playerPrev = refs.PlayerPrev;
-            playerPlay = refs.PlayerPlay;
             playerNext = refs.PlayerNext;
             radioMute = refs.RadioMute;
             trackTitle = refs.TrackTitle;
@@ -563,15 +558,13 @@ namespace SpaceTaxi.UI
         {
             if (playerPrev != null)
                 playerPrev.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(-1));
-            if (playerPlay != null)
-                playerPlay.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicPause());
             if (playerNext != null)
                 playerNext.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(1));
             if (radioMute != null)
                 radioMute.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicMuted());
         }
 
-        // имя трека и глиф ▶/⏸ по состоянию менеджера; событие MusicStateChanged
+        // имя станции и метка мьюта по состоянию менеджера; событие MusicStateChanged
         private void RefreshMusicPlayer()
         {
             if (trackTitle == null)
@@ -589,12 +582,6 @@ namespace SpaceTaxi.UI
             else
             {
                 trackTitle.text = "СТАНЦИЯ · " + StationName(audioManager.CurrentTrack);
-            }
-            if (playerPlay != null)
-            {
-                TMP_Text glyph = playerPlay.GetComponentInChildren<TMP_Text>();
-                if (glyph != null)
-                    glyph.text = audioManager != null && audioManager.MusicPaused ? "||" : "▶";
             }
         }
 
