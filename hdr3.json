@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "command": "command",
+  "data": {
+    "command": "script eval",
+    "parameters": {
+      "code": "var panel = UnityEngine.Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardComputerPanel>(UnityEngine.FindObjectsInactive.Include); var sb = new System.Text.StringBuilder(); int idx = 0; foreach (UnityEngine.Transform stack in panel.transform) { if (stack.name != \"Stack\") continue; var hdr = stack.Find(\"Header\"); if (hdr == null) { sb.Append(\"Stack #\").Append(idx).Append(\": NO HEADER\\n\"); continue; } var hrt = hdr.GetComponent<UnityEngine.RectTransform>(); sb.Append(\"=== Stack #\").Append(idx).Append(\" headerRect=\").Append(hrt.rect.size).Append(\" ===\\n\"); foreach (UnityEngine.Transform ch in hdr) { var tmp = ch.GetComponent<TMPro.TextMeshProUGUI>(); var rt = ch.GetComponent<UnityEngine.RectTransform>(); var le = ch.GetComponent<UnityEngine.UI.LayoutElement>(); sb.Append(\"  \").Append(ch.name).Append(\" tmp=\").Append(tmp != null).Append(\" text=[\").Append(tmp != null ? tmp.text : \"-\").Append(\"] font=\").Append(tmp != null && tmp.font != null ? tmp.font.name : \"NULL\").Append(\" anchoredPos=\").Append(rt.anchoredPosition).Append(\" sizeDelta=\").Append(rt.sizeDelta).Append(\" rect=\").Append(rt.rect.size).Append(\" color=\").Append(tmp != null ? tmp.color.ToString() : \"-\").Append(\" ignoreLayout=\").Append(le != null ? le.ignoreLayout.ToString() : \"noLE\").Append(\"\\n\"); } idx++; } return sb.ToString();"
+    },
+    "result": {
+      "output": null,
+      "diagnostics": [],
+      "success": true,
+      "result": "=== Stack #0 headerRect=(0.00, 0.00) ===\n  Clock tmp=True text=[15:30] font=LiberationSans SDF anchoredPos=(0.00, 0.00) sizeDelta=(0.00, 0.00) rect=(0.00, 0.00) color=RGBA(0.659, 1.000, 0.796, 1.000) ignoreLayout=noLE\n  MoneyValue tmp=True text=[Đ 0] font=LiberationSans SDF anchoredPos=(0.00, 0.00) sizeDelta=(0.00, 0.00) rect=(0.00, 0.00) color=RGBA(0.659, 1.000, 0.796, 1.000) ignoreLayout=noLE\n  RatingValue tmp=True text=[3.0] font=LiberationSans SDF anchoredPos=(0.00, 0.00) sizeDelta=(0.00, 0.00) rect=(0.00, 0.00) color=RGBA(0.357, 0.900, 0.560, 1.000) ignoreLayout=noLE\n=== Stack #1 headerRect=(100.00, 100.00) ===\n  Clock tmp=True text=[15:30] font=JetBrainsMono-Medium SDF anchoredPos=(12.00, 0.00) sizeDelta=(240.00, 44.00) rect=(240.00, 44.00) color=RGBA(0.659, 1.000, 0.796, 1.000) ignoreLayout=noLE\n  MoneyValue tmp=True text=[Đ 0] font=JetBrainsMono-Medium SDF anchoredPos=(0.00, 0.00) sizeDelta=(260.00, 44.00) rect=(260.00, 44.00) color=RGBA(0.659, 1.000, 0.796, 1.000) ignoreLayout=noLE\n  RatingValue tmp=True text=[★ 3.0] font=JetBrainsMono-Medium SDF anchoredPos=(-12.00, 0.00) sizeDelta=(240.00, 44.00) rect=(240.00, 44.00) color=RGBA(0.357, 0.900, 0.560, 1.000) ignoreLayout=noLE\n"
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7801,
+      "projectPath": "C:\\Users\\maksi\\.zcode\\workspace\\70d4ce60-f148-4fff-ba2d-b7212e95e329\\SpaceTaxi"
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "This project's com.unity.pipeline uses the old command names. Run unity pipeline upgrade."
+  ]
+}

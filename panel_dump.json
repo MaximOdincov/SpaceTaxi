@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "command": "command",
+  "data": {
+    "command": "script eval",
+    "parameters": {
+      "code": "var panel = UnityEngine.Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardComputerPanel>(UnityEngine.FindObjectsInactive.Include); var sb = new System.Text.StringBuilder(); System.Action<UnityEngine.Transform,int> walk = null; walk = (t, d) => { sb.Append(new string(' ', d*2)).Append(t.name); var txt = t.GetComponent<UnityEngine.UI.Text>(); if (txt != null) sb.Append(\" [\").Append(txt.text).Append(\"]\"); sb.Append(\"\\n\"); for (int i=0;i<t.childCount;i++) walk(t.GetChild(i), d+1); }; walk(panel.transform, 0); return sb.ToString();"
+    },
+    "result": {
+      "output": null,
+      "diagnostics": [],
+      "success": true,
+      "result": "OnboardComputer\n  Frame\n  Background\n  Stack\n    Header\n      Clock\n      MoneyValue\n      RatingValue\n    DebtRow\n    ActiveSection\n      Heading\n      Line\n      ActiveArea\n    IncomingSection\n      Heading\n      Line\n      OffersScroll\n        Viewport\n          OrderArea\n    RadioSection\n      Heading\n      Line\n      PlayerRow\n        PlayerPrev\n          Text\n        Track\n        PlayerNext\n          Text\n      Progress\n        Fill\n      RadioMute\n        Text\n    AbandonButton\n      Text\n  Stack\n    Header\n      Clock\n      MoneyValue\n      RatingValue\n    DebtRow\n    ActiveSection\n      Heading\n      Line\n      ActiveArea\n    IncomingSection\n      Heading\n      Line\n      OffersScroll\n        Viewport\n          OrderArea\n    RadioSection\n      Heading\n      Line\n      PlayerRow\n        PlayerPrev\n          Text\n        Track\n        PlayerNext\n          Text\n      Progress\n        Fill\n      RadioMute\n        Text\n    AbandonButton\n      Text\n"
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7801,
+      "projectPath": "C:\\Users\\maksi\\.zcode\\workspace\\70d4ce60-f148-4fff-ba2d-b7212e95e329\\SpaceTaxi"
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "This project's com.unity.pipeline uses the old command names. Run unity pipeline upgrade."
+  ]
+}

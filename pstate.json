@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "command": "command",
+  "data": {
+    "command": "script eval",
+    "parameters": {
+      "code": "var panel = UnityEngine.Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardComputerPanel>(); var rt = panel.GetComponent<UnityEngine.RectTransform>(); var sb = new System.Text.StringBuilder(); sb.Append(\"panelActive=\").Append(panel.gameObject.activeInHierarchy).Append(\" anchoredPos=\").Append(rt.anchoredPosition).Append(\" rect=\").Append(rt.rect.size).Append(\" parent=\").Append(rt.parent.name).Append(\"\\n\"); var canvas = panel.GetComponentInParent<UnityEngine.Canvas>(); sb.Append(\"canvas=\").Append(canvas != null).Append(\" enabled=\").Append(canvas != null && canvas.enabled).Append(\" sortOrder=\").Append(canvas != null ? canvas.sortingOrder.ToString() : \"-\").Append(\"\\n\"); foreach (UnityEngine.Transform stack in panel.transform) { if (stack.name != \"Stack\") continue; var srt = (UnityEngine.RectTransform)stack; var hdr = stack.Find(\"Header\"); sb.Append(\"Stack rect=\").Append(srt.rect.size).Append(\" pos=\").Append(srt.anchoredPosition); if (hdr != null) { var hrt = (UnityEngine.RectTransform)hdr; sb.Append(\" | Header rect=\").Append(hrt.rect.size).Append(\" pos=\").Append(hrt.anchoredPosition); foreach (UnityEngine.Transform ch in hdr) { var crt = (UnityEngine.RectTransform)ch; var tmp = ch.GetComponent<TMPro.TextMeshProUGUI>(); sb.Append(\"\\n    \").Append(ch.name).Append(\" rect=\").Append(crt.rect.size).Append(\" pos=\").Append(crt.anchoredPosition).Append(\" world=\").Append(crt.position).Append(\" text=[\").Append(tmp != null ? tmp.text : \"-\").Append(\"]\"); } } sb.Append(\"\\n\"); } return sb.ToString();"
+    },
+    "result": {
+      "output": null,
+      "diagnostics": [],
+      "success": true,
+      "result": "panelActive=True anchoredPos=(-510.00, 0.00) rect=(480.00, 1080.16) parent=UI_Root\ncanvas=True enabled=True sortOrder=0\nStack rect=(480.00, 1080.16) pos=(0.00, 0.00) | Header rect=(448.00, 44.00) pos=(240.00, -32.00)\n    Clock rect=(240.00, 44.00) pos=(12.00, 0.00) world=(-278.45, 605.51, 0.00) text=[14:02]\n    MoneyValue rect=(260.00, 44.00) pos=(0.00, 0.00) world=(-155.98, 605.51, 0.00) text=[Đ 0]\n    RatingValue rect=(240.00, 44.00) pos=(-12.00, 0.00) world=(-33.51, 605.51, 0.00) text=[★ 3.0]\n"
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7801,
+      "projectPath": "C:\\Users\\maksi\\.zcode\\workspace\\70d4ce60-f148-4fff-ba2d-b7212e95e329\\SpaceTaxi"
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "This project's com.unity.pipeline uses the old command names. Run unity pipeline upgrade."
+  ]
+}

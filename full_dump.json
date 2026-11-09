@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "command": "command",
+  "data": {
+    "command": "script eval",
+    "parameters": {
+      "code": "var panels = UnityEngine.Object.FindObjectsByType<SpaceTaxi.UI.OnboardComputerPanel>(UnityEngine.FindObjectsSortMode.None); var sb = new System.Text.StringBuilder(); sb.Append(\"panelCount=\").Append(panels.Length).Append(\"\\n\"); foreach (var p in panels) { var prt = p.GetComponent<UnityEngine.RectTransform>(); sb.Append(\"PANEL go=\").Append(p.gameObject.name).Append(\" active=\").Append(p.gameObject.activeInHierarchy).Append(\" pos=\").Append(prt.anchoredPosition).Append(\" rect=\").Append(prt.rect.size).Append(\" anchors=\").Append(prt.anchorMin).Append(\"/\").Append(prt.anchorMax).Append(\" parent=\").Append(prt.parent.name).Append(\" worldPos=\").Append(prt.position).Append(\"\\n\"); } var canvas = panels[0].GetComponentInParent<UnityEngine.Canvas>(); var crt = canvas.GetComponent<UnityEngine.RectTransform>(); sb.Append(\"CANVAS rect=\").Append(crt.rect.size).Append(\" scale=\").Append(canvas.scaleFactor).Append(\" worldPos=\").Append(crt.position).Append(\"\\n\"); var panel = panels[0]; int si = 0; foreach (UnityEngine.Transform child in panel.transform) { var crt2 = (UnityEngine.RectTransform)child; sb.Append(\"child[\").Append(si).Append(\"]=\").Append(child.name).Append(\" active=\").Append(child.gameObject.activeInHierarchy).Append(\" worldPos=\").Append(crt2.position).Append(\" rect=\").Append(crt2.rect.size).Append(\"\\n\"); if (child.name == \"Stack\") { var hdr = child.Find(\"Header\"); if (hdr != null) { var hrt = (UnityEngine.RectTransform)hdr; sb.Append(\"  HEADER worldPos=\").Append(hrt.position).Append(\" rect=\").Append(hrt.rect.size).Append(\" aPos=\").Append(hrt.anchoredPosition).Append(\" anchors=\").Append(hrt.anchorMin).Append(\"/\").Append(hrt.anchorMax).Append(\"\\n\"); foreach (UnityEngine.Transform ch in hdr) { var rt2 = (UnityEngine.RectTransform)ch; sb.Append(\"    \").Append(ch.name).Append(\" world=\").Append(rt2.position).Append(\" rect=\").Append(rt2.rect.size).Append(\"\\n\"); } } } si++; } return sb.ToString();"
+    },
+    "result": {
+      "output": null,
+      "diagnostics": [],
+      "success": true,
+      "result": "panelCount=1\nPANEL go=OnboardComputer active=True pos=(0.00, 0.00) rect=(480.00, 1080.16) anchors=(0.00, 0.00)/(0.00, 1.00) parent=UI_Root worldPos=(0.00, 312.00, 0.00)\nCANVAS rect=(1919.71, 1080.16) scale=0,577691 worldPos=(554.50, 312.00, 0.00)\nchild[0]=Frame active=True worldPos=(138.65, 312.00, 0.00) rect=(480.00, 1080.16)\nchild[1]=Background active=True worldPos=(138.65, 312.00, 0.00) rect=(476.00, 1076.16)\nchild[2]=Stack active=True worldPos=(138.65, 312.00, 0.00) rect=(480.00, 1080.16)\n  HEADER worldPos=(138.65, 605.51, 0.00) rect=(448.00, 44.00) aPos=(240.00, -32.00) anchors=(0.00, 1.00)/(0.00, 1.00)\n    Clock world=(16.18, 605.51, 0.00) rect=(240.00, 44.00)\n    MoneyValue world=(138.65, 605.51, 0.00) rect=(260.00, 44.00)\n    RatingValue world=(261.12, 605.51, 0.00) rect=(240.00, 44.00)\n"
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7801,
+      "projectPath": "C:\\Users\\maksi\\.zcode\\workspace\\70d4ce60-f148-4fff-ba2d-b7212e95e329\\SpaceTaxi"
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "This project's com.unity.pipeline uses the old command names. Run unity pipeline upgrade."
+  ]
+}

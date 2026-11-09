@@ -17,6 +17,9 @@ namespace SpaceTaxi.UI
 
         private void Awake()
         {
+            // плей не замирает без фокуса редактора: слайд панели и анимации
+            // добегают даже когда окно в фоне (нужно и автономным проверкам)
+            Application.runInBackground = true;
             SetX(hiddenX); // старт скрыт
         }
 

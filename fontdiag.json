@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "command": "command",
+  "data": {
+    "command": "script eval",
+    "parameters": {
+      "code": "var panel = UnityEngine.Object.FindAnyObjectByType<SpaceTaxi.UI.OnboardComputerPanel>(); var hdr = panel.transform.Find(\"Stack/Header\"); var clock = hdr.Find(\"Clock\").GetComponent<TMPro.TextMeshProUGUI>(); var f = clock.font; var sb = new System.Text.StringBuilder(); sb.Append(\"font=\").Append(f.name).Append(\" popMode=\").Append(f.atlasPopulationMode).Append(\" atlasTex=\").Append(f.atlasTexture != null ? f.atlasTexture.width + \"x\" + f.atlasTexture.height : \"NULL\").Append(\" atlasTexCount=\").Append(f.atlasTextures != null ? f.atlasTextures.Length.ToString() : \"NULL\").Append(\" charCount=\").Append(f.characterTable.Count).Append(\" glyphCount=\").Append(f.glyphTable.Count).Append(\"\\n\"); sb.Append(\"has1=\").Append(f.HasCharacter('1')).Append(\" hasStar=\").Append(f.HasCharacter('★')).Append(\" hasCyr=\").Append(f.HasCharacter('М')).Append(\" hasD=\").Append(f.HasCharacter('Đ')).Append(\"\\n\"); var go = new GameObject(\"probe\", typeof(UnityEngine.RectTransform), typeof(TMPro.TextMeshProUGUI)); go.transform.SetParent(panel.transform, false); var probe = go.GetComponent<TMPro.TextMeshProUGUI>(); probe.font = f; probe.fontSize = 36; probe.text = \"14:02\"; probe.ForceMeshUpdate(true, true); var b = probe.mesh.bounds.size; sb.Append(\"probeMesh=\").Append(b).Append(\"\\n\"); UnityEngine.Object.Destroy(go); return sb.ToString();"
+    },
+    "result": {
+      "output": null,
+      "diagnostics": [],
+      "success": true,
+      "result": "font=JetBrainsMono-Medium SDF popMode=Dynamic atlasTex=2048x2048 atlasTexCount=1 charCount=103 glyphCount=103\nhas1=True hasStar=True hasCyr=True hasD=True\nprobeMesh=(103.56, 28.25, 0.00)\n"
+    },
+    "target": {
+      "host": "127.0.0.1",
+      "port": 7801,
+      "projectPath": "C:\\Users\\maksi\\.zcode\\workspace\\70d4ce60-f148-4fff-ba2d-b7212e95e329\\SpaceTaxi"
+    }
+  },
+  "errors": [],
+  "warnings": [
+    "This project's com.unity.pipeline uses the old command names. Run unity pipeline upgrade."
+  ]
+}

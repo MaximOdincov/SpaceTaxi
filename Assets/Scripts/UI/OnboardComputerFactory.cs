@@ -253,7 +253,9 @@ namespace SpaceTaxi.UI
             layout.childForceExpandHeight = false;
 
             var heading = Text(section, title, 21f, LabelColor, "Heading");
-            FixedHeight(heading.gameObject, 26f);
+            // 28, не 26: строка 21pt ≈ 27.7 — Ellipsis при меньшей высоте
+            // обрезает заголовок до нуля видимых символов
+            FixedHeight(heading.gameObject, 28f);
             var line = new GameObject("Line", typeof(RectTransform), typeof(Image));
             line.transform.SetParent(section.transform, false);
             line.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.4f);
@@ -381,7 +383,9 @@ namespace SpaceTaxi.UI
             columnLe.preferredWidth = 1f;
 
             var name = Text(column, "Имя", 23f, BrightColor, "Name");
-            FixedHeight(name.gameObject, 28f);
+            // 31, не 28: строка 23pt ≈ 30.4 — Ellipsis при меньшей высоте
+            // обрезает имя пассажира до нуля видимых символов
+            FixedHeight(name.gameObject, 31f);
             name.alignment = TextAlignmentOptions.Left;
             var route = Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 16f, LabelColor, "Route");
             FixedHeight(route.gameObject, 22f);
@@ -534,18 +538,22 @@ namespace SpaceTaxi.UI
             Bar("BorderRight", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-thickness, 0f), new Vector2(0f, 0f));
         }
 
-        // элемент шапки, прижатый к левому/правому краю строки; вне лейаута
+        // элемент шапки, прижатый к левому/правому краю строки; вне лейаута.
+        // LayoutElement обязателен: без него ignoreLayout не на чем ставить,
+        // HorizontalLayoutGroup (childControlWidth) перебивает ручные якоря
+        // и «центральные» деньги уезжают, а края схлопываются.
+        // Высота 48, а не 44: строка 36pt JetBrainsMono имеет preferredHeight
+        // ≈ 47.5 — при меньшем прямоугольнике Ellipsis-переполнение обрезает
+        // текст ПО ВЕРТИКАЛИ до нуля символов (шапка «есть, но невидима»)
         public static void AnchorHeaderEdge(RectTransform rect, bool isLeft)
         {
             float edge = isLeft ? 0f : 1f;
             rect.anchorMin = new Vector2(edge, 0.5f);
             rect.anchorMax = new Vector2(edge, 0.5f);
             rect.pivot = new Vector2(edge, 0.5f);
-            rect.sizeDelta = new Vector2(240f, 44f);
+            rect.sizeDelta = new Vector2(240f, 48f);
             rect.anchoredPosition = new Vector2(isLeft ? 12f : -12f, 0f);
-            var le = rect.gameObject.GetComponent<LayoutElement>();
-            if (le != null)
-                le.ignoreLayout = true;
+            Le(rect.gameObject).ignoreLayout = true;
         }
 
         // деньги: ровно по центру ширины панели, независимо от соседних текстов
@@ -554,14 +562,15 @@ namespace SpaceTaxi.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(260f, 44f);
+            rect.sizeDelta = new Vector2(260f, 48f);
             rect.anchoredPosition = Vector2.zero;
-            var le = rect.gameObject.GetComponent<LayoutElement>();
-            if (le != null)
-                le.ignoreLayout = true;
+            Le(rect.gameObject).ignoreLayout = true;
         }
 
-        // однолинейный текст с обрезкой «…»: базовая политика панели
+        // однолинейный текст с обрезкой «…»: базовая политика панели.
+        // ВАЖНО: Ellipsis режет и по вертикали — узел с этим текстом обязан
+        // иметь высоту ≥ preferredHeight строки (36pt ≈ 47.5, 21pt ≈ 27.7,
+        // 23pt ≈ 30.4), иначе текст «есть, но невидим» (ноль видимых символов)
         public static TMP_Text Text(GameObject parent, string content, float size, Color color, string name = "Text")
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
