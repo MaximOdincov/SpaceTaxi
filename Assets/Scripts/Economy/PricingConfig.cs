@@ -50,10 +50,16 @@ namespace SpaceTaxi.Economy
         public float MeridianTipsBonusMul = 1.1f;
 
         [Header("Топливные сети (21 §3.7): индекс = тир сети − 1")]
-        [Tooltip("Цена кр/ед по тиру сети: 1 — дёшево и мало, 4 — люкс (полный бак, оверпрайс)")]
+        [Tooltip("Цена кр/ед по тиру сети: 1 — дёшево и меньше всех, 4 — люкс (полный бак, оверпрайс)")]
         public float[] FuelPricePerUnitByTier = { 0.8f, 1f, 1.3f, 1.8f };
-        [Tooltip("Запас топлива сети за один визит, доля бака корабля")]
-        public float[] FuelStockFractionByTier = { 0.35f, 0.7f, 1f, 1f };
+        [Tooltip("Запас топлива сети за один визит, доля бака корабля: бедная сеть продаёт меньше всех, но не ноль")]
+        public float[] FuelStockFractionByTier = { 0.75f, 1f, 1f, 1f };
+
+        [Header("Топливо и районы (Н4.5): индекс = Sector (Hub..Far)")]
+        [Tooltip("Множитель цены топлива по классу района: богатый центр — дешевле, бедные окраины — дороже")]
+        public float[] FuelPriceSectorMul = { 0.9f, 1f, 1.1f, 1.25f, 1.45f };
+        [Tooltip("Шанс пустой сети на заправке, % (редкое исключение: детерминирован именем станции, хаб не пустеет, у двух соседних топлива не бывает одновременно)")]
+        [Range(0, 100)] public int FuelOutageChancePct = 12;
 
         [Header("Пакеты ремонта (Н-5): индекс = пакет − 1 (мелкий/средний/полный)")]
         [Tooltip("Доля недостающего HP, которую восстанавливает пакет")]
@@ -107,6 +113,16 @@ namespace SpaceTaxi.Economy
             var fractions = FuelStockFractionByTier;
             int index = FuelTierIndex(tier, fractions != null ? fractions.Length : 0);
             return index >= 0 ? fractions[index] : 1f;
+        }
+
+        // районный множитель цены топлива: кривой/пустой массив — без наценки;
+        // незаданный сектор не бывает (enum), верхний кламп — на короткий массив
+        public float GetFuelSectorPriceMul(Sector sector)
+        {
+            var muls = FuelPriceSectorMul;
+            if (muls == null || muls.Length == 0)
+                return 1f;
+            return muls[Mathf.Clamp((int)sector, 0, muls.Length - 1)];
         }
 
         // индекс массива 0..n-1: незаданный тир считаем базовым, верхний кламп — на короткий массив

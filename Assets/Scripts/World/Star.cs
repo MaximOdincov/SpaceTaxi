@@ -10,9 +10,9 @@ namespace SpaceTaxi.World
         [Tooltip("Урон корпуса в секунду у поверхности (на краю зоны — 0).")]
         public float HeatDamagePerSecond = 30f;
 
-        public override void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig)
+        public override void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig, bool fuelOutage = false)
         {
-            base.Init(data, physicsConfig);
+            base.Init(data, physicsConfig, fuelOutage);
             HeatRadius = data.HeatRadius;
         }
 

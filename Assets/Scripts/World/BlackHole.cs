@@ -54,9 +54,9 @@ namespace SpaceTaxi.World
         private float swallowTimer;
         private float joltTimer;
 
-        public override void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig)
+        public override void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig, bool fuelOutage = false)
         {
-            base.Init(data, physicsConfig);
+            base.Init(data, physicsConfig, fuelOutage);
             Mass = Mathf.Max(data.MassMultiplier, HoleMassMultiplier);
             // горизонт должен пропускать корабль внутрь: иначе физический
             // коллайдер держит его на R+4 и воронка не дотянет до центра

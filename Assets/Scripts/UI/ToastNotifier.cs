@@ -251,15 +251,23 @@ namespace SpaceTaxi.UI
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
             landing.StationHint += planet => Show("Станция: [B] — " + StationServices(planet));
             // запас топливной сети при посадке (Н-4): сколько единиц продают и по чём
+            // (с районным множителем, Н4.5); пустая сеть — своё сообщение, чтобы
+            // игрок сразу знал, что слайдер тут не поможет
             landing.ShipLanded += planet =>
             {
                 if (!planet.HasFuel || session.Orders == null)
                     return;
                 var pricing = session.Orders.Pricing;
+                if (planet.FuelOutage)
+                {
+                    Show("Топлива на станции нет — сеть пуста");
+                    return;
+                }
                 int available = FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, planet.FuelTier, pricing);
                 if (available <= 0)
                     return;
-                Show($"Топлива на станции: {available} ед · цена {pricing.GetFuelPricePerUnit(planet.FuelTier):0.##} кр/ед");
+                Show($"Топлива на станции: {available} ед · цена " +
+                     $"{FuelNetwork.PricePerUnit(planet.FuelTier, planet.Sector, pricing):0.##} кр/ед");
             };
 
             var hull = ship.GetComponent<HullSystem>();

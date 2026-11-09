@@ -18,6 +18,12 @@ namespace SpaceTaxi.World
         public int FuelTier { get; private set; }
         // сеть ремонта (Н-5): тир планеты — макс. пакет и потолок визита из PricingConfig
         public int RepairTier { get; private set; }
+        // класс района (Н4.5): множитель цены топлива сети (PricingConfig) —
+        // читается из данных уровня, у заказов тот же сектор считает OrderService
+        public Sector Sector { get; private set; }
+        // сеть станции пуста (Н4.5): детерминировано именем станции (не прыгает
+        // между визитами); у двух соседних заправок топлива не бывает одновременно
+        public bool FuelOutage { get; private set; }
 
         protected Physics.PhysicsConfig config;
 
@@ -33,7 +39,7 @@ namespace SpaceTaxi.World
             captureRingOverride > 0f ? captureRingOverride
                 : Radius * (config != null ? config.CaptureRingK : 3.3f) + (config != null ? config.CaptureRingBase : 30f);
 
-        public virtual void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig)
+        public virtual void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig, bool fuelOutage = false)
         {
             DisplayName = data.DisplayName;
             Type = data.Type;
@@ -49,6 +55,8 @@ namespace SpaceTaxi.World
             IsHub = data.IsHub;
             FuelTier = data.FuelTier;
             RepairTier = data.RepairTier;
+            Sector = data.Sector;
+            FuelOutage = fuelOutage;
             spinSpeed = data.Visuals != null ? data.Visuals.SpinSpeed : 0f;
             landingRingOverride = data.LandingRingRadius;
             captureRingOverride = data.CaptureRingRadius;

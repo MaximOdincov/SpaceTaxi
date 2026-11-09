@@ -41,10 +41,17 @@ MonoBehaviour:
   - 1.3
   - 1.8
   FuelStockFractionByTier:
-  - 0.35
-  - 0.7
+  - 0.75
   - 1
   - 1
+  - 1
+  FuelPriceSectorMul:
+  - 0.9
+  - 1
+  - 1.1
+  - 1.25
+  - 1.45
+  FuelOutageChancePct: 12
   RepairPackFraction:
   - 0.25
   - 0.6

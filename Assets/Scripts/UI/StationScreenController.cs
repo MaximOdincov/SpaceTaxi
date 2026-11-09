@@ -335,11 +335,17 @@ namespace SpaceTaxi.UI
 
         private int FuelTier => currentPlanet != null ? currentPlanet.FuelTier : PricingConfig.BaseFuelTier;
 
+        // район станции для цены топлива (Н4.5): у экрана без планеты — базовый Near
+        private Sector FuelSector => currentPlanet != null ? currentPlanet.Sector : Sector.Near;
+
+        // сеть станции пуста (Н4.5): заправка есть, топлива в ней нет
+        private bool FuelOutage => currentPlanet != null && currentPlanet.FuelOutage;
+
         private int RepairTier => currentPlanet != null ? currentPlanet.RepairTier : PricingConfig.BaseRepairTier;
 
         private int FuelAvailable()
         {
-            if (ship == null || currentPlanet == null)
+            if (ship == null || currentPlanet == null || FuelOutage)
                 return 0;
             return FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, FuelTier, Pricing);
         }
@@ -347,10 +353,10 @@ namespace SpaceTaxi.UI
         // подтверждение: оплата ровно за выбранное (Wallet.TrySpend → Ship.Fuel → ReportServiced)
         private void ConfirmRefuel()
         {
-            if (!CanOpen() || session == null || fuelSlider == null)
+            if (!CanOpen() || session == null || fuelSlider == null || FuelOutage)
                 return;
             int units = Mathf.RoundToInt(fuelSlider.value);
-            int cost = FuelNetwork.CostOf(units, FuelTier, Pricing);
+            int cost = FuelNetwork.CostOf(units, FuelTier, FuelSector, Pricing);
             if (units <= 0 || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
             ship.Fuel += units; // сеттер клампит и шлёт FuelChanged — HUD и экран обновятся
@@ -372,21 +378,24 @@ namespace SpaceTaxi.UI
         private void UpdateFuelWindow()
         {
             int available = FuelAvailable();
-            float perUnit = Pricing.GetFuelPricePerUnit(FuelTier);
+            float perUnit = FuelNetwork.PricePerUnit(FuelTier, FuelSector, Pricing);
 
-            // 0 доступно: бак полон — заправка не нужна; иначе бак уже глубже запаса сети
-            fuelStockLine.text = available > 0
-                ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} кр/ед"
-                : ship.Fuel >= ship.Eff.FuelMax - 0.5f
-                    ? "Бак полон — заправка не нужна"
-                    : "Запас сети ниже текущего топлива";
+            // 0 доступно: сеть станции пуста (Н4.5), бак полон — заправка не
+            // нужна, либо бак уже глубже запаса сети
+            fuelStockLine.text = FuelOutage
+                ? "Сеть станции пуста — топлива нет"
+                : available > 0
+                    ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} кр/ед"
+                    : ship.Fuel >= ship.Eff.FuelMax - 0.5f
+                        ? "Бак полон — заправка не нужна"
+                        : "Запас сети ниже текущего топлива";
 
             fuelSlider.minValue = 0f;
             fuelSlider.maxValue = Mathf.Max(1, available); // 0..0 слайдер не показывает
-            fuelSlider.interactable = available > 0;
+            fuelSlider.interactable = !FuelOutage && available > 0;
             fuelSlider.SetValueWithoutNotify(Mathf.Clamp(fuelSlider.value, 0f, available));
 
-            bool hasStock = available > 0;
+            bool hasStock = !FuelOutage && available > 0;
             fuelPreset10.interactable = hasStock;
             fuelPreset50.interactable = hasStock;
             fuelPresetAll.interactable = hasStock;
@@ -398,14 +407,18 @@ namespace SpaceTaxi.UI
         private void UpdateFuelOffer()
         {
             int available = FuelAvailable();
-            int selected = Mathf.Clamp(Mathf.RoundToInt(fuelSlider.value), 0, available);
-            int cost = FuelNetwork.CostOf(selected, FuelTier, Pricing);
+            int selected = FuelOutage
+                ? 0
+                : Mathf.Clamp(Mathf.RoundToInt(fuelSlider.value), 0, available);
+            int cost = FuelNetwork.CostOf(selected, FuelTier, FuelSector, Pricing);
 
-            fuelOfferLabel.text = $"Заправить: {selected} ед ({cost} кр)";
-            fuelButton.interactable = selected > 0 && session.Wallet.Credits >= cost;
-            fuelButtonLabel.text = selected > 0
-                ? $"ЗАПРАВИТЬ ({cost} кр)"
-                : available > 0 ? "ВЫБЕРИТЕ ОБЪЁМ" : "ТОПЛИВА НЕТ";
+            fuelOfferLabel.text = FuelOutage
+                ? "Заправка не работает"
+                : $"Заправить: {selected} ед ({cost} кр)";
+            fuelButton.interactable = !FuelOutage && selected > 0 && session.Wallet.Credits >= cost;
+            fuelButtonLabel.text = FuelOutage
+                ? "ТОПЛИВА НЕТ"
+                : selected > 0 ? $"ЗАПРАВИТЬ ({cost} кр)" : "ВЫБЕРИТЕ ОБЪЁМ";
         }
 
         // слайдер объёма: дорожка/заполнение/ручка собираются кодом (схема UGUI Slider)

@@ -36,9 +36,13 @@ namespace SpaceTaxi.World
         {
             gravity = new GameObject("GravityField").AddComponent<GravityField>();
 
+            // пустые топливные сети (Н4.5): один проход ДО создания тел — правило
+            // «не двух соседних сразу» видит все заправки уровня сразу
+            var fuelOutage = FuelNetwork.OutageStations(level.Bodies, Pricing());
+
             var bodies = new List<CelestialBody>();
             for (int i = 0; i < level.Bodies.Count; i++)
-                bodies.Add(CreateBody(level.Bodies[i], i));
+                bodies.Add(CreateBody(level.Bodies[i], i, fuelOutage.Contains(level.Bodies[i].DisplayName)));
 
             // кометы (П6.3): одна система на уровень, маршруты по таймеру, не тело гравитации
             var cometGo = new GameObject("CometSystem");
@@ -63,7 +67,15 @@ namespace SpaceTaxi.World
             return planetsForBelts;
         }
 
-        private CelestialBody CreateBody(CelestialBodyData data, int index)
+        // конфиг цен (Н4.5): нужна билдеру ради шанса пустой сети — та же цепочка,
+        // что у OrderService.Pricing (Resources → кодовый дефолт); поля сцены нет
+        private static PricingConfig Pricing()
+        {
+            var fromResources = Resources.Load<PricingConfig>("PricingConfig_Default");
+            return fromResources != null ? fromResources : PricingConfig.Default;
+        }
+
+        private CelestialBody CreateBody(CelestialBodyData data, int index, bool fuelOutage)
         {
             // пояс — не тело гравитации: в списке заглушка ради индексов level.Bodies
             if (data.Type == BodyType.AsteroidBelt)
@@ -113,7 +125,7 @@ namespace SpaceTaxi.World
                 if (body == null)
                     body = go.AddComponent<Planet>();
             }
-            body.Init(data, config);
+            body.Init(data, config, fuelOutage);
 
             if (data.Type == BodyType.Star && data.HeatRadius > 0f)
             {
