@@ -84,7 +84,8 @@ TARGET_TANK_MID = (3, 5)                        # (тиры 3-4)
 TARGET_TANK_BARIN = 5                           # Барин >= 5
 TARGET_BRAKE = 450                              # тормозной путь <= 450 юн (цель 350-450)
 
-OUT_DEFAULT = "/Users/maxim/Desktop/SpaceTaxi/SpaceTaxiUnity/GameInfo/BALANCE_N3.xlsx"
+# ВНИМАНИЕ: путь по умолчанию захардкожен под этот Mac — на другой машине передать путь вывода первым аргументом.
+OUT_DEFAULT = "/Users/maxim/Desktop/SpaceTaxi/SpaceTaxiUnity/SpaceTaxi/docs/GameInfo/BALANCE_N3.xlsx"
 
 # ============================ СТИЛИ =========================================
 IN_FILL = PatternFill("solid", fgColor="FFFF00")            # входы — жёлтые
