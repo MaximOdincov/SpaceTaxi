@@ -326,7 +326,8 @@ namespace SpaceTaxi.UI
                     break; // охват перекручен — кольцо за ободом не рисуем
                 MakeImg("Ring_" + (int)RingDistances[k], mask, RingSprite(),
                     WithAlpha(GridColor, 0.16f + 0.06f * k), Vector2.one * (rPx * 2f));
-                if (k < 3)
+                // метка «С» живёт у самого обода — внешнему кольцу подпись не даём
+                if (k < RingDistances.Length - 1)
                 {
                     TMP_Text label = MakeLabel("Dist_" + (int)RingDistances[k], mask,
                         FormatDistance(RingDistances[k]), WithAlpha(GridColor, 0.55f));
