@@ -16,6 +16,9 @@ namespace SpaceTaxi.World
         private float despawnRadius;
         private Rigidbody2D body;
 
+        // направление полёта (единичное) — радару для хвоста маркера по вектору скорости
+        public Vector2 FlightDirection => direction;
+
         // кинематик с Continuous: на 400 ед/с статический коллайдер при просадках
         // FPS туннелирует сквозь корабль — «гибель при контакте» нарушается
         private void Awake()
