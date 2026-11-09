@@ -224,10 +224,9 @@ namespace SpaceTaxi.UI
             // контейнеры взаимоисключающие: переключение мгновенное, наезды исключены
             compact.gameObject.SetActive(!expand);
             expanded.gameObject.SetActive(expand);
-            // цель по составу строк: без задания Wish скрыт — раскрытая короче,
-            // иначе под кнопкой «Взять заказ» остаётся пустота
-            bool hasTask = offer.Task != null && offer.Task.Kind != PassengerTaskKind.None;
-            float expandedTarget = OnboardComputerFactory.OfferExpandedHeight - (hasTask ? 0f : 56f);
+            // цель по составу строк: без строки Wish (нет задания и реплик)
+            // раскрытая короче — иначе под кнопкой «Взять заказ» остаётся пустота
+            float expandedTarget = OnboardComputerFactory.OfferExpandedHeight - (HasWishRow(offer) ? 0f : 56f);
             float target = expand ? expandedTarget : OnboardComputerFactory.OfferCompactHeight;
             heightAnims[card] = StartCoroutine(CardHeightRoutine(card, target));
         }
@@ -294,27 +293,62 @@ namespace SpaceTaxi.UI
             if (statusNode != null)
                 statusNode.gameObject.SetActive(activeMode);
 
-            // без задания — строка пожелания скрыта
+            // строка «Пожелание клиента»: с заданием — его текст, без задания —
+            // реплика пассажира из пула Wishes (раньше без задания строка
+            // пряталась совсем, и реплики пассажира не было видно нигде)
             PassengerTask task = offer.Task;
             bool hasTask = task != null && task.Kind != PassengerTaskKind.None;
+            string wishValue = hasTask ? task.Text : PassengerWish(offer);
             var wishNode = card.Find("Expanded/Summary/Wish");
             if (wishNode != null)
-                wishNode.gameObject.SetActive(hasTask);
-            if (hasTask)
-                SetText(card.gameObject, "Expanded/Summary/Wish", StatLine("Пожелание клиента:", task.Text));
+                wishNode.gameObject.SetActive(!string.IsNullOrEmpty(wishValue));
+            if (!string.IsNullOrEmpty(wishValue))
+                SetText(card.gameObject, "Expanded/Summary/Wish", StatLine("Пожелание клиента:", wishValue));
 
-            // высота активной карточки под фактический состав строк: без Wish
-            // фиксированная высота оставляла пустоту под кнопкой отмены
+            // высота активной карточки под фактический состав строк (тот же
+            // предикат, что у раскрытия): без Wish фиксированная высота
+            // оставляла пустоту под кнопкой отмены
             if (activeMode)
             {
                 var cardLe = card.gameObject.GetComponent<LayoutElement>();
                 if (cardLe != null)
-                    cardLe.preferredHeight = hasTask
+                    cardLe.preferredHeight = HasWishRow(offer)
                         ? OnboardComputerFactory.ActiveCardHeight
                         : OnboardComputerFactory.ActiveCardHeight - 56f; // Wish 54 + зазор 2
             }
 
             RefreshLiveDistances(card, offer);
+        }
+
+        // показывается ли строка «Пожелание клиента»: с заданием — его текст,
+        // без — реплика пассажира. Единый предикат для высоты карточек
+        // (AnimateCard и FillCard), чтобы состав строк и высота не разъезжались
+        private static bool HasWishRow(OrderOffer offer)
+        {
+            if (offer == null)
+                return false;
+            if (offer.Task != null && offer.Task.Kind != PassengerTaskKind.None)
+                return !string.IsNullOrEmpty(offer.Task.Text);
+            return !string.IsNullOrEmpty(PassengerWish(offer));
+        }
+
+        // реплика пожелания пассажира (пул Wishes) для строки без задания;
+        // null — строки нет. Выпавшая пустая строка пула заменяется первой
+        // непустой — узел и высота тогда точно согласованы
+        private static string PassengerWish(OrderOffer offer)
+        {
+            if (offer == null || offer.Passenger == null)
+                return null;
+            string picked = PassengerProfile.PickPhrase(offer.Passenger.Wishes);
+            if (!string.IsNullOrEmpty(picked))
+                return picked;
+            string[] wishes = offer.Passenger.Wishes;
+            if (wishes == null)
+                return null;
+            foreach (string phrase in wishes)
+                if (!string.IsNullOrEmpty(phrase))
+                    return phrase;
+            return null;
         }
 
         // портрет: спрайт и тинт; размер фиксирован фабрикой (узкая колонка / полоса)
