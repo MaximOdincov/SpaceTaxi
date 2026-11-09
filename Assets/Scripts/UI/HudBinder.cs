@@ -82,7 +82,7 @@ namespace SpaceTaxi.UI
             hintRect.anchoredPosition = new Vector2(0f, -156f); // ниже тоста
 
             BuildSpeedometer();
-            BuildShieldIcon();
+            BuildStatIcons();
             BuildSirens();
         }
 
@@ -230,19 +230,27 @@ namespace SpaceTaxi.UI
                 + Vector2.Scale(rect.sizeDelta, new Vector2(0.5f - rect.pivot.x, 0.5f - rect.pivot.y));
         }
 
-        // щит корпуса: в сцене есть старая иконка HullIcon — меняем её спрайт
-        // на красивую из набора icons, ничего лишнего не рисуем
-        private void BuildShieldIcon()
+        // иконки статов: в сцене болванки ui_icon_shield/ui_icon_fuel — меняем
+        // спрайты на арт из icons и красим в зелёный HUD (BrightColor борткомпа)
+        private void BuildStatIcons()
         {
-            Sprite shield = Resources.Load<Sprite>("Art/icons/shield");
-            var hullIcon = transform.Find("HullIcon");
-            if (shield == null || hullIcon == null)
+            SetIcon("HullIcon", "Art/icons/shield_icon");
+            SetIcon("FuelIcon", "Art/icons/gas_icon");
+        }
+
+        // подмена спрайта существующему Image-узлу; при неудаче остаётся болванка
+        private void SetIcon(string nodeName, string resourcePath)
+        {
+            Sprite sprite = Resources.Load<Sprite>(resourcePath);
+            var node = transform.Find(nodeName);
+            if (sprite == null || node == null)
                 return;
-            var img = hullIcon.GetComponent<Image>();
+            var img = node.GetComponent<Image>();
             if (img != null)
             {
-                img.sprite = shield;
-                img.color = new Color(0.66f, 1f, 0.8f, 0.95f);
+                img.sprite = sprite;
+                img.color = IconGreen;
+                img.preserveAspect = true; // пропорции арта не тянутся в квадратный слот
             }
         }
 
