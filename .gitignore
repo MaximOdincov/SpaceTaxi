@@ -118,3 +118,7 @@ InitTestScene*.unity*
 
 # Unity build backups
 *_BackUpThisFolder_ButDontShipItWithYourGame/
+
+# Python
+__pycache__/
+*.pyc
