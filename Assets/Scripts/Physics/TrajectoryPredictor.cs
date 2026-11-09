@@ -9,6 +9,7 @@ namespace SpaceTaxi.Physics
     {
         [Header("Вид пунктира")]
         [SerializeField] private Sprite dashSprite;
+        [Tooltip("Цвет линии задаёт код (жёлтый/красный/зелёный) — из поля берётся только альфа")]
         [SerializeField] private Color dashColor = new Color(1f, 1f, 1f, 0.6f);
         [SerializeField] private float dashScale = 0.4f;
         [Tooltip("Множитель ширины чёрточки: 1 = как в спрайте, меньше = тоньше")]
@@ -16,6 +17,8 @@ namespace SpaceTaxi.Physics
         [SerializeField] private float spacing = 12f;    // юнитов между чёрточками
         [Tooltip("Насколько тускнеет линия к концу: 0 — не тускнеет, 1 — исчезает")]
         [SerializeField, Range(0f, 1f)] private float endFade = 0.6f;
+        [Tooltip("Зона обязательного торможения, юнитов: за столько до точки контакта линия начинает краснеть")]
+        [SerializeField, Min(1f)] private float brakeZone = 160f;
 
         [Header("Привязка")]
         [Tooltip("Отступ старта линии от центра корабля — из носа, чуть под корпусом")]
@@ -33,12 +36,18 @@ namespace SpaceTaxi.Physics
         private const float HorizonScreens = 1.2f;
 
         private static readonly Color LineSafe = new Color(0.235f, 1f, 0.557f);
+        // жёлтая база и красная тревога у точки обязательного торможения (Н4.2.4):
+        // значения — TaxiColor борткомпа и SpeedDanger HUD; свои копии, чтобы
+        // Physics не ссылался на UI
+        private static readonly Color LineWarm = new Color(1f, 0.831f, 0.302f);
+        private static readonly Color LineDanger = new Color(1f, 0.35f, 0.3f);
 
         private Ship ship;
         private ShipController controller;
         private GravityField gravity;
         private readonly List<Transform> dashes = new List<Transform>();
         private readonly List<SpriteRenderer> renderers = new List<SpriteRenderer>();
+        private float[] dashTotals; // пройденный путь до каждой чёрточки — для градиента
 
         private void Awake()
         {
@@ -47,6 +56,7 @@ namespace SpaceTaxi.Physics
             gravity = FindAnyObjectByType<GravityField>();
 
             maxDashes = Mathf.Max(4, maxDashes);
+            dashTotals = new float[maxDashes];
 
             for (int i = 0; i < maxDashes; i++)
             {
@@ -150,12 +160,13 @@ namespace SpaceTaxi.Physics
             smoothSpacing = Mathf.Lerp(smoothSpacing, targetSpacing, Mathf.Min(1f, 6f * Time.deltaTime));
             float spacingNow = smoothSpacing;
 
-            float travelled = spacingNow - 2f; 
-            float total = 0f;     
+            float travelled = spacingNow - 2f;
+            float total = 0f;
             int dashIndex = 0;
             bool contact = false;
             bool contactPlanet = false;
             float contactSpeed = 0f;
+            float contactTotal = -1f; // путь до точки обязательного торможения
 
             int steps = Mathf.CeilToInt(horizon / step);
             for (int i = 0; i < steps && !contact; i++)
@@ -173,6 +184,7 @@ namespace SpaceTaxi.Physics
                         contact = true;
                         contactPlanet = body is Planet;
                         contactSpeed = vel.magnitude;
+                        contactTotal = total;
                         break;
                     }
                 }
@@ -189,13 +201,19 @@ namespace SpaceTaxi.Physics
             for (int i = dashIndex; i < dashes.Count; i++)
                 dashes[i].gameObject.SetActive(false);
 
-            // зелёная — если касание будет мягким
-            Color lineColor = contact && contactPlanet && contactSpeed < config.LandSpeed
-                ? LineSafe
-                : dashColor;
+            // зелёная — если касание будет мягким; иначе жёлтая, краснеющая по
+            // мере приближения чёрточки к точке обязательного торможения
+            bool softLanding = contact && contactPlanet && contactSpeed < config.LandSpeed;
             for (int i = 0; i < dashIndex; i++)
             {
-                Color c = lineColor;
+                Color c = softLanding
+                    ? LineSafe
+                    : contact
+                        ? Color.Lerp(LineWarm, LineDanger,
+                            Mathf.Clamp01(1f - (contactTotal - dashTotals[i])
+                                / Mathf.Max(1f, brakeZone)))
+                        : LineWarm;
+                c.a *= dashColor.a; // прозрачность линии — из сериализованного поля
                 c.a *= fadeAlpha; // медленный корабль — прогноз бледнее, до нуля
                 c.a *= Mathf.Lerp(1f, 1f - endFade, i / (float)dashes.Count);
                 renderers[i].color = c;
@@ -204,6 +222,7 @@ namespace SpaceTaxi.Physics
 
         private void PlaceDash(int index, Vector2 pos, Vector2 vel, float total, float spacingNow)
         {
+            dashTotals[index] = total; // путь до чёрточки — цветовой градиент к контакту
             Transform t = dashes[index];
             t.gameObject.SetActive(true);
             t.SetPositionAndRotation(pos,
