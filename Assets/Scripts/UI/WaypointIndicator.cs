@@ -22,8 +22,8 @@ namespace SpaceTaxi.UI
 
         private static readonly Color Amber = new Color(1f, 0.72f, 0.25f);
         private static readonly Color AmberText = new Color(1f, 0.86f, 0.55f);
-        private static readonly Color TargetGreen = new Color(0.235f, 1f, 0.557f); // как HUD/кольцо посадки
-        private static readonly Color TargetText = new Color(0.66f, 1f, 0.8f);
+        // цель заказа — жёлтый проектного такси (Н4.2.3), текст дистанции тоже жёлтый
+        private static readonly Color TargetYellow = OnboardComputerFactory.TaxiColor;
 
         private GameSession session;
         private OrderService orders;
@@ -387,8 +387,44 @@ namespace SpaceTaxi.UI
 
             waypointArrow = MakeArrow("WaypointArrow", Amber, AmberText,
                 out waypointArrowTip, out waypointArrowDist);
-            targetArrow = MakeArrow("TargetArrow", TargetGreen, TargetText,
+            targetArrow = MakeArrow("TargetArrow", TargetYellow, AmberText,
                 out targetArrowTip, out targetArrowDist);
+        }
+
+        // Шеврон.png — чёрные пиксели на прозрачном: мультипликативная тонировка
+        // Image.color его чернит. Один раз перекрашиваем текстуру в белое с тем
+        // же альфа-каналом (isReadable включён у импортера) и кэшируем; остриё
+        // вверх, как у прежнего процедурного шеврона. Фолбэк — StubSprites.
+        private static Sprite chevronSprite;
+
+        private static Sprite ChevronSprite()
+        {
+            if (chevronSprite != null)
+                return chevronSprite;
+            var texture = Resources.Load<Texture2D>("Art/icons/Шеврон");
+            if (texture == null)
+                return null;
+            try
+            {
+                var pixels = texture.GetPixels32();
+                for (int i = 0; i < pixels.Length; i++)
+                    pixels[i] = new Color32(255, 255, 255, pixels[i].a);
+                var white = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp
+                };
+                white.SetPixels32(pixels);
+                white.Apply(true, false);
+                chevronSprite = Sprite.Create(white, new Rect(0f, 0f, white.width, white.height),
+                    new Vector2(0.5f, 0.5f), 100f);
+            }
+            catch (UnityException)
+            {
+                // текстура не читаема (импортер без isReadable) — процедурный фолбэк
+                return null;
+            }
+            return chevronSprite;
         }
 
         // без GraphicRaycaster: канвас ничего не перехватывает
@@ -408,7 +444,8 @@ namespace SpaceTaxi.UI
             tip.sizeDelta = new Vector2(56f, 56f);
             tip.anchoredPosition = new Vector2(0f, 12f);
             Image tipImage = tipGo.GetComponent<Image>();
-            tipImage.sprite = StubSprites.TargetChevron();
+            Sprite chevron = ChevronSprite(); // иконка Шеврон.png (Н4.2.3)
+            tipImage.sprite = chevron != null ? chevron : StubSprites.TargetChevron();
             tipImage.color = color;
             tipImage.raycastTarget = false;
 
