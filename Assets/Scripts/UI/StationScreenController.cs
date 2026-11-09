@@ -25,7 +25,11 @@ namespace SpaceTaxi.UI
     // вариант покраски (ShipConfig.PaintVariants) ротирует ShopStockService
     // раз в 2 игровых часа, покупка запоминает показанный вариант.
     // Улучшения (§3.4) и гашение долга (§3.2) — на хабе отдельной вкладкой, на
-    // обычной станции — внутри окна ремонта. Доступен ТОЛЬКО стоя
+    // обычной станции — внутри окна ремонта. Магазин (Н3.4): витрина крупнее —
+    // спрайт 220×160, статы таблицей из 6 строк с полосками сравнения с текущим
+    // кораблём (серая — текущий, цветная — модель: зелёная лучше, красная хуже,
+    // справа %) и бейджем «ВЫ ЗДЕСЬ»; улучшения — предпросмотр «старое → новое».
+    // Доступен ТОЛЬКО стоя
     // (State == Landed) на планете с услугами; мир не ставится на паузу (как
     // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
     // и карта (NotifyStationOpened/Closed + EscJustClosed). Контроллера в
@@ -37,6 +41,20 @@ namespace SpaceTaxi.UI
         private const int SegmentCount = 10;  // как в HUD
         // подпись счётчика аварий (§3.2: увольнение после третьей непогашенной)
         private const int MaxUnpaidAccidents = 3;
+
+        // витрина (Н3.4): карточка крупнее, статы — таблицей с полосками сравнения
+        private const float ShowcaseSpriteW = 220f;
+        private const float ShowcaseSpriteH = 160f;
+        private const int StatCount = 6;      // Thrust, StrafeAcc, MaxV, FuelMax, HpMax, Retro
+        private const int StatBrakeIndex = 5; // тормозной путь: меньше = лучше
+        // тормозной путь = K / Retro — условные «отн.» единицы: Retro 98–310 → ~200–610
+        private const float BrakeDistanceK = 60000f;
+
+        // подписи статов витрины; индексы совпадают с CompareValue
+        private static readonly string[] StatLabels =
+        {
+            "Тяга", "Манёвр", "Макс. скорость", "Бак", "Прочность", "Тормозной путь",
+        };
 
         // шаблоны описания прибавки ОДНОГО уровня: проценты считаются из
         // UpgradeConfig (максимум / 3, шкала линейная) — числа не дублируются
@@ -122,7 +140,9 @@ namespace SpaceTaxi.UI
         private Image showcaseSprite;
         private TMP_Text showcaseName;
         private TMP_Text showcasePaint;
-        private TMP_Text showcaseStats;
+        // Н3.4: таблица 6 статов с полосками сравнения с текущим кораблём
+        private ShowStatRowRefs[] showcaseStatRows;
+        private GameObject showcaseBadge; // «ВЫ ЗДЕСЬ» — витрина показывает текущую модель
         private TMP_Text showcaseStatus;
         private Button shopBuy;
         private TMP_Text shopBuyLabel;
@@ -795,7 +815,8 @@ namespace SpaceTaxi.UI
             var panelRect = (RectTransform)panel.transform;
             panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(560f, 0f); // высоту подберёт fitter
+            // Н3.4: панель шире (560 → 640) — витрине нужна таблица статов с полосками
+            panelRect.sizeDelta = new Vector2(640f, 0f); // высоту подберёт fitter
             panel.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(24, 24, 20, 18);
@@ -966,8 +987,28 @@ namespace SpaceTaxi.UI
         {
             public TMP_Text Level;
             public TMP_Text Effect;
+            // Н3.4: предпросмотр «Двигатель 140 → 161 (+15%)» + полоска-прирост
+            public TMP_Text Preview;
+            public CompareBarRefs PreviewBar;
             public Button Buy;
             public TMP_Text BuyLabel;
+        }
+
+        // полоска сравнения (Н3.4): дорожка + два fill-дочки; ширины двигает
+        // SetFill по долям значений (цветной fill перекрывает серый)
+        private sealed class CompareBarRefs
+        {
+            public RectTransform CurrentFill; // серая — текущий корабль / старое значение
+            public RectTransform ValueFill;   // цветная — модель / новый уровень
+            public Image ValueImage;
+        }
+
+        // строка таблицы статов витрины: подпись | полоска | процент отличия
+        private sealed class ShowStatRowRefs
+        {
+            public TMP_Text Label;
+            public TMP_Text Percent;
+            public CompareBarRefs Bar;
         }
 
         private void RefreshShop()
@@ -1040,6 +1081,10 @@ namespace SpaceTaxi.UI
 
                 refs.Effect = OnboardComputerFactory.Text(rowGo, "", 15f, OnboardComputerFactory.LabelColor, "Effect");
                 OnboardComputerFactory.FixedHeight(refs.Effect.gameObject, 20f);
+                // предпросмотр эффекта до покупки (Н3.4): числа даст ShipStats.Compute
+                refs.Preview = OnboardComputerFactory.Text(rowGo, "", 15f, OnboardComputerFactory.BrightColor, "Preview");
+                OnboardComputerFactory.FixedHeight(refs.Preview.gameObject, 20f);
+                refs.PreviewBar = BuildCompareBar(rowGo.transform, 8f);
                 upgradeRows[i] = refs;
             }
 
@@ -1086,11 +1131,72 @@ namespace SpaceTaxi.UI
                 bool maxed = level >= ShipStats.MaxLevel;
                 row.Level.text = $"ур. {level}/{ShipStats.MaxLevel}";
                 row.Effect.text = maxed ? "макс. уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
+                UpdateUpgradePreview(row, upgrades, (UpgradeLine)i, level, maxed);
                 // цена следующего уровня — PricesPerLevel[текущий уровень], как в TryUpgrade
                 int price = prices != null && level < prices.Length ? prices[level] : 0;
                 row.BuyLabel.text = maxed ? "МАКС." : $"КУПИТЬ ({price} КР)";
                 row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
             }
+        }
+
+        // предпросмотр «старое → новое» (Н3.4): ShipStats.Compute с текущими
+        // уровнями и со следующим по линии. Прирост чистого дохода из конфига
+        // честно не выводится (цены заказов зависят от тира/маршрута, не от
+        // улучшений) — окупаемость не выдумываем, показываем только прирост %
+        private void UpdateUpgradePreview(UpgradeRowRefs row, UpgradeConfig upgrades,
+            UpgradeLine line, int level, bool maxed)
+        {
+            if (row.Preview == null)
+                return;
+            var fleet = session.Fleet;
+            var config = fleet.Current;
+            var physics = session.Config;
+            int[] levels = new int[ShipStats.LineCount];
+            for (int i = 0; i < ShipStats.LineCount; i++)
+                levels[i] = fleet.GetLevel(config, (UpgradeLine)i);
+            var before = ShipStats.Compute(physics, config, levels, upgrades);
+            levels[(int)line] = Mathf.Min(level + 1, ShipStats.MaxLevel);
+            var after = ShipStats.Compute(physics, config, levels, upgrades);
+
+            string label;
+            float oldV, newV;
+            switch (line)
+            {
+                case UpgradeLine.Engine:
+                    label = upgrades.EngineName;
+                    oldV = before.Thrust;
+                    newV = after.Thrust;
+                    break;
+                case UpgradeLine.Tank:
+                    label = upgrades.TankName;
+                    oldV = before.FuelMax;
+                    newV = after.FuelMax;
+                    break;
+                case UpgradeLine.Hull:
+                    label = upgrades.HullName;
+                    oldV = before.HpMax;
+                    newV = after.HpMax;
+                    break;
+                default:
+                    label = upgrades.ManeuverName;
+                    oldV = before.Strafe;
+                    newV = after.Strafe;
+                    break;
+            }
+
+            if (maxed)
+            {
+                row.Preview.text = $"{label} {Mathf.RoundToInt(newV)} — макс.";
+                SetFill(row.PreviewBar.CurrentFill, 1f);
+                SetFill(row.PreviewBar.ValueFill, 1f);
+                return;
+            }
+            float pct = oldV > 0f ? (newV - oldV) / oldV * 100f : 0f;
+            row.Preview.text = $"{label} {Mathf.RoundToInt(oldV)} → {Mathf.RoundToInt(newV)} ({PercentText(pct)})";
+            // полоска-прирост: серый — старое, цветной — новое (до верха дорожки)
+            float top = Mathf.Max(newV, 0.01f);
+            SetFill(row.PreviewBar.CurrentFill, oldV / top);
+            SetFill(row.PreviewBar.ValueFill, 1f);
         }
 
         // прибавка следующего уровня: максимум из конфига / 3 — шкала линейная
@@ -1203,7 +1309,8 @@ namespace SpaceTaxi.UI
             return shipCatalog;
         }
 
-        // каркас витрины: [←] спрайт [→] над именем, статами, ценой и кнопкой
+        // каркас витрины (Н3.4): [←] спрайт [→] над именем с бейджем «ВЫ ЗДЕСЬ»,
+        // таблицей 6 статов с полосками сравнения, ценой и кнопкой
         private void BuildShowcaseBlock(Transform parent)
         {
             shopWindow = Section(parent, "// МАГАЗИН", "ShopWindow");
@@ -1217,15 +1324,61 @@ namespace SpaceTaxi.UI
                 OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
                 OnboardComputerFactory.LabelColor.b, 0.08f);
             showcaseSprite.preserveAspect = true;
-            OnboardComputerFactory.FixedSize(box, 168f, 122f);
+            // рамка как у кнопок фабрики — карточка читается как один блок
+            var frame = box.AddComponent<Outline>();
+            frame.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.35f);
+            frame.effectDistance = new Vector2(2f, -2f);
+            OnboardComputerFactory.FixedSize(box, ShowcaseSpriteW, ShowcaseSpriteH);
             BuildArrowButton(showcaseRow.transform, "→", () => FlipShowcase(1));
 
-            showcaseName = OnboardComputerFactory.Text(shopWindow, "", 22f, OnboardComputerFactory.BrightColor, "ModelName");
-            OnboardComputerFactory.FixedHeight(showcaseName.gameObject, 28f);
+            var nameRow = OnboardComputerFactory.H("NameRow", shopWindow.transform);
+            OnboardComputerFactory.FixedHeight(nameRow.gameObject, 28f);
+            showcaseName = OnboardComputerFactory.Text(nameRow, "", 22f, OnboardComputerFactory.BrightColor, "ModelName");
+            OnboardComputerFactory.Flexible(showcaseName.gameObject);
+            showcaseBadge = BuildBadge(nameRow.transform, "ВЫ ЗДЕСЬ");
+            showcaseBadge.SetActive(false);
+
             showcasePaint = OnboardComputerFactory.Text(shopWindow, "", 16f, OnboardComputerFactory.LabelColor, "PaintLine");
             OnboardComputerFactory.FixedHeight(showcasePaint.gameObject, 20f);
-            showcaseStats = OnboardComputerFactory.Text(shopWindow, "", 15f, OnboardComputerFactory.LabelColor, "StatsLine");
-            OnboardComputerFactory.FixedHeight(showcaseStats.gameObject, 20f);
+
+            // таблица статов: подпись | полоска сравнения | % отличия от текущего
+            var statsTable = new GameObject("StatsTable", typeof(RectTransform));
+            statsTable.transform.SetParent(shopWindow.transform, false);
+            var tableLayout = statsTable.AddComponent<VerticalLayoutGroup>();
+            tableLayout.spacing = 2f;
+            tableLayout.childControlWidth = true;
+            tableLayout.childControlHeight = true;
+            tableLayout.childForceExpandWidth = true;
+            tableLayout.childForceExpandHeight = false;
+
+            showcaseStatRows = new ShowStatRowRefs[StatCount];
+            for (int i = 0; i < StatCount; i++)
+            {
+                var rowGo = new GameObject("Stat_" + (i + 1), typeof(RectTransform));
+                rowGo.transform.SetParent(statsTable.transform, false);
+                var rowLayout = rowGo.AddComponent<HorizontalLayoutGroup>();
+                rowLayout.spacing = 8f;
+                rowLayout.childControlWidth = true;
+                rowLayout.childControlHeight = true;
+                rowLayout.childForceExpandWidth = true;
+                rowLayout.childForceExpandHeight = false;
+                rowLayout.childAlignment = TextAnchor.MiddleLeft;
+                var rowElement = rowGo.AddComponent<LayoutElement>();
+                rowElement.minHeight = 20f;
+                rowElement.preferredHeight = 20f;
+
+                var refs = new ShowStatRowRefs();
+                refs.Label = OnboardComputerFactory.Text(rowGo, StatLabels[i], 15f, OnboardComputerFactory.LabelColor, "Label");
+                OnboardComputerFactory.FixedWidth(refs.Label.gameObject, 132f);
+                OnboardComputerFactory.FixedHeight(refs.Label.gameObject, 20f);
+                refs.Bar = BuildCompareBar(rowGo.transform, 12f);
+                refs.Percent = OnboardComputerFactory.Text(rowGo, "0%", 15f, OnboardComputerFactory.LabelColor, "Percent");
+                OnboardComputerFactory.FixedWidth(refs.Percent.gameObject, 64f);
+                OnboardComputerFactory.FixedHeight(refs.Percent.gameObject, 20f);
+                refs.Percent.alignment = TextAlignmentOptions.Right;
+                showcaseStatRows[i] = refs;
+            }
+
             showcaseStatus = OnboardComputerFactory.Text(shopWindow, "", 19f, OnboardComputerFactory.TaxiColor, "PriceLine");
             OnboardComputerFactory.FixedHeight(showcaseStatus.gameObject, 24f);
             shopBuy = BuildServiceButton(shopWindow.transform, "ShopBuyButton", ConfirmShopAction, out shopBuyLabel);
@@ -1234,6 +1387,81 @@ namespace SpaceTaxi.UI
 
             Catalog(); // сортировка по цене — до первой отрисовки
             RefreshShowcase();
+        }
+
+        // бейдж «ВЫ ЗДЕСЬ»: рамка в стиле кнопок фабрики, янтарный — цвет такси
+        private static GameObject BuildBadge(Transform parent, string label)
+        {
+            var go = new GameObject("HereBadge", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var taxi = OnboardComputerFactory.TaxiColor;
+            go.GetComponent<Image>().color = new Color(taxi.r, taxi.g, taxi.b, 0.22f);
+            var outline = go.AddComponent<Outline>();
+            outline.effectColor = new Color(taxi.r, taxi.g, taxi.b, 0.6f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            var text = OnboardComputerFactory.Text(go, label, 15f, taxi, "BadgeText");
+            OnboardComputerFactory.Stretch(text.rectTransform);
+            text.alignment = TextAlignmentOptions.Center;
+            OnboardComputerFactory.FixedSize(go, 104f, 24f);
+            return go;
+        }
+
+        // полоска сравнения: дорожка + серый fill (текущее/старое) + цветной
+        // fill (модель/новое); ширины ставит SetFill по долям значений
+        private static CompareBarRefs BuildCompareBar(Transform parent, float height)
+        {
+            var bar = new GameObject("Bar", typeof(RectTransform));
+            bar.transform.SetParent(parent, false);
+            var element = bar.AddComponent<LayoutElement>();
+            element.flexibleWidth = 1f;
+            element.minHeight = height;
+            element.preferredHeight = height;
+
+            var dim = OnboardComputerFactory.LabelColor;
+            var refs = new CompareBarRefs();
+
+            var track = new GameObject("Track", typeof(RectTransform), typeof(Image));
+            track.transform.SetParent(bar.transform, false);
+            OnboardComputerFactory.Stretch((RectTransform)track.transform);
+            var trackImage = track.GetComponent<Image>();
+            trackImage.color = new Color(dim.r, dim.g, dim.b, 0.1f);
+            trackImage.raycastTarget = false;
+
+            refs.CurrentFill = BuildBarFill(track.transform, new Color(dim.r, dim.g, dim.b, 0.45f), "CurrentFill");
+            refs.ValueFill = BuildBarFill(track.transform, OnboardComputerFactory.BrightColor, "ValueFill");
+            refs.ValueImage = refs.ValueFill.GetComponent<Image>();
+            return refs;
+        }
+
+        // fill-дочка: левый край закреплён, правый двигает SetFill (доля 0..1)
+        private static RectTransform BuildBarFill(Transform parent, Color color, string name)
+        {
+            var fill = new GameObject(name, typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(parent, false);
+            var rect = (RectTransform)fill.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var image = fill.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return rect;
+        }
+
+        // ширина fill-полоски по доле значения от максимума
+        private static void SetFill(RectTransform fill, float fraction)
+        {
+            fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
+        }
+
+        // «+18%» / «−7%» / «0%» — минус типографский, как в подписях эффектов
+        private static string PercentText(float pct)
+        {
+            int rounded = Mathf.RoundToInt(pct);
+            if (rounded == 0)
+                return "0%";
+            return (rounded > 0 ? "+" : "−") + Mathf.Abs(rounded) + "%";
         }
 
         // стрелка листания витрины [←]/[→]
@@ -1246,8 +1474,8 @@ namespace SpaceTaxi.UI
             var le = go.AddComponent<LayoutElement>();
             le.minWidth = 48f;
             le.preferredWidth = 48f;
-            le.minHeight = 122f;
-            le.preferredHeight = 122f;
+            le.minHeight = ShowcaseSpriteH;
+            le.preferredHeight = ShowcaseSpriteH;
             go.GetComponent<Button>().onClick.AddListener(onClick);
         }
 
@@ -1287,7 +1515,9 @@ namespace SpaceTaxi.UI
 
             bool rental = config.IsRental;
             showcaseName.text = config.DisplayName + " · Т" + config.Tier;
-            showcaseStats.text = ShipStatsLine(config);
+            if (showcaseBadge != null)
+                showcaseBadge.SetActive(current);
+            UpdateShowcaseStats(config);
             int variants = config.PaintVariantCount;
             showcasePaint.text = variants == 0 ? "Расцветка: заводская"
                 : paintIndex == 0
@@ -1308,14 +1538,71 @@ namespace SpaceTaxi.UI
                 : "НЕТ В ПРОДАЖЕ";
         }
 
-        // «Макс» — потолок скорости MaxV (тяга/манёвр/бак/HP — из ShipConfig)
-        private static string ShipStatsLine(ShipConfig config)
+        // сравниваемая величина стата (Н3.4): индексы 0..4 — «больше = лучше»,
+        // 5 — тормозной путь K/Retro («меньше = лучше», ед. не указываем —
+        // «отн.»). Retro=0 — глобальный фолбэк из PhysicsConfig, как в полёте
+        private float CompareValue(ShipConfig config, int index)
         {
-            return "Тяга " + Mathf.RoundToInt(config.Thrust)
-                + " · Манёвр " + Mathf.RoundToInt(config.StrafeAcc)
-                + " · Бак " + Mathf.RoundToInt(config.FuelMax)
-                + " · HP " + Mathf.RoundToInt(config.HpMax)
-                + " · Макс " + Mathf.RoundToInt(config.MaxV);
+            switch (index)
+            {
+                case 0: return config.Thrust;
+                case 1: return config.StrafeAcc;
+                case 2: return config.MaxV;
+                case 3: return config.FuelMax;
+                case 4: return config.HpMax;
+                default: return BrakeDistanceK / RetroOf(config);
+            }
+        }
+
+        // модельное торможение или глобальное (ShipStats.Compute использует 80
+        // как последний фолбэк — то же число здесь); 0 не отдаём — в знаменателе
+        private float RetroOf(ShipConfig config)
+        {
+            if (config != null && config.Retro > 0f)
+                return config.Retro;
+            float global = session != null && session.Config != null ? session.Config.Retro : 80f;
+            return global > 0f ? global : 80f;
+        }
+
+        // таблица статов с полосками сравнения (Н3.4): серая полоса — текущий
+        // корабль, цветная — модель на витрине (зелёная — лучше, красная —
+        // хуже), справа % отличия. Ширина = значение / максимум по каталогу
+        // и текущему кораблю, чтобы полоски всех моделей были сопоставимы
+        private void UpdateShowcaseStats(ShipConfig config)
+        {
+            if (showcaseStatRows == null || config == null)
+                return;
+            ShipConfig[] catalog = Catalog();
+            ShipConfig baseline = session.Fleet.Current;
+            for (int i = 0; i < showcaseStatRows.Length; i++)
+            {
+                float value = CompareValue(config, i);
+                float current = baseline != null ? CompareValue(baseline, i) : 0f;
+                float max = current;
+                for (int c = 0; c < catalog.Length; c++)
+                {
+                    if (catalog[c] == null)
+                        continue;
+                    max = Mathf.Max(max, CompareValue(catalog[c], i));
+                }
+
+                var row = showcaseStatRows[i];
+                SetFill(row.Bar.CurrentFill, max > 0f ? current / max : 0f);
+                SetFill(row.Bar.ValueFill, max > 0f ? value / max : 0f);
+
+                float diff = value - current;
+                // тормозной путь — обратная величина: короче = лучше
+                bool better = i == StatBrakeIndex ? diff < 0f : diff > 0f;
+                bool worse = i == StatBrakeIndex ? diff > 0f : diff < 0f;
+                Color color = better ? OnboardComputerFactory.BrightColor
+                    : worse ? OnboardComputerFactory.DangerColor
+                    : OnboardComputerFactory.LabelColor;
+                row.Bar.ValueImage.color = color;
+
+                float pct = current > 0f ? diff / current * 100f : 0f;
+                row.Percent.text = PercentText(pct);
+                row.Percent.color = color;
+            }
         }
 
         // «Яйцо» из фолбэка (инстанс в памяти) и ассет egg_rental — одна модель:
