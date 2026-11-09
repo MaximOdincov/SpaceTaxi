@@ -131,12 +131,14 @@ namespace SpaceTaxi.Physics
             {
                 modelVisual.Apply(shipConfig, PaintIndex);
                 // корпус другой — габарит другой: на стоянке переставить на
-                // поверхность, иначе новый корпус «заползает» в планету
+                // поверхность в позу покоя капсулы (ShipPlacement), иначе новый
+                // корпус «заползает» в планету
                 if (State == ShipState.Landed && LandedOn != null)
                 {
                     Vector2 dir = ((Vector2)transform.position - (Vector2)LandedOn.transform.position).normalized;
-                    transform.position = (Vector2)LandedOn.transform.position
-                        + dir * (LandedOn.Radius + modelVisual.HalfExtent);
+                    Vector2 pos = (Vector2)LandedOn.transform.position
+                        + dir * (LandedOn.Radius + ShipPlacement.LandedExtent(modelVisual));
+                    ShipPlacement.TeleportLanded(this, pos, transform.eulerAngles.z);
                 }
                 return;
             }

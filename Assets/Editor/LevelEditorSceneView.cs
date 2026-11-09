@@ -238,7 +238,9 @@ namespace SpaceTaxi.Tools
             var start = level.Bodies[level.StartPlanetIndex];
             float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-            Vector2 pos = start.Position + dir * (start.Radius + 7f);
+            // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init)
+            Vector2 pos = start.Position
+                + dir * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
 
             Handles.color = SpawnColor;
             Vector3 p = pos;
@@ -402,7 +404,9 @@ namespace SpaceTaxi.Tools
             var start = level.Bodies[level.StartPlanetIndex];
             float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-            Vector2 pos = start.Position + dir * (start.Radius + 7f);
+            // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init)
+            Vector2 pos = start.Position
+                + dir * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
             Vector2 vel = dir * takeoffV;
 
             const float h = 1f / 60f;

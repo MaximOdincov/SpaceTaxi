@@ -15,9 +15,6 @@ namespace SpaceTaxi.Physics
         private HullSystem hull;
         private ShipModelVisual modelVisual;
 
-        // снап без визуала модели (HalfExtent ShipModelVisual возвращает то же)
-        private const float DefaultHalfExtent = 7f;
-
         // лениво: HullSystem и ShipModelVisual добавляются позже Awake (WorldBuilder)
         private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
         private ShipModelVisual Visual => modelVisual != null
@@ -116,14 +113,15 @@ namespace SpaceTaxi.Physics
                 : (Vector2)(transform.position - planet.transform.position).normalized;
 
             // снап на поверхность, скорость в ноль, нос от центра; отступ —
-            // половина высоты контента визуала: корма касается, а не канва спрайта
-            float extent = Visual != null ? Visual.HalfExtent : DefaultHalfExtent;
+            // половина высоты капсулы (ShipPlacement): корабль сразу в позе
+            // покоя, солвер не дорешивает; телепорт и тела, и transform —
+            // интерполяция иначе отдаёт кадр «пробитой» позы
+            float extent = ShipPlacement.LandedExtent(Visual);
             Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + extent);
-            transform.position = pos;
-            ship.Body.linearVelocity = Vector2.zero;
             float nose = GetComponent<ShipController>() != null ? GetComponent<ShipController>().SpriteNoseAngle : 0f;
             float angle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle - nose);
+            ShipPlacement.TeleportLanded(ship, pos, angle - nose);
+            ship.Body.linearVelocity = Vector2.zero;
 
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;

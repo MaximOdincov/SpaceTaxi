@@ -536,14 +536,15 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // как в игре: r + 7
+        // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init) + 7
         public static Vector2 SpawnPointOf(LevelAsset lvl)
         {
             if (lvl.StartPlanetIndex < 0 || lvl.StartPlanetIndex >= lvl.Bodies.Count)
                 return Vector2.zero;
             var start = lvl.Bodies[lvl.StartPlanetIndex];
             float rad = lvl.SpawnAngleDeg * Mathf.Deg2Rad;
-            return start.Position + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (start.Radius + 7f);
+            return start.Position
+                + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
         }
     }
 }

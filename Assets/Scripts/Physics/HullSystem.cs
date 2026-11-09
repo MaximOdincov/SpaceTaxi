@@ -15,9 +15,6 @@ namespace SpaceTaxi.Physics
         private Vector3 initialScale = Vector3.one; // респавн откатывает сжатие дырой
         private ShipModelVisual modelVisual;
 
-        // снап респавна без визуала модели (HalfExtent ShipModelVisual возвращает то же)
-        private const float DefaultHalfExtent = 7f;
-
         // лениво с кэшем: ShipModelVisual добавляется позже Awake (WorldBuilder)
         private ShipModelVisual Visual => modelVisual != null
             ? modelVisual
@@ -142,23 +139,29 @@ namespace SpaceTaxi.Physics
         {
             yield return new WaitForSeconds(delay);
 
+            // планету ищем до телепорта: она же пойдёт в LandedOn
+            Planet respawnPlanet = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
+
             if (level != null && level.StartPlanetIndex >= 0 && level.StartPlanetIndex < level.Bodies.Count)
             {
                 CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
                 float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
                 Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-                // тот же отступ, что у посадки: корма на поверхности, а не канва спрайта
-                float extent = Visual != null ? Visual.HalfExtent : DefaultHalfExtent;
-                transform.position = start.Position + dir * (start.Radius + extent);
+                // радиус живой планеты, а не сырых данных: облик планеты умножен
+                // на PlanetSizeMul (CelestialBody.Init), респавн от start.Radius
+                // оставлял корпус хвостом в планете; отступ — как у посадки (ShipPlacement)
+                Vector2 center = respawnPlanet != null ? (Vector2)respawnPlanet.transform.position : start.Position;
+                float radius = respawnPlanet != null ? respawnPlanet.Radius : start.Radius;
+                Vector2 pos = center + dir * (radius + ShipPlacement.LandedExtent(Visual));
                 float nose = GetComponent<ShipController>() != null ? GetComponent<ShipController>().SpriteNoseAngle : 0f;
-                transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
+                ShipPlacement.TeleportLanded(ship, pos, level.SpawnAngleDeg - nose);
             }
 
             ship.Body.linearVelocity = Vector2.zero;
             ship.Hp = ship.Eff.HpMax;
             ship.Fuel = ship.Eff.FuelMax;
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
-            ship.LandedOn = FindAnyObjectByType<GravityField>() != null ? LandedPlanet() : null;
+            ship.LandedOn = respawnPlanet;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();
             Respawned?.Invoke();

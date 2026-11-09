@@ -14,8 +14,9 @@ namespace SpaceTaxi.Physics
         // длина модели без ShipConfig (как заглушка ShipTriangle 192px = 14)
         private const float FallbackLength = 35f;
         // капсула по габаритам корпуса (высота ~0.96 длины, ширина по контенту):
-        // круг-коллайдер давал контакт «в воздухе» у носа и утопание хвоста в планете
-        private const float CapsuleHeightFraction = 0.96f;
+        // круг-коллайдер давал контакт «в воздухе» у носа и утопание хвоста в планете;
+        // публично — посадочный отступ ShipPlacement считается от неё же
+        public const float CapsuleHeightFraction = 0.96f;
         private const float CapsuleWidthFraction = 0.9f;
         // половина высоты контента без визуала — прежний снап посадки/спавна
         private const float FallbackHalfExtent = 17.5f;

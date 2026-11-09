@@ -19,10 +19,6 @@ namespace SpaceTaxi.Core
     {
         private const string FileName = "space_taxi_save.json";
 
-        // смещение корабля над поверхностью — ShipOffset WorldBuilder /
-        // магическая семёрка LandingSystem.RespawnAfter
-        private const float ShipOffset = 7f;
-
         // флаг «продолжить»: ставится ContinueGame перед загрузкой сцены,
         // снимается при чтении; новая игра флаг не ставит и сейв игнорирует
         private static bool continuePending;
@@ -384,9 +380,12 @@ namespace SpaceTaxi.Core
                 Vector2 planetPos = planet.transform.position;
                 Vector2 dir = save.Position - planetPos;
                 dir = dir.sqrMagnitude > 0.001f ? dir.normalized : Vector2.up;
-                ship.transform.position = planetPos + dir * (planet.Radius + ShipOffset);
                 float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-                ship.transform.rotation = Quaternion.Euler(0f, 0f, angle - NoseAngle(ship));
+                // посадочная поза как в игре (ShipPlacement): отступ от капсулы,
+                // а не константа — крупный корпус при загрузке не уходит
+                // хвостом в планету; телепорт и тела, и transform
+                float extent = ShipPlacement.LandedExtent(ship.GetComponent<ShipModelVisual>());
+                ShipPlacement.TeleportLanded(ship, planetPos + dir * (planet.Radius + extent), angle - NoseAngle(ship));
                 if (ship.Body != null)
                     ship.Body.linearVelocity = Vector2.zero;
                 ship.LandedOn = planet;

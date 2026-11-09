@@ -232,11 +232,21 @@ namespace SpaceTaxi.World
 
             float angleRad = level.SpawnAngleDeg * Mathf.Deg2Rad;
             Vector2 dir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
+            // радиус построенного тела, а не сырых данных уровня: облик планеты
+            // умножен на PlanetSizeMul (CelestialBody.Init), спавн от start.Radius
+            // оставлял крупный корпус хвостом в планете, солвер выталкивал;
+            // фолбэк — сырой радиус, если тела нет (пояс-заглушка)
+            CelestialBody startBody = level.StartPlanetIndex >= 0 && level.StartPlanetIndex < bodies.Count
+                ? bodies[level.StartPlanetIndex]
+                : null;
+            float startRadius = startBody != null ? startBody.Radius : start.Radius;
             // корма на поверхности планеты; ShipOffset — фолбэк без визуала
-            float spawnOffset = modelVisual.HasVisual ? modelVisual.HalfExtent : ShipOffset;
-            go.transform.position = start.Position + dir * (start.Radius + spawnOffset);
+            float spawnOffset = modelVisual.HasVisual ? ShipPlacement.LandedExtent(modelVisual) : ShipOffset;
             float nose = controller != null ? controller.SpriteNoseAngle : 0f;
-            go.transform.rotation = Quaternion.Euler(0f, 0f, level.SpawnAngleDeg - nose);
+            // Body ещё null (Init ниже) — телепорт деградирует до записи
+            // transform: корабль неактивен, истории интерполяции нет
+            ShipPlacement.TeleportLanded(ship, start.Position + dir * (startRadius + spawnOffset),
+                level.SpawnAngleDeg - nose);
 
             ship.Init(config, shipConfig);
             ship.State = ShipState.Landed;
