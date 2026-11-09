@@ -118,7 +118,11 @@ namespace SpaceTaxi.UI
             gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(0f, 1f);
             gaugeRect.pivot = new Vector2(0.5f, 0.5f);
             gaugeRect.sizeDelta = new Vector2(GaugeSize, GaugeSize);
-            gaugeRect.anchoredPosition = GaugeCenter();
+            // центр считается ОДИН раз до перепарентчивания SpeedValue внутрь
+            // шкалы: GaugeCenter() читает узлы в координатах родителя HUD, а
+            // повторный вызов после SetParent дал бы смешение пространств
+            Vector2 gaugeCenter = GaugeCenter();
+            gaugeRect.anchoredPosition = gaugeCenter;
 
             // стрелка — нижний слой: хаб в центре шкалы, вращается вокруг него
             var needleGo = new GameObject("Needle", typeof(RectTransform), typeof(Image));
@@ -168,20 +172,24 @@ namespace SpaceTaxi.UI
             if (speedIcon != null)
                 speedIcon.gameObject.SetActive(false);
 
-            ShiftHullRow(GaugeHullTop());
+            ShiftHullRow(GaugeHullTop(gaugeCenter));
         }
 
         // центр спидометра: х шкалы — по левому краю строки топлива (пивот 0),
         // иначе шкала вылезает за экран; у — под низомFuelIcon (он ниже FuelTrack,
         // дуга не должна его задевать). Всё в координатах родителя (точечные
-        // якоря), углы — от его верха-лева
+        // якоря), углы — от его верха-лева. Вызывать ДО перепарентчивания
+        // SpeedValue внутрь шкалы (poseSource не использует SpeedValue — после
+        // SetParent его координаты были бы локальными координатами шкалы)
         private Vector2 GaugeCenter()
         {
             var track = transform.Find("FuelTrack");
             var fuelIcon = transform.Find("FuelIcon");
             var speedIcon = transform.Find("SpeedIcon");
-            Transform poseSource = speedIcon != null ? speedIcon : speedValue.transform;
-            Vector2 center = RectCenter((RectTransform)poseSource.transform);
+            var poseSource = speedIcon != null ? speedIcon : fuelIcon != null ? fuelIcon : track;
+            Vector2 center = poseSource != null
+                ? RectCenter((RectTransform)poseSource.transform)
+                : new Vector2(16f + GaugeSize * 0.5f, -32f - 55f); // сцена без строк — левый край под шапкой
             float dialHalf = GaugeSize * 0.5f;
             if (track != null)
                 center.x = ((RectTransform)track).anchoredPosition.x; // пивот x=0 → левый край
@@ -196,14 +204,14 @@ namespace SpaceTaxi.UI
         }
 
         // верх строки корпуса, чтобы не задевать висящую вниз стрелку покоя
-        private float GaugeHullTop()
+        private float GaugeHullTop(Vector2 gaugeCenter)
         {
             var hullIcon = transform.Find("HullIcon");
             if (hullIcon == null)
                 return float.MinValue; // двигать нечего
             var hullRect = (RectTransform)hullIcon;
             float needleLen = (NeedleSpritePx.x - NeedleHubPx.x) * NeedleScale;
-            return GaugeCenter().y - needleLen - GaugeHullGap;
+            return gaugeCenter.y - needleLen - GaugeHullGap;
         }
 
         // сдвиг строки корпуса (иконка + значение) вниз под спидометр

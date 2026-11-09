@@ -68,7 +68,10 @@ namespace SpaceTaxi.World
         }
 
         // конфиг цен (Н4.5): нужна билдеру ради шанса пустой сети — та же цепочка,
-        // что у OrderService.Pricing (Resources → кодовый дефолт); поля сцены нет
+        // что у OrderService.Pricing (Resources → кодовый дефолт); поля сцены нет.
+        // ИНВАРИАНТ: сериализованное pricingConfig-поле OrderService в сцене
+        // НЕ назначать — иначе мир (сухие сети) и заказы разойдутся по конфигам;
+        // билдер сознательно не видит поле сцены
         private static PricingConfig Pricing()
         {
             var fromResources = Resources.Load<PricingConfig>("PricingConfig_Default");
