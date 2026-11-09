@@ -20,15 +20,19 @@ namespace SpaceTaxi.UI
     {
         [SerializeField] private TMP_FontAsset mapFont; // назначает тул Space Taxi/Fonts/Create TMP Asset
 
-        // — вид: базовый масштаб подбирается по фактическим телам уровня —
-        private const float MinViewZoom = 0.5f;
-        private const float MaxViewZoom = 3f;
-        private const float ClickZoom = 1.8f;    // клик по объекту поднимает вид до этого зума
+        // — вид: базовый масштаб = весь мир (bbox тел + поля вписан в лист), дальше колесо —
+        private const float MinViewZoom = 1f;     // зум-min по контенту: из базового вида не отдаляемся
+        private const float MaxViewZoom = 8f;     // от «весь мир» до «одна планета»
+        private const float ClickZoom = 4.5f;     // клик по объекту поднимает вид до этого зума
         private const float ZoomDuration = 0.25f;
         private const float WheelStep = 1.15f;
         private const float ClickDragGuard = 6f; // сдвиг больше этого — пан, а не выбор объекта
         private const float RubberMargin = 1.15f; // мягкий вынос листа за край при перетаскивании
-        private const float MinNeighborPx = 50f;  // целевой зазор между ближайшими телами в базовом виде
+        private const float FitMargin = 1.10f;   // поля 10%: bbox тел занимает 90% листа
+        private const float LabelFontSize = 12f; // мелкий кегль подписей тел
+        private const float LabelHoverFont = 15f;
+        private const float RouteDashPeriod = 15f; // шаг пунктира маршрута, экранных px
+        private const int RouteDashMax = 80;
 
         // — waypoint для Н-8: метка игрока на объекте, свойство + событие —
         public CelestialBodyData Waypoint { get; private set; }
@@ -95,11 +99,34 @@ namespace SpaceTaxi.UI
         private RectTransform playerArrowRoot; // вращается по курсу; обёртка с подписью не крутится
         private RectTransform targetRing;
         private Image targetRingImage;
-        private TMP_Text targetNameLabel;
-        private TMP_Text targetTagLabel;
+        private RectTransform targetChevron;
+        private TMP_Text targetLabel; // «ЦЕЛЬ: <имя>» — видна с первого взгляда
         private RectTransform waypointPin;
         private int targetIndex = -1;
+        private CelestialBodyData lastTargetBody; // чья подпись спрятана под «ЦЕЛЬ: …»
         private float playerHeading;
+
+        // маршрут активного заказа: лёгкая пунктирная дуга корабль → пассажир/цель
+        private RectTransform routeRoot;
+        private readonly List<RectTransform> routeDashes = new List<RectTransform>();
+        private readonly Vector2[] routePts = new Vector2[33];
+        private readonly float[] routeCum = new float[33]; // накопленная длина ломаной
+        private bool routeShown;
+
+        // hover по телу: тонкие круги радиусов посадки/захвата + имя крупнее
+        private RectTransform hoverCaptureRing;
+        private RectTransform hoverLandingRing;
+        private readonly Dictionary<CelestialBodyData, TMP_Text> bodyLabels = new Dictionary<CelestialBodyData, TMP_Text>();
+
+        // подписи тел: раскладка без наложений на соседей
+        private sealed class MapLabel
+        {
+            public RectTransform Rect;
+            public float Width;   // оценка ширины текста, px листа
+            public Vector2 Below; // позиция под кругом
+            public float AboveY;  // y позиции над кругом
+        }
+        private readonly List<MapLabel> mapLabels = new List<MapLabel>();
 
         // живые кометы (по ActiveComets CometSystem — как точки миникарты)
         private CometSystem cometSystem;
@@ -227,6 +254,7 @@ namespace SpaceTaxi.UI
             HandleWheel();
             UpdatePlayerMarker();
             UpdateTargetRing();
+            UpdateRoute();
             UpdateComets();
             UpdateNoteDistance();
         }
@@ -239,6 +267,10 @@ namespace SpaceTaxi.UI
                 noteRoot.SetActive(false);
             dragging = false;
             suppressClick = false;
+            if (hoverCaptureRing != null)
+                hoverCaptureRing.gameObject.SetActive(false);
+            if (hoverLandingRing != null)
+                hoverLandingRing.gameObject.SetActive(false);
             if (content != null)
                 ApplyZoom(1f, Vector2.zero);
             zoomAnim = false;
@@ -285,29 +317,33 @@ namespace SpaceTaxi.UI
             // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin);
             // тела не должны вылезать, но подстрахуемся
             mapRadius = level.WorldRadius;
-            float bodyExtent = 0f;
+            float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
             foreach (CelestialBodyData body in level.Bodies)
             {
                 float edge = body.Position.magnitude + body.Radius;
                 if (edge > mapRadius)
                     mapRadius = edge + 100f;
-                if (edge > bodyExtent)
-                    bodyExtent = edge;
+                extX = Mathf.Max(extX, Mathf.Abs(body.Position.x) + body.Radius);
+                extY = Mathf.Max(extY, Mathf.Abs(body.Position.y) + body.Radius);
             }
-            if (bodyExtent <= 0f)
-                bodyExtent = mapRadius;
+            if (level.CometAreaRadius > 0f) // зона комет — тоже часть содержимого
+            {
+                extX = Mathf.Max(extX, Mathf.Abs(level.CometAreaCenter.x) + level.CometAreaRadius);
+                extY = Mathf.Max(extY, Mathf.Abs(level.CometAreaCenter.y) + level.CometAreaRadius);
+            }
+            if (extX <= 1f)
+                extX = mapRadius;
+            if (extY <= 1f)
+                extY = mapRadius;
             worldCenter = Vector2.zero;
 
-            // базовый масштаб: вмещаем тела уровня, но не даём соседям слиться.
-            // BetaMap01: минимальный зазор ~276 юн → 50/276 ≈ 0.18 — соседи ≥ ~57 px
-            // между центрами, карта заметно больше вьюпорта (пан обязателен)
-            float fitScale = Mathf.Min(mapRect.rect.width, mapRect.rect.height) / (2f * bodyExtent * 1.06f);
-            float minGap = MinNeighborGap();
-            scale = fitScale;
-            if (minGap > 1f)
-                scale = Mathf.Max(scale, MinNeighborPx / minGap);
-            scale = Mathf.Min(scale, fitScale * 4f); // защита от вырожденно близких тел
+            // «весь мир на экране»: bbox тел уровня + поля 10% вписывается в лист целиком,
+            // без раздувания под минимальные зазоры — детализация дальше колесом
+            float w = content.rect.width, h = content.rect.height;
+            scale = Mathf.Min(w / (2f * extX * FitMargin), h / (2f * extY * FitMargin));
+            scale = Mathf.Max(scale, 0.012f); // защита от вырожденно огромных уровней
 
+            BuildRouteLine();
             BuildSectors();
             BuildCometZone();
             BuildOrbits();
@@ -318,6 +354,7 @@ namespace SpaceTaxi.UI
             for (int i = 0; i < level.Bodies.Count; i++)
                 if (level.Bodies[i].Type != BodyType.AsteroidBelt)
                     CreateBody(level.Bodies[i], i);
+            ResolveLabels();
 
             Sprite pinSprite = PaperMapArt.Icon(8) ?? PaperMapArt.Stamp(3);
             waypointPin = MakeImage("WaypointPin", content,
@@ -325,18 +362,26 @@ namespace SpaceTaxi.UI
                 pinSprite != null ? Color.white : PaperMapArt.Rust, new Vector2(26f, 26f), false);
             waypointPin.gameObject.SetActive(false);
 
-            // цель заказа: пульсирующее кольцо + имя планеты + пометка «ЦЕЛЬ»
+            // hover-круги радиусов посадки/захвата — тонкий пунктир поверх тел
+            hoverCaptureRing = MakeImage("HoverCapture", content, PaperMapArt.OrbitRing(),
+                new Color(PaperMapArt.Ink.r, PaperMapArt.Ink.g, PaperMapArt.Ink.b, 0.40f), Vector2.zero, false);
+            hoverCaptureRing.gameObject.SetActive(false);
+            hoverLandingRing = MakeImage("HoverLanding", content, PaperMapArt.OrbitRing(),
+                new Color(PaperMapArt.Rust.r, PaperMapArt.Rust.g, PaperMapArt.Rust.b, 0.55f), Vector2.zero, false);
+            hoverLandingRing.gameObject.SetActive(false);
+
+            // цель заказа: пульсирующее кольцо + Chevron в центре + подпись «ЦЕЛЬ: <имя>»
             targetRing = MakeRect("TargetRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             RectTransform ringImage = MakeImage("Ring", targetRing, PaperMapArt.TargetRing(),
                 new Color(PaperMapArt.Rust.r, PaperMapArt.Rust.g, PaperMapArt.Rust.b, 0.9f),
                 Vector2.one * 46f, false);
             targetRingImage = ringImage.GetComponent<Image>();
-            targetNameLabel = MakeLabel("TargetName", targetRing, "", 15f, PaperMapArt.Ink);
-            ((RectTransform)targetNameLabel.transform).sizeDelta = new Vector2(200f, 20f);
-            targetNameLabel.fontStyle = FontStyles.Bold;
-            targetTagLabel = MakeLabel("TargetTag", targetRing, "ЦЕЛЬ", 14f, PaperMapArt.Rust);
-            ((RectTransform)targetTagLabel.transform).sizeDelta = new Vector2(160f, 18f);
-            targetTagLabel.fontStyle = FontStyles.Bold;
+            Sprite chevArt = PaperMapArt.Icon(7); // ячейка «цель» коллажа, иначе карандашный шеврон
+            targetChevron = MakeImage("Chevron", targetRing, chevArt != null ? chevArt : StubSprites.TargetChevron(),
+                chevArt != null ? Color.white : PaperMapArt.Rust, Vector2.one * 18f, false);
+            targetLabel = MakeLabel("TargetLabel", targetRing, "", 14f, PaperMapArt.Rust);
+            ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(260f, 20f);
+            targetLabel.fontStyle = FontStyles.Bold;
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
 
@@ -374,25 +419,6 @@ namespace SpaceTaxi.UI
             RefreshWaypointPin();
         }
 
-        // минимальный зазор между телами (без поясов и комет) — по фактическим позициям уровня
-        private float MinNeighborGap()
-        {
-            var solid = new List<CelestialBodyData>();
-            foreach (CelestialBodyData body in level.Bodies)
-                if (body.Type != BodyType.AsteroidBelt && body.Type != BodyType.Comet)
-                    solid.Add(body);
-            float gap = float.MaxValue;
-            for (int i = 0; i < solid.Count; i++)
-                for (int j = i + 1; j < solid.Count; j++)
-                {
-                    float d = Vector2.Distance(solid[i].Position, solid[j].Position)
-                              - solid[i].Radius - solid[j].Radius;
-                    if (d > 0f && d < gap)
-                        gap = d;
-                }
-            return gap;
-        }
-
         // районы: тёплая клякса (спрайт-болванка × масштаб) + рукописная подпись
         private void BuildSectors()
         {
@@ -418,13 +444,13 @@ namespace SpaceTaxi.UI
                     radiusWorld = Mathf.Max(radiusWorld, Vector2.Distance(center, body.Position) + 200f);
 
                 Vector3 sc = sectorColors[(int)pair.Key % sectorColors.Length];
-                var tint = new Color(sc.x, sc.y, sc.z, 0.06f);
+                var tint = new Color(sc.x, sc.y, sc.z, 0.04f); // сетка районов приглушена — не спорит с телами
                 RectTransform blob = MakeImage("Sector_" + pair.Key, content, StubSprites.Circle(64f),
                     tint, Vector2.one * radiusWorld * 2f * scale, false);
                 blob.anchoredPosition = WorldToMap(center);
 
-                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, content, SectorName(pair.Key), 20f,
-                    new Color(sc.x, sc.y, sc.z, 0.45f));
+                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, content, SectorName(pair.Key), 18f,
+                    new Color(sc.x, sc.y, sc.z, 0.30f));
                 ((RectTransform)label.transform).sizeDelta = new Vector2(240f, 26f);
                 ((RectTransform)label.transform).anchoredPosition = WorldToMap(center) + Vector2.up * (radiusWorld * scale * 0.4f);
             }
@@ -527,6 +553,13 @@ namespace SpaceTaxi.UI
                 Vector2.one * netDiameter, false);
             ring.anchoredPosition = Vector2.zero;
 
+            // рамка карты-листа: сплошной карандашный обвод по границе мира,
+            // чуть снаружи пунктирной сети и надписей «ПОТЕРЯ СВЯЗИ»
+            RectTransform frame = MakeImage("SheetFrame", content, PaperMapArt.TargetRing(),
+                new Color(PaperMapArt.Ink.r, PaperMapArt.Ink.g, PaperMapArt.Ink.b, 0.45f),
+                Vector2.one * netDiameter * 1.06f, false);
+            frame.anchoredPosition = Vector2.zero;
+
             // буи: 12 по кругу; иконка арта или карандашная точка, чуть повёрнутая рукой
             Sprite buoySprite = PaperMapArt.Icon(5);
             for (int i = 0; i < 12; i++)
@@ -576,6 +609,15 @@ namespace SpaceTaxi.UI
                     Vector2.one * size * 1.9f, false);
                 halo.anchoredPosition = Vector2.zero;
             }
+            else if (!hole && body.Type != BodyType.Comet)
+            {
+                // планета: бледная заливка тоном сектора — читается на бумаге издали
+                Color fill = Color.Lerp(PaperMapArt.Paper, PencilColor(body, star, hole), 0.40f);
+                fill.a = 0.50f;
+                RectTransform disc = MakeImage("Fill", group, StubSprites.SoftDot(64f, 1f), fill,
+                    Vector2.one * (size * 0.84f), false);
+                disc.anchoredPosition = Vector2.zero;
+            }
 
             Sprite artSprite = PaperMapArt.Icon(hole ? 2 : star ? 1 : 0);
             Sprite iconSprite = artSprite;
@@ -607,18 +649,6 @@ namespace SpaceTaxi.UI
                 edge.anchoredPosition = Vector2.zero;
             }
 
-            // услуги Н-3: без арта — буквы в кружке (З заправка / М мастерская / Х хаб)
-            int badge = 0;
-            if (body.IsHub)
-                CreateBadge(group, "Х", 17f, new Vector2(size * 0.5f + 14f, size * 0.22f), PaperMapArt.Rust);
-            else
-            {
-                if (body.HasFuel)
-                    CreateBadge(group, "З", 15f, new Vector2(size * 0.5f + 12f + badge++ * 18f, size * 0.22f), PaperMapArt.Ink);
-                if (body.HasRepair)
-                    CreateBadge(group, "М", 15f, new Vector2(size * 0.5f + 12f + badge++ * 18f, size * 0.22f), PaperMapArt.Ink);
-            }
-
             var marker = group.gameObject.AddComponent<MapMarker>();
             marker.visual = icon.GetComponent<Image>();
             CelestialBodyData captured = body;
@@ -627,17 +657,154 @@ namespace SpaceTaxi.UI
                 if (!suppressClick) // перетаскивание мимо объекта не открывает записку
                     SelectBody(captured);
             };
+            marker.HoverEntered += () => ShowHoverRings(captured, true);
+            marker.HoverExited += () => ShowHoverRings(captured, false);
             markers[body] = group;
             icons[body] = icon;
             bodySizes[body] = size;
 
-            // подпись сверху/снизу по чётности индекса — у близких пар не сталкивается
-            bool below = index % 2 == 0;
-            TMP_Text label = MakeLabel("Label_" + body.DisplayName, content, body.DisplayName.ToUpper(), 15f,
+            // значки услуг — рядом с именем, под кругом (Stamp-ячейки арта, без него — буквы)
+            int badges = CreateServiceBadges(group, body, size);
+            float badgeDrop = badges > 0 ? 20f : 0f;
+
+            // подпись всегда под кругом, мелким кеглем; точную раскладку разводит ResolveLabels
+            Vector2 pos = WorldToMap(body.Position);
+            TMP_Text label = MakeLabel("Label_" + body.DisplayName, content, body.DisplayName.ToUpper(), LabelFontSize,
                 new Color(PaperMapArt.Ink.r, PaperMapArt.Ink.g, PaperMapArt.Ink.b, 0.8f));
-            ((RectTransform)label.transform).sizeDelta = new Vector2(160f, 18f);
-            ((RectTransform)label.transform).anchoredPosition =
-                WorldToMap(body.Position) + (below ? Vector2.down : Vector2.up) * (size * 0.5f + 14f);
+            RectTransform labelRect = (RectTransform)label.transform;
+            labelRect.sizeDelta = new Vector2(180f, 16f);
+            labelRect.anchoredPosition = pos + Vector2.down * (size * 0.5f + 13f + badgeDrop);
+            RegisterLabel(labelRect, body.DisplayName);
+            bodyLabels[body] = label;
+        }
+
+        // значки услуг между кругом и именем: хаб / заправка / мастерская; вернёт сколько нарисовано
+        private int CreateServiceBadges(RectTransform group, CelestialBodyData body, float size)
+        {
+            var stamps = new List<Sprite>();
+            var letters = new List<string>();
+            if (body.IsHub)
+            {
+                stamps.Add(PaperMapArt.Stamp(2));
+                letters.Add("Х");
+            }
+            else
+            {
+                if (body.HasFuel)
+                {
+                    stamps.Add(PaperMapArt.Stamp(0));
+                    letters.Add("З");
+                }
+                if (body.HasRepair)
+                {
+                    stamps.Add(PaperMapArt.Stamp(1));
+                    letters.Add("М");
+                }
+            }
+            if (stamps.Count == 0)
+                return 0;
+
+            const float d = 15f, gap = 4f;
+            float y = -(size * 0.5f + 11f);
+            float x = -(stamps.Count - 1) * (d + gap) * 0.5f;
+            for (int i = 0; i < stamps.Count; i++)
+            {
+                RectTransform badge = MakeImage("Badge_" + letters[i], group,
+                    stamps[i] != null ? stamps[i] : StubSprites.Circle(64f),
+                    stamps[i] != null ? Color.white : PaperMapArt.PaperDark, Vector2.one * d, false);
+                badge.anchoredPosition = new Vector2(x, y);
+                if (stamps[i] == null) // без арта — буква в кружке
+                {
+                    TMP_Text t = MakeLabel("T", badge, letters[i], d * 0.62f, PaperMapArt.Ink);
+                    ((RectTransform)t.transform).sizeDelta = Vector2.one * d;
+                    ((RectTransform)t.transform).anchoredPosition = Vector2.zero;
+                }
+                x += d + gap;
+            }
+            return stamps.Count;
+        }
+
+        // hover по телу: круги радиусов посадки/захвата + подпись крупнее
+        private void ShowHoverRings(CelestialBodyData body, bool on)
+        {
+            if (hoverCaptureRing == null || hoverLandingRing == null || body == null)
+                return;
+            if (!on)
+            {
+                hoverCaptureRing.gameObject.SetActive(false);
+                hoverLandingRing.gameObject.SetActive(false);
+                if (bodyLabels.TryGetValue(body, out TMP_Text off))
+                {
+                    off.fontSize = LabelFontSize;
+                    off.color = new Color(PaperMapArt.Ink.r, PaperMapArt.Ink.g, PaperMapArt.Ink.b, 0.8f);
+                }
+                return;
+            }
+            float capture = (body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * 3.3f + 30f) * 2f * scale;
+            float landing = (body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + 90f) * 2f * scale;
+            hoverCaptureRing.sizeDelta = Vector2.one * capture;
+            hoverCaptureRing.anchoredPosition = WorldToMap(body.Position);
+            hoverLandingRing.sizeDelta = Vector2.one * landing;
+            hoverLandingRing.anchoredPosition = WorldToMap(body.Position);
+            hoverCaptureRing.gameObject.SetActive(true);
+            hoverLandingRing.gameObject.SetActive(true);
+            if (bodyLabels.TryGetValue(body, out TMP_Text label))
+            {
+                label.fontSize = LabelHoverFont;
+                label.color = PaperMapArt.Ink;
+            }
+        }
+
+        // регистрация подписи для разводки без наложений (база — текущая позиция «под кругом»)
+        private void RegisterLabel(RectTransform rect, string name)
+        {
+            var ml = new MapLabel
+            {
+                Rect = rect,
+                Width = Mathf.Max(40f, (string.IsNullOrEmpty(name) ? 8f : name.Length) * LabelFontSize * 0.62f + 12f),
+                Below = rect.anchoredPosition,
+                AboveY = -rect.anchoredPosition.y // зеркально над кругом
+            };
+            mapLabels.Add(ml);
+        }
+
+        // разводим подписи: базово под кругом; занято — над кругом, дальше — шагом вниз/вверх
+        private void ResolveLabels()
+        {
+            const float h = 16f, pad = 5f;
+            var placed = new List<Rect>(mapLabels.Count);
+            foreach (MapLabel ml in mapLabels)
+            {
+                float halfW = ml.Width * 0.5f + pad;
+                var candidates = new[]
+                {
+                    ml.Below,
+                    new Vector2(ml.Below.x, ml.AboveY),
+                    ml.Below + Vector2.down * 22f,
+                    new Vector2(ml.Below.x, ml.AboveY + 22f)
+                };
+                Vector2 chosen = ml.Below;
+                foreach (Vector2 c in candidates)
+                {
+                    var r = new Rect(c.x - halfW, c.y - h * 0.5f - pad, ml.Width + pad * 2f, h + pad * 2f);
+                    bool hit = false;
+                    foreach (Rect p in placed)
+                    {
+                        if (r.Overlaps(p))
+                        {
+                            hit = true;
+                            break;
+                        }
+                    }
+                    if (!hit)
+                    {
+                        chosen = c;
+                        placed.Add(r);
+                        break;
+                    }
+                }
+                ml.Rect.anchoredPosition = chosen;
+            }
         }
 
         // пояс — штриховая каракуля-дуга осевой линии
@@ -654,20 +821,12 @@ namespace SpaceTaxi.UI
             string beltName = body.DisplayName.ToUpper();
             if (!beltName.Contains("ПОЯС"))
                 beltName += " · ПОЯС";
-            TMP_Text label = MakeLabel("Label_" + body.DisplayName, content, beltName, 15f,
+            TMP_Text label = MakeLabel("Label_" + body.DisplayName, content, beltName, LabelFontSize,
                 new Color(PaperMapArt.Ink.r, PaperMapArt.Ink.g, PaperMapArt.Ink.b, 0.8f));
-            ((RectTransform)label.transform).sizeDelta = new Vector2(260f, 18f);
-            ((RectTransform)label.transform).anchoredPosition = WorldToMap(body.Position) + Vector2.up * (diameter * 0.5f + 14f);
-        }
-
-        private void CreateBadge(RectTransform group, string letter, float diameter, Vector2 pos, Color letterColor)
-        {
-            RectTransform circle = MakeImage("Badge_" + letter, group, StubSprites.Circle(64f),
-                PaperMapArt.PaperDark, Vector2.one * diameter, false);
-            circle.anchoredPosition = pos;
-            TMP_Text text = MakeLabel("T", circle, letter, diameter * 0.62f, letterColor);
-            ((RectTransform)text.transform).sizeDelta = Vector2.one * diameter;
-            ((RectTransform)text.transform).anchoredPosition = Vector2.zero;
+            RectTransform labelRect = (RectTransform)label.transform;
+            labelRect.sizeDelta = new Vector2(260f, 16f);
+            labelRect.anchoredPosition = WorldToMap(body.Position) + Vector2.up * (diameter * 0.5f + 13f);
+            RegisterLabel(labelRect, beltName); // AboveY = зеркальная позиция, у пояса — под кольцом
         }
 
         private Color PencilColor(CelestialBodyData body, bool star, bool hole)
@@ -714,6 +873,7 @@ namespace SpaceTaxi.UI
             LegendRow(ref y, "Х", PaperMapArt.PaperDark, "хаб МТО");
             LegendRow(ref y, null, PaperMapArt.Ink, "буй связи", dashed: true);
             LegendRow(ref y, null, PaperMapArt.Rust, "цель заказа", ring: true);
+            LegendRow(ref y, null, PaperMapArt.Rust, "маршрут заказа", icon: PaperMapArt.RouteDash());
             LegendRow(ref y, null, PaperMapArt.HeroPencil, "вы здесь", arrow: true);
         }
 
@@ -794,7 +954,8 @@ namespace SpaceTaxi.UI
         private void BuildRuler()
         {
             // масштабная линейка: круглый шаг мира, влезающий в 150 px
-            int[] steps = { 100, 200, 500, 1000, 2000, 5000, 10000 };
+            // (шаги до 50000 — базовый вид «весь мир» на крупных уровнях даёт мелкий масштаб)
+            int[] steps = { 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000 };
             float step = steps[0];
             foreach (int candidate in steps)
             {
@@ -1158,19 +1319,16 @@ namespace SpaceTaxi.UI
             return ship != null ? ship.transform : null;
         }
 
-        // цель активного заказа — пульсирующий карандашный обвод + имя + «ЦЕЛЬ»
+        // цель активного заказа — пульсирующий обвод + шеврон + подпись «ЦЕЛЬ: <имя>»;
+        // собственная подпись тела-цели прячется, чтобы не дублировать имя
         private void UpdateTargetRing()
         {
-            var orders = session != null ? session.Orders : null;
-            var active = orders != null ? orders.Active : null;
-            int index = active == null
-                ? -1
-                : active.State == OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
-
+            int index = ActiveOrderTargetIndex();
             if (index < 0 || index >= level.Bodies.Count)
             {
                 targetRing.gameObject.SetActive(false);
                 targetIndex = -1;
+                RestoreTargetLabel();
                 return;
             }
 
@@ -1178,16 +1336,124 @@ namespace SpaceTaxi.UI
             targetRing.gameObject.SetActive(true);
             if (targetIndex != index)
             {
+                RestoreTargetLabel();
                 targetIndex = index;
+                lastTargetBody = body;
+                if (bodyLabels.TryGetValue(body, out TMP_Text own))
+                    own.enabled = false;
                 float size = Mathf.Max(46f, IconSizeOf(body) * 2.0f);
                 targetRingImage.rectTransform.sizeDelta = Vector2.one * size;
-                ((RectTransform)targetNameLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 16f);
-                ((RectTransform)targetTagLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 36f);
-                targetNameLabel.text = body.DisplayName.ToUpper();
+                targetChevron.sizeDelta = Vector2.one * Mathf.Max(16f, size * 0.42f);
+                ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 14f);
+                targetLabel.text = "ЦЕЛЬ: " + body.DisplayName.ToUpper();
             }
             targetRing.anchoredPosition = WorldToMap(body.Position);
-            // пульс: кольцо дышит, подписи стоят на месте
+            // пульс: кольцо дышит, шеврон и подпись стоят на месте
             targetRingImage.transform.localScale = Vector3.one * (1f + 0.07f * Mathf.Sin(Time.unscaledTime * 4.6f));
+        }
+
+        private void RestoreTargetLabel()
+        {
+            if (lastTargetBody != null && bodyLabels.TryGetValue(lastTargetBody, out TMP_Text label))
+                label.enabled = true;
+            lastTargetBody = null;
+        }
+
+        // тело текущего шага активного заказа: пассажир до посадки, цель — с пассажиром
+        private int ActiveOrderTargetIndex()
+        {
+            var orders = session != null ? session.Orders : null;
+            var active = orders != null ? orders.Active : null;
+            return active == null
+                ? -1
+                : active.State == OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
+        }
+
+        // ————— маршрут активного заказа: лёгкая пунктирная дуга корабль → цель —————
+
+        private void BuildRouteLine()
+        {
+            routeRoot = MakeRect("RouteLine", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero);
+            routeRoot.SetAsFirstSibling(); // маршрут под всеми телами и секторами
+        }
+
+        private void UpdateRoute()
+        {
+            int index = ActiveOrderTargetIndex();
+            Transform shipT = ShipPosition();
+            if (routeRoot == null || index < 0 || index >= level.Bodies.Count || shipT == null)
+            {
+                HideRoute();
+                return;
+            }
+
+            Vector2 a = WorldToMap(shipT.position);
+            Vector2 b = WorldToMap(level.Bodies[index].Position);
+            Vector2 span = b - a;
+            float len = span.magnitude;
+
+            // лёгкая дуга: квадратичная кривая с перпендикулярным прогибом ~12% длины
+            Vector2 perp = len > 1f ? new Vector2(-span.y, span.x) / len : Vector2.right;
+            Vector2 ctrl = (a + b) * 0.5f + perp * Mathf.Min(len * 0.12f, 260f) * (index % 2 == 0 ? 1f : -1f);
+            float step = 1f / (routePts.Length - 1);
+            float total = 0f;
+            routePts[0] = a;
+            routeCum[0] = 0f;
+            for (int i = 1; i < routePts.Length; i++)
+            {
+                float t = i * step;
+                float u = 1f - t;
+                routePts[i] = u * u * a + 2f * u * t * ctrl + t * t * b;
+                total += Vector2.Distance(routePts[i - 1], routePts[i]);
+                routeCum[i] = total;
+            }
+
+            // плотность пунктира постоянна на экране: шаг и толщина делятся на зум
+            float period = RouteDashPeriod / Mathf.Max(zoom, 0.001f);
+            float dashLen = 9f / Mathf.Max(zoom, 0.001f);
+            float dashThick = 2.6f / Mathf.Max(zoom, 0.001f);
+            int count = Mathf.Clamp(Mathf.CeilToInt(total / period), 1, RouteDashMax);
+            if (count == RouteDashMax)
+                period = total / RouteDashMax;
+
+            var rust = new Color(PaperMapArt.Rust.r, PaperMapArt.Rust.g, PaperMapArt.Rust.b, 0.6f);
+            routeShown = true;
+            for (int i = 0; i < count; i++)
+            {
+                if (i >= routeDashes.Count) // пул растёт лениво, только пока карта открыта
+                {
+                    RectTransform dash = MakeImage("RouteDash_" + i, routeRoot, PaperMapArt.RouteDash(),
+                        rust, new Vector2(dashLen, dashThick), false);
+                    routeDashes.Add(dash);
+                }
+                RectTransform d = routeDashes[i];
+                d.gameObject.SetActive(true);
+                d.sizeDelta = new Vector2(dashLen, dashThick);
+
+                // равномерно по длине дуги: ищем сегмент с накопленной длиной
+                float target = Mathf.Min((i + 0.5f) * period, total);
+                int seg = 0;
+                while (seg < routePts.Length - 2 && routeCum[seg + 1] < target)
+                    seg++;
+                float segLen = Mathf.Max(routeCum[seg + 1] - routeCum[seg], 0.0001f);
+                float k = Mathf.Clamp01((target - routeCum[seg]) / segLen);
+                d.anchoredPosition = Vector2.Lerp(routePts[seg], routePts[seg + 1], k);
+                Vector2 dir = routePts[seg + 1] - routePts[seg];
+                if (dir.sqrMagnitude > 0.0001f)
+                    d.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+            }
+            for (int i = count; i < routeDashes.Count; i++)
+                routeDashes[i].gameObject.SetActive(false);
+        }
+
+        private void HideRoute()
+        {
+            if (routeRoot == null || !routeShown)
+                return;
+            routeShown = false;
+            foreach (RectTransform dash in routeDashes)
+                dash.gameObject.SetActive(false);
         }
 
         // живые кометы — карандашные значки с хвостом по курсу
@@ -1277,16 +1543,24 @@ namespace SpaceTaxi.UI
             markers.Clear();
             icons.Clear();
             bodySizes.Clear();
+            bodyLabels.Clear();
+            mapLabels.Clear();
             cometIcons.Clear();
             cometLastPos.Clear();
+            routeRoot = null;
+            routeDashes.Clear();
+            hoverCaptureRing = null;
+            hoverLandingRing = null;
             playerMarker = null;
             playerArrowRoot = null;
             targetRing = null;
             targetRingImage = null;
-            targetNameLabel = null;
-            targetTagLabel = null;
+            targetChevron = null;
+            targetLabel = null;
             waypointPin = null;
             targetIndex = -1;
+            lastTargetBody = null;
+            routeShown = false;
             selectedBody = null;
             dragging = false;
             suppressClick = false;
