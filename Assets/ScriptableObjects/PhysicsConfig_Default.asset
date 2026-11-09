@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: PhysicsConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
   Retro: 62
+  MinSpeed: 10
   StrafeMaxTurnRate: 60
   LandSpeed: 75
   TakeoffV: 85

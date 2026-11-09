@@ -210,7 +210,10 @@ namespace SpaceTaxi.Physics
                     velocity += dir * (ship.Eff.Thrust * engMul * dt);
                 if (brakeOn)
                 {
-                    float nv = Mathf.Max(0f, v - ship.Eff.Retro * engMul * dt);
+                    // тормоз не опускает скорость ниже MinSpeed (Н4.2.5) — нельзя
+                    // зависнуть у планеты; если уже медленнее, тормоз не мешает
+                    float floor = v > config.MinSpeed ? config.MinSpeed : v;
+                    float nv = Mathf.Max(floor, v - ship.Eff.Retro * engMul * dt);
                     velocity *= nv / v;
                 }
                 if (Mathf.Abs(strafe) > 0f)
