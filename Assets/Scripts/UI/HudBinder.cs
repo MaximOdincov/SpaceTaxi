@@ -112,7 +112,10 @@ namespace SpaceTaxi.UI
             gaugeGo.transform.SetParent(speedValue.transform.parent, false);
             var gaugeRect = (RectTransform)gaugeGo.transform;
             gaugeRect.localScale = Vector3.one;
-            gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(0.5f, 0.5f);
+            // якоря как у соседей левой колонки (FuelTrack/FuelIcon — top-left):
+            // GaugeCenter() возвращает координаты именно в этой конвенции,
+            // центр-якорь сдвигал бы спидометр на пол-канваса (к центру экрана)
+            gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(0f, 1f);
             gaugeRect.pivot = new Vector2(0.5f, 0.5f);
             gaugeRect.sizeDelta = new Vector2(GaugeSize, GaugeSize);
             gaugeRect.anchoredPosition = GaugeCenter();
@@ -151,6 +154,7 @@ namespace SpaceTaxi.UI
             var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
+            speedRect.pivot = new Vector2(0.5f, 0.5f); // центр по x, иначе текст уезжает вправо от хаба
             speedRect.sizeDelta = new Vector2(110f, 42f);
             speedRect.anchoredPosition = new Vector2(0f, GaugeSize * 0.25f);
             speedValue.fontSize = 30f;
