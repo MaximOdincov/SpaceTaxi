@@ -87,12 +87,14 @@ namespace SpaceTaxi.Core
             // столкновениям заказа, комиссия на аренде; оффер приходит в аргументе
             // события (Active уже обнулён) — отдельный доступ не нужен
             Orders.OrderDelivered += OnOrderDelivered;
-            // дельты рейтинга (§3.7): отказ и гибель; доставка — внутри OnOrderDelivered
-            // отказ от заказа, пока пассажир не на борту, — без штрафа рейтингу
+            // дельты рейтинга (§3.7): отказ и гибель; доставка — внутри OnOrderDelivered.
+            // Отказ от заказа, пока пассажир не на борту, — без штрафа рейтингу;
+            // отмена оператором — деньгами: 25% цены (ChargeCancelPenalty)
             Orders.OrderCancelled += offer =>
             {
                 if (offer.State == SpaceTaxi.Orders.OrderState.Aboard)
                     Rating.FailNoDeath();
+                ChargeCancelPenalty(offer);
             };
             Orders.OrderFailed += _ => Rating.FailWithLoss();
             // столкновение при активном заказе — минус рейтинг. Рейтинг слушает
@@ -153,6 +155,25 @@ namespace SpaceTaxi.Core
         {
             if (Orders != null && Orders.Active != null)
                 Rating.AddCollisionPenalty();
+        }
+
+        // штраф за отмену заказа оператором: 25% цены, округление вниз.
+        // Кошелёк в минус не уходит (правило Wallet): платим чем есть, недостача —
+        // в долг (DebtService.AddCharge — не авария, счётчик аварий не растёт);
+        // рейтинг-штраф за высадку пассажира уже в OrderCancelled-хендлере выше
+        private void ChargeCancelPenalty(OrderOffer offer)
+        {
+            int penalty = OrderService.CancelPenalty(offer.Price);
+            if (penalty <= 0)
+                return;
+            int fromWallet = Mathf.Min(penalty, Wallet.Credits);
+            if (fromWallet > 0)
+                Wallet.TrySpend(fromWallet);
+            int toDebt = penalty - fromWallet;
+            if (toDebt > 0)
+                Debt.AddCharge(toDebt);
+            FindAnyObjectByType<UI.ToastNotifier>()?.Show("Отказ от заказа: штраф −" + penalty + " кр");
+            Debug.Log($"[Economy] штраф за отмену: {penalty} кр (кошелёк {fromWallet}, долг {toDebt})");
         }
 
         // потеря корабля: арендный — долг за аварию. Проверка владения ДО

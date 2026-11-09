@@ -1784,9 +1784,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63743167aa4c54f2096316ac1da39f96, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.OnboardBinder
-  cashIcon: {fileID: 6926361368378116079, guid: 083a70906c59e405fb48017324c17138, type: 3}
-  ratingIcon: {fileID: -1087995082467479703, guid: d2e17faa3f595e6a82cb721c562fd3fa, type: 3}
-  panelFont: {fileID: 0}
+  panelFont: {fileID: 11400000, guid: 95da15eaff74e468abb324d550c64056, type: 2}
 --- !u!1 &3484819690779439273
 GameObject:
   m_ObjectHideFlags: 0

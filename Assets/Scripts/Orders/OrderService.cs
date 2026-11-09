@@ -62,6 +62,26 @@ namespace SpaceTaxi.Orders
         public int Deliveries { get; private set; }
         public int Failures { get; private set; }
 
+        // штраф за отмену заказа оператором: доля цены, деньги списывает
+        // GameSession на OrderCancelled (кошелёк → долг)
+        public const float CancelPenaltyFraction = 0.25f;
+
+        // 25% цены, округление вниз — и на кнопке отмены, и при списании
+        public static int CancelPenalty(int price)
+        {
+            return Mathf.FloorToInt(price * CancelPenaltyFraction);
+        }
+
+        // цена по текущему прайсу — пересчёт активным заказам из старых сейвов,
+        // где поле цены ещё не писалось (иначе штраф отмены показывал «−Đ 0»)
+        public int PriceFor(OrderOffer offer)
+        {
+            int taxiTier = ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
+            int basePrice = OrderPricing.ComputePrice(Pricing,
+                RouteDistance(offer), SectorOf(offer.DropoffIndex), taxiTier);
+            return PriceWithRatingBonus(basePrice);
+        }
+
         // столкновения активного заказа (Active или Aboard); сброс при его закрытии/смене
         public int CollisionsOfActive { get; private set; }
 
@@ -323,6 +343,10 @@ namespace SpaceTaxi.Orders
             restored.State = restored.State == OrderState.Aboard
                 ? OrderState.Aboard
                 : OrderState.Active;
+            // старые сейвы поле цены не писали (Price=0) — пересчёт по маршруту,
+            // иначе штраф отмены на кнопке показывал «−Đ 0»
+            if (restored.Price <= 0)
+                restored.Price = PriceFor(restored);
             Active = restored;
             CollisionsOfActive = 0; // удары до сейва не доезжают — счёт с нуля
             ActiveOrderChanged?.Invoke();

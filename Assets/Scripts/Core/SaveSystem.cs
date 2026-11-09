@@ -461,6 +461,7 @@ namespace SpaceTaxi.Core
                 ExpiresAt = float.MaxValue, // активный карточкой не протухает
                 Task = RebuildTask(save),
             };
+            // старый сейв без цены — цену досчитает RestoreActive (единая точка)
             offer.Task?.StartDeadline(Time.time); // с сохранённого остатка
             session.Orders.RestoreActive(offer);
         }

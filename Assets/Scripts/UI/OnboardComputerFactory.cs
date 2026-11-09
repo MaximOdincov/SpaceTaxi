@@ -9,12 +9,13 @@ namespace SpaceTaxi.UI
     public sealed class OnboardRefs
     {
         public TMP_Text Clock, MoneyValue, RatingValue;
-        public Image RatingIcon;
+        public GameObject DebtRow;         // строка долга под шапкой — скрыта при нуле
+        public TMP_Text DebtValue;
         public GameObject ActiveSection;   // секция целиком — скрывается без активного заказа
-        public RectTransform ActiveArea;   // блок активного заказа + кнопка отмены (ведёт биндер)
+        public RectTransform ActiveArea;   // карточка активного заказа (ведёт биндер)
         public RectTransform OrderArea;    // контент скролла входящих карточек (ведёт биндер)
-        public TMP_Text EconCounters, DebtValue;
-        public Button AbandonButton;
+        public GameObject OffersScroll;    // скролл входящих
+        public Button AbandonButton;       // красная «ОТКЛЮЧИТЬ КОРАБЛЬ» в нижнем слоте
         public Button PlayerPrev, PlayerNext;
         public Button RadioMute;
         public TMP_Text TrackTitle;
@@ -22,28 +23,53 @@ namespace SpaceTaxi.UI
         public TMP_FontAsset Font;
     }
 
-    // Строит каркас бортового компьютера: [статус-строка] → [активный заказ] →
-    // [входящие со скроллом] → [эфир-строка] → [система]. Высоты секций
-    // фиксированные, скролл только в списке входящих (паттерн
-    // StationScreenController). Из редактора результат сериализуется в сцену;
-    // в рантайме биндер строит каркас этим же методом поверх старого мокапа
-    // (Frame/Background сохраняются, остальное сносится).
+    // Строит каркас бортового компьютера: [СОСТОЯНИЕ: часы · кредиты · ★ рейтинг]
+    // → [строка долга] → [активный заказ (всегда детальный)] → [входящие со скроллом:
+    // карточки раскрываются IN PLACE] → [статистика] → [эфир] → [отключить корабль].
+    // Высоты секций фиксированные, скролл только в списке входящих (паттерн
+    // StationScreenController). Политика переполнения: все тексты однолинейные с
+    // обрезкой «…», высоты узлов фиксированные — контент никогда не двигает layout
+    // (исключения — «Пожелание клиента» в сводке: 2 строки). Из редактора результат
+    // сериализуется в сцену; в рантайме биндер строит каркас этим же методом поверх
+    // старого мокапа (Frame/Background сохраняются, остальное сносится).
     public static class OnboardComputerFactory
     {
         // используется и рантайм-карточками
         private static TMP_FontAsset currentFont;
 
-        public const float MoneyValueWidth = 180f; // «999 999 кр» при 30 pt моноширинного
+        // --- Геометрия карточек (контракт с биндером: анимация раскрытия) ---
+        // карточка имеет два взаимоисключающих контейнера: Compact и Expanded.
+        // Раскрытие гасит Compact, включает Expanded и анимирует preferredHeight
+        // карточки OfferCompactHeight ↔ OfferExpandedHeight; RectMask2D на карточке
+        // срезает контент, пока анимация не отдала высоту — ничего не вылезает
+        public const float CardSpacing = 4f;
+        public const float AcceptHeight = 40f;
+        public const float OfferCompactHeight = 124f;   // рамка 16 + Compact 108
+        public const float DetailAvatarHeight = 176f;   // портрет на всю ширину
+        public const float SummaryHeight = 170f;        // Имя 30 + Откуда/Куда/Маршрут 26×3 + Пожелание 54 + зазоры
+        public const float ExpandedContentHeight = DetailAvatarHeight + CardSpacing + SummaryHeight + CardSpacing + AcceptHeight;
+        public const float OfferExpandedHeight = 16f + ExpandedContentHeight;
+        // активный заказ — тот же Expanded всегда (без строки статуса и тоггла)
+        public const float ActiveSummaryHeight = SummaryHeight;
+        public const float ActiveExpandedContentHeight = DetailAvatarHeight + CardSpacing + ActiveSummaryHeight + CardSpacing + AcceptHeight;
+        public const float ActiveCardHeight = 16f + ActiveExpandedContentHeight;
 
-        private const string CashIconPath = "Assets/Sprites/cash.png";
-        private const string RatingIconPath = "Assets/Sprites/icons/Star 2.png";
+        // приглушённая зелень рамки аватара: яркая LabelColor спорила с портретом
+        public static readonly Color AvatarFrameColor = new Color(0.27f, 0.54f, 0.39f, 0.9f);
+
         public static readonly Color RatingGreen = new Color(0.357f, 0.9f, 0.56f);
 
         public static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
         public static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);
         public static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);
         public static readonly Color PanelColor = new Color(0.031f, 0.078f, 0.047f, 0.92f);
-        public static readonly Color DangerColor = new Color(1f, 0.478f, 0.361f);
+        public static readonly Color DangerColor = new Color(1f, 0.32f, 0.24f);
+        public static readonly Color DangerDark = new Color(0.05f, 0.02f, 0.03f);
+        // текст на ярких кнопках действия (жёлтая «взять», красная «отменить») — чёрный
+        public static readonly Color ActionTextColor = Color.black;
+        // «спокойный» красный долга: платится по графику или докатывается вниз
+        public static readonly Color DebtCalmColor = new Color(0.86f, 0.46f, 0.42f);
+        public static readonly Color ButtonColor = new Color(0.06f, 0.2f, 0.13f, 0.9f);
 
         public static OnboardRefs Build(Transform panel, bool destroyImmediate = false, TMP_FontAsset fontOverride = null)
         {
@@ -85,27 +111,35 @@ namespace SpaceTaxi.UI
 
             var refs = new OnboardRefs { Font = font };
 
-            // --- Статус-строка: часы | деньги (крупно) | рейтинг ---
+            // --- СОСТОЯНИЕ: время у левого края · деньги строго по центру панели · ★ рейтинг у правого края ---
+            // якоря вручную (ignoreLayout): равные трети дают центр «своей» ячейки,
+            // а не панели; деньги ставим якорем в середину ширины Header
             var header = H("Header", root.transform);
             FixedHeight(header, 44f);
-            refs.Clock = Text(header, "14:02", 36f, BrightColor, "Clock");
-            FixedWidth(refs.Clock.gameObject, 118f);
+            var headerRect = (RectTransform)header.transform;
+            // глиф «⏲» есть не в каждом атласе: без него — просто время
+            bool clockGlyph = font.HasCharacter('⏲');
+            refs.Clock = Text(header, clockGlyph ? "⏲ 15:30" : "15:30", 36f, BrightColor, "Clock");
+            AnchorHeaderEdge(refs.Clock.transform as RectTransform, isLeft: true);
             refs.Clock.alignment = TextAlignmentOptions.Left;
-            var spacer = Text(header, "", 18f, LabelColor, "Spacer");
-            spacer.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            // деньги без иконки: символ валюты прямо в тексте (¤ 10k) —
-            // ширина строки теперь предсказуема
-            refs.MoneyValue = Text(header, "¤ 0", 30f, TaxiColor, "MoneyValue");
-            FixedWidth(refs.MoneyValue.gameObject, 118f);
-            refs.MoneyValue.alignment = TextAlignmentOptions.Right;
-            refs.RatingValue = IconStat(header.transform, RatingIconPath, "RatingValue",
-                28f, 78f, BrightColor, out refs.RatingIcon);
-            // звезда рейтинга — зелёная и крупная (красит биндер при падении)
-            if (refs.RatingIcon != null)
-                refs.RatingIcon.color = RatingGreen;
-            refs.RatingValue.alignment = TextAlignmentOptions.Left;
+            // деньги без иконки: символ валюты прямо в тексте (Đ 3.5k)
+            refs.MoneyValue = Text(header, "Đ 0", 36f, BrightColor, "MoneyValue");
+            AnchorHeaderCenter(refs.MoneyValue.transform as RectTransform);
+            refs.MoneyValue.alignment = TextAlignmentOptions.Center;
+            // рейтинг — текст «★ 3.0»: глиф звезды испечён в атласы JetBrainsMono;
+            // без глифа (сброс dynamic-атласа в билде) биндер пишет просто «3.0»
+            bool starGlyph = font.HasCharacter('★');
+            refs.RatingValue = Text(header, starGlyph ? "★ 3.0" : "3.0", 36f, RatingGreen, "RatingValue");
+            AnchorHeaderEdge(refs.RatingValue.transform as RectTransform, isLeft: false);
+            refs.RatingValue.alignment = TextAlignmentOptions.Right;
 
-            // --- АКТИВНЫЙ ЗАКАЗ: блок и кнопку отмены строит биндер ---
+            // --- Строка долга: пустая → скрыта, секции ниже поднимаются ---
+            refs.DebtValue = Text(root, "Текущий долг: Đ 0", 22f, DebtCalmColor, "DebtRow");
+            FixedHeight(refs.DebtValue.gameObject, 30f);
+            refs.DebtRow = refs.DebtValue.gameObject;
+            refs.DebtRow.SetActive(false);
+
+            // --- АКТИВНЫЙ ЗАКАЗ: всегда в детальном виде, строит биндер ---
             var active = Section(root.transform, "// АКТИВНЫЙ ЗАКАЗ", "ActiveSection");
             refs.ActiveSection = active;
             var activeArea = new GameObject("ActiveArea", typeof(RectTransform));
@@ -125,6 +159,7 @@ namespace SpaceTaxi.UI
             var wrapElement = scrollWrap.AddComponent<LayoutElement>();
             wrapElement.flexibleHeight = 1f; // всё свободное место между секциями
             wrapElement.minHeight = 120f;
+            refs.OffersScroll = scrollWrap;
 
             var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
             viewport.transform.SetParent(scrollWrap.transform, false);
@@ -158,37 +193,22 @@ namespace SpaceTaxi.UI
 
             refs.OrderArea = contentRect;
 
-            // --- ЭФИР: плеер одной строкой (несжимаемая секция) ---
-            var player = new GameObject("PlayerSection", typeof(RectTransform));
-            player.transform.SetParent(root.transform, false);
-            var playerLayout = player.AddComponent<VerticalLayoutGroup>();
-            playerLayout.spacing = 4;
-            playerLayout.childControlWidth = true;
-            playerLayout.childControlHeight = true;
-            playerLayout.childForceExpandWidth = true;
-            playerLayout.childForceExpandHeight = false;
-            // шапка эфира: метка + мьют (перечёркнутая — радио молчит, трек идёт)
-            var radioHeader = H("RadioHeader", player.transform);
-            FixedHeight(radioHeader, 26f);
-            var radioLabel = Text(radioHeader, "ЭФИР", 15f, LabelColor, "RadioLabel");
-            radioLabel.alignment = TextAlignmentOptions.Left;
-            Flexible(radioLabel.gameObject);
-            var muteGo = Button(radioHeader.transform, "ЗВУК: ВКЛ",
-                new Color(0.06f, 0.2f, 0.13f, 0.9f), BrightColor, 13f, "RadioMute");
-            FixedWidth(muteGo, 92f);
-            refs.RadioMute = muteGo.GetComponent<Button>();
-            var playerRow = H("PlayerRow", player.transform);
-            FixedHeight(playerRow, 30f);
+            // --- ЭФИР: заголовок секции, плеер, прогресс, мьют ---
+            var radio = Section(root.transform, "// ЭФИР", "RadioSection");
+            var playerRow = H("PlayerRow", radio.transform);
+            FixedHeight(playerRow, 44f);
+            var playerRowLayout = playerRow.GetComponent<HorizontalLayoutGroup>();
+            playerRowLayout.childForceExpandWidth = false; // кнопки строго 44×44, трек — flexible
+            // паузу убрали по просьбе владельца: радио всегда играет, мьют ниже плеера
             refs.PlayerPrev = PlayerButton(playerRow.transform, "|<", "PlayerPrev");
-            // паузу убрали по просьбе владельца: радио всегда играет, мьют в шапке
-            refs.TrackTitle = Text(playerRow, "—", 19f, BrightColor, "Track");
+            refs.TrackTitle = Text(playerRow, "—", 20f, BrightColor, "Track");
             refs.TrackTitle.alignment = TextAlignmentOptions.Center;
             refs.TrackTitle.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             refs.PlayerNext = PlayerButton(playerRow.transform, ">|", "PlayerNext");
             var progress = new GameObject("Progress", typeof(RectTransform), typeof(Image));
-            progress.transform.SetParent(player.transform, false);
+            progress.transform.SetParent(radio.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
-            FixedHeight(progress, 4f);
+            FixedHeight(progress, 6f);
             // заливка прогресса: ширина = доля clip position/length (ведёт OnboardBinder)
             var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fill.transform.SetParent(progress.transform, false);
@@ -201,22 +221,20 @@ namespace SpaceTaxi.UI
             fillRect.offsetMin = Vector2.zero;
             fillRect.offsetMax = Vector2.zero;
             refs.ProgressFill = fillRect;
+            var muteGo = Button(radio.transform, "ЗВУК: ВКЛ", ButtonColor, BrightColor, 15f, "RadioMute");
+            var muteLe = muteGo.AddComponent<LayoutElement>();
+            muteLe.minHeight = 34f;
+            muteLe.flexibleWidth = 1f;
+            refs.RadioMute = muteGo.GetComponent<Button>();
 
-            // --- СИСТЕМА: смены/аварии, долг, отключение ---
-            var system = Section(root.transform, "// СИСТЕМА", "SystemSection");
-            // 17pt: строка счётчиков с длинными числами не переносится в 448 px
-            refs.EconCounters = Text(system, "", 17f, LabelColor, "EconCounters");
-            FixedHeight(refs.EconCounters.gameObject, 22f);
-            refs.EconCounters.alignment = TextAlignmentOptions.Left;
-            refs.DebtValue = Text(system, "", 18f, BrightColor, "DebtValue");
-            FixedHeight(refs.DebtValue.gameObject, 22f);
-            var abandon = Button(system.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
-                new Color(0.05f, 0.02f, 0.03f), 18f, "AbandonButton");
+            // --- ОТКЛЮЧИТЬ КОРАБЛЬ: тревожная красная, клик сразу запускает
+            // штатный пайплайн потери (HullSystem.Abandon → респавн/долг/парк)
+            var abandon = Button(root.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
+                DangerDark, 18f, "AbandonButton");
             var abandonLe = abandon.AddComponent<LayoutElement>();
-            abandonLe.minHeight = 38f;
+            abandonLe.minHeight = 40f;
             abandonLe.flexibleWidth = 1f;
             refs.AbandonButton = abandon.GetComponent<Button>();
-            abandon.SetActive(false);
 
             return refs;
         }
@@ -243,46 +261,228 @@ namespace SpaceTaxi.UI
             return section;
         }
 
-        private static TMP_Text IconStat(Transform parent, string iconPath, string name,
-            float valueSize, float valueWidth, Color valueColor, out Image icon)
+        // --- Карточки заказов ---
+
+        // Пути узлов (контракт для OnboardBinder):
+        //   Compact/Avatar, Compact/Info/Name, Compact/Info/Route, Compact/Info/Dist,
+        //   Expanded/DetailAvatar, Expanded/Summary/{Name,From,To,RouteLen,Wish},
+        //   Expanded/Accept, ExpandToggle
+        // Карточка входящего: Compact = [аватар по аспекту | имя / маршрут / расстояние],
+        // Expanded = портрет на всю ширину + сводка + «Взять заказ». Контейнеры
+        // взаимоисключающие; раскрытие анимирует preferredHeight карточки.
+        public static GameObject BuildOfferCard()
         {
-            var stat = new GameObject(name, typeof(RectTransform));
-            stat.transform.SetParent(parent, false);
-            var layout = stat.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 4;
+            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+            var layout = card.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.spacing = CardSpacing;
+            // высоты детей фиксированные (LE preferred): во время анимации сумма детей
+            // больше карточки — маска срезает, ничего не наезжает и не сплющивается
             layout.childControlWidth = true;
             layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
+            layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
+            card.GetComponent<Image>().color = PanelColor;
+            Frame(card);
+            var cardLe = card.AddComponent<LayoutElement>();
+            cardLe.minHeight = 0f;
+            cardLe.preferredHeight = OfferCompactHeight; // биндер анимирует до OfferExpandedHeight
+            cardLe.flexibleHeight = 0f;
+            cardLe.flexibleWidth = 1f;
+            ((RectTransform)card.transform).sizeDelta = new Vector2(440f, OfferCompactHeight); // стартовый размер для префаб-режима
 
-            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
-            iconGo.transform.SetParent(stat.transform, false);
-            var iconImage = iconGo.GetComponent<Image>();
-            iconImage.sprite = LoadSprite(iconPath);
-            iconImage.preserveAspect = true;
-            iconImage.color = TaxiColor;
-            FixedSize(iconGo, 24f, 24f);
+            BuildCompactRow(card.transform);
 
-            var value = Text(stat, "0", valueSize, valueColor, "Value");
-            FixedWidth(value.gameObject, valueWidth);
-            icon = iconImage;
-            return value;
+            BuildExpandedBlock(card.transform, SummaryHeight, false, "Accept", "Взять заказ · Đ 0", TaxiColor, bold: true, visible: false);
+
+            // «+»/«−»: аккуратный квадратик 34×34 в правом верхнем углу поверх рамки,
+            // позиция не зависит от текстов и состояния
+            var expand = Button(card.transform, "+", ButtonColor, BrightColor, 18f, "ExpandToggle", framed: false);
+            FixedSize(expand, 34f, 34f);
+            var expandRect = (RectTransform)expand.transform;
+            expandRect.anchorMin = Vector2.one;
+            expandRect.anchorMax = Vector2.one;
+            expandRect.pivot = Vector2.one;
+            // ignoreLayout отключает лейаут-контроль — размер руками, иначе виснет
+            // дефолтный sizeDelta 100×100 от new RectTransform и кнопка наездает на карточку
+            expandRect.sizeDelta = new Vector2(34f, 34f);
+            expandRect.anchoredPosition = new Vector2(-4f, -4f);
+            expand.GetComponent<LayoutElement>().ignoreLayout = true;
+
+            return card;
         }
 
-        private static Sprite LoadSprite(string path)
+        // Пути узлов (контракт для OnboardBinder):
+        //   Expanded/DetailAvatar, Expanded/Summary/{Name,From,To,RouteLen,Status,Wish}, Cancel
+        // Карточка активного заказа: ТОТ ЖЕ Expanded всегда (компакта и тоггла нет),
+        // внизу — красная «Отменить · −Đ N» со штрафом (сумму ставит биндер).
+        public static GameObject BuildActiveOrderCard()
         {
-#if UNITY_EDITOR
-            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
-#else
-            return null;
-#endif
+            var card = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+            var layout = card.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.spacing = CardSpacing;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            card.GetComponent<Image>().color = PanelColor;
+            Frame(card);
+            var cardLe = card.AddComponent<LayoutElement>();
+            cardLe.minHeight = 0f;
+            cardLe.preferredHeight = ActiveCardHeight;
+            cardLe.flexibleHeight = 0f;
+            cardLe.flexibleWidth = 1f;
+            ((RectTransform)card.transform).sizeDelta = new Vector2(440f, ActiveCardHeight);
+
+            BuildExpandedBlock(card.transform, ActiveSummaryHeight, false, "Cancel", "Отменить · −Đ 0", DangerColor * 0.9f, bold: false, visible: true);
+
+            return card;
         }
 
-        private static Button PlayerButton(Transform parent, string glyph, string name)
+        // компактный контейнер: узкий аватар в рамке слева + текстовая колонка
+        private static void BuildCompactRow(Transform parent)
         {
-            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 15f, name);
-            FixedSize(go, 26f, 26f);
-            return go.GetComponent<Button>();
+            var compact = H("Compact", parent);
+            FixedHeight(compact, 108f);
+            // childForceExpandWidth у H() растянул бы аватар на пол-ряда вопреки
+            // preferred-ширине — Info(flexible=1) сам забирает всё лишнее
+            compact.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+
+            var avatar = new GameObject("Avatar", typeof(RectTransform));
+            avatar.transform.SetParent(compact.transform, false);
+            RectBorder(avatar, 4f, AvatarFrameColor); // Outline на портретном Image рисует 4 призрака фигуры
+            // фиксированный размер: любой портрет в одинаковой узкой колонке;
+            // картинка — child с отступом от рамки, фигура не прижата и не срезана
+            FixedWidth(avatar, 84f);
+            FixedHeight(avatar, 108f);
+            var picture = new GameObject("Picture", typeof(RectTransform), typeof(Image));
+            picture.transform.SetParent(avatar.transform, false);
+            var pictureImage = picture.GetComponent<Image>();
+            pictureImage.preserveAspect = true;
+            pictureImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+            var pictureRect = (RectTransform)picture.transform;
+            pictureRect.anchorMin = Vector2.zero;
+            pictureRect.anchorMax = Vector2.one;
+            pictureRect.offsetMin = new Vector2(7f, 7f);
+            pictureRect.offsetMax = new Vector2(-7f, -7f);
+
+            var column = new GameObject("Info", typeof(RectTransform));
+            column.transform.SetParent(compact.transform, false);
+            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
+            columnLayout.spacing = 2;
+            columnLayout.childControlWidth = true;
+            columnLayout.childControlHeight = true;
+            columnLayout.childForceExpandWidth = true;
+            columnLayout.childForceExpandHeight = false;
+            var columnLe = column.AddComponent<LayoutElement>();
+            columnLe.flexibleWidth = 1f;
+            columnLe.minWidth = 100f;
+            columnLe.preferredWidth = 1f;
+
+            var name = Text(column, "Имя", 23f, BrightColor, "Name");
+            FixedHeight(name.gameObject, 28f);
+            name.alignment = TextAlignmentOptions.Left;
+            var route = Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 16f, LabelColor, "Route");
+            FixedHeight(route.gameObject, 22f);
+            route.alignment = TextAlignmentOptions.Left;
+            var dist = Text(column, "Расстояние до пассажира: 0 юн.", 16f, LabelColor, "Dist");
+            FixedHeight(dist.gameObject, 22f);
+            dist.alignment = TextAlignmentOptions.Left;
+        }
+
+        // раскрытый контейнер: портрет на всю ширину в рамке + сводка + кнопка действия
+        private static void BuildExpandedBlock(Transform parent, float summaryHeight, bool withStatus,
+            string actionName, string actionLabel, Color actionBackground, bool bold, bool visible)
+        {
+            var expanded = new GameObject("Expanded", typeof(RectTransform));
+            expanded.transform.SetParent(parent, false);
+            var layout = expanded.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = CardSpacing;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            var expandedLe = expanded.AddComponent<LayoutElement>();
+            expandedLe.flexibleWidth = 1f;
+            expanded.SetActive(visible); // карточка входящего стартует свёрнутой, активная — раскрытой
+
+            var avatar = new GameObject("DetailAvatar", typeof(RectTransform));
+            avatar.transform.SetParent(expanded.transform, false);
+            RectBorder(avatar, 4f, AvatarFrameColor); // Outline на портретном Image рисует 4 призрака фигуры
+            var picture = new GameObject("Picture", typeof(RectTransform), typeof(Image));
+            picture.transform.SetParent(avatar.transform, false);
+            var pictureImage = picture.GetComponent<Image>();
+            pictureImage.preserveAspect = true;
+            pictureImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+            var pictureRect = (RectTransform)picture.transform;
+            pictureRect.anchorMin = Vector2.zero;
+            pictureRect.anchorMax = Vector2.one;
+            pictureRect.offsetMin = new Vector2(7f, 7f);
+            pictureRect.offsetMax = new Vector2(-7f, -7f);
+            var avatarLe = avatar.AddComponent<LayoutElement>();
+            avatarLe.flexibleWidth = 1f; // полоса на всю ширину карточки; фигура по центру (preserveAspect)
+            avatarLe.minHeight = DetailAvatarHeight;
+            avatarLe.preferredHeight = DetailAvatarHeight;
+            avatarLe.flexibleHeight = 0f;
+
+            // сводка: строки фиксированной высоты, лейблы LabelColor / значения Bright — биндер
+            var summary = new GameObject("Summary", typeof(RectTransform));
+            summary.transform.SetParent(expanded.transform, false);
+            var summaryLayout = summary.AddComponent<VerticalLayoutGroup>();
+            summaryLayout.spacing = 2;
+            summaryLayout.childControlWidth = true;
+            summaryLayout.childControlHeight = true;
+            summaryLayout.childForceExpandWidth = true;
+            summaryLayout.childForceExpandHeight = false;
+            var summaryLe = summary.AddComponent<LayoutElement>();
+            summaryLe.flexibleWidth = 1f;
+            summaryLe.minWidth = 100f;
+            summaryLe.preferredWidth = 1f;
+
+            var name = Text(summary, "Имя: —", 19f, BrightColor, "Name");
+            FixedHeight(name.gameObject, 30f);
+            name.alignment = TextAlignmentOptions.Left;
+            var from = Text(summary, "Откуда: —", 17f, BrightColor, "From");
+            FixedHeight(from.gameObject, 26f);
+            from.alignment = TextAlignmentOptions.Left;
+            var to = Text(summary, "Куда: —", 17f, BrightColor, "To");
+            FixedHeight(to.gameObject, 26f);
+            to.alignment = TextAlignmentOptions.Left;
+            var routeLen = Text(summary, "Примерная длина маршрута: 0 юн", 17f, BrightColor, "RouteLen");
+            FixedHeight(routeLen.gameObject, 26f);
+            routeLen.alignment = TextAlignmentOptions.Left;
+            if (withStatus)
+            {
+                var status = Text(summary, "статус", 17f, BrightColor, "Status");
+                FixedHeight(status.gameObject, 26f);
+                status.alignment = TextAlignmentOptions.Left;
+            }
+            // «Пожелание клиента»: единственное исключение из политики — wrap
+            // ровно на 2 строки фиксированной высоты, дальше «…»
+            var wish = Text(summary, "Пожелание клиента: —", 17f, BrightColor, "Wish");
+            FixedHeight(wish.gameObject, 54f);
+            wish.alignment = TextAlignmentOptions.Left;
+            wish.textWrappingMode = TextWrappingModes.Normal;
+
+            var action = Button(expanded.transform, actionLabel, actionBackground, ActionTextColor, 17f, actionName);
+            var actionLe = action.AddComponent<LayoutElement>();
+            actionLe.minHeight = AcceptHeight;
+            actionLe.flexibleWidth = 1f;
+            if (bold)
+            {
+                var actionText = action.GetComponentInChildren<TMP_Text>();
+                if (actionText != null)
+                    actionText.fontStyle = FontStyles.Bold;
+            }
+        }
+
+        public static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
         }
 
         // --- Общие помощники ---
@@ -301,6 +501,67 @@ namespace SpaceTaxi.UI
             return go;
         }
 
+        // зелёная рамка по контуру узла (карточка/аватар) — UI.Outline, цвет лейблов
+        public static void Frame(GameObject go, float thickness = 2f)
+        {
+            var outline = go.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = LabelColor;
+            outline.effectDistance = new Vector2(thickness, -thickness);
+        }
+
+        // рамка прямоугольником из 4 тонких полосок — для узлов с прозрачной
+        // картинкой: UI.Outline продублировал бы сам портрет 4 раза со смещением
+        public static void RectBorder(GameObject go, float thickness = 2f, Color? color = null)
+        {
+            var parent = (RectTransform)go.transform;
+            Color frameColor = color ?? LabelColor;
+            void Bar(string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
+            {
+                var bar = new GameObject(name, typeof(RectTransform), typeof(Image));
+                bar.transform.SetParent(parent, false);
+                var img = bar.GetComponent<Image>();
+                img.color = frameColor;
+                img.raycastTarget = false;
+                var rt = (RectTransform)bar.transform;
+                rt.anchorMin = anchorMin;
+                rt.anchorMax = anchorMax;
+                rt.offsetMin = offsetMin;
+                rt.offsetMax = offsetMax;
+            }
+            Bar("BorderTop", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -thickness), new Vector2(0f, 0f));
+            Bar("BorderBottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, thickness));
+            Bar("BorderLeft", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(thickness, 0f));
+            Bar("BorderRight", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-thickness, 0f), new Vector2(0f, 0f));
+        }
+
+        // элемент шапки, прижатый к левому/правому краю строки; вне лейаута
+        public static void AnchorHeaderEdge(RectTransform rect, bool isLeft)
+        {
+            float edge = isLeft ? 0f : 1f;
+            rect.anchorMin = new Vector2(edge, 0.5f);
+            rect.anchorMax = new Vector2(edge, 0.5f);
+            rect.pivot = new Vector2(edge, 0.5f);
+            rect.sizeDelta = new Vector2(240f, 44f);
+            rect.anchoredPosition = new Vector2(isLeft ? 12f : -12f, 0f);
+            var le = rect.gameObject.GetComponent<LayoutElement>();
+            if (le != null)
+                le.ignoreLayout = true;
+        }
+
+        // деньги: ровно по центру ширины панели, независимо от соседних текстов
+        public static void AnchorHeaderCenter(RectTransform rect)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(260f, 44f);
+            rect.anchoredPosition = Vector2.zero;
+            var le = rect.gameObject.GetComponent<LayoutElement>();
+            if (le != null)
+                le.ignoreLayout = true;
+        }
+
+        // однолинейный текст с обрезкой «…»: базовая политика панели
         public static TMP_Text Text(GameObject parent, string content, float size, Color color, string name = "Text")
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -310,20 +571,26 @@ namespace SpaceTaxi.UI
             text.fontSize = size;
             text.color = color;
             text.text = content;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Ellipsis;
             text.raycastTarget = false;
             return text;
         }
 
-        public static GameObject Button(Transform parent, string label, Color background, Color textColor, float size, string name = null)
+        public static GameObject Button(Transform parent, string label, Color background, Color textColor, float size,
+            string name = null, bool framed = true)
         {
             var go = new GameObject(name ?? label, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             var bg = go.GetComponent<Image>();
             bg.color = background;
-            // рамка и светлый верх — силуэт кнопки читается сразу
-            var outline = go.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.55f);
-            outline.effectDistance = new Vector2(2f, -2f);
+            // рамка и светлый верх — силуэт кнопки читается сразу; мелким тогглам не нужна
+            if (framed)
+            {
+                var outline = go.AddComponent<UnityEngine.UI.Outline>();
+                outline.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.55f);
+                outline.effectDistance = new Vector2(2f, -2f);
+            }
             var text = Text(go, label, size, textColor);
             Stretch(text.rectTransform);
             text.alignment = TextAlignmentOptions.Center;
@@ -333,9 +600,31 @@ namespace SpaceTaxi.UI
             return go;
         }
 
+        // кнопки плеера: без масштабирования при нажатии — только цветовой отклик
+        private static Button PlayerButton(Transform parent, string glyph, string name)
+        {
+            var go = Button(parent, glyph, new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.22f), BrightColor, 18f, name);
+            FixedSize(go, 44f, 44f);
+            var button = go.GetComponent<Button>();
+            button.transition = Selectable.Transition.ColorTint;
+            var colors = button.colors;
+            colors.fadeDuration = 0.1f;
+            colors.highlightedColor = new Color(0.82f, 1f, 0.9f);
+            colors.pressedColor = new Color(0.6f, 1f, 0.78f);
+            button.colors = colors;
+            return button;
+        }
+
+        // get-or-add: один LayoutElement на узел (Flexible + Fixed* поверх него)
+        private static LayoutElement Le(GameObject go)
+        {
+            var le = go.GetComponent<LayoutElement>();
+            return le != null ? le : go.AddComponent<LayoutElement>();
+        }
+
         public static void FixedSize(GameObject go, float width, float height)
         {
-            var le = go.AddComponent<LayoutElement>();
+            var le = Le(go);
             le.minWidth = width;
             le.minHeight = height;
             le.preferredWidth = width;
@@ -346,7 +635,7 @@ namespace SpaceTaxi.UI
 
         public static void FixedHeight(GameObject go, float height)
         {
-            var le = go.AddComponent<LayoutElement>();
+            var le = Le(go);
             le.minHeight = height;
             le.preferredHeight = height;
             le.flexibleHeight = 0f;
@@ -354,7 +643,7 @@ namespace SpaceTaxi.UI
 
         public static void FixedWidth(GameObject go, float width)
         {
-            var le = go.AddComponent<LayoutElement>();
+            var le = Le(go);
             le.minWidth = width;
             le.preferredWidth = width;
             le.flexibleWidth = 0f;
@@ -362,137 +651,7 @@ namespace SpaceTaxi.UI
 
         public static void Flexible(GameObject go)
         {
-            go.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        }
-
-        // --- Карточки заказов ---
-
-        // Карточка входящего: 2 строки текста + кнопки справа.
-        // [аватар | имя … цена / маршрут · задание | ✓ | ✕]
-        public static GameObject BuildOfferCard()
-        {
-            var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image), typeof(Button));
-            var layout = card.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.spacing = 8;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            card.GetComponent<Image>().color = PanelColor;
-            var le = card.AddComponent<LayoutElement>();
-            le.minHeight = 96f;
-            le.flexibleWidth = 1f;
-            ((RectTransform)card.transform).sizeDelta = new Vector2(440f, 96f); // стартовый размер для префаб-режима
-
-            var avatar = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
-            avatar.transform.SetParent(card.transform, false);
-            var avatarImage = avatar.GetComponent<Image>();
-            avatarImage.preserveAspect = true;
-            avatarImage.color = new Color(0.06f, 0.2f, 0.13f, 0.9f);
-            FixedSize(avatar, 64f, 64f);
-
-            var column = new GameObject("Info", typeof(RectTransform));
-            column.transform.SetParent(card.transform, false);
-            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
-            columnLayout.spacing = 2;
-            columnLayout.childControlWidth = true;
-            columnLayout.childControlHeight = true;
-            columnLayout.childForceExpandWidth = true;
-            columnLayout.childForceExpandHeight = false;
-            var columnLe = column.AddComponent<LayoutElement>();
-            columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 100f;
-            columnLe.preferredWidth = 1f;
-
-            var nameRow = H("NameRow", column.transform);
-            TMP_Text name = Text(nameRow, "Имя", 20f, BrightColor, "Name");
-            Flexible(name.gameObject);
-            name.alignment = TextAlignmentOptions.Left;
-            TMP_Text price = Text(nameRow, "¤ 0", 19f, TaxiColor, "Price");
-            FixedWidth(price.gameObject, 96f);
-            price.alignment = TextAlignmentOptions.Right;
-            Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 15f, LabelColor, "Route");
-            var distRow = H("DistRow", column.transform);
-            TMP_Text dist = Text(distRow, "до пассажира: 0 юн", 15f, LabelColor, "Dist");
-            Flexible(dist.gameObject);
-            dist.alignment = TextAlignmentOptions.Left;
-            // блок деталей: скрыт, раскрывается кликом по карточке (ведёт биндер)
-            var details = new GameObject("Details", typeof(RectTransform));
-            details.transform.SetParent(column.transform, false);
-            var detailsLayout = details.AddComponent<VerticalLayoutGroup>();
-            detailsLayout.spacing = 2;
-            detailsLayout.childControlWidth = true;
-            detailsLayout.childControlHeight = true;
-            detailsLayout.childForceExpandWidth = true;
-            detailsLayout.childForceExpandHeight = false;
-            details.SetActive(false);
-            TMP_Text sector = Text(details, "Район: —", 14f, LabelColor, "Sector");
-            sector.alignment = TextAlignmentOptions.Left;
-            TMP_Text routeLen = Text(details, "Маршрут: 0 юн", 14f, LabelColor, "RouteLen");
-            routeLen.alignment = TextAlignmentOptions.Left;
-            var taskText = Text(details, "", 15f, BrightColor, "Task");
-            taskText.alignment = TextAlignmentOptions.Left;
-
-            var accept = Button(card.transform, "ВЗЯТЬ", TaxiColor, new Color(0.04f, 0.06f, 0.1f), 15f, "Accept");
-            FixedSize(accept, 74f, 34f);
-            var decline = Button(card.transform, "НЕТ", new Color(DangerColor.r, DangerColor.g, DangerColor.b, 0.3f), DangerColor, 15f, "Decline");
-            FixedSize(decline, 62f, 34f);
-
-            return card;
-        }
-
-        // Блок активного заказа (крупный): [фото | имя / маршрут / статус / задание]
-        public static GameObject BuildActiveOrderBlock()
-        {
-            var row = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image));
-            var rowLayout = row.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.padding = new RectOffset(10, 10, 10, 10);
-            rowLayout.spacing = 10;
-            rowLayout.childAlignment = TextAnchor.MiddleCenter;
-            rowLayout.childControlWidth = true;
-            rowLayout.childControlHeight = true;
-            rowLayout.childForceExpandWidth = false;
-            rowLayout.childForceExpandHeight = false;
-            row.GetComponent<Image>().color = PanelColor;
-            row.AddComponent<LayoutElement>().minHeight = 104f;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(440f, 116f); // стартовый размер для префаб-режима
-
-            var photo = new GameObject("Photo", typeof(RectTransform), typeof(Image));
-            photo.transform.SetParent(row.transform, false);
-            var photoImage = photo.GetComponent<Image>();
-            photoImage.preserveAspect = true;
-            photoImage.color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.3f);
-            FixedSize(photo, 64f, 64f);
-
-            var column = new GameObject("Info", typeof(RectTransform));
-            column.transform.SetParent(row.transform, false);
-            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
-            columnLayout.spacing = 2;
-            columnLayout.childControlWidth = true;
-            columnLayout.childControlHeight = true;
-            columnLayout.childForceExpandWidth = true;
-            columnLayout.childForceExpandHeight = false;
-            var columnLe = column.AddComponent<LayoutElement>();
-            columnLe.flexibleWidth = 1f;
-            columnLe.minWidth = 100f;
-            columnLe.preferredWidth = 1f;
-
-            Text(column, "Имя", 20f, BrightColor, "Name");
-            Text(column, "ПЛАНЕТА А → ПЛАНЕТА Б", 18f, TaxiColor, "Route");
-            Text(column, "статус", 15f, LabelColor, "OrderStatus");
-            Text(column, "«пожелание»", 15f, LabelColor, "Wish");
-
-            return row;
-        }
-
-        public static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            Le(go).flexibleWidth = 1f;
         }
     }
 }

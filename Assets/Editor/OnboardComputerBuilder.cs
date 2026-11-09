@@ -94,7 +94,7 @@ namespace SpaceTaxi.Tools
             PrefabUtility.SaveAsPrefabAsset(card, "Assets/Prefabs/UI/OfferCard.prefab");
             Object.DestroyImmediate(card);
 
-            var block = SpaceTaxi.UI.OnboardComputerFactory.BuildActiveOrderBlock();
+            var block = SpaceTaxi.UI.OnboardComputerFactory.BuildActiveOrderCard();
             block.transform.SetParent(null, false);
             RebuildLayout(block.transform as RectTransform);
             PrefabUtility.SaveAsPrefabAsset(block, "Assets/Prefabs/UI/ActiveOrder.prefab");

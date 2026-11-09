@@ -46,7 +46,7 @@ namespace SpaceTaxi.Orders
             {
                 Sprite picked = readyPool[rnd.Next(readyPool.Length)];
                 if (picked != null && picked.name != DispatcherName)
-                    return picked;
+                    return Trimmed(picked);
                 // выпал диспетчер — соберём случайного вместо него
             }
             return Compose(rnd);
@@ -71,10 +71,72 @@ namespace SpaceTaxi.Orders
             Blit(eyesSprite, Color.white, dst); // глаза и рот не красим
             Blit(mouthSprite, Color.white, dst);
 
+            // фигура должна заполнять rect спрайта: аватар в UI строится по
+            // аспекту спрайта, прозрачные поля канвы — мёртвые зоны рамки
+            Rect bounds = AlphaBounds(dst, w, h, new Rect(0f, 0f, w, h));
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
             tex.SetPixels32(dst);
             tex.Apply(false, false);
-            return Sprite.Create(tex, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), w);
+            return Sprite.Create(tex, bounds, new Vector2(0.5f, 0.5f), w);
+        }
+
+        // --- Обрезка прозрачных полей ---
+
+        // порог альфы: срезаем прозрачные поля и полупрозрачную «пыль» краёв
+        // (32 — отсекает туман/антиалиас фигур, тонкие конечности не рвутся)
+        private const byte AlphaThreshold = 32;
+
+        // готовые NPC — ассеты на общей канве с полями; трим в момент выдачи
+        // (текстуры readable, пересчёт дешёвый), кэш по имени исходника —
+        // один портрет всегда даёт один и тот же обрезанный спрайт
+        private static readonly System.Collections.Generic.Dictionary<string, Sprite> trimmedCache =
+            new System.Collections.Generic.Dictionary<string, Sprite>();
+
+        private static Sprite Trimmed(Sprite source)
+        {
+            if (source == null)
+                return null;
+            if (trimmedCache.TryGetValue(source.name, out Sprite cached) && cached != null)
+                return cached;
+
+            Texture2D tex = source.texture;
+            if (!tex.isReadable)
+                return source; // нечитаемая — покажем как есть (крайний случай)
+            Rect area = source.textureRect;
+            Color32[] px = tex.GetPixels32();
+            Rect bounds = AlphaBounds(px, tex.width, tex.height, area);
+            if (bounds.width <= 0f || bounds.height <= 0f)
+                return source; // фигура не найдена — покажем как есть
+
+            // PPU исходника сохраняет масштаб; имя не меняем — кэш по нему
+            Sprite result = Sprite.Create(tex, bounds, new Vector2(0.5f, 0.5f), source.pixelsPerUnit);
+            result.name = source.name;
+            trimmedCache[source.name] = result;
+            return result;
+        }
+
+        // границы непрозрачных пикселей в области area (координаты в пространстве
+        // текстуры); не нашли ни одного пикселя — вернём пустой rect, вызывающий
+        // откатит трим
+        private static Rect AlphaBounds(Color32[] px, int w, int h, Rect area)
+        {
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            int x0 = Mathf.Max(0, (int)area.x);
+            int y0 = Mathf.Max(0, (int)area.y);
+            int x1 = Mathf.Min(w, x0 + (int)area.width);
+            int y1 = Mathf.Min(h, y0 + (int)area.height);
+            for (int y = y0; y < y1; y++)
+                for (int x = x0; x < x1; x++)
+                    if (px[y * w + x].a > AlphaThreshold)
+                    {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+            if (maxX < 0)
+                return Rect.zero;
+            return Rect.MinMaxRect(minX, minY, maxX + 1, maxY + 1);
         }
 
         // слой поверх dst пиксель-в-пиксель (размер канвы = размеру слоёв),

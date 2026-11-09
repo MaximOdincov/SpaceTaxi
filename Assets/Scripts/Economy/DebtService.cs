@@ -34,6 +34,17 @@ namespace SpaceTaxi.Economy
                 Dismissal?.Invoke();
         }
 
+        // разовый штраф (отмена заказа оператором): баланс растёт, счётчик
+        // аварий не трогаем — авария тут ни при чём; автогашение с выплат
+        // подхватит долг как обычный
+        public void AddCharge(int amount)
+        {
+            if (amount <= 0)
+                return;
+            balance += amount;
+            DebtChanged?.Invoke(balance);
+        }
+
         // гашение: кламп до нуля (переплата кредитов не создаёт — платить
         // должен вызывающий), полный расчёт обнуляет счётчик аварий
         public void Repay(int amount)

@@ -24,6 +24,16 @@ namespace SpaceTaxi.UI
         {
             if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
                 Toggle();
+            // страховка от рассинхрона флага и позиции: корутина слайда может
+            // умереть на полпути (перезагрузка домена в плее, замерзший кадр
+            // без фокуса) — тогда флаг «открыто» и позиция «за экраном» живут
+            // врозь и панель «пропадает». Пока анимации нет — выравниваем.
+            if (anim == null && panel != null)
+            {
+                float targetX = shown ? shownX : hiddenX;
+                if (Mathf.Abs(panel.anchoredPosition.x - targetX) > 1f)
+                    SetX(targetX);
+            }
         }
 
         public void Toggle()

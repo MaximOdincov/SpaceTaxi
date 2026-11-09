@@ -14,24 +14,39 @@ namespace SpaceTaxi.UI
     // Бортовой компьютер: панель на автоматических layout-группах. Каркас всегда
     // строится фабрикой (в рантайме — поверх старого мокапа префаба: Frame и
     // Background сохраняются, остальное сносится), живые данные — по ссылкам
-    // из OnboardRefs и событиям систем.
+    // из OnboardRefs и событиям систем. Входящие карточки раскрываются IN PLACE
+    // (анимация высоты обёртки Detail), активный заказ живёт в закреплённой
+    // секции и всегда детальный. Политика переполнения: тексты не меняют высоту
+    // узлов, всё лишнее обрезается «…» на стороне фабрики.
     public class OnboardBinder : MonoBehaviour
     {
         private TMP_Text clock;
         private TMP_Text moneyValue, ratingValue;
-        private Image ratingIconImage;
+        // «★ 3.0»: префикс пуст, если атлас не дал глиф звезды (сброс dynamic-атласа)
+        private string ratingPrefix = "";
+        // символ валюты проекта и глиф часов (есть не в каждом атласе — проверка при бинде)
+        private const string Currency = "Đ";
+        private bool clockGlyph;
+        // анимация денег: показанное значение догоняет целевое (как рейтинг)
+        private float moneyShown = -1f;
+        private int moneyTarget;
+        // строка долга: катится значением, цвет «дышит» — рост горячее погашения
+        private GameObject debtRow;
+        private TMP_Text debtValue;
+        private float debtShown = -1f;
+        private int debtTarget;
+        private bool debtRising;
         // анимация рейтинга: показанное значение догоняет целевое, цвет — динамика
         private float ratingShown = -1f;
         private bool ratingDropping;
         private GameObject activeSection;
-        private RectTransform activeArea; // блок активного заказа + кнопка отмены
+        private RectTransform activeArea; // карточка активного заказа (всегда детальная)
         private RectTransform orderArea;  // контент скролла входящих
-        private TMP_Text econCounters, debtValue;
         private Button abandonButton;
-        private Button cancelButton;
-        private OrderOffer builtActiveOffer; // блок перестраивается только при смене заказа
-
-        [SerializeField] private Sprite ratingIcon;
+        private OrderOffer builtActiveOffer; // карточка актива перестраивается только при смене заказа
+        private GameObject activeCardGo;
+        // раскрытие: входящая карточка разворачивается прямо в ленте скролла
+        private OrderOffer expandedOffer;
 
         [Tooltip("Единый шрифт панели: применяется ко всем текстам каркаса и карточек. Пусто — шрифт часов старого каркаса")]
         [SerializeField] private TMP_FontAsset panelFont;
@@ -41,6 +56,8 @@ namespace SpaceTaxi.UI
         private HullSystem hull;
         private Wallet wallet;
         private DebtService debt;
+        private RatingService rating;      // для отписки от RatingChanged
+        private GameSession cachedSession; // для анимации рейтинга — без поиска в кадре
         private float nextSlowUpdate;
         private bool bound;
         private readonly List<GameObject> activeAreaChildren = new List<GameObject>();
@@ -48,25 +65,24 @@ namespace SpaceTaxi.UI
         // плеер «ЭФИР»
         private Button playerPrev, playerNext;
         private Button radioMute;
-        private GameSession session; // для районов карточек (уровень)
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
         private bool musicBound;
 
+        // анимации раскрытия карточек: одна на карточку, повторный клик не перезапускает
+        private readonly Dictionary<GameObject, Coroutine> heightAnims = new Dictionary<GameObject, Coroutine>();
+        private const float ExpandDuration = 0.22f; // как Slide панели, ease-out cubic
+
         private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
         // §3.2: увольнение после третьей непогашенной аварии (как в StationScreenController)
         private const int MaxUnpaidAccidents = 3;
-
-        private static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);   // #5BC98F
-        private static readonly Color DangerColor = new Color(1f, 0.478f, 0.361f);
 
         private void Awake()
         {
             ApplyPanelFont();
             // каркас всегда кодом: и для старых сцен, и поверх мокапа префаба
             BindRefs(OnboardComputerFactory.Build(transform, fontOverride: panelFont));
-            BindIcons();
             SetupMusicPlayer();
         }
 
@@ -75,6 +91,19 @@ namespace SpaceTaxi.UI
             // AudioManager переживает сцену — иначе событие пришло бы в разрушенный биндер
             if (musicBound && audioManager != null)
                 audioManager.MusicStateChanged -= RefreshMusicPlayer;
+            // симметричная отписка от всего, на что подписались при бинде
+            // (события в разрушенный биндер = NRE, проект уже ломался на этом)
+            if (wallet != null)
+                wallet.CreditsChanged -= ShowCredits;
+            if (debt != null)
+                debt.DebtChanged -= RefreshDebt;
+            if (orders != null)
+            {
+                orders.OffersChanged -= RefreshOrder;
+                orders.ActiveOrderChanged -= RefreshOrder;
+            }
+            if (rating != null)
+                rating.RatingChanged -= ShowRating;
         }
 
         // шрифт панели: panelFont или шрифт часов стоящего каркаса — старого
@@ -91,32 +120,26 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // иконки денег/рейтинга: спрайты сериализованы на биндере (в билде
-        // AssetDatabase недоступен — фабрика грузит их только в редакторе)
-        private void BindIcons()
-        {
-            if (ratingIcon != null && ratingIconImage != null)
-                ratingIconImage.sprite = ratingIcon;
-        }
-
         private void BindRefs(OnboardRefs refs)
         {
             clock = refs.Clock;
             moneyValue = refs.MoneyValue;
             ratingValue = refs.RatingValue;
-            ratingIconImage = refs.RatingIcon;
+            debtRow = refs.DebtRow;
+            debtValue = refs.DebtValue;
             activeSection = refs.ActiveSection;
             activeArea = refs.ActiveArea;
             orderArea = refs.OrderArea;
-            econCounters = refs.EconCounters;
-            debtValue = refs.DebtValue;
-            session = FindAnyObjectByType<GameSession>();
             abandonButton = refs.AbandonButton;
             playerPrev = refs.PlayerPrev;
             playerNext = refs.PlayerNext;
             radioMute = refs.RadioMute;
             trackTitle = refs.TrackTitle;
             progressFill = refs.ProgressFill;
+            if (clock != null && clock.font != null)
+                clockGlyph = clock.font.HasCharacter('⏲');
+            if (refs.Font != null && refs.Font.HasCharacter('★'))
+                ratingPrefix = "★ ";
         }
 
         private static void SetText(GameObject root, string path, string value)
@@ -126,22 +149,31 @@ namespace SpaceTaxi.UI
                 t.GetComponent<TMP_Text>().text = value;
         }
 
-        // --- Зона заказа: активный блок + список входящих ---
+        // лейбл (приглушённый) + значение (яркое) одной строкой — единый стиль сводки;
+        // ColorHex уже возвращает «#hex» — второй решётки после «color=» быть не должно
+        private static string StatLine(string label, string value)
+        {
+            return $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>{label}</color> " +
+                   $"<color={ColorHex(OnboardComputerFactory.BrightColor)}>{value}</color>";
+        }
+
+        // --- Зона заказа: активный заказ + входящие карточки (in place) ---
 
         private void RefreshOrder()
         {
             bool hasActive = orders.Active != null;
+
             if (activeSection != null)
                 activeSection.SetActive(hasActive);
 
-            // блок активного заказа перестраивается только при смене заказа —
-            // иначе каждое OffersChanged (протухание карточек) перезапускало бы фейд
+            // карточка активного заказа перестраивается только при смене заказа —
+            // иначе каждое OffersChanged (протухание) перезапускало бы фейд
             if (!hasActive || orders.Active != builtActiveOffer)
             {
                 foreach (GameObject child in activeAreaChildren)
                     Destroy(child);
                 activeAreaChildren.Clear();
-                cancelButton = null;
+                activeCardGo = null;
                 if (hasActive)
                     BuildActiveOrder();
                 builtActiveOffer = hasActive ? orders.Active : null;
@@ -149,61 +181,194 @@ namespace SpaceTaxi.UI
 
             BuildIncoming();
             UpdateAcceptButtons();
+            RefreshCancelState();
+        }
+
+        private void ExpandOrder(OrderOffer offer)
+        {
+            if (offer == null || !OfferExists(offer))
+                return;
+            if (expandedOffer == offer)
+            {
+                CollapseExpansion(); // повторный клик по «−» сворачивает
+                return;
+            }
+            if (expandedOffer != null)
+                AnimateCard(expandedOffer, expand: false);
+            expandedOffer = offer;
+            AnimateCard(offer, expand: true);
+            RefreshToggleGlyphs();
+        }
+
+        private void CollapseExpansion()
+        {
+            if (expandedOffer == null)
+                return;
+            AnimateCard(expandedOffer, expand: false);
+            expandedOffer = null;
+            RefreshToggleGlyphs();
+        }
+
+        // разворот/сворот карточки in place: Compact гасится, Expanded включается,
+        // preferredHeight карточки анимируется между константами фабрики
+        private void AnimateCard(OrderOffer offer, bool expand)
+        {
+            if (offer == null || !cardMap.TryGetValue(offer, out GameObject card) || card == null)
+                return;
+            Transform compact = card.transform.Find("Compact");
+            Transform expanded = card.transform.Find("Expanded");
+            if (compact == null || expanded == null)
+                return;
+            if (heightAnims.TryGetValue(card, out Coroutine running) && running != null)
+                StopCoroutine(running);
+            // контейнеры взаимоисключающие: переключение мгновенное, наезды исключены
+            compact.gameObject.SetActive(!expand);
+            expanded.gameObject.SetActive(expand);
+            // цель по составу строк: без задания Wish скрыт — раскрытая короче,
+            // иначе под кнопкой «Взять заказ» остаётся пустота
+            bool hasTask = offer.Task != null && offer.Task.Kind != PassengerTaskKind.None;
+            float expandedTarget = OnboardComputerFactory.OfferExpandedHeight - (hasTask ? 0f : 56f);
+            float target = expand ? expandedTarget : OnboardComputerFactory.OfferCompactHeight;
+            heightAnims[card] = StartCoroutine(CardHeightRoutine(card, target));
+        }
+
+        private System.Collections.IEnumerator CardHeightRoutine(GameObject card, float target)
+        {
+            var le = card != null ? card.GetComponent<LayoutElement>() : null;
+            if (le == null)
+                yield break;
+            float from = le.preferredHeight;
+            // ease-out cubic как Slide панели; проверка null — карточка могла протухнуть
+            for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / ExpandDuration)
+            {
+                if (card == null || le == null)
+                    yield break;
+                float k = Mathf.Clamp01(t);
+                float eased = 1f - Mathf.Pow(1f - k, 3f);
+                le.preferredHeight = Mathf.Lerp(from, target, eased);
+                yield return null;
+            }
+            if (card == null || le == null)
+                yield break;
+            le.preferredHeight = target;
+            heightAnims.Remove(card);
         }
 
         private void BuildActiveOrder()
         {
             OrderOffer offer = orders.Active;
 
-            GameObject row = OnboardComputerFactory.BuildActiveOrderBlock();
-            row.transform.SetParent(activeArea, false);
-            activeAreaChildren.Add(row);
-            StartCoroutine(FadeIn(row));
+            GameObject card = OnboardComputerFactory.BuildActiveOrderCard();
+            card.transform.SetParent(activeArea, false);
+            activeAreaChildren.Add(card);
+            activeCardGo = card;
+            StartCoroutine(FadeIn(card));
 
-            var photo = row.transform.Find("Photo");
-            var photoImage = photo != null ? photo.GetComponent<Image>() : null;
-            if (photoImage != null)
+            // тоггла нет: активный заказ всегда в детальном виде
+            var cancel = card.transform.Find("Expanded/Cancel");
+            if (cancel != null)
             {
-                // без портрета (арт А5) — цветная заглушка из палитры генератора
-                if (offer.Passenger.Portrait != null)
-                    photoImage.sprite = offer.Passenger.Portrait;
-                photoImage.color = offer.Passenger.PortraitTint;
+                // деньги штрафа списывает GameSession на OrderCancelled (Wallet/DebtService)
+                cancel.GetComponent<Button>().onClick.AddListener(() => orders.CancelActive());
+                int penalty = OrderService.CancelPenalty(offer.Price);
+                SetText(card.gameObject, "Expanded/Cancel/Text", "Отменить · −" + Currency + " " + penalty);
             }
 
-            SetText(row, "Info/Name", offer.Passenger.DisplayName);
-            SetText(row, "Info/Route",
-                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper()
-                + "  ·  " + orders.RouteDistance(offer).ToString("0") + " юн");
-            // П5.3: вместо пожелания — текст задания, если оно выпало;
-            // таймер дедлайна дописывается в SlowUpdate
-            PassengerTask task = offer.Task;
-            string wish = task != null && task.Kind != PassengerTaskKind.None
-                ? task.Text
-                : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            SetText(row, "Info/Wish", string.IsNullOrEmpty(wish) ? "" : "«" + wish + "»");
+            FillCard(card.transform, offer, activeMode: true);
+        }
 
-            var cancel = OnboardComputerFactory.Button(activeArea, "ОТКАЗАТЬСЯ ОТ ЗАКАЗА",
-                new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.25f), LabelColor, 15f);
-            var cancelLe = cancel.AddComponent<LayoutElement>();
-            cancelLe.minHeight = 30f;
-            cancelLe.flexibleWidth = 1f;
-            cancelButton = cancel.GetComponent<Button>();
-            cancelButton.onClick.AddListener(() => orders.CancelActive());
-            activeAreaChildren.Add(cancel);
+        // единое заполнение карточки (входящей или активной): аватары, верх, сводка
+        private void FillCard(Transform card, OrderOffer offer, bool activeMode)
+        {
+            // аватары фиксированного размера (узкая колонка / полоса) — только
+            // спрайт и тинт, геометрию не трогаем; картинка живёт в child Picture
+            ApplyPortrait(card, "Compact/Avatar/Picture", offer.Passenger);
+            ApplyPortrait(card, "Expanded/DetailAvatar/Picture", offer.Passenger);
+
+            SetText(card.gameObject, "Compact/Info/Name", offer.Passenger.DisplayName);
+            SetText(card.gameObject, "Compact/Info/Route",
+                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
+
+            // строка статуса есть только у актива (узел не строится у входящих)
+            var statusNode = card.Find("Expanded/Summary/Status");
+            if (statusNode != null)
+                statusNode.gameObject.SetActive(activeMode);
+
+            // без задания — строка пожелания скрыта
+            PassengerTask task = offer.Task;
+            bool hasTask = task != null && task.Kind != PassengerTaskKind.None;
+            var wishNode = card.Find("Expanded/Summary/Wish");
+            if (wishNode != null)
+                wishNode.gameObject.SetActive(hasTask);
+            if (hasTask)
+                SetText(card.gameObject, "Expanded/Summary/Wish", StatLine("Пожелание клиента:", task.Text));
+
+            // высота активной карточки под фактический состав строк: без Wish
+            // фиксированная высота оставляла пустоту под кнопкой отмены
+            if (activeMode)
+            {
+                var cardLe = card.gameObject.GetComponent<LayoutElement>();
+                if (cardLe != null)
+                    cardLe.preferredHeight = hasTask
+                        ? OnboardComputerFactory.ActiveCardHeight
+                        : OnboardComputerFactory.ActiveCardHeight - 56f; // Wish 54 + зазор 2
+            }
+
+            RefreshLiveDistances(card, offer);
+        }
+
+        // портрет: спрайт и тинт; размер фиксирован фабрикой (узкая колонка / полоса)
+        // спрайта (NpcPortrait отдаёт обрезанные по альфе спрайты — рамка без
+        // мёртвых зон). Полосе на всю ширину (Expanded/DetailAvatar) ширину не трогаем
+        private static void ApplyPortrait(Transform card, string path, PassengerProfile passenger)
+        {
+            var node = card.Find(path);
+            var image = node != null ? node.GetComponent<Image>() : null;
+            if (image == null)
+                return;
+            if (passenger.Portrait != null)
+                image.sprite = passenger.Portrait;
+            image.color = passenger.PortraitTint;
+        }
+
+        // живые расстояния «от вас» в сводке — вызывается и при заполнении, и в SlowUpdate
+        private void RefreshLiveDistances(Transform card, OrderOffer offer)
+        {
+            if (card == null || offer == null || ship == null)
+                return;
+            float fromDist = orders.DistanceToPlanet(offer.PickupIndex, ship.transform.position);
+            float toDist = orders.DistanceToPlanet(offer.DropoffIndex, ship.transform.position);
+            SetText(card.gameObject, "Expanded/Summary/Name", StatLine("Имя:", offer.Passenger.DisplayName));
+            SetText(card.gameObject, "Expanded/Summary/From",
+                StatLine("Откуда:", orders.PlanetName(offer.PickupIndex).ToUpper() + $" ({fromDist:0} юн от вас)"));
+            SetText(card.gameObject, "Expanded/Summary/To",
+                StatLine("Куда:", orders.PlanetName(offer.DropoffIndex).ToUpper() + $" ({toDist:0} юн от вас)"));
+            SetText(card.gameObject, "Expanded/Summary/RouteLen",
+                StatLine("Примерная длина маршрута:", orders.RouteDistance(offer).ToString("0") + " юн"));
         }
 
         private readonly Dictionary<OrderOffer, GameObject> cardMap = new Dictionary<OrderOffer, GameObject>();
 
         private void BuildIncoming()
         {
-            // ушедшие предложения — плавно растворяются
+            // ушедшие предложения — плавно растворяются; раскрытая перед этим сворачивается
             var gone = new List<OrderOffer>();
             foreach (var pair in cardMap)
                 if (!OfferExists(pair.Key))
                     gone.Add(pair.Key);
             foreach (OrderOffer offer in gone)
             {
-                StartCoroutine(FadeOut(cardMap[offer]));
+                GameObject card = cardMap[offer];
+                if (offer == expandedOffer)
+                {
+                    expandedOffer = null;
+                    AnimateCard(offer, expand: false); // протух пока раскрыт — плавный сворот
+                    RefreshToggleGlyphs();
+                }
+                if (heightAnims.TryGetValue(card, out Coroutine fading) && fading != null)
+                    StopCoroutine(fading);
+                heightAnims.Remove(card);
+                StartCoroutine(FadeOut(card));
                 cardMap.Remove(offer);
             }
 
@@ -223,14 +388,31 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // входящие видны всегда; при активном заказе кнопка «взять» неактивна
+        // «Взять заказ» недоступна при активном заказе — кнопки сереют
         private void UpdateAcceptButtons()
         {
             foreach (GameObject card in cardMap.Values)
             {
-                Transform accept = card.transform.Find("Accept");
+                Transform accept = card.transform.Find("Expanded/Accept");
                 if (accept != null)
                     accept.GetComponent<Button>().interactable = orders.Active == null;
+            }
+        }
+
+        // отмена активного: с пассажиром на борту — только стоя (как в OrderService.CancelActive).
+        // Лейбл штрафа обновляем живьём: цена восстановленного из сейва может
+        // пересчитаться (старые сейвы цену не хранили)
+        private void RefreshCancelState()
+        {
+            if (activeCardGo == null || orders.Active == null || ship == null)
+                return;
+            Transform cancel = activeCardGo.transform.Find("Expanded/Cancel");
+            if (cancel != null)
+            {
+                cancel.GetComponent<Button>().interactable = orders.Active.State == OrderState.Active
+                    || ship.State == ShipState.Landed;
+                int penalty = OrderService.CancelPenalty(orders.Active.Price);
+                SetText(activeCardGo, "Expanded/Cancel/Text", "Отменить · −" + Currency + " " + penalty);
             }
         }
 
@@ -279,102 +461,40 @@ namespace SpaceTaxi.UI
                 Destroy(go);
         }
 
-        // карточка входящего: [аватар | имя+цена / маршрут / дистанция | ВЗЯТЬ | НЕТ],
-        // клик по карточке раскрывает детали (район, длина маршрута, задание)
+        // карточка входящего: Compact = [аватар | имя / маршрут / расстояние],
+        // «+» в углу разворачивает Expanded (портрет, сводка, кнопка) в ленте скролла
         private GameObject BuildCard(OrderOffer offer)
         {
             GameObject card = OnboardComputerFactory.BuildOfferCard();
             card.transform.SetParent(orderArea, false);
 
-            var avatar = card.transform.Find("Avatar");
-            var avatarImage = avatar != null ? avatar.GetComponent<Image>() : null;
-            if (avatarImage != null)
-            {
-                // без портрета (арт А5) — цветная заглушка из палитры генератора
-                if (offer.Passenger.Portrait != null)
-                    avatarImage.sprite = offer.Passenger.Portrait;
-                avatarImage.color = offer.Passenger.PortraitTint;
-            }
-
-            SetText(card, "Info/NameRow/Name", offer.Passenger.DisplayName);
-            var priceNode = card.transform.Find("Info/NameRow/Price");
-            if (priceNode != null)
-                priceNode.GetComponent<TMP_Text>().text = "¤ " + FormatCredits(offer.Price);
-
-            SetText(card, "Info/Route",
-                orders.PlanetName(offer.PickupIndex).ToUpper() + " → " + orders.PlanetName(offer.DropoffIndex).ToUpper());
+            FillCard(card.transform, offer, activeMode: false);
             float toPassenger = orders.DistanceToPlanet(offer.PickupIndex, ship.transform.position);
-            SetText(card, "Info/DistRow/Dist", "до пассажира: " + toPassenger.ToString("0") + " юн");
-
-            // детали (скрыты до раскрытия): район, длина маршрута, задание
-            PassengerTask task = offer.Task;
-            string taskText = task != null && task.Kind != PassengerTaskKind.None
-                ? "Задание: " + task.Text
-                : "";
-            string wishPhrase = task != null && task.Kind != PassengerTaskKind.None
-                ? ""
-                : PassengerProfile.PickPhrase(offer.Passenger.Wishes);
-            SetText(card, "Info/Details/Sector", "Район: " + SectorName(offer.PickupIndex));
-            SetText(card, "Info/Details/RouteLen", "Длина маршрута: " + orders.RouteDistance(offer).ToString("0") + " юн");
-            SetText(card, "Info/Details/Task", string.IsNullOrEmpty(taskText) && !string.IsNullOrEmpty(wishPhrase)
-                ? "Пожелание: «" + wishPhrase + "»"
-                : taskText);
+            SetText(card, "Compact/Info/Dist",
+                "Расстояние до пассажира: " + toPassenger.ToString("0") + " юн.");
+            SetText(card, "Expanded/Accept/Text", "Взять заказ · " + Currency + " " + FormatCredits(offer.Price));
 
             OrderOffer captured = offer;
-            var accept = card.transform.Find("Accept");
+            var accept = card.transform.Find("Expanded/Accept");
             if (accept != null)
                 accept.GetComponent<Button>().onClick.AddListener(() => orders.Accept(captured));
-            var decline = card.transform.Find("Decline");
-            if (decline != null)
-                decline.GetComponent<Button>().onClick.AddListener(() => orders.Decline(captured));
+            var expand = card.transform.Find("ExpandToggle");
+            if (expand != null)
+                expand.GetComponent<Button>().onClick.AddListener(() => ExpandOrder(captured));
 
-            // раскрытие: клик по карточке (кнопки внутри съедают свои клики сами)
-            var cardButton = card.GetComponent<Button>();
-            if (cardButton != null)
-            {
-                var details = card.transform.Find("Info/Details");
-                var le = card.GetComponent<LayoutElement>();
-                cardButton.onClick.AddListener(() =>
-                {
-                    bool opening = details != null && !details.gameObject.activeSelf;
-                    if (details != null)
-                        details.gameObject.SetActive(opening);
-                    StartCoroutine(TweenCardHeight(le, opening ? 176f : 96f));
-                });
-            }
             return card;
         }
 
-        // плавное изменение высоты карточки (раскрытие/сворачивание заказа)
-        private System.Collections.IEnumerator TweenCardHeight(LayoutElement le, float target)
+        // глифы «+»/«−» по состоянию раскрытия
+        private void RefreshToggleGlyphs()
         {
-            if (le == null)
-                yield break;
-            float start = le.minHeight;
-            float t = 0f;
-            while (t < 1f)
+            foreach (var pair in cardMap)
             {
-                t += Time.unscaledDeltaTime / 0.18f;
-                le.minHeight = Mathf.Lerp(start, target, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t)));
-                yield return null;
-            }
-            le.minHeight = target;
-        }
-
-        // район планеты для карточки (сектора карты П1.3)
-        private string SectorName(int index)
-        {
-            var level = session != null ? session.Level : null;
-            if (level == null || index < 0 || index >= level.Bodies.Count)
-                return "—";
-            switch (level.Bodies[index].Sector)
-            {
-                case SpaceTaxi.World.Sector.Hub: return "хаб";
-                case SpaceTaxi.World.Sector.Near: return "ближний";
-                case SpaceTaxi.World.Sector.Mid1: return "средний-1";
-                case SpaceTaxi.World.Sector.Mid2: return "средний-2";
-                case SpaceTaxi.World.Sector.Far: return "дальний";
-                default: return "—";
+                if (pair.Value == null)
+                    continue;
+                var expand = pair.Value.transform.Find("ExpandToggle");
+                if (expand != null)
+                    expand.GetComponentInChildren<TMP_Text>().text = pair.Key == expandedOffer ? "−" : "+";
             }
         }
 
@@ -392,7 +512,9 @@ namespace SpaceTaxi.UI
                 RefreshMusicPlayer(); // музыка могла стартовать до бинда (SceneMusic)
             }
 
+            AnimateMoney();
             AnimateRating();
+            AnimateDebt();
 
             if (!bound)
             {
@@ -402,6 +524,7 @@ namespace SpaceTaxi.UI
                     return;
                 orders = session.Orders;
                 hull = ship.GetComponent<HullSystem>();
+                cachedSession = session;
                 wallet = session.Wallet;
                 wallet.CreditsChanged += ShowCredits;
                 ShowCredits(wallet.Credits);
@@ -416,9 +539,12 @@ namespace SpaceTaxi.UI
                 // слот рейтинга (§3.7): живёт событием, первичный показ при бинде
                 if (session.Rating != null)
                 {
-                    session.Rating.RatingChanged += ShowRating;
-                    ShowRating(session.Rating.Value);
+                    rating = session.Rating;
+                    rating.RatingChanged += ShowRating;
+                    ShowRating(rating.Value);
                 }
+                // «ОТКЛЮЧИТЬ КОРАБЛЬ»: сразу штатный пайплайн потери (HullSystem →
+                // респавн, DebtService.RegisterAccident за аренду, Fleet.NotifyShipLost)
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
                 RefreshOrder();
@@ -435,53 +561,73 @@ namespace SpaceTaxi.UI
         private void SlowUpdate()
         {
             int minutes = 14 * 60 + 2 + (int)Time.time / 3;
-            clock.text = minutes / 60 + ":" + (minutes % 60).ToString("00");
+            clock.text = (clockGlyph ? "⏲ " : "") + minutes / 60 + ":" + (minutes % 60).ToString("00");
 
-            econCounters.text = orders.Deliveries + " доставок · " + orders.Failures + " провалов"
-                + (debt != null ? " · аварий: " + debt.UnpaidAccidents + "/" + MaxUnpaidAccidents : "");
             if (debt != null)
                 RefreshDebt(debt.Balance); // страховка от пропущенного события
             // прогресс трека плеера (П9.3): доля clip position/length, опрос в SlowUpdate
             if (progressFill != null && audioManager != null)
                 progressFill.anchorMax = new Vector2(audioManager.MusicProgress, 1f);
-            abandonButton.gameObject.SetActive(ship.Fuel <= 0f);
-            if (cancelButton != null && orders.Active != null)
-                cancelButton.gameObject.SetActive(orders.Active.State == OrderState.Active
-                    || ship.State == ShipState.Landed);
 
-            var statusText = FindText(activeArea, "ActiveOrder/Info/OrderStatus");
-            if (orders.Active != null && statusText != null)
-                statusText.text = orders.Active.State == OrderState.Aboard
-                    ? Col("Пассажир", "НА БОРТУ → " + orders.PlanetName(orders.Active.DropoffIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price)
-                    : Col("Пассажир", "ожидает на " + orders.PlanetName(orders.Active.PickupIndex).ToUpper()) + "  ·  " + PriceTag(orders.Active.Price);
-
-            // остаток дедлайна Торопыги (П5.3): строка задания, обновление раз в SlowUpdate
-            var wishText = FindText(activeArea, "ActiveOrder/Info/Wish");
-            if (orders.Active != null && wishText != null)
+            // расстояния на компактных карточках — живые
+            foreach (var pair in cardMap)
             {
-                PassengerTask task = orders.Active.Task;
-                if (task != null && task.Kind == PassengerTaskKind.Deadline)
+                if (pair.Value == null)
+                    continue;
+                var dist = pair.Value.transform.Find("Compact/Info/Dist");
+                if (dist != null && ship != null)
                 {
-                    float remaining = task.DeadlineRemaining(Time.time);
-                    string remain = remaining < DeadlineWarnSeconds
-                        ? $"<color=#{ColorUtility.ToHtmlStringRGB(DangerColor)}>Осталось {remaining:0} с</color>"
-                        : $"Осталось {remaining:0} с";
-                    wishText.text = "«" + task.Text + "» · " + remain;
+                    float toPassenger = orders.DistanceToPlanet(pair.Key.PickupIndex, ship.transform.position);
+                    dist.GetComponent<TMP_Text>().text =
+                        "Расстояние до пассажира: " + toPassenger.ToString("0") + " юн.";
                 }
-                // прогресс ожидания на планете (П8.1): посидели X/10 с
-                else if (task != null && task.Kind == PassengerTaskKind.WaitOnPlanet)
-                {
-                    wishText.text = "«" + task.Text + "» · Посидели "
-                        + Mathf.Min(task.WaitAccumulated, task.WaitSeconds).ToString("0")
-                        + "/" + task.WaitSeconds.ToString("0") + " с";
-                }
+            }
+
+            // раскрытая входящая: живые расстояния сводки
+            if (expandedOffer != null && cardMap.TryGetValue(expandedOffer, out GameObject expandedCard)
+                && expandedCard != null && expandedCard.activeInHierarchy)
+                RefreshLiveDistances(expandedCard.transform, expandedOffer);
+
+            // активный заказ: сводка, статус, прогресс задания, доступность отмены
+            if (orders.Active != null && activeCardGo != null && activeCardGo.activeInHierarchy)
+            {
+                RefreshLiveDistances(activeCardGo.transform, orders.Active);
+                UpdateActiveWish();
+                RefreshCancelState();
             }
         }
 
-        // строка «Цена: N кр» — сумма акцентным цветом такси
-        private static string PriceTag(int price)
+        // прогресс задания для строки пожелания (дедлайн/ожидание), null — показывать без прогресса
+        private string TaskProgress(PassengerTask task)
         {
-            return "Цена: <color=" + ColorHex(OnboardComputerFactory.TaxiColor) + ">" + price + " кр</color>";
+            if (task == null || task.Kind == PassengerTaskKind.None)
+                return null;
+            if (task.Kind == PassengerTaskKind.Deadline)
+            {
+                float remaining = task.DeadlineRemaining(Time.time);
+                return remaining < DeadlineWarnSeconds
+                    ? $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Осталось {remaining:0} с</color>"
+                    : $"Осталось {remaining:0} с";
+            }
+            if (task.Kind == PassengerTaskKind.WaitOnPlanet)
+                return "Посидели " + Mathf.Min(task.WaitAccumulated, task.WaitSeconds).ToString("0")
+                    + "/" + task.WaitSeconds.ToString("0") + " с";
+            return null;
+        }
+
+        // задание активного заказа в сводке с живым прогрессом
+        private void UpdateActiveWish()
+        {
+            if (activeCardGo == null || orders.Active == null)
+                return;
+            var wishText = FindText(activeCardGo.transform, "Expanded/Summary/Wish");
+            if (wishText == null || !wishText.gameObject.activeSelf)
+                return;
+            PassengerTask task = orders.Active.Task;
+            if (task == null || task.Kind == PassengerTaskKind.None)
+                return;
+            string progress = TaskProgress(task);
+            wishText.text = StatLine("Пожелание клиента:", task.Text + (progress != null ? " · " + progress : ""));
         }
 
         private static string ColorHex(Color color)
@@ -489,11 +635,33 @@ namespace SpaceTaxi.UI
             return "#" + ColorUtility.ToHtmlStringRGB(color);
         }
 
-        // кредит обновляется событием, без опроса в SlowUpdate
+        // --- СОСТОЯНИЕ: деньги, рейтинг, долг ---
+
+        // кредит обновляется событием, значение плавно докатывается; до первого
+        // события moneyShown == -1 (сентинел) — текст не пишем, не мигнув «Đ -1»
         private void ShowCredits(int credits)
         {
-            if (moneyValue != null)
-                moneyValue.text = "¤ " + FormatCredits(credits);
+            moneyTarget = credits;
+            if (moneyShown < 0f)
+                moneyShown = credits;
+            UpdateMoneyText();
+        }
+
+        private void AnimateMoney()
+        {
+            if (moneyValue == null || moneyShown < 0f || Mathf.Approximately(moneyShown, moneyTarget))
+                return;
+            float speed = Mathf.Max(80f, Mathf.Abs(moneyTarget - moneyShown) * 4f);
+            moneyShown = Mathf.MoveTowards(moneyShown, moneyTarget, speed * Time.unscaledDeltaTime);
+            if (Mathf.Abs(moneyTarget - moneyShown) < 0.5f)
+                moneyShown = moneyTarget;
+            UpdateMoneyText();
+        }
+
+        private void UpdateMoneyText()
+        {
+            if (moneyValue != null && moneyShown >= 0f)
+                moneyValue.text = Currency + " " + FormatCredits(Mathf.RoundToInt(moneyShown));
         }
 
         // компактный формат: 10000 -> 10k, 1 400 000 -> 1.4m — размер строки предсказуем
@@ -514,40 +682,80 @@ namespace SpaceTaxi.UI
             if (ratingShown < 0f)
                 ratingShown = value;
             ratingDropping = value < ratingShown - 0.001f;
-            ratingValue.text = ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+            WriteRatingText();
         }
 
         private void AnimateRating()
         {
-            var s2 = FindAnyObjectByType<GameSession>();
-            var orders = s2 != null ? s2.Orders : null;
-            if (orders == null || s2.Rating == null || ratingValue == null)
+            // сессия кэшируется при бинде: тяжёлый поиск в каждом кадре не нужен
+            var s2 = cachedSession != null ? cachedSession : FindAnyObjectByType<GameSession>();
+            cachedSession = s2;
+            var rating2 = s2 != null ? s2.Rating : null;
+            if (rating2 == null || ratingValue == null)
                 return;
-            float target = s2.Rating.Value;
+            float target = rating2.Value;
             if (ratingShown < 0f)
                 ratingShown = target;
             if (Mathf.Approximately(ratingShown, target))
                 return;
             ratingDropping = target < ratingShown;
-            ratingShown = Mathf.MoveTowards(ratingShown, target, Time.unscaledDeltaTime * 3.5f);
-            if (Mathf.Abs(target - ratingShown) < 0.05f)
+            // плавный glide: скорость пропорциональна дельте (лёгкий разгон и мягкий
+            // докат), минимум не даёт хвосту «залипать» — виден перелист 3.0 → 4.5
+            float delta = Mathf.Abs(target - ratingShown);
+            float speed = Mathf.Max(delta * 4f, 0.4f);
+            ratingShown = Mathf.MoveTowards(ratingShown, target, speed * Time.unscaledDeltaTime);
+            if (Mathf.Abs(target - ratingShown) < 0.005f)
                 ratingShown = target;
-            ratingValue.text = ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+            WriteRatingText();
+        }
+
+        private void WriteRatingText()
+        {
+            if (ratingValue == null)
+                return;
+            ratingValue.text = ratingPrefix + ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+            // в покое — зелёный (цвет рейтинга в шапке), в динамике — красный/зелёный
             ratingValue.color = ratingDropping
                 ? OnboardComputerFactory.DangerColor
                 : OnboardComputerFactory.RatingGreen;
-            if (Mathf.Approximately(ratingShown, target))
-                ratingValue.color = Color.white;
         }
 
-        // при нуле строка пуста; долг — цветом тревоги фабрики
+        // долг: строка скрыта при нуле (layout сжимается), значение катится,
+        // цвет «дышит» — рост горячее, погашение спокойнее
         private void RefreshDebt(int value)
         {
             if (debtValue == null)
                 return;
-            debtValue.text = value > 0
-                ? $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.DangerColor)}>Долг: {value} кр</color>"
-                : "";
+            if (debtShown < 0f)
+                debtShown = value;
+            debtRising = value > debtShown + 0.5f;
+            debtTarget = value;
+            if (debtRow != null)
+                debtRow.SetActive(value > 0 || debtShown > 0.5f);
+            UpdateDebtText();
+        }
+
+        private void AnimateDebt()
+        {
+            if (debtValue == null || debtShown < 0f || Mathf.Approximately(debtShown, debtTarget))
+                return;
+            float speed = Mathf.Max(40f, Mathf.Abs(debtTarget - debtShown) * 3f);
+            debtShown = Mathf.MoveTowards(debtShown, debtTarget, speed * Time.unscaledDeltaTime);
+            if (Mathf.Abs(debtTarget - debtShown) < 0.5f)
+                debtShown = debtTarget;
+            if (debtRow != null && debtTarget <= 0 && debtShown <= 0.5f)
+                debtRow.SetActive(false); // докатка до нуля закончилась — строка уходит
+            UpdateDebtText();
+        }
+
+        private void UpdateDebtText()
+        {
+            if (debtValue == null || debtShown < 0f)
+                return;
+            debtValue.text = "Текущий долг: " + Currency + " " + FormatCredits(Mathf.RoundToInt(debtShown));
+            debtValue.color = debtRising && debtTarget > debtShown + 0.5f
+                ? OnboardComputerFactory.DangerColor
+                : OnboardComputerFactory.DebtCalmColor;
         }
 
         // --- Плеер «ЭФИР» ---
@@ -601,12 +809,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        private static string Col(string label, string value)
-        {
-            return $"<color=#{ColorUtility.ToHtmlStringRGB(OnboardComputerFactory.LabelColor)}>{label}:</color> {value}";
-        }
-
-        private static TMP_Text FindText(RectTransform parent, string name)
+        private static TMP_Text FindText(Transform parent, string name)
         {
             var found = parent.Find(name);
             return found != null ? found.GetComponent<TMP_Text>() : null;
