@@ -3,16 +3,20 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Economy
 {
-    // Числа модели цены заказа (16_BETA_PLAN §3.5, не менять):
-    // цена = (база + min(дальность, кап) × ставка) × класс сектора планеты назначения
+    // Числа модели цены заказа (16_BETA_PLAN §3.5; Н3.1 добавил премиальность тира):
+    // цена = (база + min(дальность, кап) × ставка) × класс сектора × премиальность тира таксиста
     [CreateAssetMenu(fileName = "PricingConfig", menuName = "Space Taxi/Pricing Config")]
     public sealed class PricingConfig : ScriptableObject
     {
         [Header("Формула цены предложения")]
-        public int BasePrice = 40;
-        public float PricePerDistanceUnit = 0.25f;
+        public int BasePrice = 45;
+        public float PricePerDistanceUnit = 0.28f;
         [Tooltip("Кап дальности: заказ «через всю карту» не делает богатым")]
         public float DistanceCap = 1500f;
+
+        [Header("Премиальность тира таксиста (Н3.1): индекс = тир корабля − 1")]
+        [Tooltip("Множитель оплаты заказа: переход на следующий тир окупается за 6-10 заказов")]
+        public float[] TierPrestigeMul = { 1f, 1.26f, 1.52f, 2.26f, 4.28f };
 
         [Header("Класс сектора планеты назначения")]
         public float SectorHubMul = 1.0f;
@@ -27,7 +31,7 @@ namespace SpaceTaxi.Economy
         [Tooltip("Потолок суммарного штрафа, % от цены")]
         public int PenaltyCapPct = 45;
         [Tooltip("% от (цена − штраф), только на арендном корабле")]
-        public int RentalCommissionPct = 25;
+        public int RentalCommissionPct = 35;
         [Tooltip("% выплаты, автоматически уходящий в счёт долга (пока долг > 0)")]
         public int DebtRepaySharePct = 50;
 
@@ -77,6 +81,16 @@ namespace SpaceTaxi.Economy
                 case Sector.Far: return SectorFarMul;
                 default: return 1f;
             }
+        }
+
+        // множитель премиальности по тиру корабля-таксиста; кривой тир/пустой
+        // массив — кламп в 1..5 (короткий массив ассета — верхний кламп)
+        public float GetTierPrestigeMul(int tier)
+        {
+            var muls = TierPrestigeMul;
+            if (muls == null || muls.Length == 0)
+                return 1f;
+            return muls[Mathf.Clamp(tier, 1, muls.Length) - 1];
         }
 
         // цена единицы топлива сети; тир 0/некорректный → базовая сеть (1 кр/ед)

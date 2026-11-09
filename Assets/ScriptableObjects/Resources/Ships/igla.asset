@@ -28,7 +28,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: bfdb87b691ca582baa7a2c047038ae16, type: 3}
   - {fileID: 21300000, guid: 9e422e9d194b51a1940bb8a8255ffbc4, type: 3}
   VisualLength: 35
-  Price: 5200
+  Price: 4600
   IsRental: 0
-  Retro: 72
+  Retro: 276
   Description: "\u0421\u0430\u043C\u044B\u0439 \u0431\u044B\u0441\u0442\u0440\u044B\u0439, \u0445\u0440\u0443\u043F\u043A\u0438\u0439"

@@ -76,12 +76,12 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.Thrust = 95f;
                 eggRentalFallback.StrafeAcc = 85f;
                 eggRentalFallback.MaxV = 330f;
-                eggRentalFallback.FuelMax = 100f;
+                eggRentalFallback.FuelMax = 85f;
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;
                 eggRentalFallback.VisualLength = 27f;
-        eggRentalFallback.Retro = 60f;
+                eggRentalFallback.Retro = 120f; // числа держим равными egg_rental.asset (Н3.1)
                 eggRentalFallback.Description = "Арендный корабль компании, всегда сток";
                 return eggRentalFallback;
             }
