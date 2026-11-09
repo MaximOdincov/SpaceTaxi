@@ -395,9 +395,10 @@ namespace SpaceTaxi.UI
         // Image.color его чернит. Один раз перекрашиваем текстуру в белое с тем
         // же альфа-каналом (isReadable включён у импортера) и кэшируем; остриё
         // вверх, как у прежнего процедурного шеврона. Фолбэк — StubSprites.
+        // Публично: маркер игрока на карте (Н4.6.2) красит этот же белый шеврон.
         private static Sprite chevronSprite;
 
-        private static Sprite ChevronSprite()
+        public static Sprite ChevronSprite()
         {
             if (chevronSprite != null)
                 return chevronSprite;
