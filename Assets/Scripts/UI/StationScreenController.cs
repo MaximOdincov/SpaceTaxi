@@ -135,6 +135,7 @@ namespace SpaceTaxi.UI
         // ShopStockService (раз в 2 игровых часа) — витрина меняется сама
         private ShipConfig[] shipCatalog;
         private int showcaseIndex;
+        private int showcasePaintIndex; // покраска на витрине сейчас: 0 = заводская, 1..N — PaintVariants
         private int stockSlot;           // слот ротации на последней отрисовке
         private ShipConfig showcaseShip; // модель на витрине сейчас
         private Image showcaseSprite;
@@ -1338,8 +1339,14 @@ namespace SpaceTaxi.UI
             showcaseBadge = BuildBadge(nameRow.transform, "ВЫ ЗДЕСЬ");
             showcaseBadge.SetActive(false);
 
-            showcasePaint = OnboardComputerFactory.Text(shopWindow, "", 16f, OnboardComputerFactory.LabelColor, "PaintLine");
-            OnboardComputerFactory.FixedHeight(showcasePaint.gameObject, 20f);
+            // строка расцветки: текст + кнопка листания покраски витрины
+            // (0 = заводская, 1..N — PaintVariants; модель без вариантов —
+            // FlipPaint молчит)
+            var paintRow = OnboardComputerFactory.H("PaintRow", shopWindow.transform);
+            OnboardComputerFactory.FixedHeight(paintRow.gameObject, 24f);
+            showcasePaint = OnboardComputerFactory.Text(paintRow, "", 16f, OnboardComputerFactory.LabelColor, "PaintLine");
+            OnboardComputerFactory.Flexible(showcasePaint.gameObject);
+            BuildPaintFlipButton(paintRow.transform, "расцветка →", () => FlipPaint(1));
 
             // таблица статов: подпись | полоска сравнения | % отличия от текущего
             var statsTable = new GameObject("StatsTable", typeof(RectTransform));
@@ -1488,6 +1495,37 @@ namespace SpaceTaxi.UI
             RefreshShowcase();
         }
 
+        // кнопка листания покраски витрины — маленькая сестра BuildArrowButton:
+        // тот же стиль фабрики, но в высоту строки расцветки
+        private void BuildPaintFlipButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = OnboardComputerFactory.Button(parent, label,
+                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
+                    OnboardComputerFactory.LabelColor.b, 0.18f),
+                OnboardComputerFactory.LabelColor, 15f, "PaintFlip");
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = 132f;
+            le.preferredWidth = 132f;
+            le.minHeight = 24f;
+            le.preferredHeight = 24f;
+            go.GetComponent<Button>().onClick.AddListener(onClick);
+        }
+
+        // листание расцветки показанной модели: 0 = заводская, 1..N — PaintVariants.
+        // Перерисовывается только спрайт и строка расцветки: полный рефреш
+        // вернул бы значение из ротации слота
+        private void FlipPaint(int delta)
+        {
+            ShipConfig config = showcaseShip;
+            if (config == null || config.PaintVariantCount == 0 || shopWindow == null
+                || session == null || session.Fleet == null)
+                return;
+            int values = config.PaintVariantCount + 1;
+            showcasePaintIndex = (showcasePaintIndex + delta + values) % values;
+            ApplyShowcaseSprite(session.Fleet, config, showcasePaintIndex);
+            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
+        }
+
         // витрина перечитывается на каждый RefreshShop (деньги/парк) и при
         // смене слота ротации из Update — вариант покраски меняется сам
         private void RefreshShowcase()
@@ -1501,28 +1539,19 @@ namespace SpaceTaxi.UI
             showcaseShip = config;
             int slot = ShopStockService.CurrentSlot(Time.time);
             stockSlot = slot;
-            int paintIndex = ShopStockService.DisplayPaintIndex(config, slot);
-
-            // спрайт: показанный вариант покраски (ротация) или заводской;
-            // арта нет вовсе — заглушка-треугольник с затенением по тиру
-            Sprite sprite = config.GetPaintSprite(paintIndex);
-            bool current = IsCurrent(fleet, config);
-            bool owned = fleet.IsOwned(config);
-            showcaseSprite.sprite = sprite != null ? sprite : StubSprites.ShipTriangle();
-            showcaseSprite.color = sprite == null ? TierShade(config.Tier)
-                : owned && !current ? new Color(0.62f, 0.62f, 0.62f, 0.9f) // «в ангаре» — серым
-                : Color.white;
+            // стартовое значение из ротации слота: листание покраски (FlipPaint)
+            // переписывает поле, полный рефреш возвращает витрину к ротации
+            showcasePaintIndex = ShopStockService.DisplayPaintIndex(config, slot);
+            ApplyShowcaseSprite(fleet, config, showcasePaintIndex);
 
             bool rental = config.IsRental;
+            bool current = IsCurrent(fleet, config);
+            bool owned = fleet.IsOwned(config);
             showcaseName.text = config.DisplayName + " · Т" + config.Tier;
             if (showcaseBadge != null)
                 showcaseBadge.SetActive(current);
             UpdateShowcaseStats(config);
-            int variants = config.PaintVariantCount;
-            showcasePaint.text = variants == 0 ? "Расцветка: заводская"
-                : paintIndex == 0
-                    ? $"Расцветка: заводская · ещё {variants} в ротации"
-                    : $"Расцветка: вариант {paintIndex} из {variants} (ротация 2 игрочаса)";
+            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
             showcaseStatus.text = current ? "В полёте (текущий)"
                 : owned ? "В ангаре"
                 : rental ? "Аренда"
@@ -1536,6 +1565,30 @@ namespace SpaceTaxi.UI
                 : canSit ? "СЕСТЬ В"
                 : current ? "В ПОЛЁТЕ"
                 : "НЕТ В ПРОДАЖЕ";
+        }
+
+        // спрайт витрины: показанный вариант покраски или заводской; арта нет
+        // вовсе — заглушка-треугольник с затенением по тиру; «в ангаре» — серым.
+        // Один источник для полного рефреша и листания покраски
+        private void ApplyShowcaseSprite(FleetService fleet, ShipConfig config, int paintIndex)
+        {
+            Sprite sprite = config.GetPaintSprite(paintIndex);
+            bool current = IsCurrent(fleet, config);
+            bool owned = fleet.IsOwned(config);
+            showcaseSprite.sprite = sprite != null ? sprite : StubSprites.ShipTriangle();
+            showcaseSprite.color = sprite == null ? TierShade(config.Tier)
+                : owned && !current ? new Color(0.62f, 0.62f, 0.62f, 0.9f) // «в ангаре» — серым
+                : Color.white;
+        }
+
+        // строка «Расцветка: …» под именем модели на витрине
+        private static string PaintLineText(ShipConfig config, int paintIndex)
+        {
+            int variants = config.PaintVariantCount;
+            return variants == 0 ? "Расцветка: заводская"
+                : paintIndex == 0
+                    ? $"Расцветка: заводская · ещё {variants} в ротации"
+                    : $"Расцветка: вариант {paintIndex} из {variants} (ротация 2 игрочаса)";
         }
 
         // сравниваемая величина стата (Н3.4): индексы 0..4 — «больше = лучше»,
@@ -1641,8 +1694,10 @@ namespace SpaceTaxi.UI
             int price = config.Price;
             if (price <= 0)
                 return; // «НЕТ В ПРОДАЖЕ» — кнопка серая, но поток проверяет сам
-            // покупка в показанном варианте: индекс витрины = индекс покраски
-            int paintIndex = ShopStockService.DisplayPaintIndex(config, ShopStockService.CurrentSlot(Time.time));
+            // покупка показанного варианта: индекс покраски берём с витрины
+            // (листание переписывает showcasePaintIndex), иначе «показано X,
+            // куплено Y»
+            int paintIndex = showcasePaintIndex;
             if (!session.Fleet.TryBuy(config, session.Wallet, paintIndex))
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
