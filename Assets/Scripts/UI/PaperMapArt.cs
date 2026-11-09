@@ -83,6 +83,21 @@ namespace SpaceTaxi.UI
         return RingSprite("target", 256, 0.94f, 0.99f, 1f, 1f, 0.012f);
     }
 
+    // карандашный штрих пунктира маршрута: короткий, чуть толще к середине
+    public static Sprite RouteDash()
+    {
+        if (cache.TryGetValue("routedash", out Sprite s) && s != null)
+            return s;
+        var tex = StubSprites.CreateMaskTexture(64, (x, y) =>
+        {
+            float taper = 0.10f + 0.07f * (1f - Mathf.Abs(x)); // толще в середине штриха
+            return Mathf.Abs(x) < 0.84f && Mathf.Abs(y) < taper;
+        });
+        s = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
+        cache["routedash"] = s;
+        return s;
+    }
+
     // ————— процедурный карандаш: тела как будто обведены от руки —————
     // сид (хэш имени) фиксирует дрожь руки: форма тела держится между открытиями.
     // Вариантов немного (кэш по сиду % N) — текстуры не плодятся на каждый объект.

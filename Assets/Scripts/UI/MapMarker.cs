@@ -14,6 +14,8 @@ namespace SpaceTaxi.UI
         public Graphic visual; // что подсвечивать (иконка); пусто — первый Graphic в дереве
 
         public event Action Clicked;
+        public event Action HoverEntered;
+        public event Action HoverExited;
 
         private Vector3 baseScale;
         private Color baseColor;
@@ -30,6 +32,7 @@ namespace SpaceTaxi.UI
             if (visual != null)
                 visual.color = Color.Lerp(baseColor, Color.white, 0.35f);
             Cursor.SetCursor(PaperMapArt.CursorTexture(), PaperMapArt.CursorHotspot, CursorMode.Auto);
+            HoverEntered?.Invoke();
         }
 
         public void OnPointerExit(PointerEventData eventData)
@@ -41,6 +44,7 @@ namespace SpaceTaxi.UI
             if (visual != null)
                 visual.color = baseColor;
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+            HoverExited?.Invoke();
         }
 
         public void OnPointerClick(PointerEventData eventData)
