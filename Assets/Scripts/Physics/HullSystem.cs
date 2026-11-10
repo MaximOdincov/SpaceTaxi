@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using SpaceTaxi.Audio;
 using SpaceTaxi.Economy;
@@ -14,6 +15,12 @@ namespace SpaceTaxi.Physics
         private LevelAsset level;
         private Vector3 initialScale = Vector3.one; // респавн откатывает сжатие дырой
         private ShipModelVisual modelVisual;
+        // рендереры, спрятанные на «мёртвую» паузу до респавна: возвращаем ровно их,
+        // чтобы не воскресить корневой спрайт под визуалом модели (двойной корпус)
+        private readonly List<SpriteRenderer> hiddenVisuals = new List<SpriteRenderer>();
+        // палитра взрыва: копия OnboardComputerFactory.DangerColor — UI-неймспейс
+        // в физику не тащим, цвет уходит параметром в ShipExplosion.Spawn
+        private static readonly Color DangerTint = new Color(1f, 0.32f, 0.24f);
 
         // лениво с кэшем: ShipModelVisual добавляется позже Awake (WorldBuilder)
         private ShipModelVisual Visual => modelVisual != null
@@ -130,9 +137,35 @@ namespace SpaceTaxi.Physics
             Died?.Invoke();
             Sound.Play(SoundId.Explosion); // дакнет остальные группы в AudioManager
             CameraFollow.AddShake(0.85f); // гибель — самый сильный толчок
+            // взрыв в точке корабля до телепорта респавна: вспышка закрывает корпус,
+            // сам корпус на «мёртвую» паузу прячем — видны только частицы (0.6 c)
+            ShipExplosion.Spawn(transform.position, Visual != null ? Visual.HalfExtent : 0f, DangerTint);
+            HideVisuals();
             ship.State = ShipState.Respawning;
             ship.Body.linearVelocity = Vector2.zero;
             StartCoroutine(RespawnAfter(0.6f)); // короткая пауза на взрыв
+        }
+
+        // спрятать корпус на время между смертью и респавном (взрыв вместо него);
+        // кэшируем только включённые рендереры — выключенные сами вернутся как были
+        private void HideVisuals()
+        {
+            hiddenVisuals.Clear();
+            foreach (SpriteRenderer renderer in GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                if (!renderer.enabled)
+                    continue;
+                renderer.enabled = false;
+                hiddenVisuals.Add(renderer);
+            }
+        }
+
+        private void RestoreVisuals()
+        {
+            foreach (SpriteRenderer renderer in hiddenVisuals)
+                if (renderer != null)
+                    renderer.enabled = true;
+            hiddenVisuals.Clear();
         }
 
         private System.Collections.IEnumerator RespawnAfter(float delay)
@@ -161,6 +194,7 @@ namespace SpaceTaxi.Physics
             ship.Hp = ship.Eff.HpMax;
             ship.Fuel = ship.Eff.FuelMax;
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
+            RestoreVisuals(); // корпус возвращается при респавне (после гибели прятался)
             ship.LandedOn = respawnPlanet;
             ship.State = ShipState.Landed;
             HpChanged?.Invoke();
