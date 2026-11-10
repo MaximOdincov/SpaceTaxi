@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e32d23da162b4722a5218ef2da1858db, type: 3}
   m_Name: UpgradeConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Economy.UpgradeConfig
-  PricesPerLevel:
-  - 300
-  - 700
-  - 1500
+  PricesPerLevel: 2c010000bc020000dc050000i
+  EnginePrices: 0a0000001e00000028000000i
+  TankPrices: 560400008a070000140a0000i
+  HullPrices: 4600000096000000e6000000i
+  ManeuverPrices: 280000002800000028000000i
   EngineName: "\u0414\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
   TankName: "\u0411\u0430\u043A"
   HullName: "\u041A\u043E\u0440\u043F\u0443\u0441"

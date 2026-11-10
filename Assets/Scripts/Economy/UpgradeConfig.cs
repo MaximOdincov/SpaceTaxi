@@ -20,6 +20,14 @@ namespace SpaceTaxi.Economy
         [Header("Цены за уровень (индекс = уровень - 1)")]
         public int[] PricesPerLevel = { 300, 700, 1500 };
 
+        // По-линейные цены (D1/BALANCE_N4): 0 или пустой массив — фолбэк на общий
+        // PricesPerLevel (старые ассеты). Индекс = уровень - 1
+        [Header("Цены по линиям (индекс = уровень - 1; 0/пусто — общий PricesPerLevel)")]
+        public int[] EnginePrices = { 10, 30, 40 };
+        public int[] TankPrices = { 1110, 1930, 2580 };
+        public int[] HullPrices = { 70, 150, 230 };
+        public int[] ManeuverPrices = { 40, 40, 40 };
+
         [Header("Названия линий (для магазина П3.3)")]
         public string EngineName = "Двигатель";
         public string TankName = "Бак";
@@ -41,6 +49,34 @@ namespace SpaceTaxi.Economy
         public float HullHeatRedPct = 30f;
         [Tooltip("Прибавка боковой тяги, %")]
         public float ManeuverStrafePct = 35f;
+
+        // Цена уровня level (1..3) линии lineIndex (порядок UpgradeLine):
+        // если массив линии задан ненулевым — его значение, иначе общий
+        // PricesPerLevel[level - 1] (обратная совместимость); нет данных — 0
+        public int GetPrice(int lineIndex, int level)
+        {
+            if (level < 1 || level > ShipStats.MaxLevel)
+                return 0;
+            int[] perLine = LinePrices(lineIndex);
+            if (perLine != null && level <= perLine.Length && perLine[level - 1] > 0)
+                return perLine[level - 1];
+            int[] common = PricesPerLevel;
+            return common != null && level <= common.Length && common[level - 1] > 0
+                ? common[level - 1]
+                : 0;
+        }
+
+        private int[] LinePrices(int lineIndex)
+        {
+            switch (lineIndex)
+            {
+                case (int)UpgradeLine.Engine: return EnginePrices;
+                case (int)UpgradeLine.Tank: return TankPrices;
+                case (int)UpgradeLine.Hull: return HullPrices;
+                case (int)UpgradeLine.Maneuver: return ManeuverPrices;
+                default: return null;
+            }
+        }
 
         private static UpgradeConfig fallback;
 

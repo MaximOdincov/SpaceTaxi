@@ -1137,7 +1137,6 @@ namespace SpaceTaxi.UI
             var upgrades = fleet.Upgrades;
             if (upgrades == null)
                 return;
-            int[] prices = upgrades.PricesPerLevel;
             for (int i = 0; i < upgradeRows.Length; i++)
             {
                 var row = upgradeRows[i];
@@ -1146,8 +1145,8 @@ namespace SpaceTaxi.UI
                 row.Level.text = $"ур. {level}/{ShipStats.MaxLevel}";
                 row.Effect.text = maxed ? "макс. уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
                 UpdateUpgradePreview(row, upgrades, (UpgradeLine)i, level, maxed);
-                // цена следующего уровня — PricesPerLevel[текущий уровень], как в TryUpgrade
-                int price = prices != null && level < prices.Length ? prices[level] : 0;
+                // цена следующего уровня — GetPrice линии (level + 1), как в TryUpgrade
+                int price = upgrades.GetPrice(i, level + 1);
                 row.BuyLabel.text = maxed ? "МАКС." : $"КУПИТЬ ({price} КР)";
                 row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
             }

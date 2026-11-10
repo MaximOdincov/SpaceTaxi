@@ -139,7 +139,10 @@ def collect_upgrade_payback(ship, physics, pricing, upgrades, sim):
     cruise = stats0["max_v"] * bm.EST["cruise_frac"]
     income_per_sec = sim["net_per_order"] / max(1.0, sim["time_per_order"])
     lam = bm.EST["careful_lambda"]
-    death_cost_own = ship["price"] + sum(upgrades["prices"]) * 4 + sim["net_per_order"]
+    # полная прокачка 4 линий (по-линейные цены, D1) — как UpgradeConfig.GetPrice
+    full_upgrade_cost = sum(sum(upgrades[k + "_prices"])
+                            for k in ("engine", "tank", "hull", "maneuver"))
+    death_cost_own = ship["price"] + full_upgrade_cost + sim["net_per_order"]
 
     # типовой заказ: платный маршрут ≈ средняя дистанция карты с холостым плечом
     flight_dist = sim["_flight_dist"]
@@ -156,7 +159,7 @@ def collect_upgrade_payback(ship, physics, pricing, upgrades, sim):
             levels = [0, 0, 0, 0]
             levels[lines.index(line)] = lvl
             stats = bm.ship_stats(physics, upgrades, ship, tuple(levels))
-            price = upgrades["prices"][lvl - 1]
+            price = upgrades[line + "_prices"][lvl - 1]  # по-линейная цена (D1)
             if line == "engine":
                 # тяга ↑ → быстрее разгон до MaxV: экономия времени × 2 разгона/заказ
                 t_saved = bm.EST["k_accel"] * stats0["max_v"] * (1 / stats0["thrust"] - 1 / stats["thrust"])
@@ -354,8 +357,11 @@ def build_params(ws, data):
         r += 1
 
     section("5. Улучшения — UpgradeConfig_Default.asset (ShipStats.Compute)")
-    row("Цены уровней 1/2/3, кр", " / ".join(str(int(p)) for p in upgrades["prices"]),
+    row("Цены общие уровней 1/2/3 (фолбэк), кр", " / ".join(str(int(p)) for p in upgrades["prices"]),
         upgrades["source"] + " → PricesPerLevel")
+    for _ln, _nm in (("engine", "Двигатель"), ("tank", "Бак"), ("hull", "Корпус"), ("maneuver", "Манёвровые")):
+        row("Цены %s ур. 1/2/3, кр" % _nm, " / ".join(str(int(p)) for p in upgrades[_ln + "_prices"]),
+            upgrades["source"] + " → " + _ln.capitalize() + "Prices")
     row("Двигатель: +тяга %% на макс / буст качелей до" % (), "%d / %s" % (upgrades["engine_thrust"], upgrades["engine_boost"]),
         upgrades["source"] + " → EngineThrustPct/EngineBoostMax")
     row("Бак: +ёмкость %% / −расход %% на макс" % (), "%d / %d" % (upgrades["tank_cap"], upgrades["tank_drain_red"]),
@@ -726,7 +732,7 @@ def build_invariants(ws, data):
     verdict("И2: улучшение окупается ≤ %d заказов (аналитически, все корабли)" % bm.TARGETS["upgrade_payback_max"],
             "проваливают: %s" % ("; ".join(fails2[:6]) if fails2 else "никто"),
             "≤ %d заказов на уровень" % bm.TARGETS["upgrade_payback_max"], inv2_ok,
-            "UpgradeConfig_Default → PricesPerLevel 300/700/1500 → снизить до ~уровня Δдохода×N (см. Метрики.5); "
+            "UpgradeConfig_Default → по-линейные цены EnginePrices/TankPrices/HullPrices/ManeuverPrices (D1, фолбэк PricesPerLevel); "
             "корневая причина — эффекты линий не конвертируются в доход (время разгона/заправки) — механика минусов владельца (+тяга=+расход, +бак=+масса) добавит и осмысленность")
 
     # 3. смерть дороже заправки

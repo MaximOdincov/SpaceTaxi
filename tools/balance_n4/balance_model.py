@@ -20,6 +20,7 @@ import math
 import os
 import random
 import re
+import struct
 
 # ============================ ПУТИ ==========================================
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -47,10 +48,22 @@ def _scalar(text, field, cast=float):
     return cast(raw)
 
 def _float_list(text, field):
+    """Массив из YAML-ассета: список '- N' либо компактная запись Unity 6
+    примитивных массивов '2c010000...i' (hex little-endian, суффикс i=int32/f=float32)."""
     m = re.search(r"^\s*%s:\s*\n((?:\s*-\s*[-\d.]+\s*\n)+)" % re.escape(field), text, re.M)
+    if m is not None:
+        return [float(x) for x in re.findall(r"-\s*([-\d.]+)", m.group(1))]
+    m = re.search(r"^\s*%s: ([0-9a-fA-F]+[if])\s*$" % re.escape(field), text, re.M)
     if m is None:
         raise KeyError("массив %s не найден" % field)
-    return [float(x) for x in re.findall(r"-\s*([-\d.]+)", m.group(1))]
+    return _bin_array(m.group(1))
+
+def _bin_array(raw):
+    """'2c010000bc020000dc050000i' → [300.0, 700.0, 1500.0] (int32/float32 LE по 4 байта)."""
+    body, kind = raw[:-1], raw[-1]
+    fmt = "i" if kind == "i" else "f"
+    return [struct.unpack("<" + fmt, bytes.fromhex(body[j:j + 8]))[0]
+            for j in range(0, len(body), 8)]
 
 def load_pricing(path=PRICING_ASSET):
     """Assets/Scripts/Economy/PricingConfig.cs — имена полей 1:1."""
@@ -86,9 +99,15 @@ def load_pricing(path=PRICING_ASSET):
 def load_upgrades(path=UPGRADE_ASSET):
     """Assets/Scripts/Economy/UpgradeConfig.cs — имена полей 1:1."""
     t = _read(path)
+    prices = _float_list(t, "PricesPerLevel")          # общие цены уровней 1..3 (фолбэк)
     return dict(
         source=os.path.relpath(path, ROOT),
-        prices=_float_list(t, "PricesPerLevel"),          # цены уровней 1..3
+        prices=prices,
+        # по-линейные цены (D1, UpgradeConfig.GetPrice): поля нет/пуст — общий prices
+        engine_prices=_line_prices(t, "EnginePrices", prices),
+        tank_prices=_line_prices(t, "TankPrices", prices),
+        hull_prices=_line_prices(t, "HullPrices", prices),
+        maneuver_prices=_line_prices(t, "ManeuverPrices", prices),
         engine_thrust=_scalar(t, "EngineThrustPct"),      # +тяга %
         engine_boost=_scalar(t, "EngineBoostMax"),        # буст качелей до
         tank_cap=_scalar(t, "TankCapacityPct"),           # +бак %
@@ -97,6 +116,15 @@ def load_upgrades(path=UPGRADE_ASSET):
         hull_heat_red=_scalar(t, "HullHeatRedPct"),       # −жар %
         maneuver_strafe=_scalar(t, "ManeuverStrafePct"),  # +Strafe %
     )
+
+def _line_prices(text, field, fallback):
+    """Цена линии из ассета (массив уровней 1..3); поля нет или пуст —
+    общий PricesPerLevel, как фолбэк в UpgradeConfig.GetPrice."""
+    try:
+        vals = _float_list(text, field)
+    except KeyError:
+        return fallback
+    return vals if vals else fallback
 
 def load_physics(path=PHYSICS_ASSET):
     """Assets/Scripts/Physics/PhysicsConfig.cs — имена полей 1:1."""
@@ -578,15 +606,15 @@ def simulate(world, physics, pricing, upgrades, ships_by_id, strategy, seed,
         levels = st.levels.setdefault(sid, [0, 0, 0, 0])
         if levels[line_idx] >= 3:
             return False
-        price = upgrades["prices"][levels[line_idx]]
+        line_key = ("engine", "tank", "hull", "maneuver")[line_idx]  # UpgradeLine: Engine=0..Maneuver=3
+        price = upgrades[line_key + "_prices"][levels[line_idx]]     # по-линейная цена (UpgradeConfig.GetPrice)
         if st.wallet < price:
             return False
         st.wallet -= price
         levels[line_idx] += 1
         totals["upgrade_spent"] += price
         ship_cost_total[sid] = ship_cost_total.get(sid, 0) + price
-        upgrade_buys.append((st.order_no, ["engine", "tank", "hull", "maneuver"][line_idx],
-                             levels[line_idx], price))
+        upgrade_buys.append((st.order_no, line_key, levels[line_idx], price))
         return True
 
     def stats_of(sid, levels):
