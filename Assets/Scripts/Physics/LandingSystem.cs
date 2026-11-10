@@ -30,6 +30,12 @@ namespace SpaceTaxi.Physics
         // две планеты) не должны бить и сажать дважды
         private bool touchHandled;
 
+        // дожим в посадочную позу корутиной: контактная точка не совпадает с позой
+        // покоя, мгновенный телепорт давал подпрыгивание — тело замораживается,
+        // поза доводится плавно (A5)
+        private Coroutine landingPinch;
+        private RigidbodyConstraints2D savedConstraints;
+
         private void FixedUpdate()
         {
             touchHandled = false; // каждый шаг физики предшествует своей пачке коллбэков
@@ -92,6 +98,7 @@ namespace SpaceTaxi.Physics
         // взлёт со стоянки — импульс от центра планеты
         public void Takeoff()
         {
+            CancelPinch(); // снять дожим и разморозить тело, иначе импульс не сдвинет
             if (ship == null || ship.State != ShipState.Landed || ship.LandedOn == null)
                 return;
             Vector2 dir = ((Vector2)ship.transform.position - (Vector2)ship.LandedOn.transform.position).normalized;
@@ -108,24 +115,33 @@ namespace SpaceTaxi.Physics
         private void Land(Planet planet, Collision2D collision)
         {
             touchHandled = true; // касание обработано — параллельные пары в этом шаге молчат
-            Vector2 normal = collision.contactCount > 0
-                ? collision.contacts[0].normal
-                : (Vector2)(transform.position - planet.transform.position).normalized;
 
-            // снап на поверхность, скорость в ноль, нос от центра; отступ —
-            // половина высоты капсулы (ShipPlacement): корабль сразу в позе
-            // покоя, солвер не дорешивает; телепорт и тела, и transform —
-            // интерполяция иначе отдаёт кадр «пробитой» позы
+            // целевая поза по радиали от центра планеты, не по нормали контакта:
+            // нормаль у касания капсулы уходит вбок — мгновенный снап давал боковой
+            // рывок; радиаль совпадает с Takeoff и Ship.ApplyModelSprite
+            Vector2 dir = ((Vector2)transform.position - (Vector2)planet.transform.position).normalized;
+            if (dir.sqrMagnitude < 1e-6f)
+                dir = collision.contactCount > 0 ? (Vector2)collision.contacts[0].normal : Vector2.up;
             float extent = ShipPlacement.LandedExtent(Visual);
-            Vector2 pos = (Vector2)planet.transform.position + normal * (planet.Radius + extent);
-            float nose = GetComponent<ShipController>() != null ? GetComponent<ShipController>().SpriteNoseAngle : 0f;
-            float angle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg;
-            ShipPlacement.TeleportLanded(ship, pos, angle - nose);
-            ship.Body.linearVelocity = Vector2.zero;
+            Vector2 targetPos = (Vector2)planet.transform.position + dir * (planet.Radius + extent);
+            ShipController controller = GetComponent<ShipController>();
+            float nose = controller != null ? controller.SpriteNoseAngle : 0f;
+            float targetAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - nose;
 
+            // стартовая поза — до заморозки, из тела (при интерполяции transform отстаёт)
+            Vector2 fromPos = ship.Body.position;
+            float fromAngle = ship.Body.rotation;
+
+            // заморозка на время дожима: солвер не выталкивает из позы «чуть ниже»
+            // и не подпрыгивает; скорость и вращение гасим сразу
+            ship.Body.linearVelocity = Vector2.zero;
+            ship.Body.angularVelocity = 0f; // касание капсулой не должно оставлять вращение
+            savedConstraints = ship.Body.constraints;
+            ship.Body.constraints = RigidbodyConstraints2D.FreezeAll;
+
+            // состояние и события — до корутины: UI и заказы видят Landed в кадр контакта
             ship.LandedOn = planet;
             ship.State = ShipState.Landed;
-            ship.Body.angularVelocity = 0f; // касание капсулой не должно оставлять вращение
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);
@@ -138,6 +154,41 @@ namespace SpaceTaxi.Physics
                 StationHint?.Invoke(planet);
 
             Debug.Log($"[Landing] посадка на «{planet.DisplayName}»" + (planet.HasFuel || planet.HasRepair ? " (станция: сервис за кредиты, [B])" : ""));
+
+            if (landingPinch != null)
+                StopCoroutine(landingPinch);
+            landingPinch = StartCoroutine(PinchToPose(planet, fromPos, fromAngle, targetPos, targetAngle, 0.12f));
+        }
+
+        // плавный довод посадочной позы (unscaled — дожим доигрывается и на паузе
+        // после модала доставки); взлёт/гибель посреди дожима отпускают тело
+        private System.Collections.IEnumerator PinchToPose(Planet planet, Vector2 fromPos, float fromAngle,
+            Vector2 toPos, float toAngle, float duration)
+        {
+            float t = 0f;
+            while (t < 1f)
+            {
+                yield return null;
+                if (ship == null || ship.State != ShipState.Landed || ship.LandedOn != planet)
+                    break; // взлёт/гибель — отпустить
+                t = Mathf.Min(1f, t + Time.unscaledDeltaTime / duration);
+                float k = t * t * (3f - 2f * t);
+                ShipPlacement.TeleportLanded(ship, Vector2.Lerp(fromPos, toPos, k), Mathf.LerpAngle(fromAngle, toAngle, k));
+            }
+            if (ship != null && ship.Body != null)
+                ship.Body.constraints = savedConstraints;
+            landingPinch = null;
+        }
+
+        // снять дожим, если идёт: корутина стоп, constraints восстановлены
+        private void CancelPinch()
+        {
+            if (landingPinch == null)
+                return;
+            StopCoroutine(landingPinch);
+            landingPinch = null;
+            if (ship != null && ship.Body != null)
+                ship.Body.constraints = savedConstraints;
         }
 
         public event Action<string> StationServiced;
