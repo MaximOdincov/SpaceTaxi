@@ -210,11 +210,25 @@ namespace SpaceTaxi.Physics
                     velocity += dir * (ship.Eff.Thrust * engMul * dt);
                 if (brakeOn)
                 {
-                    // тормоз не опускает скорость ниже MinSpeed (Н4.2.5) — нельзя
-                    // зависнуть у планеты; если уже медленнее, тормоз не мешает
-                    float floor = v > config.MinSpeed ? config.MinSpeed : v;
-                    float nv = Mathf.Max(floor, v - ship.Eff.Retro * engMul * dt);
-                    velocity *= nv / v;
+                    // Анти-ховер (Н4.11): тормоз каждый кадр занулял скорость
+                    // (retro·dt ≫ g·dt) — корабль реально висел в воздухе. Теперь
+                    // тормоз не может погасить гравитацию: у падающего корабля
+                    // (скорость по направлению гравитации) есть мин. скорость
+                    // падения = BrakeHoverFraction × локальная гравитация. В пустоте
+                    // пол нулевой — можно остановиться. Тормоз никогда не
+                    // разгоняет (nv зажат и сверху текущей v) — джиттера на пороге нет.
+                    Vector2 gravityNow = gravity != null
+                        ? gravity.GetAccelerationAt(pos, config)
+                        : Vector2.zero;
+                    float brakeFloor = gravityNow.magnitude > 0f
+                        && Vector2.Dot(velocity, gravityNow) > 0f
+                        ? config.BrakeHoverFraction * gravityNow.magnitude
+                        : 0f;
+                    float nv = Mathf.Clamp(
+                        v - ship.Eff.Retro * engMul * dt,
+                        Mathf.Min(brakeFloor, v),
+                        v);
+                    velocity *= nv / Mathf.Max(0.0001f, v);
                 }
                 if (Mathf.Abs(strafe) > 0f)
                 {
