@@ -97,7 +97,7 @@ namespace SpaceTaxi.Physics
             {
                 HideAll();
                 smoothDir = Vector2.zero;
-                smoothSpacing = 0f;
+                appliedSpacing = 0f;
                 fadeAlpha = 0f;
                 return;
             }
@@ -109,7 +109,7 @@ namespace SpaceTaxi.Physics
                 // почти стоит: направление не определено, прогноз схлопнулся в ноль
                 HideAll();
                 smoothDir = Vector2.zero;
-                smoothSpacing = 0f;
+                appliedSpacing = 0f;
                 return;
             }
             float target = Mathf.Clamp(HorizonScreens * refWidth / Mathf.Max(speed, 1f), HorizonMin, HorizonMax);
@@ -119,7 +119,9 @@ namespace SpaceTaxi.Physics
         }
 
         private Vector2 smoothDir;
-        private float smoothSpacing;
+        // ступенчатый spacing с гистерезисом: плавный лерп в кламп-зоне горизонта
+        // (слингшот) ежекадрово догонял растущий target — хвост дэшей уезжал
+        private float appliedSpacing;
 
         private static Vector2 Rotate(Vector2 v, float degrees)
         {
@@ -155,11 +157,12 @@ namespace SpaceTaxi.Physics
             Vector2 vel = StartVelocity(out pos);
             var config = ship.Config;
 
-            float targetSpacing = Mathf.Max(spacing, vel.magnitude * horizon / dashes.Count);
-            if (smoothSpacing <= 0f)
-                smoothSpacing = targetSpacing;
-            smoothSpacing = Mathf.Lerp(smoothSpacing, targetSpacing, Mathf.Min(1f, 6f * Time.deltaTime));
-            float spacingNow = smoothSpacing;
+            // spacing меняется ступенями с гистерезисом ±10%: пока спрос не ушёл
+            // за порог, держим прежний шаг — линия не «дышит» вдоль хвоста
+            float needSpacing = Mathf.Max(spacing, vel.magnitude * horizon / dashes.Count);
+            if (appliedSpacing <= 0f || needSpacing > appliedSpacing * 1.1f || needSpacing < appliedSpacing / 1.1f)
+                appliedSpacing = needSpacing;
+            float spacingNow = appliedSpacing;
 
             float travelled = spacingNow - 2f;
             float total = 0f;
@@ -192,8 +195,15 @@ namespace SpaceTaxi.Physics
 
                 if (travelled >= spacingNow && dashIndex < dashes.Count)
                 {
-                    PlaceDash(dashIndex++, next, vel, total, spacingNow);
-                    travelled = 0f;
+                    // дэш в точке пересечения шага (интерполяция), а не на его
+                    // конце — иначе фазовый прыжок до speed/step; перелёт
+                    // сохраняется в travelled, а не выбрасывается
+                    float overshoot = travelled - spacingNow;
+                    float t = 1f - overshoot / Mathf.Max(seg, 1e-5f);
+                    Vector2 dashPos = Vector2.Lerp(pos, next, t);
+                    float dashTotal = total - seg * (1f - t);
+                    PlaceDash(dashIndex++, dashPos, vel, dashTotal, spacingNow);
+                    travelled = overshoot;
                 }
 
                 pos = next;
