@@ -51,7 +51,7 @@ MonoBehaviour:
   - 1.1
   - 1.25
   - 1.45
-  FuelOutageChancePct: 12
+  FuelOutageChancePct: 0
   RepairPackFraction:
   - 0.25
   - 0.6
