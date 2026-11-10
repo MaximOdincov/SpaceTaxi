@@ -238,6 +238,14 @@ namespace SpaceTaxi.Orders
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
+
+            // корабль уже стоит на планете пикапа — пассажир сразу на борт,
+            // без требования взлететь и сесть повторно (A6)
+            if (ship != null && ship.State == ShipState.Landed && ship.LandedOn != null
+                && PlanetIndexByName(ship.LandedOn.DisplayName) == offer.PickupIndex)
+            {
+                OnLanded(ship.LandedOn);
+            }
             return true;
         }
 
@@ -470,6 +478,7 @@ namespace SpaceTaxi.Orders
             {
                 Active.State = OrderState.Aboard;
                 PassengerBoarded?.Invoke(Active);
+                ActiveOrderChanged?.Invoke(); // панель заказа перерисовывается и при пикапе
                 Debug.Log($"[Orders] пассажир на борту: {Active.Passenger.DisplayName}");
             }
             else if (Active.State == OrderState.Aboard && idx == Active.DropoffIndex)
