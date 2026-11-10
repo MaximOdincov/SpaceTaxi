@@ -202,12 +202,22 @@ namespace SpaceTaxi.UI
                 : "");
 
             // разбивка Н4.4: приход со «+», убытки с «−», суммы в формате
-            // борткомпа (Đ + компактные числа); каждая строка прокатывается
+            // борткомпа (Đ + компактные числа); каждая строка прокатывается.
+            // Порядок: Перевозка → Чаевые → Штраф → Комиссия аренды → Долг → ИТОГО
+            // «Перевозка» — цена карточки ЦЕЛИКОМ: наценка рейтинга ×1.1
+            // добавляется при спавне карточки (OrderService.PriceWithRatingBonus)
+            // и запекается в offer.Price — базовая цена нигде не сохраняется.
+            // Разделить на «база + бонус» в UI честно нельзя: текущий рейтинг не
+            // равен рейтингу на момент спавна (доставка сама двигает его на
+            // ±0.1–0.15, порог 4.0 в середине шкалы), а заказы из сейва вообще
+            // не имеют контекста спавна — строка бонуса могла бы показывать
+            // несуществующую надбавку. Чистое разделение требует одного поля
+            // в OrderOffer (OrderService — вне скоупа правок этого экрана)
             SetMoneyRow(priceRow, true, "Перевозка: ", result.Price);
+            SetMoneyRow(tipsRow, result.Tips > 0, "Чаевые: ", result.Tips);
             SetMoneyRow(penaltyRow, result.Penalty > 0, "Штраф: ", -result.Penalty,
                 result.Collisions > 0 ? $" ({result.Collisions} столкн.)" : "");
-            SetMoneyRow(commissionRow, result.Commission > 0, "Аренда: ", -result.Commission);
-            SetMoneyRow(tipsRow, result.Tips > 0, "Чаевые: ", result.Tips);
+            SetMoneyRow(commissionRow, result.Commission > 0, "Комиссия аренды: ", -result.Commission);
             SetMoneyRow(debtRow, result.ToDebt > 0, "Долг: ", -result.ToDebt);
             SetMoneyRow(totalRow, true, "ИТОГО: ", result.Net);
 
@@ -365,11 +375,12 @@ namespace SpaceTaxi.UI
                 OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.4f);
             OnboardComputerFactory.FixedHeight(line, 2f);
 
-            // --- Разбивка выплаты: приход (+) — яркий борткомпа, убытки (−) — красные ---
+            // --- Разбивка выплаты: приход (+) — яркий борткомпа, убытки (−) — красные.
+            // Порядок: Перевозка → Чаевые → Штраф → Комиссия аренды → Долг → ИТОГО ---
             priceRow = BuildRow(panel.transform, "PriceLine", OnboardComputerFactory.BrightColor);
+            tipsRow = BuildRow(panel.transform, "TipsLine", OnboardComputerFactory.BrightColor);
             penaltyRow = BuildRow(panel.transform, "PenaltyLine", OnboardComputerFactory.DangerColor);
             commissionRow = BuildRow(panel.transform, "CommissionLine", OnboardComputerFactory.DangerColor);
-            tipsRow = BuildRow(panel.transform, "TipsLine", OnboardComputerFactory.BrightColor);
             // «спокойный» красный долга — тот же тон, что у строки долга в шапке борткомпа
             debtRow = BuildRow(panel.transform, "DebtLine", OnboardComputerFactory.DebtCalmColor);
 
@@ -378,9 +389,9 @@ namespace SpaceTaxi.UI
             taskRow = BuildRow(panel.transform, "TaskLine", OnboardComputerFactory.LabelColor, 16f, 22f);
 
             rows.Add(priceRow);
+            rows.Add(tipsRow);
             rows.Add(penaltyRow);
             rows.Add(commissionRow);
-            rows.Add(tipsRow);
             rows.Add(debtRow);
             rows.Add(totalRow);
             rows.Add(ratingRow);
