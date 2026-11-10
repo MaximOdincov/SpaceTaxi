@@ -64,7 +64,16 @@ namespace SpaceTaxi.UI
             warningText.fontSizeMax = 36f;
             var bannerRect = warningBanner.transform as RectTransform;
             if (bannerRect != null)
+            {
                 bannerRect.sizeDelta = new Vector2(bannerRect.sizeDelta.x * 1.3f, bannerRect.sizeDelta.y * 1.25f);
+                // №19: тревога убрана из центра UI — баннер переезжает на низ экрана
+                // (сверху стопка тостов и подсказка цели); текст, пульс, сирены
+                // и звук сирены остаются как были
+                bannerRect.anchorMin = new Vector2(0.5f, 0f);
+                bannerRect.anchorMax = new Vector2(0.5f, 0f);
+                bannerRect.pivot = new Vector2(0.5f, 0f);
+                bannerRect.anchoredPosition = new Vector2(0f, 16f);
+            }
             speedBaseColor = speedValue.color;
 
             // подсказка текущей цели
