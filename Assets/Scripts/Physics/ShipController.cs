@@ -127,7 +127,10 @@ namespace SpaceTaxi.Physics
                     bool wasInside = insideRing.Contains(body);
                     if (d < ring)
                     {
-                        if (!wasInside && v > PhysicsConfig.EscapeVelocity(config.GravParamOf(body), d))
+                        // качели — только у звёзд и чёрных дыр (Н5.A3): у планет
+                        // буст отключён, сама гравитация и посадка не тронуты
+                        if (!(body is Planet) && !wasInside
+                            && v > PhysicsConfig.EscapeVelocity(config.GravParamOf(body), d))
                         {
                             velocity *= ship.Eff.GravityBoost; // улучшение двигателя усиливает качели
                             v = velocity.magnitude;
