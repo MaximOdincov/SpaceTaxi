@@ -88,8 +88,8 @@ namespace SpaceTaxi.UI
 
         // ————— геометрия спидометра (каркас строится кодом, префаб удалён) —————
 
-        private const float GaugeSize = 150f;     // сторона квадрата спидометра
-        private const float NeedleScale = 1.5f;   // масштаб спрайта стрелки
+        private const float GaugeSize = 70f;      // сторона квадрата спидометра — компактная иконка, как у соседних статов
+        private const float NeedleScale = 1f;     // масштаб спрайта стрелки (остриё 27.5 < радиуса шкалы 35)
         private const float GaugeTopGap = 3f;     // зазор между шкалой и строкой топлива
         private const float GaugeHullGap = 6f;    // зазор между стрелкой и строкой корпуса
         // Ход стрелки: 240° из допустимых брифом 180..270. Хвост arrow.png в z=0
@@ -152,17 +152,18 @@ namespace SpaceTaxi.UI
             dialRect.sizeDelta = new Vector2(GaugeSize, dialHeight);
             dialRect.anchoredPosition = new Vector2(0f, dialHeight * 0.5f); // плоская сторона — к центру
 
-            // цифровое значение — внутрь шкалы над хабом; 42, не 40: строка
-            // 30pt ≈ 39.6 — Ellipsis при меньшей высоте режет текст по вертикали
+            // цифровое значение — СПРАВА от шкалы по её центру (Н4.11: владелец —
+            // «текст скорости справа, не снизу»); 42, не 40: строка 30pt ≈ 39.6 —
+            // Ellipsis при меньшей высоте режет текст по вертикали
             speedValue.transform.SetParent(gaugeRect, false);
             var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
-            speedRect.pivot = new Vector2(0.5f, 0.5f); // центр по x, иначе текст уезжает вправо от хаба
+            speedRect.pivot = new Vector2(0f, 0.5f); // левый край — от шкалы вправо
             speedRect.sizeDelta = new Vector2(110f, 42f);
-            speedRect.anchoredPosition = new Vector2(0f, GaugeSize * 0.25f);
+            speedRect.anchoredPosition = new Vector2(GaugeSize * 0.5f + 8f, 0f);
             speedValue.fontSize = 30f;
-            speedValue.alignment = TextAlignmentOptions.Center;
+            speedValue.alignment = TextAlignmentOptions.Left;
 
             gauge = gaugeGo.GetComponent<SpeedometerGauge>();
             gauge.Setup(needleRect, NeedleAngleAtZero, NeedleSweep);
@@ -246,7 +247,9 @@ namespace SpaceTaxi.UI
         // спрайты на арт из icons и красим в зелёный HUD (BrightColor борткомпа)
         private void BuildStatIcons()
         {
-            SetIcon("HullIcon", "Art/icons/shield_icon");
+            // shield.png (249×292, залитый) — заметно отличается от старой болванки;
+            // shield_icon.png выглядел почти как stub, владелец не видел замены
+            SetIcon("HullIcon", "Art/icons/shield");
             SetIcon("FuelIcon", "Art/icons/gas_icon");
         }
 
