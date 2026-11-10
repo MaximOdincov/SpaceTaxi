@@ -15,6 +15,7 @@ namespace SpaceTaxi.Core
     {
         private bool shown;
         private string creditsField = "1000";
+        private string ratingField = "5.0";
         private int ownedCursor;
         private const int WindowId = 4711; // панель одна — константный id окна OnGUI
         private Rect windowRect = new Rect(12f, 120f, 250f, 10f);
@@ -58,6 +59,17 @@ namespace SpaceTaxi.Core
             if (GUILayout.Button("ВЫДАТЬ КР", GUILayout.Width(90))
                 && int.TryParse(creditsField, out int amount) && amount > 0)
                 session.Wallet.Add(amount);
+            GUILayout.EndHorizontal();
+
+            // D2: гейты районов и шанс «жирных» заказов читают рейтинг — ручка
+            // для приёмки прогрессии без прокачки вручную
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"★ {session.Rating?.Value.ToString("0.0") ?? "—"}", GUILayout.Width(40));
+            ratingField = GUILayout.TextField(ratingField);
+            if (GUILayout.Button("РЕЙТИНГ", GUILayout.Width(90))
+                && float.TryParse(ratingField, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float ratingValue))
+                session.Rating?.Restore(Mathf.Clamp(ratingValue, 0f, 5f));
             GUILayout.EndHorizontal();
 
             if (GUILayout.Button("ВЫДАТЬ ВСЕ КОРАБЛИ (бесплатно)"))

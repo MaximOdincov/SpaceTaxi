@@ -64,3 +64,18 @@ MonoBehaviour:
   - 0.3
   - 0.7
   - 1
+  SectorMinShipTier:
+  - 1
+  - 1
+  - 3
+  - 4
+  - 5
+  PickupProximityRange: 1400
+  PickupNearShareAtMinRating: 0.9
+  PickupNearShareAtMaxRating: 0.3
+  FatOrderBaseChancePct: 3
+  FatOrderChancePerRatingPct: 2
+  FatOrderMaxChancePct: 20
+  FatOrderPriceMul: 1.5
+  FatOrderMinRouteDistance: 1200
+  FatOrderLockedSectorChancePct: 25

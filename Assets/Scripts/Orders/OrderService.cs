@@ -49,7 +49,7 @@ namespace SpaceTaxi.Orders
         [SerializeField] private PricingConfig pricingConfig;
 
         private readonly List<OrderOffer> offers = new List<OrderOffer>();
-        private readonly List<int> planetIndices = new List<int>();
+        private const int FatTaskRolls = 8; // бросков на обязательное задание «жирного» (шанс null 50% за бросок)
         private LevelAsset level;
         private PassengerCatalog catalog;
         private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
@@ -543,35 +543,176 @@ namespace SpaceTaxi.Orders
             if (passenger == null)
                 return;
 
-            int pickup = RandomPlanetIndex(-1);
-            if (pickup < 0)
+            PricingConfig pricing = Pricing;
+            int taxiTier = ShipTier();
+            float ratingValue = CurrentRating();
+
+            // D2 §3: редкий «жирный» заказ — дальний, с заданием и наценкой;
+            // шанс растёт с рейтингом
+            bool fat = UnityEngine.Random.value * 100f < FatOrderChancePct(pricing, ratingValue);
+            // D2 §1: жирный изредка пренебрегает гейтом районов — «вкус» закрытых
+            // секторов; отказаться можно бесплатно (Decline без штрафа)
+            bool ignoreGate = fat && UnityEngine.Random.value * 100f < pricing.FatOrderLockedSectorChancePct;
+
+            List<int> pool = OfferPlanets(taxiTier, ignoreGate);
+            if (pool.Count < 2)
+            {
+                // D2 §4: пустая доска хуже дальнего заказа — гейт ослабляется
+                Debug.LogWarning("[Orders] гейт районов отсеял почти все планеты — ослабляю фильтр");
+                pool = OfferPlanets(taxiTier, true);
+            }
+
+            int pickup = PickPickup(pool, pricing);
+            int dropoff = PickDropoff(pool, pickup, fat, pricing);
+            if (pickup < 0 || dropoff < 0)
                 return;
+
             var offer = new OrderOffer
             {
                 Passenger = passenger,
                 PickupIndex = pickup,
-                DropoffIndex = RandomPlanetIndex(pickup),
+                DropoffIndex = dropoff,
                 ExpiresAt = Time.time + offerLifetime,
             };
             // цена фиксируется в момент спавна карточки и дальше не меняется;
             // премиальность — по тиру корабля-таксиста (Н3.1), без корабля — тир арендного Яйца
-            int taxiTier = ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
-            int basePrice = OrderPricing.ComputePrice(Pricing,
+            int basePrice = OrderPricing.ComputePrice(pricing,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex), taxiTier);
+            if (fat)
+                basePrice = (int)Math.Round(basePrice * pricing.FatOrderPriceMul, MidpointRounding.AwayFromZero);
             offer.Price = PriceWithRatingBonus(basePrice);
             // чаевые (Н-14): случайные 10–25% на заказ, бросок один раз при спавне —
             // число живёт до выплаты и не «перебрасывается»
             offer.TipsFraction = UnityEngine.Random.Range(0.10f, 0.25f);
             // задание пассажира (П5.3): случайный тип с шансом 50% (Н-14); дедлайну
             // нужна дальность маршрута, точкам интереса (П8.1) — концы маршрута
-            // и контекст уровня
-            offer.Task = PassengerTasks.CreateRandom(RouteDistance(offer),
-                pickup, offer.DropoffIndex, level, CometsAvailable());
+            // и контекст уровня. У «жирного» задание обязательно (D2 §3) — добрасываем
+            int taskRolls = fat ? FatTaskRolls : 1;
+            for (int i = 0; i < taskRolls && offer.Task == null; i++)
+                offer.Task = PassengerTasks.CreateRandom(RouteDistance(offer),
+                    pickup, dropoff, level, CometsAvailable());
             offers.Add(offer);
             OffersChanged?.Invoke();
             OfferAdded?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName}, " +
-                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр");
+                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр" +
+                      (fat ? " [жирный]" : ""));
+        }
+
+        // тир корабля-таксиста; без корабля — тир арендного Яйца (Н3.1)
+        private int ShipTier()
+        {
+            return ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
+        }
+
+        // рейтинг на момент спавна; Bind приходит после Init (GameSession),
+        // первые карточки считаем от старта новой игры (RatingService.StartValue)
+        private float CurrentRating()
+        {
+            return rating != null ? rating.Value : 3f;
+        }
+
+        // D2 §3: шанс «жирного» заказа, % — база + прибавка за рейтинг, кламп потолком
+        private static float FatOrderChancePct(PricingConfig pricing, float ratingValue)
+        {
+            return Mathf.Clamp(pricing.FatOrderBaseChancePct + pricing.FatOrderChancePerRatingPct * ratingValue,
+                0f, pricing.FatOrderMaxChancePct);
+        }
+
+        // D2 §1: пул планет для офферов; ignoreGate — редкий «жирный» заказ
+        // в закрытый район. Гейт — жёсткий фильтр списка, а не отбраковка
+        // бросков: закрытые сектора не просачиваются в обычные офферы
+        private List<int> OfferPlanets(int taxiTier, bool ignoreGate)
+        {
+            var pool = new List<int>();
+            for (int i = 0; i < level.Bodies.Count; i++)
+            {
+                if (level.Bodies[i].Type != BodyType.Planet)
+                    continue;
+                if (!ignoreGate && taxiTier < Pricing.GetSectorMinShipTier(level.Bodies[i].Sector))
+                    continue;
+                pool.Add(i);
+            }
+            return pool;
+        }
+
+        // D2 §2: пикап со сдвигом «к игроку». Вес планеты = nearShare × близость
+        // (линейный спад до нуля к PickupProximityRange) + остаток равномерно;
+        // nearShare тает с рейтингом — доля дальних пикапов растёт с прокачкой.
+        // Кривая от «низкого рейтинга» (тот же порог, что замедляет спавн §3.7)
+        // до рейтинга 5: игра стартует с 3.0 — точка уже на спаде кривой
+        private int PickPickup(List<int> pool, PricingConfig pricing)
+        {
+            if (pool.Count == 0)
+                return -1;
+            Vector2 playerPos = ShipPosition();
+            float ratingSpan = Mathf.Max(0.001f, 5f - pricing.LowRatingSpawnThreshold);
+            float ratingT = Mathf.Clamp01((CurrentRating() - pricing.LowRatingSpawnThreshold) / ratingSpan);
+            float nearShare = Mathf.Lerp(pricing.PickupNearShareAtMinRating,
+                pricing.PickupNearShareAtMaxRating, ratingT);
+            float total = 0f;
+            var weights = new float[pool.Count];
+            for (int i = 0; i < pool.Count; i++)
+            {
+                float proximity = Mathf.Clamp01(1f - DistanceToPlanet(pool[i], playerPos)
+                    / Mathf.Max(1f, pricing.PickupProximityRange));
+                weights[i] = nearShare * proximity + (1f - nearShare);
+                total += weights[i];
+            }
+            if (total <= 0f)
+                return pool[UnityEngine.Random.Range(0, pool.Count)];
+            float roll = UnityEngine.Random.value * total;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                roll -= weights[i];
+                if (roll <= 0f)
+                    return pool[i];
+            }
+            return pool[pool.Count - 1];
+        }
+
+        // цель: обычный заказ — равномерно по пулу (как было); «жирный» — дальняя
+        // пара: планеты дальше FatOrderMinRouteDistance, иначе самая дальняя (D2 §3)
+        private int PickDropoff(List<int> pool, int pickup, bool fat, PricingConfig pricing)
+        {
+            if (pickup < 0 || pickup >= level.Bodies.Count)
+                return -1;
+            var candidates = new List<int>();
+            var far = new List<int>();
+            float farthest = -1f;
+            int farthestIndex = -1;
+            foreach (int index in pool)
+            {
+                if (index == pickup)
+                    continue;
+                candidates.Add(index);
+                float distance = Vector2.Distance(level.Bodies[pickup].Position, level.Bodies[index].Position);
+                if (distance > farthest)
+                {
+                    farthest = distance;
+                    farthestIndex = index;
+                }
+                if (fat && distance >= pricing.FatOrderMinRouteDistance)
+                    far.Add(index);
+            }
+            if (candidates.Count == 0)
+                return -1;
+            if (!fat)
+                return candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            return far.Count > 0
+                ? far[UnityEngine.Random.Range(0, far.Count)]
+                : farthestIndex;
+        }
+
+        // позиция для весов близости: корабль жив — от него; нет — планета старта
+        private Vector2 ShipPosition()
+        {
+            if (ship != null)
+                return ship.Body != null ? (Vector2)ship.Body.position : (Vector2)ship.transform.position;
+            int start = level.StartPlanetIndex;
+            return start >= 0 && start < level.Bodies.Count
+                ? level.Bodies[start].Position
+                : Vector2.zero;
         }
 
         // класс района планеты-цели (влияет на цену)
@@ -603,16 +744,6 @@ namespace SpaceTaxi.Orders
                 ? pricing.LowRatingSpawnSlowdown
                 : 1f;
             return UnityEngine.Random.Range(spawnMin, spawnMax) * mul;
-        }
-
-        // случайная планета уровня, exclude — не эта
-        private int RandomPlanetIndex(int exclude)
-        {
-            planetIndices.Clear();
-            for (int i = 0; i < level.Bodies.Count; i++)
-                if (level.Bodies[i].Type == BodyType.Planet && i != exclude)
-                    planetIndices.Add(i);
-            return planetIndices.Count == 0 ? -1 : planetIndices[UnityEngine.Random.Range(0, planetIndices.Count)];
         }
 
         private int PlanetIndexByName(string name)

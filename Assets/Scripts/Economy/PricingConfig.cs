@@ -75,6 +75,32 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель базовой цены ремонта: бедные мастерские дешевле, лучшие берут дороже (наценка выше в лучших мастерских)")]
         public float[] RepairTierSurchargeMul = { 0.9f, 1f, 1.25f };
 
+        [Header("Прогрессия заказов (D2): индекс = Sector (Hub..Far)")]
+        [Tooltip("Минимальный тир корабля для офферов в район: бедный Near всегда открыт с 1-го тира (тиры 1-2 — только бедный район), богатые окраины — с прокачкой корабля: Стрела 3 → Mid1, Игла 4 → Mid2, Барин 5 → Far")]
+        public int[] SectorMinShipTier = { 1, 1, 3, 4, 5 };
+
+        [Header("Близость пикапа (D2)")]
+        [Tooltip("Радиус «рядом с игроком», юн: ближе вес пикапа максимален, дальше линейно спадает к нулю")]
+        public float PickupProximityRange = 1400f;
+        [Tooltip("Доля «ближних» офферов при рейтинге 0 (остаток равномерно по всем планетам пула)")]
+        [Range(0f, 1f)] public float PickupNearShareAtMinRating = 0.9f;
+        [Tooltip("Доля «ближних» офферов при рейтинге 5 — с ростом рейтинга дальние пикапы встречаются чаще")]
+        [Range(0f, 1f)] public float PickupNearShareAtMaxRating = 0.3f;
+
+        [Header("«Жирные» заказы (D2): редкие дальние с заданием и наценкой")]
+        [Tooltip("Базовый шанс жирного заказа, % (рейтинг 0)")]
+        public float FatOrderBaseChancePct = 3f;
+        [Tooltip("Прибавка шанса жирного заказа за 1 пункт рейтинга, %")]
+        public float FatOrderChancePerRatingPct = 2f;
+        [Tooltip("Потолок шанса жирного заказа, %")]
+        public float FatOrderMaxChancePct = 20f;
+        [Tooltip("Множитель цены жирного заказа (сверх прайса и районного множителя)")]
+        public float FatOrderPriceMul = 1.5f;
+        [Tooltip("Минимальная дальность маршрута жирного заказа, юн (дальних пар нет — берётся самая дальняя планета)")]
+        public float FatOrderMinRouteDistance = 1200f;
+        [Tooltip("Шанс, % что жирный заказ пренебрегает гейтом районов — «вкус» закрытых секторов; отказаться можно бесплатно")]
+        [Range(0f, 100f)] public float FatOrderLockedSectorChancePct = 25f;
+
         // базовая сеть: планеты без проставленного FuelTier и старые ассеты карт
         public const int BaseFuelTier = 2;
         // незаданный тир ремонта — мастерская чинит полностью (как до Н-5)
@@ -127,6 +153,16 @@ namespace SpaceTaxi.Economy
             if (muls == null || muls.Length == 0)
                 return 1f;
             return muls[Mathf.Clamp((int)sector, 0, muls.Length - 1)];
+        }
+
+        // минимальный тир корабля, которому район даёт офферы (D2); кривой/пустой
+        // массив — всё открыто с 1-го тира (гейт не ломает спавн)
+        public int GetSectorMinShipTier(Sector sector)
+        {
+            var tiers = SectorMinShipTier;
+            if (tiers == null || tiers.Length == 0)
+                return 1;
+            return tiers[Mathf.Clamp((int)sector, 0, tiers.Length - 1)];
         }
 
         // индекс массива 0..n-1: незаданный тир считаем базовым, верхний кламп — на короткий массив

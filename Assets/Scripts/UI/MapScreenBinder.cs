@@ -1143,7 +1143,8 @@ namespace SpaceTaxi.UI
         }
 
         // что можно сделать на теле — из HasFuel/FuelOutage/HasRepair/IsHub; планеты
-        // всегда принимают заказы (OrderService.RandomPlanetIndex — любой Planet)
+        // принимают и отдают заказы (пул спавна OrderService — любой Planet,
+        // но гейты районов D2 не дают офферы в сектора, закрытые для тира корабля)
         private static string ServicesLine(CelestialBodyData body)
         {
             if (body.IsHub)
