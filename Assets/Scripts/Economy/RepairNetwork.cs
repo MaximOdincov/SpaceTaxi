@@ -17,6 +17,31 @@ namespace SpaceTaxi.Economy
             return Mathf.Clamp(t, 1, PackCount) - 1;
         }
 
+        // --- Круг тиров кораблей, который берёт мастерская (С4): бедная (T1)
+        // обслуживает корабли тиров 1–2, средняя (T2) — 1–3, лучшие (T3+) —
+        // 1–5 (всё): лестница «чем богаче мастерская, тем шире круг», иначе
+        // хаб Гавань (T3, точка респавна) отказывал бы арендному Яйцу.
+        // Корабль вне круга не чинится вовсе ---
+
+        // минимальный тир корабля, который возьмёт мастерская (для отказа «ниже тира N»)
+        public static int MinShipTier(int shopTier)
+        {
+            return 1; // T1 чинит с первого тира, T2 — с 1-3, T3+ — всё (см. шапку)
+        }
+
+        // максимальный тир корабля, который возьмёт мастерская
+        public static int MaxShipTier(int shopTier)
+        {
+            int t = shopTier <= 0 ? PricingConfig.BaseRepairTier : shopTier;
+            return t <= 1 ? 2 : t == 2 ? 3 : 5;
+        }
+
+        // берёт ли мастерская этого тира корабль этого тира
+        public static bool ShipTierAccepted(int shopTier, int shipTier)
+        {
+            return shipTier >= MinShipTier(shopTier) && shipTier <= MaxShipTier(shopTier);
+        }
+
         // сколько HP недостаёт до полного
         public static float MissingHp(float hpMax, float hp)
         {
@@ -41,13 +66,16 @@ namespace SpaceTaxi.Economy
             return Mathf.Min(pack, Mathf.Max(0f, visitBudget));
         }
 
-        // ceil(HP × множитель пакета): базовая цена 1 кр/HP, недостающая доля ед. тоже платная
-        public static int CostOf(float repairHp, int packIndex, PricingConfig pricing)
+        // ceil(HP × множитель пакета × наценка тира сети): базовая цена 1 кр/HP,
+        // недостающая доля ед. тоже платная; лучшие мастерские дороже (С4,
+        // RepairTierSurchargeMul) — базовая формула не тронута, умножение сверху
+        public static int CostOf(float repairHp, int packIndex, int tier, PricingConfig pricing)
         {
             if (repairHp <= 0f)
                 return 0;
             float mul = pricing != null ? pricing.GetRepairPackPriceMul(packIndex) : 1f;
-            return Mathf.CeilToInt(repairHp * mul);
+            float surcharge = pricing != null ? pricing.GetRepairTierSurcharge(tier) : 1f;
+            return Mathf.CeilToInt(repairHp * mul * surcharge);
         }
     }
 }

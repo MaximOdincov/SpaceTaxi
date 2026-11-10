@@ -71,6 +71,10 @@ namespace SpaceTaxi.Economy
         [Tooltip("Потолок ремонта за визит, доля НУЖНОГО (недостающего) HP: бедная станция может взять не весь пакет")]
         public float[] RepairTierCapByTier = { 0.3f, 0.7f, 1f };
 
+        [Header("Наценка мастерских (С4): индекс = тир сети − 1")]
+        [Tooltip("Множитель базовой цены ремонта: бедные мастерские дешевле, лучшие берут дороже (наценка выше в лучших мастерских)")]
+        public float[] RepairTierSurchargeMul = { 0.9f, 1f, 1.25f };
+
         // базовая сеть: планеты без проставленного FuelTier и старые ассеты карт
         public const int BaseFuelTier = 2;
         // незаданный тир ремонта — мастерская чинит полностью (как до Н-5)
@@ -163,6 +167,15 @@ namespace SpaceTaxi.Economy
             var caps = RepairTierCapByTier;
             int index = RepairTierIndex(tier, caps != null ? caps.Length : 0);
             return index >= 0 ? caps[index] : 1f;
+        }
+
+        // наценка мастерской по тиру сети (С4); кривой/пустой массив — без наценки,
+        // тир 0/некорректный — базовая сеть (средняя)
+        public float GetRepairTierSurcharge(int tier)
+        {
+            var muls = RepairTierSurchargeMul;
+            int index = RepairTierIndex(tier, muls != null ? muls.Length : 0);
+            return index >= 0 ? muls[index] : 1f;
         }
 
         private static PricingConfig fallback;

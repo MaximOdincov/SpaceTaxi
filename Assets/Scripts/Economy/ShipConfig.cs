@@ -61,13 +61,21 @@ namespace SpaceTaxi.Economy
             return ShipSprite;
         }
 
-        // Фолбэк на арендное «Яйцо», если ShipConfig в GameSession отключён
+        // Фолбэк на арендное «Яйцо», если ShipConfig в GameSession отключён:
+        // сначала настоящий ассет (баланс правит статы в одном месте — Н5.13),
+        // кодовые статы ниже — только если ассет не найден
         public static ShipConfig EggRentalFallback
         {
             get
             {
                 if (eggRentalFallback != null)
                     return eggRentalFallback;
+                var loaded = Resources.Load<ShipConfig>("Ships/egg_rental");
+                if (loaded != null)
+                {
+                    eggRentalFallback = loaded;
+                    return eggRentalFallback;
+                }
                 Debug.Log("[Ships] ShipConfig не подключён — фолбэк на арендное «Яйцо»");
                 eggRentalFallback = CreateInstance<ShipConfig>();
                 eggRentalFallback.Id = "egg_rental";

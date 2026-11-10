@@ -15,12 +15,18 @@ namespace SpaceTaxi.UI
 {
     // Экран станции [B] (§3.3): вкладки по услугам планеты — хаб МТО даёт все
     // четыре [МАГАЗИН][УЛУЧШЕНИЯ][ЗАПРАВКА][РЕМОНТ], обычная станция — по
-    // флагам (заправка/мастерская). Заправка (Н-4): слайдер объёма, цена/ед и
-    // запас визита — по тиру сети планеты (PricingConfig), оплата ровно за
-    // взятое. Ремонт (Н-5): пакеты мелкий/средний/полный — доля недостающего
-    // HP по базовой цене 1 кр/HP × множитель пакета; тир сети ремонта планеты
-    // режет максимальный пакет и потолок визита, ограничения видны на карточках
-    // заранее. Магазин (Н-3а): витрина — большой спрайт модели, статы, цена,
+    // флагам (заправка/мастерская). Каркас попапа — StationUI (рамка С4):
+    // хедер «СТАНЦИЯ · …» с кредитами «Đ N» (обновляются по
+    // Wallet.CreditsChanged) и крестик закрытия в углу (Esc закрывает тем же
+    // Close()). Заправка (С1, механика Н-4 не тронута): ячейки бака на всю
+    // ширину панели, слайдер объёма, сумма «Đ», ОДНА кнопка подтверждения —
+    // по умолчанию выбран весь доступный объём («ЗАПРАВИТЬ ДО ПОЛНОГО»),
+    // пресеты убраны. Ремонт (С4): HP-бар и ОДНА кнопка «Починить» — полный
+    // пакет, зажатый потолком визита; цена = HP × множитель пакета × наценка
+    // тира сети (RepairTierSurchargeMul). Правило тиров мастерских: T1 берёт
+    // корабли 1–2, T2 — 1–3, T3+ — 4–5 (RepairNetwork.ShipTierAccepted),
+    // чужой корабль — отказ с текстом борткомпа. Магазин (Н-3а): витрина —
+    // большой спрайт модели, статы, цена,
     // листание [←][→], сортировка по цене; базовые корабли всегда в наличии,
     // вариант покраски (ShipConfig.PaintVariants) ротирует ShopStockService
     // раз в 2 игровых часа, покупка запоминает показанный вариант.
@@ -83,25 +89,25 @@ namespace SpaceTaxi.UI
         private InputAction stationAction;
 
         private TMP_Text stationTitle;
-        private TMP_Text creditsValue;
+        private TMP_Text creditsValue; // «Đ N» — рамка StationUI, перечитывается по Wallet.CreditsChanged
         private TMP_Text fuelValue;
         private TMP_Text hullValue;
         private TMP_Text fuelStatus;
         private TMP_Text hullStatus;
-        private Image[] fuelSegments;
-        private Image[] hullSegments;
+        private Image[] fuelSegments;   // ячейки бака на всю ширину панели (С1)
+        private RectTransform hpFill;   // заливка HP-бара ремонта (С4)
         private Button fuelButton;
         private TMP_Text fuelButtonLabel;
-        // заправка (Н-4): слайдер объёма с живым предрасчётом и пресеты
-        private TMP_Text fuelStockLine;  // «Топлива на станции: N ед · цена M кр/ед»
-        private TMP_Text fuelOfferLabel; // «Заправить: X ед (Y кр)»
+        // заправка (С1): слайдер объёма с живым предрасчётом; пресеты убраны —
+        // одна кнопка подтверждения (по умолчанию выбран весь доступный объём)
+        private TMP_Text fuelStockLine;  // «Топлива на станции: N ед · цена M Đ/ед»
+        private TMP_Text fuelOfferLabel; // «Заправить: X ед · Đ Y»
         private Slider fuelSlider;
-        private Button fuelPreset10;
-        private Button fuelPreset50;
-        private Button fuelPresetAll;
-        // ремонт (Н-5): три карточки пакетов вместо одной кнопки
-        private TMP_Text repairTierLine; // «Мастерская: тир N — за визит не более X% починки»
-        private RepairPackRefs[] repairPacks;
+        // ремонт (С4): одна кнопка «Починить» вместо трёх пакетов
+        private TMP_Text repairTierLine; // «Мастерская тир N — за визит ≤X% · наценка ×K»
+        private TMP_Text repairOffer;    // «Починка: +N HP · Đ M» или отказ по тиру корабля
+        private Button repairButton;
+        private TMP_Text repairButtonLabel;
         // бюджет «за визит не более X%»: кап × недостающее на момент посадки;
         // покупки минусуют его, иначе повторные мелкие пакеты собирают 100%
         private Planet repairBudgetPlanet;
@@ -290,6 +296,10 @@ namespace SpaceTaxi.UI
             fuelStatus.text = "";
             hullStatus.text = "";
             Refresh();
+            // С1: по умолчанию выбран весь доступный объём — кнопка сразу
+            // читается «ЗАПРАВИТЬ ДО ПОЛНОГО»; onValueChanged перерисует суммы
+            if (fuelSlider != null && FuelAvailable() > 0)
+                fuelSlider.value = FuelAvailable();
 
             if (pauseController == null) pauseController = FindAnyObjectByType<PauseScreenController>();
             if (pauseController != null)
@@ -350,7 +360,8 @@ namespace SpaceTaxi.UI
             return FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, FuelTier, Pricing);
         }
 
-        // подтверждение: оплата ровно за выбранное (Wallet.TrySpend → Ship.Fuel → ReportServiced)
+        // подтверждение: оплата ровно за выбранное (Wallet.TrySpend → Ship.Fuel → ReportServiced);
+        // выбор слайдера по умолчанию — весь доступный объём («до полного»)
         private void ConfirmRefuel()
         {
             if (!CanOpen() || session == null || fuelSlider == null || FuelOutage)
@@ -360,17 +371,8 @@ namespace SpaceTaxi.UI
             if (units <= 0 || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
             ship.Fuel += units; // сеттер клампит и шлёт FuelChanged — HUD и экран обновятся
-            fuelStatus.text = $"Заправлено {units} ед за {cost} кр";
+            fuelStatus.text = $"Заправлено {units} ед за {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
             landing.ReportServiced(ship.LandedOn.DisplayName);
-        }
-
-        private void NudgeFuel(int delta) => SetFuelSelection(Mathf.RoundToInt(fuelSlider.value) + delta);
-
-        // сдвиг выбора слайдера; onValueChanged сам обновит подписи
-        private void SetFuelSelection(int units)
-        {
-            if (fuelSlider != null)
-                fuelSlider.value = Mathf.Clamp(units, 0, FuelAvailable());
         }
 
         // запас сети и диапазон слайдера — при каждом Refresh: посадка, заправка
@@ -381,11 +383,11 @@ namespace SpaceTaxi.UI
             float perUnit = FuelNetwork.PricePerUnit(FuelTier, FuelSector, Pricing);
 
             // 0 доступно: сеть станции пуста (Н4.5), бак полон — заправка не
-            // нужна, либо бак уже глубже запаса сети
+            // нужна, либо бак уже глубже запаса сети (тексты в стиле борткомпа)
             fuelStockLine.text = FuelOutage
                 ? "Сеть станции пуста — топлива нет"
                 : available > 0
-                    ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} кр/ед"
+                    ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} {StationUI.Currency}/ед"
                     : ship.Fuel >= ship.Eff.FuelMax - 0.5f
                         ? "Бак полон — заправка не нужна"
                         : "Запас сети ниже текущего топлива";
@@ -395,15 +397,11 @@ namespace SpaceTaxi.UI
             fuelSlider.interactable = !FuelOutage && available > 0;
             fuelSlider.SetValueWithoutNotify(Mathf.Clamp(fuelSlider.value, 0f, available));
 
-            bool hasStock = !FuelOutage && available > 0;
-            fuelPreset10.interactable = hasStock;
-            fuelPreset50.interactable = hasStock;
-            fuelPresetAll.interactable = hasStock;
-
             UpdateFuelOffer();
         }
 
-        // живой предрасчёт: подпись объёма и доступность подтверждения
+        // живой предрасчёт: сумма «Đ» и ОДНА кнопка (С1) — подтверждает выбор
+        // слайдера; на полном выборе подпись «ЗАПРАВИТЬ ДО ПОЛНОГО»
         private void UpdateFuelOffer()
         {
             int available = FuelAvailable();
@@ -414,11 +412,14 @@ namespace SpaceTaxi.UI
 
             fuelOfferLabel.text = FuelOutage
                 ? "Заправка не работает"
-                : $"Заправить: {selected} ед ({cost} кр)";
+                : $"Заправить: {selected} ед · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
             fuelButton.interactable = !FuelOutage && selected > 0 && session.Wallet.Credits >= cost;
             fuelButtonLabel.text = FuelOutage
                 ? "ТОПЛИВА НЕТ"
-                : selected > 0 ? $"ЗАПРАВИТЬ ({cost} кр)" : "ВЫБЕРИТЕ ОБЪЁМ";
+                : selected <= 0 ? "ВЫБЕРИТЕ ОБЪЁМ"
+                : selected >= available
+                    ? $"ЗАПРАВИТЬ ДО ПОЛНОГО · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}"
+                    : $"ЗАПРАВИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
         }
 
         // слайдер объёма: дорожка/заполнение/ручка собираются кодом (схема UGUI Slider)
@@ -467,103 +468,49 @@ namespace SpaceTaxi.UI
             return slider;
         }
 
-        // пресеты объёма: сдвиг выбора с клампом в доступный запас
-        private void BuildFuelPresets(Transform parent)
+        // ячейки бака (С1): ряд сегментов НА ВСЮ ШИРИНУ панели — отдельная
+        // строка секции, без подписи и чисел в том же ряду (те — над ячейками).
+        // Цвета сегментов — как в HUD (SegmentOn/SegmentOff)
+        private static Image[] BuildTankCells(Transform parent)
         {
-            var row = OnboardComputerFactory.H("FuelPresets", parent);
-            OnboardComputerFactory.FixedHeight(row.gameObject, 34f);
-            fuelPreset10 = BuildPresetButton(row.transform, "+10 ед", () => NudgeFuel(10));
-            fuelPreset50 = BuildPresetButton(row.transform, "+50 ед", () => NudgeFuel(50));
-            fuelPresetAll = BuildPresetButton(row.transform, "ПОЛНЫЙ ДОСТУПНЫЙ", () => SetFuelSelection(FuelAvailable()));
-        }
-
-        private static Button BuildPresetButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
-        {
-            var go = OnboardComputerFactory.Button(parent, label,
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.18f),
-                OnboardComputerFactory.LabelColor, 16f);
-            var le = go.AddComponent<LayoutElement>();
-            le.flexibleWidth = 1f;
-            le.minHeight = 34f;
-            le.preferredHeight = 34f;
-            var button = go.GetComponent<Button>();
-            button.onClick.AddListener(onClick);
-            return button;
-        }
-
-        // --- Ремонт (Н-5): пакеты мелкий/средний/полный по тиру сети планеты ---
-
-        private sealed class RepairPackRefs
-        {
-            public TMP_Text Info;    // «+25% · +18 HP» — эффективная доля пакета
-            public TMP_Text Price;   // «15 кр»
-            public Button Buy;
-            public TMP_Text BuyLabel;
-            public TMP_Text Note;    // причина блокировки (тир станции, деньги)
-        }
-
-        // ряд из трёх карточек: состав и цены пакетов — PricingConfig
-        private void BuildRepairPacks(Transform parent)
-        {
-            var row = new GameObject("PackRow", typeof(RectTransform));
+            var row = new GameObject("TankCells", typeof(RectTransform));
             row.transform.SetParent(parent, false);
             var layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = 4f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = true; // карточки одной высоты — по самой высокой
+            layout.childForceExpandHeight = true;
+            OnboardComputerFactory.FixedHeight(row.gameObject, 34f);
 
-            string[] names = { "МЕЛКИЙ", "СРЕДНИЙ", "ПОЛНЫЙ" };
-            repairPacks = new RepairPackRefs[RepairNetwork.PackCount];
-            for (int i = 0; i < RepairNetwork.PackCount; i++)
+            var cells = new Image[SegmentCount];
+            for (int i = 0; i < SegmentCount; i++)
             {
-                int packIndex = i; // замыкание: иначе все кнопки поймают PackCount
-                repairPacks[i] = BuildRepairCard(row.transform, packIndex, names[i]);
+                var cell = new GameObject("Cell_" + (i + 1).ToString("00"), typeof(RectTransform), typeof(Image));
+                cell.transform.SetParent(row.transform, false);
+                cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                cells[i] = cell.GetComponent<Image>();
+                cells[i].color = SegmentOff;
+                cells[i].raycastTarget = false;
             }
+            return cells;
         }
 
-        private RepairPackRefs BuildRepairCard(Transform parent, int packIndex, string title)
+        // --- Ремонт (С4): HP-бар + ОДНА кнопка «Починить» вместо карточек
+        // пакетов. Правило тиров мастерских (RepairNetwork.ShipTierAccepted):
+        // T1 берёт корабли 1–2, T2 — 1–3, T3+ — 4–5; чужой корабль не чинится,
+        // на экране отказ текстом борткомпа. Кнопка = полный пакет, зажатый
+        // потолком визита (InitRepairBudget); цена = HP × множитель пакета ×
+        // наценка тира сети (RepairTierSurchargeMul, С4) ---
+
+        // тир корабля таксиста для правила тиров мастерских (FleetService.Current)
+        private int ShipTier
         {
-            var card = new GameObject("Pack_" + (packIndex + 1), typeof(RectTransform), typeof(Image));
-            card.transform.SetParent(parent, false);
-            card.GetComponent<Image>().color = new Color(
-                OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                OnboardComputerFactory.LabelColor.b, 0.14f);
-            var cardLayout = card.AddComponent<VerticalLayoutGroup>();
-            cardLayout.padding = new RectOffset(8, 8, 8, 8);
-            cardLayout.spacing = 3f;
-            cardLayout.childControlWidth = true;
-            cardLayout.childControlHeight = true;
-            cardLayout.childForceExpandWidth = true;
-            cardLayout.childForceExpandHeight = false;
-            var cardElement = card.AddComponent<LayoutElement>();
-            cardElement.flexibleWidth = 1f;
-            cardElement.minWidth = 150f;
-
-            var refs = new RepairPackRefs();
-            var heading = OnboardComputerFactory.Text(card, title, 16f, OnboardComputerFactory.LabelColor, "Title");
-            OnboardComputerFactory.FixedHeight(heading.gameObject, 20f);
-            refs.Info = OnboardComputerFactory.Text(card, "—", 18f, OnboardComputerFactory.BrightColor, "Info");
-            OnboardComputerFactory.FixedHeight(refs.Info.gameObject, 24f);
-            refs.Price = OnboardComputerFactory.Text(card, "—", 18f, OnboardComputerFactory.TaxiColor, "Price");
-            OnboardComputerFactory.FixedHeight(refs.Price.gameObject, 24f);
-
-            var buttonGo = OnboardComputerFactory.Button(card.transform, "—",
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.22f),
-                OnboardComputerFactory.BrightColor, 16f, "BuyButton");
-            var le = buttonGo.AddComponent<LayoutElement>();
-            le.minHeight = 34f;
-            le.preferredHeight = 34f;
-            refs.Buy = buttonGo.GetComponent<Button>();
-            refs.Buy.onClick.AddListener(() => ConfirmRepair(packIndex));
-            refs.BuyLabel = buttonGo.GetComponentInChildren<TMP_Text>();
-
-            refs.Note = OnboardComputerFactory.Text(card, "", 14f, OnboardComputerFactory.LabelColor, "Note");
-            OnboardComputerFactory.FixedHeight(refs.Note.gameObject, 18f);
-            return refs;
+            get
+            {
+                var config = session != null && session.Fleet != null ? session.Fleet.Current : null;
+                return config != null ? config.Tier : 2;
+            }
         }
 
         // бюджет визита считается от недостающего HP на момент посадки и
@@ -575,101 +522,83 @@ namespace SpaceTaxi.UI
             repairBudgetRemaining = cap * RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
         }
 
-        // потолок станции и карточки — при каждом Refresh: ремонт, урон, деньги
+        // потолок станции, круг тиров и предложение — при каждом Refresh:
+        // ремонт, урон, деньги
         private void UpdateRepairWindow()
         {
             int tier = RepairTier;
             float missing = RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
             float cap = Pricing.GetRepairTierCap(tier);
+            float surcharge = Pricing.GetRepairTierSurcharge(tier);
 
-            repairTierLine.text = missing <= 0f
-                ? "Корпус цел — ремонт не нужен"
-                : $"Мастерская: тир {tier} — за визит не более {Mathf.RoundToInt(cap * 100f)}% починки";
+            repairTierLine.text = $"Мастерская тир {tier} — за визит не более {Mathf.RoundToInt(cap * 100f)}% починки · наценка ×{surcharge:0.##}";
 
-            int maxPack = RepairNetwork.MaxPackIndex(tier);
-            int credits = session.Wallet.Credits;
-            for (int i = 0; i < repairPacks.Length; i++)
+            if (missing <= 0f)
             {
-                var card = repairPacks[i];
-                if (missing <= 0f)
-                {
-                    card.Info.text = "—";
-                    card.Price.text = "—";
-                    card.Buy.interactable = false;
-                    card.BuyLabel.text = "КОРПУС ЦЕЛ";
-                    card.Note.text = "";
-                    continue;
-                }
-
-                bool tierOk = i <= maxPack;
-                float amount;
-                if (tierOk)
-                {
-                    // пакет от текущего недостающего, зажатый остатком бюджета визита
-                    amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp, i, tier,
-                        Pricing, repairBudgetRemaining);
-                }
-                else
-                {
-                    // пакет вне тира не предлагается — на карточке его номинал,
-                    // чтобы было видно, что именно станция отказывается делать
-                    amount = missing * Pricing.GetRepairPackFraction(i);
-                }
-                float fraction = amount / missing;
-                int cost = RepairNetwork.CostOf(amount, i, Pricing);
-
-                card.Info.text = $"+{Mathf.RoundToInt(fraction * 100f)}% · +{Mathf.RoundToInt(amount)} HP";
-                card.Price.text = cost + " кр";
-
-                if (!tierOk)
-                {
-                    card.Buy.interactable = false;
-                    card.BuyLabel.text = "НЕ ВОЗЬМЁМСЯ";
-                    card.Note.text = "не тот уровень станции";
-                    card.Note.color = OnboardComputerFactory.DangerColor;
-                }
-                else if (amount <= 0.01f)
-                {
-                    card.Buy.interactable = false;
-                    card.BuyLabel.text = "ЛИМИТ ВИЗИТА";
-                    card.Note.text = "потолок станции исчерпан";
-                    card.Note.color = OnboardComputerFactory.LabelColor;
-                }
-                else if (credits < cost)
-                {
-                    card.Buy.interactable = false;
-                    card.BuyLabel.text = "МАЛО КРЕДИТОВ";
-                    card.Note.text = "нужно " + cost + " кр";
-                    card.Note.color = OnboardComputerFactory.LabelColor;
-                }
-                else
-                {
-                    card.Buy.interactable = true;
-                    card.BuyLabel.text = "ПОЧИНИТЬ";
-                    card.Note.text = "";
-                }
+                repairOffer.text = "Корпус цел — ремонт не нужен";
+                repairOffer.color = OnboardComputerFactory.LabelColor;
+                repairButton.interactable = false;
+                repairButtonLabel.text = "КОРПУС ЦЕЛ";
+                hullStatus.text = "";
+                return;
             }
+
+            // С4: корабль вне круга тиров станции — отказ, ремонта не будет
+            if (!RepairNetwork.ShipTierAccepted(tier, ShipTier))
+            {
+                repairOffer.text = ShipTier < RepairNetwork.MinShipTier(tier)
+                    ? $"Мастерская не берётся за корабли ниже тира {RepairNetwork.MinShipTier(tier)}"
+                    : $"Корабли выше тира {RepairNetwork.MaxShipTier(tier)} здесь не обслуживаются";
+                repairOffer.color = OnboardComputerFactory.DangerColor;
+                repairButton.interactable = false;
+                repairButtonLabel.text = "НЕ БЕРЁМСЯ";
+                hullStatus.text = "";
+                return;
+            }
+
+            // полный пакет от текущего недостающего, зажатый остатком бюджета визита
+            float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp,
+                RepairNetwork.PackCount - 1, tier, Pricing, repairBudgetRemaining);
+            int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
+
+            if (amount <= 0.01f)
+            {
+                repairOffer.text = "Потолок визита исчерпан — приходите после нового урона";
+                repairOffer.color = OnboardComputerFactory.LabelColor;
+                repairButton.interactable = false;
+                repairButtonLabel.text = "ЛИМИТ ВИЗИТА";
+                hullStatus.text = "";
+                return;
+            }
+
+            repairOffer.text = $"Починка: +{Mathf.RoundToInt(amount)} HP · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+            repairOffer.color = OnboardComputerFactory.BrightColor;
+            bool canPay = session.Wallet.Credits >= cost;
+            repairButton.interactable = canPay;
+            repairButtonLabel.text = canPay ? "ПОЧИНИТЬ" : "МАЛО КРЕДИТОВ";
         }
 
-        // подтверждение пакета: существующий платёжный путь — TrySpend → HullSystem.Repair
-        private void ConfirmRepair(int packIndex)
+        // подтверждение: существующий платёжный путь — TrySpend → HullSystem.Repair;
+        // наценка тира сети внутри RepairNetwork.CostOf (базовая формула не тронута)
+        private void ConfirmRepair()
         {
             if (!CanOpen() || session == null)
                 return;
-            if (packIndex > RepairNetwork.MaxPackIndex(RepairTier))
-                return; // станция такой пакет не даёт — кнопка должна была быть серой
+            int tier = RepairTier;
+            if (!RepairNetwork.ShipTierAccepted(tier, ShipTier))
+                return; // станция такие корабли не берёт — кнопка должна была быть серой
             float missing = RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
             if (missing <= 0f)
                 return;
-            float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp, packIndex, RepairTier,
-                Pricing, repairBudgetRemaining);
-            int cost = RepairNetwork.CostOf(amount, packIndex, Pricing);
+            float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp,
+                RepairNetwork.PackCount - 1, tier, Pricing, repairBudgetRemaining);
+            int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
             if (amount <= 0.01f || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
-            hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — карточки пересчитаются
+            hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — экран пересчитается
             repairBudgetRemaining = Mathf.Max(0f, repairBudgetRemaining - amount);
             int pct = Mathf.RoundToInt(amount / missing * 100f);
-            hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {cost} кр";
+            hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
             ShowToast($"Отремонтировано на {pct}%");
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
@@ -700,11 +629,11 @@ namespace SpaceTaxi.UI
             }
 
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();
-            creditsValue.text = session.Wallet.Credits + " кр";
+            creditsValue.text = StationUI.Currency + " " + OnboardBinder.FormatCredits(session.Wallet.Credits);
 
             UpdateGauge(fuelSegments, ship.FuelFraction);
             fuelValue.text = Mathf.RoundToInt(ship.Fuel) + "/" + Mathf.RoundToInt(ship.Eff.FuelMax);
-            UpdateGauge(hullSegments, ship.HpFraction);
+            UpdateHpBar(ship.HpFraction);
             hullValue.text = Mathf.RoundToInt(ship.Hp) + "/" + Mathf.RoundToInt(ship.Eff.HpMax);
 
             UpdateFuelWindow();
@@ -842,14 +771,13 @@ namespace SpaceTaxi.UI
             var fitter = panel.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // --- Шапка: точка + заголовок + кредиты ---
-            var titleRow = OnboardComputerFactory.H("TitleRow", panel.transform);
-            var dot = OnboardComputerFactory.Text(titleRow, "<voffset=0.35em>●</voffset>", 18f, OnboardComputerFactory.LabelColor, "LinkDot");
-            OnboardComputerFactory.FixedWidth(dot.gameObject, 24f);
-            stationTitle = OnboardComputerFactory.Text(titleRow, "СТАНЦИЯ", 26f, OnboardComputerFactory.BrightColor, "Title");
-            OnboardComputerFactory.Flexible(stationTitle.gameObject);
-            creditsValue = OnboardComputerFactory.Text(titleRow, "0 кр", 24f, OnboardComputerFactory.TaxiColor, "Credits");
-            OnboardComputerFactory.FixedWidth(creditsValue.gameObject, 120f);
+            // --- Шапка попапа (рамка С4): «СТАНЦИЯ · …» слева, кредиты «Đ N»
+            // справа (Refresh перечитывает по Wallet.CreditsChanged), крестик
+            // закрытия в правом верхнем углу — клик закрывает попап ---
+            var header = StationUI.PopupHeader(panel.transform, "СТАНЦИЯ");
+            stationTitle = header.Title;
+            creditsValue = header.Credits;
+            header.Close.onClick.AddListener(Close);
 
             // --- Вкладки услуг (§3.3): кнопки создаём все четыре, видимость
             // под флаги планеты ставит ApplyTabs при каждом открытии ---
@@ -869,33 +797,74 @@ namespace SpaceTaxi.UI
             AddTabButton(StationTab.Fuel, tabRow.transform, "ЗАПРАВКА");
             AddTabButton(StationTab.Repair, tabRow.transform, "РЕМОНТ");
 
-            // --- Окно заправки (вкладка ЗАПРАВКА): слайдер объёма (Н-4) ---
-            fuelWindow = Section(panel.transform, "// ЗАПРАВКА", "FuelWindow");
-            var fuelGauge = BuildGauge(fuelWindow, "ТОПЛИВО", "Fuel");
-            fuelSegments = fuelGauge.Segments;
-            fuelValue = fuelGauge.Value;
+            // --- Окно заправки (вкладка ЗАПРАВКА, С1): ячейки бака на всю
+            // ширину панели, слайдер объёма (механика Н-4 не тронута), сумма
+            // «Đ», одна кнопка подтверждения ---
+            fuelWindow = StationUI.Section(panel.transform, "// ТОПЛИВО", "FuelWindow");
+
+            // шапка бака: метка слева, значение справа (правило 1.32: 17pt ≈ 22.4 → высота 24)
+            var fuelHead = OnboardComputerFactory.H("FuelHead", fuelWindow.transform);
+            OnboardComputerFactory.FixedHeight(fuelHead.gameObject, 24f);
+            var fuelCaption = OnboardComputerFactory.Text(fuelHead, "БАК", 17f, OnboardComputerFactory.LabelColor, "Caption");
+            OnboardComputerFactory.Flexible(fuelCaption.gameObject);
+            fuelValue = OnboardComputerFactory.Text(fuelHead, "0/0", 17f, OnboardComputerFactory.BrightColor, "FuelValue");
+            OnboardComputerFactory.FixedWidth(fuelValue.gameObject, 110f);
+            fuelValue.alignment = TextAlignmentOptions.Right;
+
+            fuelSegments = BuildTankCells(fuelWindow.transform);
+
             fuelStockLine = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "StockLine");
-            OnboardComputerFactory.FixedHeight(fuelStockLine.gameObject, 22f);
+            OnboardComputerFactory.FixedHeight(fuelStockLine.gameObject, 23f);
             fuelOfferLabel = OnboardComputerFactory.Text(fuelWindow, "", 18f, OnboardComputerFactory.BrightColor, "OfferLabel");
             OnboardComputerFactory.FixedHeight(fuelOfferLabel.gameObject, 24f);
             fuelSlider = BuildFuelSlider(fuelWindow.transform);
             OnboardComputerFactory.FixedHeight(fuelSlider.gameObject, 30f);
             fuelSlider.onValueChanged.AddListener(_ => UpdateFuelOffer());
-            BuildFuelPresets(fuelWindow.transform);
-            fuelButton = BuildServiceButton(fuelWindow.transform, "FuelButton", ConfirmRefuel, out fuelButtonLabel);
-            fuelStatus = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
-            OnboardComputerFactory.FixedHeight(fuelStatus.gameObject, 22f);
 
-            // --- Окно ремонта (вкладка РЕМОНТ): пакеты (Н-5) ---
-            hullWindow = Section(panel.transform, "// РЕМОНТ", "HullWindow");
-            var hullGauge = BuildGauge(hullWindow, "КОРПУС", "Hull");
-            hullSegments = hullGauge.Segments;
-            hullValue = hullGauge.Value;
+            // ОДНА кнопка заправки (С1): пресеты убраны; каркасная кнопка —
+            // яркий текст, ColorTint, щелчок озвучен каркасом. Подтверждает
+            // выбор слайдера (по умолчанию — весь доступный объём)
+            var fuelButtonGo = StationUI.Button(fuelWindow.transform, "—", 20f, "FuelButton");
+            var fuelButtonLe = fuelButtonGo.AddComponent<LayoutElement>();
+            fuelButtonLe.minHeight = 44f;
+            fuelButtonLe.preferredHeight = 44f;
+            fuelButtonLe.flexibleWidth = 1f;
+            fuelButton = fuelButtonGo.GetComponent<Button>();
+            fuelButton.onClick.AddListener(ConfirmRefuel);
+            fuelButtonLabel = fuelButtonGo.GetComponentInChildren<TMP_Text>();
+
+            fuelStatus = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
+            OnboardComputerFactory.FixedHeight(fuelStatus.gameObject, 23f);
+
+            // --- Окно ремонта (вкладка РЕМОНТ, С4): HP-бар, цена «Đ», кнопка «Починить» ---
+            hullWindow = StationUI.Section(panel.transform, "// РЕМОНТ", "HullWindow");
+
+            var hullHead = OnboardComputerFactory.H("HullHead", hullWindow.transform);
+            OnboardComputerFactory.FixedHeight(hullHead.gameObject, 24f);
+            var hullCaption = OnboardComputerFactory.Text(hullHead, "КОРПУС", 17f, OnboardComputerFactory.LabelColor, "Caption");
+            OnboardComputerFactory.Flexible(hullCaption.gameObject);
+            hullValue = OnboardComputerFactory.Text(hullHead, "0/0", 17f, OnboardComputerFactory.BrightColor, "HullValue");
+            OnboardComputerFactory.FixedWidth(hullValue.gameObject, 110f);
+            hullValue.alignment = TextAlignmentOptions.Right;
+
+            hpFill = StationUI.FillBar(hullWindow.transform, 14f, OnboardComputerFactory.BrightColor);
+
             repairTierLine = OnboardComputerFactory.Text(hullWindow, "", 17f, OnboardComputerFactory.LabelColor, "TierLine");
-            OnboardComputerFactory.FixedHeight(repairTierLine.gameObject, 22f);
-            BuildRepairPacks(hullWindow.transform);
+            OnboardComputerFactory.FixedHeight(repairTierLine.gameObject, 23f);
+            repairOffer = OnboardComputerFactory.Text(hullWindow, "", 18f, OnboardComputerFactory.BrightColor, "OfferLine");
+            OnboardComputerFactory.FixedHeight(repairOffer.gameObject, 24f);
+
+            var repairButtonGo = StationUI.Button(hullWindow.transform, "—", 20f, "RepairButton");
+            var repairButtonLe = repairButtonGo.AddComponent<LayoutElement>();
+            repairButtonLe.minHeight = 44f;
+            repairButtonLe.preferredHeight = 44f;
+            repairButtonLe.flexibleWidth = 1f;
+            repairButton = repairButtonGo.GetComponent<Button>();
+            repairButton.onClick.AddListener(ConfirmRepair);
+            repairButtonLabel = repairButtonGo.GetComponentInChildren<TMP_Text>();
+
             hullStatus = OnboardComputerFactory.Text(hullWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
-            OnboardComputerFactory.FixedHeight(hullStatus.gameObject, 22f);
+            OnboardComputerFactory.FixedHeight(hullStatus.gameObject, 23f);
 
             // --- Окно улучшений: вкладка УЛУЧШЕНИЯ (хаб) или контент окна
             // РЕМОНТА (обычная станция); гашение долга живёт здесь же (§3.2) ---
@@ -915,69 +884,24 @@ namespace SpaceTaxi.UI
             BuildShowcaseBlock(panel.transform);
 
             var footer = OnboardComputerFactory.Text(panel, "B / ESC — закрыть", 16f, OnboardComputerFactory.LabelColor, "Footer");
-            OnboardComputerFactory.FixedHeight(footer.gameObject, 20f);
+            // 22, не 20: строка 16pt ≈ 21.1 — Ellipsis при меньшей высоте режет по вертикали
+            OnboardComputerFactory.FixedHeight(footer.gameObject, 22f);
 
             return root;
         }
 
-        // секция в стиле фабрики борткомпа: заголовок + линия
-        private static GameObject Section(Transform parent, string title, string name)
+        // HP-бар (С4): ширина заливки = доля корпуса; цвет — яркий зелень,
+        // ниже четверти — тревожный красный (цвета борткомпа)
+        private void UpdateHpBar(float fraction)
         {
-            var section = new GameObject(name, typeof(RectTransform));
-            section.transform.SetParent(parent, false);
-            var layout = section.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-
-            var heading = OnboardComputerFactory.Text(section, title, 20f, OnboardComputerFactory.LabelColor, "Heading");
-            OnboardComputerFactory.FixedHeight(heading.gameObject, 26f);
-            var line = new GameObject("Line", typeof(RectTransform), typeof(Image));
-            line.transform.SetParent(section.transform, false);
-            line.GetComponent<Image>().color = new Color(
-                OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g, OnboardComputerFactory.LabelColor.b, 0.4f);
-            OnboardComputerFactory.FixedHeight(line, 2f);
-            return section;
-        }
-
-        private sealed class GaugeRefs
-        {
-            public Image[] Segments = new Image[SegmentCount];
-            public TMP_Text Value;
-        }
-
-        // строка «метка | сегменты | числа» — как в HUD
-        private static GaugeRefs BuildGauge(GameObject parent, string label, string name)
-        {
-            var row = OnboardComputerFactory.H(name + "Row", parent.transform);
-            var caption = OnboardComputerFactory.Text(row, label, 18f, OnboardComputerFactory.LabelColor, "Caption");
-            OnboardComputerFactory.FixedWidth(caption.gameObject, 96f);
-
-            var track = new GameObject(name + "Track", typeof(RectTransform));
-            track.transform.SetParent(row.transform, false);
-            var trackLayout = track.AddComponent<HorizontalLayoutGroup>();
-            trackLayout.spacing = 3f;
-            trackLayout.childControlWidth = true;
-            trackLayout.childControlHeight = true;
-            trackLayout.childForceExpandWidth = true;
-            trackLayout.childForceExpandHeight = true;
-            OnboardComputerFactory.Flexible(track);
-
-            var gauge = new GaugeRefs();
-            for (int i = 0; i < SegmentCount; i++)
-            {
-                var seg = new GameObject(name + "Seg_" + (i + 1).ToString("00"), typeof(RectTransform), typeof(Image));
-                seg.transform.SetParent(track.transform, false);
-                seg.AddComponent<LayoutElement>().flexibleWidth = 1f;
-                gauge.Segments[i] = seg.GetComponent<Image>();
-                gauge.Segments[i].color = SegmentOff;
-            }
-
-            gauge.Value = OnboardComputerFactory.Text(row, "0/0", 20f, OnboardComputerFactory.BrightColor, name + "Value");
-            OnboardComputerFactory.FixedWidth(gauge.Value.gameObject, 100f);
-            return gauge;
+            if (hpFill == null)
+                return;
+            SetFill(hpFill, fraction);
+            var image = hpFill.GetComponent<Image>();
+            if (image != null)
+                image.color = fraction < 0.25f
+                    ? OnboardComputerFactory.DangerColor
+                    : OnboardComputerFactory.BrightColor;
         }
 
         private static Button BuildServiceButton(Transform parent, string name, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
@@ -1047,7 +971,7 @@ namespace SpaceTaxi.UI
         // блок «Улучшения» — свой метод-строитель (как долг ниже и ангар П3.2)
         private void BuildUpgradesBlock(Transform shop)
         {
-            var section = Section(shop, "// УЛУЧШЕНИЯ", "UpgradesSection");
+            var section = StationUI.Section(shop, "// УЛУЧШЕНИЯ", "UpgradesSection");
 
             // аренда: строка-пояснение без кнопок
             upgradesRental = OnboardComputerFactory.Text(section,
@@ -1251,7 +1175,7 @@ namespace SpaceTaxi.UI
         // блок «Долг» — свой метод-строитель
         private void BuildDebtBlock(Transform shop)
         {
-            debtSection = Section(shop, "// ДОЛГ", "DebtSection");
+            debtSection = StationUI.Section(shop, "// ДОЛГ", "DebtSection");
             debtLine = OnboardComputerFactory.Text(debtSection, "", 18f, OnboardComputerFactory.DangerColor, "DebtLine");
             OnboardComputerFactory.FixedHeight(debtLine.gameObject, 24f);
 
@@ -1326,7 +1250,7 @@ namespace SpaceTaxi.UI
         // таблицей 6 статов с полосками сравнения, ценой и кнопкой
         private void BuildShowcaseBlock(Transform parent)
         {
-            shopWindow = Section(parent, "// МАГАЗИН", "ShopWindow");
+            shopWindow = StationUI.Section(parent, "// МАГАЗИН", "ShopWindow");
 
             var showcaseRow = OnboardComputerFactory.H("ShowcaseRow", shopWindow.transform);
             BuildArrowButton(showcaseRow.transform, "←", () => FlipShowcase(-1));
