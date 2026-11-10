@@ -88,9 +88,9 @@ namespace SpaceTaxi.UI
 
         // ————— геометрия спидометра (каркас строится кодом, префаб удалён) —————
 
-        private const float GaugeSize = 70f;      // сторона квадрата спидометра — компактная иконка, как у соседних статов
-        private const float NeedleScale = 1f;     // масштаб спрайта стрелки (остриё 27.5 < радиуса шкалы 35)
-        private const float GaugeTopGap = 3f;     // зазор между шкалой и строкой топлива
+        private const float GaugeSize = 55f;      // слот как у соседних иконок статов (FuelIcon/HullIcon 55×55)
+        private const float NeedleScale = 0.85f;  // остриё 23.4 < радиуса шкалы 27.5 — не вылезает
+        private const float GaugeTopGap = 12f;    // зазор между шкалой и строкой топлива (опущена ниже по Н4.13)
         private const float GaugeHullGap = 6f;    // зазор между стрелкой и строкой корпуса
         // Ход стрелки: 240° из допустимых брифом 180..270. Хвост arrow.png в z=0
         // смотрит вправо-вниз (≈ −12°), −78° ставит его строго вниз; дальше — по
@@ -132,6 +132,7 @@ namespace SpaceTaxi.UI
             if (arrow == null)
                 Debug.LogWarning("[Hud] Art/icons/arrow не найден — спидометр без стрелки");
             needleImage.sprite = arrow;
+            needleImage.color = IconGreen; // стрелка в зелёном HUD, как шкала и иконки (Н4.13)
             needleImage.raycastTarget = false;
             var needleRect = (RectTransform)needleGo.transform;
             needleRect.anchorMin = needleRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -152,17 +153,18 @@ namespace SpaceTaxi.UI
             dialRect.sizeDelta = new Vector2(GaugeSize, dialHeight);
             dialRect.anchoredPosition = new Vector2(0f, dialHeight * 0.5f); // плоская сторона — к центру
 
-            // цифровое значение — СПРАВА от шкалы по её центру (Н4.11: владелец —
-            // «текст скорости справа, не снизу»); 42, не 40: строка 30pt ≈ 39.6 —
-            // Ellipsis при меньшей высоте режет текст по вертикали
+            // цифровое значение — СПРАВА от шкалы, размер как у HullValue (36pt,
+            // высота 42, BrightColor — ровный ряд статов, Н4.13); высота 42 < 47.5
+            // правила 1.32 допустима: у SpeedValue Overflow (узел сцены, не фабрика)
             speedValue.transform.SetParent(gaugeRect, false);
             var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
             speedRect.anchorMax = new Vector2(0.5f, 0.5f);
             speedRect.pivot = new Vector2(0f, 0.5f); // левый край — от шкалы вправо
-            speedRect.sizeDelta = new Vector2(110f, 42f);
+            speedRect.sizeDelta = new Vector2(130f, 42f);
             speedRect.anchoredPosition = new Vector2(GaugeSize * 0.5f + 8f, 0f);
-            speedValue.fontSize = 30f;
+            speedValue.fontSize = 36f;
+            speedValue.color = OnboardComputerFactory.BrightColor;
             speedValue.alignment = TextAlignmentOptions.Left;
 
             gauge = gaugeGo.GetComponent<SpeedometerGauge>();
@@ -176,30 +178,28 @@ namespace SpaceTaxi.UI
             ShiftHullRow(GaugeHullTop(gaugeCenter));
         }
 
-        // центр спидометра: х шкалы — по левому краю строки топлива (пивот 0),
-        // иначе шкала вылезает за экран; у — под низомFuelIcon (он ниже FuelTrack,
-        // дуга не должна его задевать). Всё в координатах родителя (точечные
-        // якоря), углы — от его верха-лева. Вызывать ДО перепарентчивания
-        // SpeedValue внутрь шкалы (poseSource не использует SpeedValue — после
-        // SetParent его координаты были бы локальными координатами шкалы)
+        // центр спидометра: левый край шкалы выровнен по левому краю иконок
+        // статов (FuelIcon/HullIcon x=14.2, пивоты x=0 — anchoredPosition.x и есть
+        // левый край), у — под строкой топлива с зазором GaugeTopGap (опущена
+        // ниже по Н4.13). Всё в координатах родителя (точечные якоря), углы —
+        // от его верха-лева. Вызывать ДО перепарентчивания SpeedValue внутрь
+        // шкалы (poseSource не использует SpeedValue — после SetParent его
+        // координаты были бы локальными координатами шкалы)
         private Vector2 GaugeCenter()
         {
             var track = transform.Find("FuelTrack");
             var fuelIcon = transform.Find("FuelIcon");
-            var speedIcon = transform.Find("SpeedIcon");
-            var poseSource = speedIcon != null ? speedIcon : fuelIcon != null ? fuelIcon : track;
-            Vector2 center = poseSource != null
-                ? RectCenter((RectTransform)poseSource.transform)
+            // колонка статов задана FuelIcon (x=14.2): шкала выравнивается по ней,
+            // а не по скрытому SpeedIcon (x=18) — «выровняй с остальными» (Н4.13)
+            Transform xSource = fuelIcon != null ? fuelIcon : track;
+            Vector2 center = xSource != null
+                ? new Vector2(((RectTransform)xSource).anchoredPosition.x + GaugeSize * 0.5f, 0f)
                 : new Vector2(16f + GaugeSize * 0.5f, -32f - 55f); // сцена без строк — левый край под шапкой
             float dialHalf = GaugeSize * 0.5f;
-            if (track != null)
-                center.x = ((RectTransform)track).anchoredPosition.x; // пивот x=0 → левый край
-            else
-                center.x = Mathf.Max(center.x, dialHalf);
             if (fuelIcon != null || track != null)
             {
                 var rowRect = (RectTransform)(fuelIcon != null ? fuelIcon : track);
-                center.y = Mathf.Min(center.y, RowBottom(rowRect) - GaugeTopGap - dialHalf);
+                center.y = RowBottom(rowRect) - GaugeTopGap - dialHalf;
             }
             return center;
         }
@@ -234,13 +234,6 @@ namespace SpaceTaxi.UI
         private static float RowBottom(RectTransform rect)
         {
             return rect.anchoredPosition.y - rect.pivot.y * rect.sizeDelta.y;
-        }
-
-        // центр точечно-заякоренного узла в координатах родителя
-        private static Vector2 RectCenter(RectTransform rect)
-        {
-            return rect.anchoredPosition
-                + Vector2.Scale(rect.sizeDelta, new Vector2(0.5f - rect.pivot.x, 0.5f - rect.pivot.y));
         }
 
         // иконки статов: в сцене болванки ui_icon_shield/ui_icon_fuel — меняем
