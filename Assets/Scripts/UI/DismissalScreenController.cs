@@ -142,16 +142,27 @@ namespace SpaceTaxi.UI
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 
+            // подтверждение увольнения — выраженно красная кнопка: полная заливка
+            // DangerColor (была 28% прозрачность), светлый текст борткомпа
             var menu = OnboardComputerFactory.Button(content.transform, "В МЕНЮ",
-                new Color(OnboardComputerFactory.DangerColor.r, OnboardComputerFactory.DangerColor.g,
-                    OnboardComputerFactory.DangerColor.b, 0.28f),
+                OnboardComputerFactory.DangerColor,
                 OnboardComputerFactory.BrightColor, 26f, "ButtonMenu");
             var menuLayout = menu.AddComponent<LayoutElement>();
             menuLayout.minWidth = 260f;
             menuLayout.preferredWidth = 260f;
             menuLayout.minHeight = 56f;
             menuLayout.preferredHeight = 56f;
-            menu.GetComponent<Button>().onClick.AddListener(GoToMenu);
+            // hover: встроенный ColorTint (паттерн PlayerButton фабрики) — под
+            // курсором красный светлеет; тон умножается на цвет фона, поэтому
+            // компоненты >1 дают более светлый красный
+            var menuButton = menu.GetComponent<Button>();
+            menuButton.transition = Selectable.Transition.ColorTint;
+            var menuColors = menuButton.colors;
+            menuColors.fadeDuration = 0.1f;
+            menuColors.highlightedColor = new Color(1.2f, 1.6f, 1.6f);
+            menuColors.pressedColor = new Color(0.9f, 0.9f, 0.9f);
+            menuButton.colors = menuColors;
+            menuButton.onClick.AddListener(GoToMenu);
             return root;
         }
     }
