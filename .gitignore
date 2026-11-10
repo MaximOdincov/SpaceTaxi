@@ -122,3 +122,6 @@ InitTestScene*.unity*
 # Python
 __pycache__/
 *.pyc
+
+# Unity crash recovery
+Assets/_Recovery/
