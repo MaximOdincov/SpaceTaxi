@@ -25,16 +25,20 @@ namespace SpaceTaxi.UI
     // пакет, зажатый потолком визита; цена = HP × множитель пакета × наценка
     // тира сети (RepairTierSurchargeMul). Правило тиров мастерских: T1 берёт
     // корабли 1–2, T2 — 1–3, T3+ — 4–5 (RepairNetwork.ShipTierAccepted),
-    // чужой корабль — отказ с текстом борткомпа. Магазин (Н-3а): витрина —
-    // большой спрайт модели, статы, цена,
-    // листание [←][→], сортировка по цене; базовые корабли всегда в наличии,
-    // вариант покраски (ShipConfig.PaintVariants) ротирует ShopStockService
-    // раз в 2 игровых часа, покупка запоминает показанный вариант.
-    // Улучшения (§3.4) и гашение долга (§3.2) — на хабе отдельной вкладкой, на
-    // обычной станции — внутри окна ремонта. Магазин (Н3.4): витрина крупнее —
-    // спрайт 220×160, статы таблицей из 6 строк с полосками сравнения с текущим
-    // кораблём (серая — текущий, цветная — модель: зелёная лучше, красная хуже,
-    // справа %) и бейджем «ВЫ ЗДЕСЬ»; улучшения — предпросмотр «старое → новое».
+    // чужой корабль — отказ с текстом борткомпа. Магазин (C2): слева таблица
+    // статов — полоска рассматриваемой модели с риской (засечкой) твоего
+    // текущего значения; отрезок между ними подкрашен (зелёный — модель
+    // лучше, красный — хуже); ВСЕ статы «больше = лучше», торможение —
+    // «Мощность торможения» по полю Retro (инверсий нет). Справа — большая
+    // модель в ВЫБРАННОЙ расцветке (свотчи под таблицей, механика бывшего
+    // FlipPaint; покупка берёт выбранный вариант), внизу — навигация
+    // [←] ИМЯ · ТИР N [→] и подпись статуса владения («ВАШ»/«В АРЕНДЕ ·
+    // СЕЙЧАС АКТИВЕН») вместо бейджа «ВЫ ЗДЕСЬ». Сортировка витрины по цене;
+    // базовые корабли всегда в наличии, показанный вариант покраски
+    // (ShipConfig.PaintVariants) ротирует ShopStockService раз в 2 игровых
+    // часа. Улучшения (§3.4, C3): строки линий «УР N → УР N+1», прибавка из
+    // процентов UpgradeConfig, цена «Đ» — по-линейные GetPrice(line,
+    // level+1), полоска уровня из 3 сегментов; только на СВОЙ корабль.
     // Доступен ТОЛЬКО стоя
     // (State == Landed) на планете с услугами; мир не ставится на паузу (как
     // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
@@ -48,18 +52,26 @@ namespace SpaceTaxi.UI
         // подпись счётчика аварий (§3.2: увольнение после третьей непогашенной)
         private const int MaxUnpaidAccidents = 3;
 
-        // витрина (Н3.4): карточка крупнее, статы — таблицей с полосками сравнения
-        private const float ShowcaseSpriteW = 220f;
-        private const float ShowcaseSpriteH = 160f;
-        private const int StatCount = 6;      // Thrust, StrafeAcc, MaxV, FuelMax, HpMax, Retro
-        private const int StatBrakeIndex = 5; // тормозной путь: меньше = лучше
-        // тормозной путь = K / Retro — условные «отн.» единицы: Retro 98–310 → ~200–610
-        private const float BrakeDistanceK = 60000f;
+        // витрина (C2): слева таблица статов с риской текущего значения, справа
+        // большая модель в выбранной расцветке
+        private const float ShowcaseSpriteW = 250f;
+        private const float ShowcaseSpriteH = 200f;
+        private const int StatCount = 6; // Thrust, MaxV, FuelMax, HpMax, Retro, StrafeAcc
+        // ширины колонок строки стата: подпись — под «Мощность торможения»
+        // (самая длинная строка), справа округлённое значение модели
+        private const float StatLabelWidth = 165f;
+        private const float StatValueWidth = 44f;
+        // свотчи расцветок: 30px влезает при ≤5 вариантах, 26px при 6 (в колонке
+        // статов под свотчи ~220px)
+        private const float SwatchSize = 30f;
+        private const float SwatchSizeSmall = 26f;
 
-        // подписи статов витрины; индексы совпадают с CompareValue
+        // подписи статов витрины (C2); ВСЕ статы «больше = лучше»: тормозной
+        // путь переименован в «Мощность торможения» (поле Retro, больше =
+        // лучше). Индексы совпадают со StatValue/CurrentStatValue
         private static readonly string[] StatLabels =
         {
-            "Тяга", "Манёвр", "Макс. скорость", "Бак", "Прочность", "Тормозной путь",
+            "Тяга", "Макс. скорость", "Бак", "Прочность", "Мощность торможения", "Манёвренность",
         };
 
         // шаблоны описания прибавки ОДНОГО уровня: проценты считаются из
@@ -147,13 +159,16 @@ namespace SpaceTaxi.UI
         private Image showcaseSprite;
         private TMP_Text showcaseName;
         private TMP_Text showcasePaint;
-        // Н3.4: таблица 6 статов с полосками сравнения с текущим кораблём
+        // C2: таблица 6 статов — полоска модели + риска текущего значения +
+        // подкрашенный отрезок разницы
         private ShowStatRowRefs[] showcaseStatRows;
-        private GameObject showcaseBadge; // «ВЫ ЗДЕСЬ» — витрина показывает текущую модель
-        private TMP_Text showcaseStatus;
+        private TMP_Text showcaseState;    // «ВАШ · СЕЙЧАС АКТИВЕН» / «В АРЕНДЕ …» — вместо бейджа
+        private GameObject paintSwatchRow; // свотчи расцветок: выбор меняет большой спрайт
+        private Image[] paintSwatchIcons;  // иконки свотчей по индексу покраски
+        private ShipConfig swatchConfig;   // модель, под которую собраны свотчи
         private Button shopBuy;
         private TMP_Text shopBuyLabel;
-        private TMP_Text shopStatus; // строка обратной связи покупки
+        private TMP_Text shopStatus; // «Не хватает Đ N» при недостаче, иначе пусто
         private ToastNotifier toast;
 
         public bool IsOpened => opened;
@@ -758,8 +773,8 @@ namespace SpaceTaxi.UI
             var panelRect = (RectTransform)panel.transform;
             panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            // Н3.4: панель шире (560 → 640) — витрине нужна таблица статов с полосками
-            panelRect.sizeDelta = new Vector2(640f, 0f); // высоту подберёт fitter
+            // C2: панель шире (640 → 700) — витрина: слева статы, справа большая модель
+            panelRect.sizeDelta = new Vector2(700f, 0f); // высоту подберёт fitter
             panel.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(24, 24, 20, 18);
@@ -906,13 +921,11 @@ namespace SpaceTaxi.UI
 
         private static Button BuildServiceButton(Transform parent, string name, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
         {
-            var go = OnboardComputerFactory.Button(parent, "—",
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.22f),
-                OnboardComputerFactory.BrightColor, 20f, name);
+            var go = StationUI.Button(parent, "—", 20f, name);
             var le = go.AddComponent<LayoutElement>();
             le.minHeight = 44f;
             le.preferredHeight = 44f;
+            le.flexibleWidth = 1f;
             var button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
             label = go.GetComponentInChildren<TMP_Text>();
@@ -923,30 +936,26 @@ namespace SpaceTaxi.UI
 
         private sealed class UpgradeRowRefs
         {
-            public TMP_Text Level;
-            public TMP_Text Effect;
-            // Н3.4: предпросмотр «Двигатель 140 → 161 (+15%)» + полоска-прирост
-            public TMP_Text Preview;
-            public CompareBarRefs PreviewBar;
+            public TMP_Text Level;   // «УР 1 → УР 2» / «УР 3 · МАКС»
+            public TMP_Text Effect;  // «+8% тяги» … — прибавка следующего уровня
+            public Image[] Segments; // полоска уровня: 3 сегмента, заполнение = уровень
             public Button Buy;
             public TMP_Text BuyLabel;
         }
 
-        // полоска сравнения (Н3.4): дорожка + два fill-дочки; ширины двигает
-        // SetFill по долям значений (цветной fill перекрывает серый)
-        private sealed class CompareBarRefs
-        {
-            public RectTransform CurrentFill; // серая — текущий корабль / старое значение
-            public RectTransform ValueFill;   // цветная — модель / новый уровень
-            public Image ValueImage;
-        }
-
-        // строка таблицы статов витрины: подпись | полоска | процент отличия
+        // строка таблицы статов витрины (C2): подпись | полоска модели с риской
+        // текущего значения | значение модели. Полоска: нейтральный fill —
+        // рассматриваемый корабль, подкрашенный отрезок — разница с твоим
+        // (зелёный — рассматриваемый лучше, красный — хуже), янтарная риска —
+        // твоё текущее значение поверх всех слоёв
         private sealed class ShowStatRowRefs
         {
             public TMP_Text Label;
-            public TMP_Text Percent;
-            public CompareBarRefs Bar;
+            public TMP_Text Value;
+            public RectTransform ValueFill; // доля рассматриваемого корабля (0..1)
+            public RectTransform DeltaFill; // отрезок между твоим и рассматриваемым
+            public Image DeltaImage;
+            public RectTransform Tick;      // риска текущего значения
         }
 
         private void RefreshShop()
@@ -968,7 +977,10 @@ namespace SpaceTaxi.UI
             OnShopChanged();
         }
 
-        // блок «Улучшения» — свой метод-строитель (как долг ниже и ангар П3.2)
+        // блок «Улучшения» — свой метод-строитель (как долг ниже и ангар П3.2).
+        // C3: у каждой линии — «УР N → УР N+1», прибавка следующего уровня,
+        // цена «Đ» по-линейная (UpgradeConfig.GetPrice), кнопка КУПИТЬ и
+        // полоска уровня из 3 сегментов
         private void BuildUpgradesBlock(Transform shop)
         {
             var section = StationUI.Section(shop, "// УЛУЧШЕНИЯ", "UpgradesSection");
@@ -983,7 +995,7 @@ namespace SpaceTaxi.UI
             upgradesOwned = new GameObject("OwnedRows", typeof(RectTransform));
             upgradesOwned.transform.SetParent(section.transform, false);
             var rows = upgradesOwned.AddComponent<VerticalLayoutGroup>();
-            rows.spacing = 6f;
+            rows.spacing = 10f;
             rows.childControlWidth = true;
             rows.childControlHeight = true;
             rows.childForceExpandWidth = true;
@@ -1001,53 +1013,83 @@ namespace SpaceTaxi.UI
                 var rowGo = new GameObject("Row_" + (i + 1), typeof(RectTransform));
                 rowGo.transform.SetParent(upgradesOwned.transform, false);
                 var rowLayout = rowGo.AddComponent<VerticalLayoutGroup>();
-                rowLayout.spacing = 2f;
+                rowLayout.spacing = 4f;
                 rowLayout.childControlWidth = true;
                 rowLayout.childControlHeight = true;
                 rowLayout.childForceExpandWidth = true;
                 rowLayout.childForceExpandHeight = false;
 
                 var top = OnboardComputerFactory.H("Top", rowGo.transform);
-                var caption = OnboardComputerFactory.Text(top, names[i], 17f, OnboardComputerFactory.BrightColor, "Caption");
-                OnboardComputerFactory.FixedWidth(caption.gameObject, 120f);
+                OnboardComputerFactory.FixedHeight(top.gameObject, 34f);
+                top.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+                var caption = OnboardComputerFactory.Text(top, names[i], 17f,
+                    OnboardComputerFactory.BrightColor, "Caption");
+                OnboardComputerFactory.FixedWidth(caption.gameObject, 130f);
+                OnboardComputerFactory.FixedHeight(caption.gameObject, 22f);
                 var refs = new UpgradeRowRefs();
-                refs.Level = OnboardComputerFactory.Text(top, "ур. 0/3", 17f, OnboardComputerFactory.LabelColor, "Level");
-                OnboardComputerFactory.FixedWidth(refs.Level.gameObject, 76f);
+                refs.Level = OnboardComputerFactory.Text(top, "", 17f, OnboardComputerFactory.LabelColor, "Level");
+                OnboardComputerFactory.FixedWidth(refs.Level.gameObject, 120f);
+                OnboardComputerFactory.FixedHeight(refs.Level.gameObject, 22f);
                 var spacer = OnboardComputerFactory.Text(top, "", 15f, OnboardComputerFactory.LabelColor, "Spacer");
                 OnboardComputerFactory.Flexible(spacer.gameObject);
                 refs.Buy = BuildRowButton(top.transform, () => BuyUpgrade(line), out refs.BuyLabel);
 
+                refs.Segments = BuildLevelSegments(rowGo.transform);
                 refs.Effect = OnboardComputerFactory.Text(rowGo, "", 15f, OnboardComputerFactory.LabelColor, "Effect");
                 OnboardComputerFactory.FixedHeight(refs.Effect.gameObject, 20f);
-                // предпросмотр эффекта до покупки (Н3.4): числа даст ShipStats.Compute
-                refs.Preview = OnboardComputerFactory.Text(rowGo, "", 15f, OnboardComputerFactory.BrightColor, "Preview");
-                OnboardComputerFactory.FixedHeight(refs.Preview.gameObject, 20f);
-                refs.PreviewBar = BuildCompareBar(rowGo.transform, 8f);
                 upgradeRows[i] = refs;
             }
 
             RefreshUpgrades();
         }
 
-        // компактная кнопка строки улучшения (стиль BuildServiceButton)
+        // полоска прогресса уровней (C3): 3 сегмента на всю ширину строки,
+        // заполнение = уровень (0..3) — цвета сегментов как в HUD
+        private static Image[] BuildLevelSegments(Transform parent)
+        {
+            var row = new GameObject("LevelSegments", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+            OnboardComputerFactory.FixedHeight(row.gameObject, 10f);
+
+            var segments = new Image[ShipStats.MaxLevel];
+            for (int i = 0; i < ShipStats.MaxLevel; i++)
+            {
+                var cell = new GameObject("Seg_" + (i + 1), typeof(RectTransform), typeof(Image));
+                cell.transform.SetParent(row.transform, false);
+                cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                segments[i] = cell.GetComponent<Image>();
+                segments[i].color = SegmentOff;
+                segments[i].raycastTarget = false;
+            }
+            return segments;
+        }
+
+        // компактная кнопка строки улучшения: каркасная StationUI.Button
+        // (фон ButtonColor, BrightColor, hover) — «КУПИТЬ · Đ N»
         private static Button BuildRowButton(Transform parent, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
         {
-            var go = OnboardComputerFactory.Button(parent, "—",
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.22f),
-                OnboardComputerFactory.BrightColor, 15f, "BuyButton");
+            var go = StationUI.Button(parent, "—", 15f, "BuyButton");
             var le = go.AddComponent<LayoutElement>();
             le.minWidth = 150f;
             le.preferredWidth = 150f;
             le.minHeight = 32f;
             le.preferredHeight = 32f;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
             var button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
             label = go.GetComponentInChildren<TMP_Text>();
             return button;
         }
 
-        // уровни/цены — из конфига; аренда всегда сток, ур.3 — без кнопки
+        // уровни/цены — из конфига (по-линейные GetPrice, C3); аренда всегда
+        // сток, ур.3 — без кнопки. UpgradesChanged после покупки перечитывает всё
         private void RefreshUpgrades()
         {
             if (upgradeRows == null || session == null || session.Fleet == null)
@@ -1066,74 +1108,23 @@ namespace SpaceTaxi.UI
                 var row = upgradeRows[i];
                 int level = fleet.GetLevel(fleet.Current, (UpgradeLine)i);
                 bool maxed = level >= ShipStats.MaxLevel;
-                row.Level.text = $"ур. {level}/{ShipStats.MaxLevel}";
-                row.Effect.text = maxed ? "макс. уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
-                UpdateUpgradePreview(row, upgrades, (UpgradeLine)i, level, maxed);
+                row.Level.text = maxed ? $"УР {level} · МАКС" : $"УР {level} → УР {level + 1}";
+                row.Effect.text = maxed ? "Максимальный уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
+                SetLevelSegments(row.Segments, level);
                 // цена следующего уровня — GetPrice линии (level + 1), как в TryUpgrade
                 int price = upgrades.GetPrice(i, level + 1);
-                row.BuyLabel.text = maxed ? "МАКС." : $"КУПИТЬ ({price} КР)";
+                row.BuyLabel.text = maxed
+                    ? "МАКС."
+                    : $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(price)}";
                 row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
             }
         }
 
-        // предпросмотр «старое → новое» (Н3.4): ShipStats.Compute с текущими
-        // уровнями и со следующим по линии. Прирост чистого дохода из конфига
-        // честно не выводится (цены заказов зависят от тира/маршрута, не от
-        // улучшений) — окупаемость не выдумываем, показываем только прирост %
-        private void UpdateUpgradePreview(UpgradeRowRefs row, UpgradeConfig upgrades,
-            UpgradeLine line, int level, bool maxed)
+        // заполнение полоски уровня: lit = level сегментов из трёх
+        private static void SetLevelSegments(Image[] segments, int level)
         {
-            if (row.Preview == null)
-                return;
-            var fleet = session.Fleet;
-            var config = fleet.Current;
-            var physics = session.Config;
-            int[] levels = new int[ShipStats.LineCount];
-            for (int i = 0; i < ShipStats.LineCount; i++)
-                levels[i] = fleet.GetLevel(config, (UpgradeLine)i);
-            var before = ShipStats.Compute(physics, config, levels, upgrades);
-            levels[(int)line] = Mathf.Min(level + 1, ShipStats.MaxLevel);
-            var after = ShipStats.Compute(physics, config, levels, upgrades);
-
-            string label;
-            float oldV, newV;
-            switch (line)
-            {
-                case UpgradeLine.Engine:
-                    label = upgrades.EngineName;
-                    oldV = before.Thrust;
-                    newV = after.Thrust;
-                    break;
-                case UpgradeLine.Tank:
-                    label = upgrades.TankName;
-                    oldV = before.FuelMax;
-                    newV = after.FuelMax;
-                    break;
-                case UpgradeLine.Hull:
-                    label = upgrades.HullName;
-                    oldV = before.HpMax;
-                    newV = after.HpMax;
-                    break;
-                default:
-                    label = upgrades.ManeuverName;
-                    oldV = before.Strafe;
-                    newV = after.Strafe;
-                    break;
-            }
-
-            if (maxed)
-            {
-                row.Preview.text = $"{label} {Mathf.RoundToInt(newV)} — макс.";
-                SetFill(row.PreviewBar.CurrentFill, 1f);
-                SetFill(row.PreviewBar.ValueFill, 1f);
-                return;
-            }
-            float pct = oldV > 0f ? (newV - oldV) / oldV * 100f : 0f;
-            row.Preview.text = $"{label} {Mathf.RoundToInt(oldV)} → {Mathf.RoundToInt(newV)} ({PercentText(pct)})";
-            // полоска-прирост: серый — старое, цветной — новое (до верха дорожки)
-            float top = Mathf.Max(newV, 0.01f);
-            SetFill(row.PreviewBar.CurrentFill, oldV / top);
-            SetFill(row.PreviewBar.ValueFill, 1f);
+            for (int i = 0; i < segments.Length; i++)
+                segments[i].color = i < level ? SegmentOn : SegmentOff;
         }
 
         // прибавка следующего уровня: максимум из конфига / 3 — шкала линейная
@@ -1246,16 +1237,64 @@ namespace SpaceTaxi.UI
             return shipCatalog;
         }
 
-        // каркас витрины (Н3.4): [←] спрайт [→] над именем с бейджем «ВЫ ЗДЕСЬ»,
-        // таблицей 6 статов с полосками сравнения, ценой и кнопкой
+        // каркас витрины (C2): слева таблица статов + свотчи расцветки, справа
+        // большая модель в выбранной расцветке; внизу навигация [←] имя [→],
+        // подпись статуса владения и кнопка покупки
         private void BuildShowcaseBlock(Transform parent)
         {
             shopWindow = StationUI.Section(parent, "// МАГАЗИН", "ShopWindow");
 
             var showcaseRow = OnboardComputerFactory.H("ShowcaseRow", shopWindow.transform);
-            BuildArrowButton(showcaseRow.transform, "←", () => FlipShowcase(-1));
+
+            // --- левая колонка: 6 статов + выбор расцветки ---
+            var statsColumn = new GameObject("StatsColumn", typeof(RectTransform));
+            statsColumn.transform.SetParent(showcaseRow.transform, false);
+            var statsLayout = statsColumn.AddComponent<VerticalLayoutGroup>();
+            statsLayout.spacing = 6f;
+            statsLayout.childControlWidth = true;
+            statsLayout.childControlHeight = true;
+            statsLayout.childForceExpandWidth = true;
+            statsLayout.childForceExpandHeight = false;
+            var statsElement = statsColumn.AddComponent<LayoutElement>();
+            statsElement.flexibleWidth = 1f;
+
+            showcaseStatRows = new ShowStatRowRefs[StatCount];
+            for (int i = 0; i < StatCount; i++)
+                showcaseStatRows[i] = BuildStatRow(statsColumn.transform, i, StatLabels[i]);
+
+            // выбор расцветки: свотчи (заводская + PaintVariants); клик меняет
+            // большой спрайт, покупка берёт выбранный вариант (механика бывшего
+            // FlipPaint — индекс живёт в showcasePaintIndex)
+            var paintRow = OnboardComputerFactory.H("PaintRow", statsColumn.transform);
+            OnboardComputerFactory.FixedHeight(paintRow.gameObject, 34f);
+            paintRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+            var paintCaption = OnboardComputerFactory.Text(paintRow, "РАСКРАВКА", 15f,
+                OnboardComputerFactory.LabelColor, "PaintCaption");
+            OnboardComputerFactory.FixedWidth(paintCaption.gameObject, StatLabelWidth);
+            paintSwatchRow = OnboardComputerFactory.H("Swatches", paintRow.transform);
+            paintSwatchRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+            OnboardComputerFactory.Flexible(paintSwatchRow);
+
+            showcasePaint = OnboardComputerFactory.Text(statsColumn, "", 15f,
+                OnboardComputerFactory.LabelColor, "PaintLine");
+            OnboardComputerFactory.FixedHeight(showcasePaint.gameObject, 20f);
+
+            // --- правая колонка: большая модель ---
+            var spriteColumn = new GameObject("SpriteColumn", typeof(RectTransform));
+            spriteColumn.transform.SetParent(showcaseRow.transform, false);
+            var spriteColumnLayout = spriteColumn.AddComponent<VerticalLayoutGroup>();
+            spriteColumnLayout.spacing = 6f;
+            spriteColumnLayout.childControlWidth = true;
+            spriteColumnLayout.childControlHeight = true;
+            spriteColumnLayout.childForceExpandWidth = true;
+            spriteColumnLayout.childForceExpandHeight = false;
+            var spriteElement = spriteColumn.AddComponent<LayoutElement>();
+            spriteElement.minWidth = ShowcaseSpriteW;
+            spriteElement.preferredWidth = ShowcaseSpriteW;
+            spriteElement.flexibleWidth = 0f;
+
             var box = new GameObject("SpriteBox", typeof(RectTransform), typeof(Image));
-            box.transform.SetParent(showcaseRow.transform, false);
+            box.transform.SetParent(spriteColumn.transform, false);
             showcaseSprite = box.GetComponent<Image>();
             showcaseSprite.color = new Color(
                 OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
@@ -1266,114 +1305,102 @@ namespace SpaceTaxi.UI
             frame.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.35f);
             frame.effectDistance = new Vector2(2f, -2f);
             OnboardComputerFactory.FixedSize(box, ShowcaseSpriteW, ShowcaseSpriteH);
-            BuildArrowButton(showcaseRow.transform, "→", () => FlipShowcase(1));
 
-            var nameRow = OnboardComputerFactory.H("NameRow", shopWindow.transform);
-            OnboardComputerFactory.FixedHeight(nameRow.gameObject, 28f);
-            showcaseName = OnboardComputerFactory.Text(nameRow, "", 22f, OnboardComputerFactory.BrightColor, "ModelName");
+            // --- навигация (C2): компактные стрелки-каркасные кнопки (40×40,
+            // меньше прежних 48×160), название с тиром по центру; «ВЫ ЗДЕСЬ»
+            // убрано — статус владения подписью под названием ---
+            var navRow = OnboardComputerFactory.H("NavBar", shopWindow.transform);
+            OnboardComputerFactory.FixedHeight(navRow.gameObject, 44f);
+            navRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+            BuildNavArrow(navRow.transform, "←", () => FlipShowcase(-1));
+            showcaseName = OnboardComputerFactory.Text(navRow, "", 21f,
+                OnboardComputerFactory.BrightColor, "ModelName");
             OnboardComputerFactory.Flexible(showcaseName.gameObject);
-            showcaseBadge = BuildBadge(nameRow.transform, "ВЫ ЗДЕСЬ");
-            showcaseBadge.SetActive(false);
+            // 36, не 28: строка 21pt ≈ 27.7 — Ellipsis при меньшей высоте режет заголовок
+            OnboardComputerFactory.FixedHeight(showcaseName.gameObject, 36f);
+            showcaseName.alignment = TextAlignmentOptions.Center;
+            BuildNavArrow(navRow.transform, "→", () => FlipShowcase(1));
 
-            // строка расцветки: текст + кнопка листания покраски витрины
-            // (0 = заводская, 1..N — PaintVariants; модель без вариантов —
-            // FlipPaint молчит)
-            var paintRow = OnboardComputerFactory.H("PaintRow", shopWindow.transform);
-            OnboardComputerFactory.FixedHeight(paintRow.gameObject, 24f);
-            showcasePaint = OnboardComputerFactory.Text(paintRow, "", 16f, OnboardComputerFactory.LabelColor, "PaintLine");
-            OnboardComputerFactory.Flexible(showcasePaint.gameObject);
-            BuildPaintFlipButton(paintRow.transform, "расцветка →", () => FlipPaint(1));
+            showcaseState = OnboardComputerFactory.Text(shopWindow, "", 15f,
+                OnboardComputerFactory.TaxiColor, "StateLine");
+            OnboardComputerFactory.FixedHeight(showcaseState.gameObject, 20f);
+            showcaseState.alignment = TextAlignmentOptions.Center;
 
-            // таблица статов: подпись | полоска сравнения | % отличия от текущего
-            var statsTable = new GameObject("StatsTable", typeof(RectTransform));
-            statsTable.transform.SetParent(shopWindow.transform, false);
-            var tableLayout = statsTable.AddComponent<VerticalLayoutGroup>();
-            tableLayout.spacing = 2f;
-            tableLayout.childControlWidth = true;
-            tableLayout.childControlHeight = true;
-            tableLayout.childForceExpandWidth = true;
-            tableLayout.childForceExpandHeight = false;
-
-            showcaseStatRows = new ShowStatRowRefs[StatCount];
-            for (int i = 0; i < StatCount; i++)
-            {
-                var rowGo = new GameObject("Stat_" + (i + 1), typeof(RectTransform));
-                rowGo.transform.SetParent(statsTable.transform, false);
-                var rowLayout = rowGo.AddComponent<HorizontalLayoutGroup>();
-                rowLayout.spacing = 8f;
-                rowLayout.childControlWidth = true;
-                rowLayout.childControlHeight = true;
-                rowLayout.childForceExpandWidth = true;
-                rowLayout.childForceExpandHeight = false;
-                rowLayout.childAlignment = TextAnchor.MiddleLeft;
-                var rowElement = rowGo.AddComponent<LayoutElement>();
-                rowElement.minHeight = 20f;
-                rowElement.preferredHeight = 20f;
-
-                var refs = new ShowStatRowRefs();
-                refs.Label = OnboardComputerFactory.Text(rowGo, StatLabels[i], 15f, OnboardComputerFactory.LabelColor, "Label");
-                OnboardComputerFactory.FixedWidth(refs.Label.gameObject, 132f);
-                OnboardComputerFactory.FixedHeight(refs.Label.gameObject, 20f);
-                refs.Bar = BuildCompareBar(rowGo.transform, 12f);
-                refs.Percent = OnboardComputerFactory.Text(rowGo, "0%", 15f, OnboardComputerFactory.LabelColor, "Percent");
-                OnboardComputerFactory.FixedWidth(refs.Percent.gameObject, 64f);
-                OnboardComputerFactory.FixedHeight(refs.Percent.gameObject, 20f);
-                refs.Percent.alignment = TextAlignmentOptions.Right;
-                showcaseStatRows[i] = refs;
-            }
-
-            showcaseStatus = OnboardComputerFactory.Text(shopWindow, "", 19f, OnboardComputerFactory.TaxiColor, "PriceLine");
-            OnboardComputerFactory.FixedHeight(showcaseStatus.gameObject, 24f);
             shopBuy = BuildServiceButton(shopWindow.transform, "ShopBuyButton", ConfirmShopAction, out shopBuyLabel);
-            shopStatus = OnboardComputerFactory.Text(shopWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
-            OnboardComputerFactory.FixedHeight(shopStatus.gameObject, 22f);
+            shopStatus = OnboardComputerFactory.Text(shopWindow, "", 17f, OnboardComputerFactory.TaxiColor, "Status");
+            OnboardComputerFactory.FixedHeight(shopStatus.gameObject, 23f);
 
             Catalog(); // сортировка по цене — до первой отрисовки
             RefreshShowcase();
         }
 
-        // бейдж «ВЫ ЗДЕСЬ»: рамка в стиле кнопок фабрики, янтарный — цвет такси
-        private static GameObject BuildBadge(Transform parent, string label)
+        // строка таблицы статов (C2): подпись | полоска | значение модели.
+        // Полоска: дорожка → нейтральный fill модели → подкрашенный отрезок
+        // разницы → янтарная риска текущего значения (поверх всех слоёв)
+        private ShowStatRowRefs BuildStatRow(Transform parent, int index, string label)
         {
-            var go = new GameObject("HereBadge", typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(parent, false);
-            var taxi = OnboardComputerFactory.TaxiColor;
-            go.GetComponent<Image>().color = new Color(taxi.r, taxi.g, taxi.b, 0.22f);
-            var outline = go.AddComponent<Outline>();
-            outline.effectColor = new Color(taxi.r, taxi.g, taxi.b, 0.6f);
-            outline.effectDistance = new Vector2(2f, -2f);
-            var text = OnboardComputerFactory.Text(go, label, 15f, taxi, "BadgeText");
-            OnboardComputerFactory.Stretch(text.rectTransform);
-            text.alignment = TextAlignmentOptions.Center;
-            OnboardComputerFactory.FixedSize(go, 104f, 24f);
-            return go;
-        }
+            var rowGo = OnboardComputerFactory.H("Stat_" + index, parent);
+            OnboardComputerFactory.FixedHeight(rowGo.gameObject, 22f);
 
-        // полоска сравнения: дорожка + серый fill (текущее/старое) + цветной
-        // fill (модель/новое); ширины ставит SetFill по долям значений
-        private static CompareBarRefs BuildCompareBar(Transform parent, float height)
-        {
+            var refs = new ShowStatRowRefs();
+            refs.Label = OnboardComputerFactory.Text(rowGo, label, 15f, OnboardComputerFactory.LabelColor, "Label");
+            OnboardComputerFactory.FixedWidth(refs.Label.gameObject, StatLabelWidth);
+            OnboardComputerFactory.FixedHeight(refs.Label.gameObject, 22f);
+            refs.Label.alignment = TextAlignmentOptions.Left;
+
             var bar = new GameObject("Bar", typeof(RectTransform));
-            bar.transform.SetParent(parent, false);
-            var element = bar.AddComponent<LayoutElement>();
-            element.flexibleWidth = 1f;
-            element.minHeight = height;
-            element.preferredHeight = height;
-
+            bar.transform.SetParent(rowGo.transform, false);
+            var barElement = bar.AddComponent<LayoutElement>();
+            barElement.flexibleWidth = 1f;
             var dim = OnboardComputerFactory.LabelColor;
-            var refs = new CompareBarRefs();
-
             var track = new GameObject("Track", typeof(RectTransform), typeof(Image));
             track.transform.SetParent(bar.transform, false);
             OnboardComputerFactory.Stretch((RectTransform)track.transform);
             var trackImage = track.GetComponent<Image>();
-            trackImage.color = new Color(dim.r, dim.g, dim.b, 0.1f);
+            trackImage.color = new Color(dim.r, dim.g, dim.b, 0.12f);
             trackImage.raycastTarget = false;
 
-            refs.CurrentFill = BuildBarFill(track.transform, new Color(dim.r, dim.g, dim.b, 0.45f), "CurrentFill");
-            refs.ValueFill = BuildBarFill(track.transform, OnboardComputerFactory.BrightColor, "ValueFill");
-            refs.ValueImage = refs.ValueFill.GetComponent<Image>();
+            refs.ValueFill = BuildBarFill(track.transform, new Color(dim.r, dim.g, dim.b, 0.45f), "ValueFill");
+            refs.DeltaFill = BuildBarFill(track.transform, dim, "DeltaFill");
+            refs.DeltaImage = refs.DeltaFill.GetComponent<Image>();
+            refs.Tick = BuildTick(track.transform);
+
+            refs.Value = OnboardComputerFactory.Text(rowGo, "", 14f, OnboardComputerFactory.LabelColor, "Value");
+            OnboardComputerFactory.FixedWidth(refs.Value.gameObject, StatValueWidth);
+            OnboardComputerFactory.FixedHeight(refs.Value.gameObject, 22f);
+            refs.Value.alignment = TextAlignmentOptions.Right;
             return refs;
+        }
+
+        // отрезок полоски между двумя долями (0..1): риски/подкраска разницы
+        private static void SetSegment(RectTransform fill, float from, float to)
+        {
+            float a = Mathf.Clamp01(Mathf.Min(from, to));
+            float b = Mathf.Clamp01(Mathf.Max(from, to));
+            fill.anchorMin = new Vector2(a, 0f);
+            fill.anchorMax = new Vector2(b, 1f);
+            fill.offsetMin = Vector2.zero;
+            fill.offsetMax = Vector2.zero;
+        }
+
+        // риска-засечка текущего значения (C2): вертикальная полоска 3px,
+        // ширину стата показывает от всей дорожки
+        private static RectTransform BuildTick(Transform track)
+        {
+            var tick = new GameObject("Tick", typeof(RectTransform), typeof(Image));
+            tick.transform.SetParent(track, false);
+            var image = tick.GetComponent<Image>();
+            image.color = OnboardComputerFactory.TaxiColor;
+            image.raycastTarget = false;
+            return (RectTransform)tick.transform;
+        }
+
+        private static void SetTick(RectTransform tick, float fraction)
+        {
+            float x = Mathf.Clamp01(fraction);
+            tick.anchorMin = new Vector2(x, 0f);
+            tick.anchorMax = new Vector2(x, 1f);
+            tick.sizeDelta = new Vector2(3f, 0f); // высоту дают якоря, ширина — 3px
         }
 
         // fill-дочка: левый край закреплён, правый двигает SetFill (доля 0..1)
@@ -1398,27 +1425,18 @@ namespace SpaceTaxi.UI
             fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
         }
 
-        // «+18%» / «−7%» / «0%» — минус типографский, как в подписях эффектов
-        private static string PercentText(float pct)
+        // стрелка навигации витрины (C2): компактная каркасная StationUI.Button
+        // 40×40 — меньше прежних 48×160, звук уже хукнут каркасом
+        private static void BuildNavArrow(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
         {
-            int rounded = Mathf.RoundToInt(pct);
-            if (rounded == 0)
-                return "0%";
-            return (rounded > 0 ? "+" : "−") + Mathf.Abs(rounded) + "%";
-        }
-
-        // стрелка листания витрины [←]/[→]
-        private void BuildArrowButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
-        {
-            var go = OnboardComputerFactory.Button(parent, label,
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.18f),
-                OnboardComputerFactory.LabelColor, 26f, "Arrow");
+            var go = StationUI.Button(parent, label, 18f, "NavArrow");
             var le = go.AddComponent<LayoutElement>();
-            le.minWidth = 48f;
-            le.preferredWidth = 48f;
-            le.minHeight = ShowcaseSpriteH;
-            le.preferredHeight = ShowcaseSpriteH;
+            le.minWidth = 40f;
+            le.preferredWidth = 40f;
+            le.minHeight = 40f;
+            le.preferredHeight = 40f;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
             go.GetComponent<Button>().onClick.AddListener(onClick);
         }
 
@@ -1431,39 +1449,97 @@ namespace SpaceTaxi.UI
             RefreshShowcase();
         }
 
-        // кнопка листания покраски витрины — маленькая сестра BuildArrowButton:
-        // тот же стиль фабрики, но в высоту строки расцветки
-        private void BuildPaintFlipButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+        // свотчи расцветки собираются под модель: заводская (индекс 0) +
+        // PaintVariants; старые уничтожаются — число вариантов у моделей разное
+        private void RebuildPaintSwatches(ShipConfig config)
         {
-            var go = OnboardComputerFactory.Button(parent, label,
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.18f),
-                OnboardComputerFactory.LabelColor, 15f, "PaintFlip");
-            var le = go.AddComponent<LayoutElement>();
-            le.minWidth = 132f;
-            le.preferredWidth = 132f;
-            le.minHeight = 24f;
-            le.preferredHeight = 24f;
-            go.GetComponent<Button>().onClick.AddListener(onClick);
+            if (paintSwatchRow == null || config == null)
+                return;
+            for (int i = paintSwatchRow.transform.childCount - 1; i >= 0; i--)
+                Destroy(paintSwatchRow.transform.GetChild(i).gameObject);
+            int count = config.PaintVariantCount + 1;
+            paintSwatchIcons = new Image[count];
+            float size = count > 5 ? SwatchSizeSmall : SwatchSize;
+            for (int i = 0; i < count; i++)
+                paintSwatchIcons[i] = BuildPaintSwatch(config, i, size);
+            UpdatePaintSwatches();
         }
 
-        // листание расцветки показанной модели: 0 = заводская, 1..N — PaintVariants.
-        // Перерисовывается только спрайт и строка расцветки: полный рефреш
-        // вернул бы значение из ротации слота
-        private void FlipPaint(int delta)
+        // свотч: спрайт варианта (арта нет — затенение по тиру), ColorTint hover,
+        // звук хуком каркаса ПЕРВЫМ, рамка-Outline только у выбранного
+        private Image BuildPaintSwatch(ShipConfig config, int paintIndex, float size)
+        {
+            var go = new GameObject("Swatch_" + paintIndex, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(paintSwatchRow.transform, false);
+            var icon = go.GetComponent<Image>();
+            Sprite sprite = config.GetPaintSprite(paintIndex);
+            if (sprite != null)
+            {
+                icon.sprite = sprite;
+                icon.preserveAspect = true;
+            }
+            var outline = go.AddComponent<Outline>();
+            outline.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.9f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = size;
+            le.preferredWidth = size;
+            le.minHeight = size;
+            le.preferredHeight = size;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
+            var button = go.GetComponent<Button>();
+            button.transition = Selectable.Transition.ColorTint;
+            var colors = button.colors;
+            colors.fadeDuration = 0.1f;
+            colors.highlightedColor = new Color(0.82f, 1f, 0.9f);
+            colors.pressedColor = new Color(0.6f, 1f, 0.78f);
+            button.colors = colors;
+            UiSfx.Hook(button); // каркас: хук первым, слушатели вызывающего после
+            int captured = paintIndex;
+            button.onClick.AddListener(() => SelectShowcasePaint(captured));
+            return icon;
+        }
+
+        // выбор расцветки свотчем (механика бывшего FlipPaint): большой спрайт
+        // перерисовывается, покупка берёт выбранный индекс
+        private void SelectShowcasePaint(int paintIndex)
         {
             ShipConfig config = showcaseShip;
-            if (config == null || config.PaintVariantCount == 0 || shopWindow == null
-                || session == null || session.Fleet == null)
+            if (config == null || shopWindow == null || session == null || session.Fleet == null)
                 return;
-            int values = config.PaintVariantCount + 1;
-            showcasePaintIndex = (showcasePaintIndex + delta + values) % values;
-            ApplyShowcaseSprite(session.Fleet, config, showcasePaintIndex);
-            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
+            if (paintIndex < 0 || paintIndex > config.PaintVariantCount)
+                return;
+            showcasePaintIndex = paintIndex;
+            ApplyShowcaseSprite(session.Fleet, config, paintIndex);
+            UpdatePaintSwatches();
+            showcasePaint.text = PaintLineText(config, paintIndex);
+        }
+
+        // подсветка выбранного свотча: рамка + полный цвет, невыбранные серее
+        private void UpdatePaintSwatches()
+        {
+            ShipConfig config = swatchConfig;
+            if (paintSwatchIcons == null || config == null)
+                return;
+            for (int i = 0; i < paintSwatchIcons.Length; i++)
+            {
+                bool selected = i == showcasePaintIndex;
+                var image = paintSwatchIcons[i];
+                Color baseColor = image.sprite != null ? Color.white : TierShade(config.Tier);
+                image.color = selected
+                    ? baseColor
+                    : new Color(baseColor.r * 0.62f, baseColor.g * 0.62f, baseColor.b * 0.62f, baseColor.a);
+                var outline = image.GetComponent<Outline>();
+                if (outline != null)
+                    outline.enabled = selected;
+            }
         }
 
         // витрина перечитывается на каждый RefreshShop (деньги/парк) и при
-        // смене слота ротации из Update — вариант покраски меняется сам
+        // смене слота ротации из Update — показанный вариант меняется сам.
+        // Ручной выбор расцветки (свотч) переживает перечитывание денег/парка:
+        // сбрасывается только сменой модели или слота ротации
         private void RefreshShowcase()
         {
             ShipConfig[] catalog = Catalog();
@@ -1471,36 +1547,58 @@ namespace SpaceTaxi.UI
                 || session == null || session.Fleet == null)
                 return;
             var fleet = session.Fleet;
-            var config = catalog[showcaseIndex];
+            ShipConfig config = catalog[showcaseIndex];
+            bool modelChanged = showcaseShip != config;
             showcaseShip = config;
             int slot = ShopStockService.CurrentSlot(Time.time);
+            bool slotChanged = slot != stockSlot;
             stockSlot = slot;
-            // стартовое значение из ротации слота: листание покраски (FlipPaint)
-            // переписывает поле, полный рефреш возвращает витрину к ротации
-            showcasePaintIndex = ShopStockService.DisplayPaintIndex(config, slot);
+            if (modelChanged || slotChanged)
+                showcasePaintIndex = ShopStockService.DisplayPaintIndex(config, slot);
+            if (swatchConfig != config)
+            {
+                swatchConfig = config;
+                RebuildPaintSwatches(config);
+            }
             ApplyShowcaseSprite(fleet, config, showcasePaintIndex);
+
+            // название по центру навигации: «ЯЙЦО · ТИР 2»; статус владения —
+            // подпись под названием вместо бейджа «ВЫ ЗДЕСЬ» (C2)
+            showcaseName.text = config.DisplayName.ToUpper() + " · ТИР " + config.Tier;
+            showcaseState.text = OwnershipLine(fleet, config);
+            UpdateShowcaseStats(config);
+            UpdatePaintSwatches();
+            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
 
             bool rental = config.IsRental;
             bool current = IsCurrent(fleet, config);
             bool owned = fleet.IsOwned(config);
-            showcaseName.text = config.DisplayName + " · Т" + config.Tier;
-            if (showcaseBadge != null)
-                showcaseBadge.SetActive(current);
-            UpdateShowcaseStats(config);
-            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
-            showcaseStatus.text = current ? "В полёте (текущий)"
-                : owned ? "В ангаре"
-                : rental ? "Аренда"
-                : config.Price + " кр";
-
             bool canBuy = !owned && !rental && config.Price > 0;
             bool canSit = !current && (owned || rental);
-            shopBuy.interactable = (canBuy && session.Wallet.Credits >= config.Price) || canSit;
+            bool affordable = session.Wallet.Credits >= config.Price;
+            shopBuy.interactable = canBuy ? affordable : canSit;
             shopBuyLabel.text = canBuy
-                ? $"КУПИТЬ ({config.Price} КР)"
-                : canSit ? "СЕСТЬ В"
-                : current ? "В ПОЛЁТЕ"
+                ? $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(config.Price)}"
+                : canSit ? "ПЕРЕСЕСТЬ"
+                : current ? "СЕЙЧАС АКТИВЕН"
                 : "НЕТ В ПРОДАЖЕ";
+            // недостача кредитов: кнопка гаснет + статус с нехваткой (C2)
+            shopStatus.text = canBuy && !affordable
+                ? $"Не хватает {StationUI.Currency} {OnboardBinder.FormatCredits(config.Price - session.Wallet.Credits)}"
+                : "";
+        }
+
+        // подпись статуса владения под названием (C2): честно и коротко
+        private static string OwnershipLine(FleetService fleet, ShipConfig config)
+        {
+            bool current = IsCurrent(fleet, config);
+            if (current)
+                return fleet.IsOwned(config)
+                    ? "ВАШ · СЕЙЧАС АКТИВЕН"
+                    : "В АРЕНДЕ · СЕЙЧАС АКТИВЕН";
+            if (fleet.IsOwned(config))
+                return "ВАШ · В АНГАРЕ";
+            return config.IsRental ? "АРЕНДА" : "";
         }
 
         // спрайт витрины: показанный вариант покраски или заводской; арта нет
@@ -1527,24 +1625,25 @@ namespace SpaceTaxi.UI
                     : $"Расцветка: вариант {paintIndex} из {variants} (ротация 2 игрочаса)";
         }
 
-        // сравниваемая величина стата (Н3.4): индексы 0..4 — «больше = лучше»,
-        // 5 — тормозной путь K/Retro («меньше = лучше», ед. не указываем —
-        // «отн.»). Retro=0 — глобальный фолбэк из PhysicsConfig, как в полёте
-        private float CompareValue(ShipConfig config, int index)
+        // значение стата модели по индексам StatLabels. ВСЕ статы «больше =
+        // лучше» (C2): Retro сравнивается напрямую — тормозной путь с его
+        // инверсией убран, вместо него «Мощность торможения». Retro=0 —
+        // глобальный фолбэк из PhysicsConfig, как в полёте
+        private float StatValue(ShipConfig config, int index)
         {
             switch (index)
             {
                 case 0: return config.Thrust;
-                case 1: return config.StrafeAcc;
-                case 2: return config.MaxV;
-                case 3: return config.FuelMax;
-                case 4: return config.HpMax;
-                default: return BrakeDistanceK / RetroOf(config);
+                case 1: return config.MaxV;
+                case 2: return config.FuelMax;
+                case 3: return config.HpMax;
+                case 4: return RetroOf(config);
+                default: return config.StrafeAcc;
             }
         }
 
         // модельное торможение или глобальное (ShipStats.Compute использует 80
-        // как последний фолбэк — то же число здесь); 0 не отдаём — в знаменателе
+        // как последний фолбэк — то же число здесь); 0 не отдаём
         private float RetroOf(ShipConfig config)
         {
             if (config != null && config.Retro > 0f)
@@ -1553,44 +1652,65 @@ namespace SpaceTaxi.UI
             return global > 0f ? global : 80f;
         }
 
-        // таблица статов с полосками сравнения (Н3.4): серая полоса — текущий
-        // корабль, цветная — модель на витрине (зелёная — лучше, красная —
-        // хуже), справа % отличия. Ширина = значение / максимум по каталогу
-        // и текущему кораблю, чтобы полоски всех моделей были сопоставимы
+        // «твоё текущее значение» для риски (C2): эффективные статы живого
+        // корабля — улучшения учтены (тяга/бак/прочность/манёвр растут с
+        // уровнями); MaxV улучшениями не меняется — из конфига текущей модели
+        private float CurrentStatValue(int index)
+        {
+            ShipConfig baseline = session != null && session.Fleet != null ? session.Fleet.Current : null;
+            if (ship == null)
+                return baseline != null ? StatValue(baseline, index) : 0f;
+            switch (index)
+            {
+                case 0: return ship.Eff.Thrust;
+                case 1: return baseline != null ? baseline.MaxV : 0f;
+                case 2: return ship.Eff.FuelMax;
+                case 3: return ship.Eff.HpMax;
+                case 4: return ship.Eff.Retro;
+                default: return ship.Eff.Strafe;
+            }
+        }
+
+        // масштаб полоски — общий максимум стата по всему каталогу и твоим
+        // текущим значениям (посчитан в коде, C2): полоски всех моделей
+        // сопоставимы между собой, риска не выходит за дорожку
+        private float StatScale(int index, float value, float current)
+        {
+            float max = Mathf.Max(value, current);
+            ShipConfig[] catalog = Catalog();
+            for (int c = 0; c < catalog.Length; c++)
+                if (catalog[c] != null)
+                    max = Mathf.Max(max, StatValue(catalog[c], index));
+            return max > 0f ? max : 1f;
+        }
+
+        // таблица статов (C2): полоска — значение рассматриваемой модели,
+        // риска — твоё текущее, отрезок между ними подкрашен: зелёный — модель
+        // лучше, красный — хуже (все статы «больше = лучше», инверсий нет)
         private void UpdateShowcaseStats(ShipConfig config)
         {
-            if (showcaseStatRows == null || config == null)
+            if (showcaseStatRows == null || config == null || session == null || session.Fleet == null)
                 return;
-            ShipConfig[] catalog = Catalog();
-            ShipConfig baseline = session.Fleet.Current;
             for (int i = 0; i < showcaseStatRows.Length; i++)
             {
-                float value = CompareValue(config, i);
-                float current = baseline != null ? CompareValue(baseline, i) : 0f;
-                float max = current;
-                for (int c = 0; c < catalog.Length; c++)
-                {
-                    if (catalog[c] == null)
-                        continue;
-                    max = Mathf.Max(max, CompareValue(catalog[c], i));
-                }
+                float value = StatValue(config, i);
+                float current = CurrentStatValue(i);
+                float max = StatScale(i, value, current);
+                float valueFraction = Mathf.Clamp01(value / max);
+                float currentFraction = Mathf.Clamp01(current / max);
 
                 var row = showcaseStatRows[i];
-                SetFill(row.Bar.CurrentFill, max > 0f ? current / max : 0f);
-                SetFill(row.Bar.ValueFill, max > 0f ? value / max : 0f);
+                SetFill(row.ValueFill, valueFraction);
+                SetSegment(row.DeltaFill, currentFraction, valueFraction);
+                SetTick(row.Tick, currentFraction);
 
                 float diff = value - current;
-                // тормозной путь — обратная величина: короче = лучше
-                bool better = i == StatBrakeIndex ? diff < 0f : diff > 0f;
-                bool worse = i == StatBrakeIndex ? diff > 0f : diff < 0f;
-                Color color = better ? OnboardComputerFactory.BrightColor
+                bool better = diff > 0.001f;
+                bool worse = diff < -0.001f;
+                row.DeltaImage.color = better ? OnboardComputerFactory.BrightColor
                     : worse ? OnboardComputerFactory.DangerColor
                     : OnboardComputerFactory.LabelColor;
-                row.Bar.ValueImage.color = color;
-
-                float pct = current > 0f ? diff / current * 100f : 0f;
-                row.Percent.text = PercentText(pct);
-                row.Percent.color = color;
+                row.Value.text = Mathf.RoundToInt(value).ToString();
             }
         }
 
@@ -1638,11 +1758,8 @@ namespace SpaceTaxi.UI
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
             ShowToast($"Куплен «{config.DisplayName}» (−{price} кр)", emphasized: true);
-            shopStatus.text = paintIndex == 0
-                ? $"Куплен «{config.DisplayName}» в заводской расцветке"
-                : $"Куплен «{config.DisplayName}», покраска вариант {paintIndex}";
             // купленной модели «нет в продаже» — витрина листается дальше,
-            // сама модель остаётся в списке серой с меткой «В ангаре»
+            // сама модель остаётся в списке серой с подписью «ВАШ · В АНГАРЕ»
             FlipShowcase(1);
         }
 
