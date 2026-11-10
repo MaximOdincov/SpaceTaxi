@@ -240,9 +240,8 @@ namespace SpaceTaxi.UI
         // спрайты на арт из icons и красим в зелёный HUD (BrightColor борткомпа)
         private void BuildStatIcons()
         {
-            // shield.png (249×292, залитый) — заметно отличается от старой болванки;
-            // shield_icon.png выглядел почти как stub, владелец не видел замены
-            SetIcon("HullIcon", "Art/icons/shield");
+            // владелец вернул shield_icon.png (Н5.A1) — shield.png слишком «залитый»
+            SetIcon("HullIcon", "Art/icons/shield_icon");
             SetIcon("FuelIcon", "Art/icons/gas_icon");
         }
 
