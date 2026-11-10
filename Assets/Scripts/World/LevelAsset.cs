@@ -50,6 +50,8 @@ namespace SpaceTaxi.World
         public BodyType Type = BodyType.Planet;
         public Vector2 Position;
         [Min(5f)] public float Radius = 50f;
+        [Tooltip("Множитель размера планеты поверх Radius (0 = авто по имени, WorldSprites.PlanetSizeMul); только планеты")]
+        [Min(0f)] public float VisualSizeMul;
         [Min(0.1f)] public float MassMultiplier = 1f; // планета 1, звезда 4.5
         [Min(0f)] public float HeatRadius = 0f;       // звёзды: 3.6 * r
         public BodyVisuals Visuals = new BodyVisuals();

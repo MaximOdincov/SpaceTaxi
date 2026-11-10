@@ -209,6 +209,8 @@ namespace SpaceTaxi.Tools
                     new GUIContent("Мастерская (ремонт за кредиты)"));
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("IsHub"),
                     new GUIContent("Хаб МТО (магазин + улучшения)"));
+                EditorGUILayout.PropertyField(element.FindPropertyRelative("VisualSizeMul"),
+                    new GUIContent("Размер × (0 = авто по имени)"));
             }
             EditorGUILayout.PropertyField(element.FindPropertyRelative("Sector"),
                 new GUIContent("Сектор (оплата)"));
