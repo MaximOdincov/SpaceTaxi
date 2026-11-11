@@ -175,6 +175,7 @@ namespace SpaceTaxi.Orders
         private Transform targetGlow;
         private SpriteRenderer glowRenderer;
         private string glowBodyName;
+        private float glowScaleBase = 1f;
         private GravityField gravityField;
 
         private void UpdateTargetGlow()
@@ -198,7 +199,8 @@ namespace SpaceTaxi.Orders
             {
                 var glowGo = new GameObject("TargetGlow");
                 glowRenderer = glowGo.AddComponent<SpriteRenderer>();
-                glowRenderer.sortingOrder = -2; // позади планеты — виден как ободок
+                glowRenderer.sortingOrder = -2; // позади планеты
+                glowRenderer.sprite = StubSprites.SoftDot(128f, 0.55f); // ПРОСТО жёлтый круг (Н6: не копия спрайта планеты)
                 targetGlow = glowGo.transform;
             }
 
@@ -210,8 +212,12 @@ namespace SpaceTaxi.Orders
                     if (body.DisplayName != bodyName)
                         continue;
                     var bodyRenderer = body.GetComponent<SpriteRenderer>();
-                    glowRenderer.sprite = bodyRenderer != null ? bodyRenderer.sprite : null;
+                    // диаметр круга — от реального спрайта планеты: круг чуть больше тела
+                    float planetUnits = bodyRenderer != null && bodyRenderer.sprite != null
+                        ? bodyRenderer.sprite.bounds.size.x
+                        : 2f;
                     targetGlow.SetParent(body.transform, false);
+                    glowScaleBase = planetUnits * 1.25f / 1.28f; // SoftDot(128) = 1.28 юн при масштабе 1
                     break;
                 }
             }
@@ -219,11 +225,10 @@ namespace SpaceTaxi.Orders
             targetGlow.gameObject.SetActive(glowRenderer.sprite != null);
             if (!targetGlow.gameObject.activeSelf)
                 return;
-            // пульс и масштабом (±6%), и альфой вокруг прежних 0.16 — ореол «дышит»
+            // пульс масштабом и альфой — заметный жёлтый круг за планетой (Н6)
             float wave = Mathf.Sin(Time.time * 3f);
-            float pulse = 1.32f + 0.08f * wave;
-            targetGlow.localScale = Vector3.one * pulse;
-            glowRenderer.color = new Color(1f, 0.83f, 0.3f, Mathf.Lerp(0.10f, 0.22f, 0.5f + 0.5f * wave));
+            targetGlow.localScale = Vector3.one * glowScaleBase * (1f + 0.06f * wave);
+            glowRenderer.color = new Color(1f, 0.94f, 0.3f, Mathf.Lerp(0.38f, 0.62f, 0.5f + 0.5f * wave));
         }
 
         public bool Accept(OrderOffer offer)
