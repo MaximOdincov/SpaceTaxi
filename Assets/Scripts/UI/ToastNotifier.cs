@@ -267,7 +267,7 @@ namespace SpaceTaxi.UI
                 if (available <= 0)
                     return;
                 Show($"Топлива на станции: {available} ед · цена " +
-                     $"{FuelNetwork.PricePerUnit(planet.FuelTier, planet.Sector, pricing):0.##} кр/ед");
+                     $"{StationUI.Currency} {FuelNetwork.PricePerUnit(planet.FuelTier, planet.Sector, pricing):0.##}/ед");
             };
 
             var hull = ship.GetComponent<HullSystem>();
@@ -282,7 +282,7 @@ namespace SpaceTaxi.UI
                 debt.DebtChanged += value =>
                 {
                     if (value > prevBalance)
-                        Show($"ДОЛГ +{value - prevBalance} кр за арендный корабль", true);
+                        Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(value - prevBalance)} за арендный корабль", true);
                     prevBalance = value;
                 };
             }
@@ -291,9 +291,9 @@ namespace SpaceTaxi.UI
             if (session.Payout != null)
                 session.Payout.Paid += result =>
                 {
-                    Show($"Доставка: +{result.Net} кр", true);
+                    Show($"Доставка: +{StationUI.Currency} {OnboardBinder.FormatCredits(result.Net)}", true);
                     if (result.ToDebt > 0)
-                        Show($"{result.ToDebt} кр ушло в счёт долга");
+                        Show($"{StationUI.Currency} {OnboardBinder.FormatCredits(result.ToDebt)} ушло в счёт долга");
                 };
 
             // кометы (П6.3): предупреждение за 20 с до входа в систему

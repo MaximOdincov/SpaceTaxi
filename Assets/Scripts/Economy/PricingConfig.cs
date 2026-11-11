@@ -50,7 +50,7 @@ namespace SpaceTaxi.Economy
         public float MeridianTipsBonusMul = 1.1f;
 
         [Header("Топливные сети (21 §3.7): индекс = тир сети − 1")]
-        [Tooltip("Цена кр/ед по тиру сети: 1 — дёшево и меньше всех, 4 — люкс (полный бак, оверпрайс)")]
+        [Tooltip("Цена Đ/ед по тиру сети: 1 — дёшево и меньше всех, 4 — люкс (полный бак, оверпрайс)")]
         public float[] FuelPricePerUnitByTier = { 0.8f, 1f, 1.3f, 1.8f };
         [Tooltip("Запас топлива сети за один визит, доля бака корабля: бедная сеть продаёт меньше всех, но не ноль")]
         public float[] FuelStockFractionByTier = { 0.75f, 1f, 1f, 1f };
@@ -64,7 +64,7 @@ namespace SpaceTaxi.Economy
         [Header("Пакеты ремонта (Н-5): индекс = пакет − 1 (мелкий/средний/полный)")]
         [Tooltip("Доля недостающего HP, которую восстанавливает пакет")]
         public float[] RepairPackFraction = { 0.25f, 0.6f, 1f };
-        [Tooltip("Множитель базовой цены 1 кр/HP для пакета")]
+        [Tooltip("Множитель базовой цены 1 Đ/HP для пакета")]
         public float[] RepairPackPriceMul = { 0.8f, 1f, 1.2f };
 
         [Header("Сеть ремонта (Н-5): индекс = тир сети − 1")]
@@ -129,7 +129,7 @@ namespace SpaceTaxi.Economy
             return muls[Mathf.Clamp(tier, 1, muls.Length) - 1];
         }
 
-        // цена единицы топлива сети; тир 0/некорректный → базовая сеть (1 кр/ед)
+        // цена единицы топлива сети; тир 0/некорректный → базовая сеть (1 Đ/ед)
         public float GetFuelPricePerUnit(int tier)
         {
             var prices = FuelPricePerUnitByTier;
@@ -191,7 +191,7 @@ namespace SpaceTaxi.Economy
             return ArrayAt(RepairPackFraction, packIndex, 1f);
         }
 
-        // множитель базовой цены 1 кр/HP для пакета
+        // множитель базовой цены 1 Đ/HP для пакета
         public float GetRepairPackPriceMul(int packIndex)
         {
             return ArrayAt(RepairPackPriceMul, packIndex, 1f);

@@ -9,20 +9,25 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Н-8: waypoint с карты — в мире и на экране. Над помеченным телом янтарная
-    // скобка-луч с подписью (форма/цвет отличны от жёлтого пульса TargetGlow);
+    // Н-8/G-15: waypoint с карты — в мире и на экране. Над помеченным телом
+    // зелёная компактная скобка-луч с подписью (цвет — своя метка, как на
+    // карте и радаре; форма отлична от жёлтого пульса TargetGlow цели заказа);
     // если waypoint или цель заказа за кадром — стрелка-компас у края экрана
-    // с дистанцией. Waypoint приходит по MapScreenBinder.WaypointChanged, цель
-    // заказа — по ActiveOrderChanged/PassengerBoarded (при посадке за пассажиром
+    // с дистанцией (зелёная — своя метка, жёлтая — цель заказа). Waypoint
+    // приходит по MapScreenBinder.WaypointChanged, цель заказа — по
+    // ActiveOrderChanged/PassengerBoarded (при посадке за пассажиром
     // ActiveOrderChanged не фаерится). TargetGlow OrderService не трогаем.
     public sealed class WaypointIndicator : MonoBehaviour
     {
         private const float EdgePad = 88f;     // отступ стрелки от края, единиц канваса
         private const float OverlapGap = 110f; // минимальный зазор между стрелками
 
-        private static readonly Color Amber = new Color(1f, 0.72f, 0.25f);
+        // своя метка (waypoint с карты) — зелёная (G-15): единый цвет с ромбом на
+        // радаре; на бумажной карте тот же смысл — тёмно-карандашный GreenPencil
+        public static readonly Color WaypointGreen = new Color(0.235f, 1f, 0.557f);
+        private static readonly Color WaypointGreenText = new Color(0.62f, 1f, 0.78f);
         private static readonly Color AmberText = new Color(1f, 0.86f, 0.55f);
-        // цель заказа — жёлтый проектного такси (Н4.2.3), текст дистанции тоже жёлтый
+        // цель заказа — жёлтый проектного такси (Н4.2.3), жёлтым и остаётся (G-15)
         private static readonly Color TargetYellow = OnboardComputerFactory.TaxiColor;
 
         private GameSession session;
@@ -201,7 +206,7 @@ namespace SpaceTaxi.UI
             markerLabel = labelGo.GetComponent<TextMeshPro>();
             if (font != null)
                 markerLabel.font = font;
-            markerLabel.fontSize = 96f; // 3D TMP: em ≈ fontSize/10 мировых юнитов
+            markerLabel.fontSize = 84f; // 3D TMP: em ≈ fontSize/10 мировых юнитов; компактнее (G-15)
             markerLabel.alignment = TextAlignmentOptions.Center;
             markerLabel.overflowMode = TextOverflowModes.Overflow;
             markerLabel.rectTransform.sizeDelta = new Vector2(400f, 44f);
@@ -218,11 +223,12 @@ namespace SpaceTaxi.UI
             return part;
         }
 
-        // скобка над верхней кромкой тела + подпись; размеры в юнитах мира
+        // скобка над верхней кромкой тела + подпись; размеры в юнитах мира.
+        // G-15: компактнее прежнего — зелёная метка не спорит с жёлтой целью
         private void PlaceMarker()
         {
             float gap = markerBody.Radius + 10f;
-            const float len = 26f, width = 1.8f, tick = 9f;
+            const float len = 21f, width = 1.6f, tick = 7f;
             beam.transform.localPosition = Vector3.up * (gap + len * 0.5f);
             beam.transform.localScale = new Vector3(width / 16f, len / 16f, 1f); // Line(): 16 юнитов
             tickTop.transform.localPosition = Vector3.up * (gap + len);
@@ -242,11 +248,12 @@ namespace SpaceTaxi.UI
             markerRoot.position = new Vector3(p.x, p.y, 0f);
 
             float t = Time.time * 2.4f;
-            Color beamColor = new Color(Amber.r, Amber.g, Amber.b, 0.62f + 0.28f * Mathf.Sin(t));
+            // зелёная метка (G-15) с лёгким пульсом: альфа гуляет слабее прежнего
+            Color beamColor = new Color(WaypointGreen.r, WaypointGreen.g, WaypointGreen.b, 0.72f + 0.14f * Mathf.Sin(t));
             beam.color = beamColor;
             tickTop.color = beamColor;
             tickBottom.color = beamColor;
-            markerLabel.color = new Color(AmberText.r, AmberText.g, AmberText.b, 0.72f + 0.18f * Mathf.Sin(t));
+            markerLabel.color = new Color(WaypointGreenText.r, WaypointGreenText.g, WaypointGreenText.b, 0.78f + 0.12f * Mathf.Sin(t));
         }
 
         // ————— краевые стрелки —————
@@ -385,7 +392,7 @@ namespace SpaceTaxi.UI
             scaler.referenceResolution = new Vector2(1920f, 1080f); // как UI_Root
             scaler.matchWidthOrHeight = 0.5f;
 
-            waypointArrow = MakeArrow("WaypointArrow", Amber, AmberText,
+            waypointArrow = MakeArrow("WaypointArrow", WaypointGreen, WaypointGreenText,
                 out waypointArrowTip, out waypointArrowDist);
             targetArrow = MakeArrow("TargetArrow", TargetYellow, AmberText,
                 out targetArrowTip, out targetArrowDist);

@@ -595,7 +595,7 @@ namespace SpaceTaxi.Orders
             OffersChanged?.Invoke();
             OfferAdded?.Invoke();
             Debug.Log($"[Orders] предложение: {passenger.DisplayName}, " +
-                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {offer.Price} кр" +
+                      $"{PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}, {UI.StationUI.Currency} {offer.Price}" +
                       (fat ? " [жирный]" : ""));
         }
 

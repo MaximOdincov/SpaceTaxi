@@ -1193,8 +1193,8 @@ namespace SpaceTaxi.UI
             debtSection.SetActive(balance > 0);
             if (balance <= 0)
                 return;
-            debtLine.text = $"Долг: {balance} кр · Аварий: {session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
-            repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({balance} КР)";
+            debtLine.text = $"Долг: {StationUI.Currency} {OnboardBinder.FormatCredits(balance)} · Аварий: {session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
+            repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({StationUI.Currency} {OnboardBinder.FormatCredits(balance)})";
             repayButton.interactable = session.Wallet.Credits >= balance;
         }
 
@@ -1757,7 +1757,7 @@ namespace SpaceTaxi.UI
             if (!session.Fleet.TryBuy(config, session.Wallet, paintIndex))
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
-            ShowToast($"Куплен «{config.DisplayName}» (−{price} кр)", emphasized: true);
+            ShowToast($"Куплен «{config.DisplayName}» (−{StationUI.Currency} {OnboardBinder.FormatCredits(price)})", emphasized: true);
             // купленной модели «нет в продаже» — витрина листается дальше,
             // сама модель остаётся в списке серой с подписью «ВАШ · В АНГАРЕ»
             FlipShowcase(1);

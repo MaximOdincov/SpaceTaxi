@@ -138,7 +138,7 @@ namespace SpaceTaxi.UI
                 26f, OnboardComputerFactory.BrightColor, "Reason");
             reason.alignment = TextAlignmentOptions.Center;
             var stats = OnboardComputerFactory.Text(content,
-                $"Непогашенный долг: {debt.Balance} кр · аварий: {debt.UnpaidAccidents}",
+                $"Непогашенный долг: {StationUI.Currency} {OnboardBinder.FormatCredits(debt.Balance)} · аварий: {debt.UnpaidAccidents}",
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 

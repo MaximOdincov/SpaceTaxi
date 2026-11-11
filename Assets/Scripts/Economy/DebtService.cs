@@ -9,7 +9,7 @@ namespace SpaceTaxi.Economy
     // подключатся поверх этого API позже.
     public sealed class DebtService
     {
-        // 16_BETA_PLAN §3.1: разбил арендный корабль — долг +400 кр
+        // 16_BETA_PLAN §3.1: разбил арендный корабль — долг +400 Đ
         private const int AccidentDebt = 400;
         // §3.2: три аварии с непогашенными долгами — увольнение
         private const int DismissalAfterAccidents = 3;

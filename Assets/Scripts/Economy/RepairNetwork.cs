@@ -66,7 +66,7 @@ namespace SpaceTaxi.Economy
             return Mathf.Min(pack, Mathf.Max(0f, visitBudget));
         }
 
-        // ceil(HP × множитель пакета × наценка тира сети): базовая цена 1 кр/HP,
+        // ceil(HP × множитель пакета × наценка тира сети): базовая цена 1 Đ/HP,
         // недостающая доля ед. тоже платная; лучшие мастерские дороже (С4,
         // RepairTierSurchargeMul) — базовая формула не тронута, умножение сверху
         public static int CostOf(float repairHp, int packIndex, int tier, PricingConfig pricing)

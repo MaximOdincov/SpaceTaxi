@@ -172,8 +172,9 @@ namespace SpaceTaxi.Core
             int toDebt = penalty - fromWallet;
             if (toDebt > 0)
                 Debt.AddCharge(toDebt);
-            FindAnyObjectByType<UI.ToastNotifier>()?.Show("Отказ от заказа: штраф −" + penalty + " кр");
-            Debug.Log($"[Economy] штраф за отмену: {penalty} кр (кошелёк {fromWallet}, долг {toDebt})");
+            FindAnyObjectByType<UI.ToastNotifier>()?.Show(
+                $"Отказ от заказа: штраф −{UI.StationUI.Currency} {UI.OnboardBinder.FormatCredits(penalty)}");
+            Debug.Log($"[Economy] штраф за отмену: {penalty} Đ (кошелёк {fromWallet}, долг {toDebt})");
         }
 
         // потеря корабля: арендный — долг за аварию. Проверка владения ДО
