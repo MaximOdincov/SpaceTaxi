@@ -1,4 +1,5 @@
 using System;
+using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.Economy
 {
@@ -91,6 +92,10 @@ namespace SpaceTaxi.Economy
             LastResult = result;
             wallet?.Add(result.Net);
             debt?.Repay(result.ToDebt);
+            // звон монет на приход (Н6/Z): только когда на руки что-то упало —
+            // выплата, съеденная штрафом целиком, молчит
+            if (result.Net > 0)
+                Sound.Play(SoundId.MoneyGain);
             Paid?.Invoke(result);
             return result;
         }

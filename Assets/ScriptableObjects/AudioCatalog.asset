@@ -15,13 +15,14 @@ MonoBehaviour:
   entries:
   - Id: 1
     Clips:
-    - {fileID: 8300000, guid: 408268bc09ef7412c90ee334d89d4066, type: 3}
+    - {fileID: 8300000, guid: 1dc57029e3027144b8773209c64aec0d, type: 3}
     Group: 0
-    Volume: 0.6
+    Volume: 0.3
     Pitch: 1
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 2
     Clips:
     - {fileID: 8300000, guid: 8940fdfd48bf049f7aa2a6b6f69e3cd1, type: 3}
@@ -31,6 +32,7 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 3
     Clips:
     - {fileID: 8300000, guid: 8940fdfd48bf049f7aa2a6b6f69e3cd1, type: 3}
@@ -40,6 +42,7 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 4
     Clips:
     - {fileID: 8300000, guid: cf72de0ec76c94ad1b15ff646bc8c576, type: 3}
@@ -49,6 +52,7 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 5
     Clips:
     - {fileID: 8300000, guid: b3278893911864fb59750ea80af85bc9, type: 3}
@@ -60,33 +64,37 @@ MonoBehaviour:
     PitchJitter: 0.08
     Loop: 0
     Sequential: 1
+    FadeOut: 0
   - Id: 6
     Clips:
-    - {fileID: 8300000, guid: 9f4d7c52961054efb83601e2a2073ef6, type: 3}
+    - {fileID: 8300000, guid: bb4a02d870fe65f4ba210d05136d7995, type: 3}
     Group: 1
     Volume: 0.95
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0
     Sequential: 0
+    FadeOut: 0
   - Id: 7
     Clips:
-    - {fileID: 8300000, guid: e2cb98dfc5c51414581231e77f3b7ac8, type: 3}
+    - {fileID: 8300000, guid: 917c5a8127b9de2408e4d324d1180c24, type: 3}
     Group: 1
-    Volume: 0.7
+    Volume: 0.5
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0
     Sequential: 0
+    FadeOut: 1
   - Id: 8
     Clips:
-    - {fileID: 8300000, guid: 8123c6cd775c641e8b05d781c170415f, type: 3}
+    - {fileID: 8300000, guid: 2be691bccabfb3f49859aa96fe708727, type: 3}
     Group: 1
     Volume: 1
     Pitch: 1
     PitchJitter: 0.04
     Loop: 0
     Sequential: 0
+    FadeOut: 0
   - Id: 9
     Clips:
     - {fileID: 8300000, guid: 3f1c2d2ebf9954ca0a5f7cee50c75cfd, type: 3}
@@ -96,15 +104,17 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 0
     Sequential: 0
+    FadeOut: 0
   - Id: 10
     Clips:
-    - {fileID: 8300000, guid: 78f7b7a074a504b779d941e8d3ba7702, type: 3}
+    - {fileID: 8300000, guid: d54ee18767082c14bb8ffe7f651719d8, type: 3}
     Group: 2
     Volume: 0.5
     Pitch: 1
     PitchJitter: 0
     Loop: 0
     Sequential: 0
+    FadeOut: 0
   - Id: 11
     Clips:
     - {fileID: 8300000, guid: d62fa02e5c7ae4773838d17cce147e86, type: 3}
@@ -114,6 +124,7 @@ MonoBehaviour:
     PitchJitter: 0
     Loop: 0
     Sequential: 0
+    FadeOut: 0
   - Id: 12
     Clips:
     - {fileID: 8300000, guid: 0c5903bda280c4207942e36671a2fbbe, type: 3}
@@ -123,6 +134,7 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 13
     Clips:
     - {fileID: 8300000, guid: c232f0222fe6a47de9528553746794ce, type: 3}
@@ -132,6 +144,7 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
   - Id: 14
     Clips:
     - {fileID: 8300000, guid: 40b08367c3cea42aba4ee418ac230877, type: 3}
@@ -141,3 +154,67 @@ MonoBehaviour:
     PitchJitter: 0.04
     Loop: 1
     Sequential: 0
+    FadeOut: 0
+  - Id: 16
+    Clips:
+    - {fileID: 8300000, guid: 607f184d4e9d7db468b4addff14c2e4f, type: 3}
+    Group: 1
+    Volume: 0.4
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 1
+    Sequential: 0
+    FadeOut: 0
+  - Id: 18
+    Clips:
+    - {fileID: 8300000, guid: d43ad837a4fb26648bd9b2a71726b3ce, type: 3}
+    - {fileID: 8300000, guid: 14a74cecbb791714abcd652df58ad7a0, type: 3}
+    - {fileID: 8300000, guid: d161c06ede3e52243b658cefd5de36c2, type: 3}
+    - {fileID: 8300000, guid: c9f33c941c93e6d4195e3d6c15dd9b4c, type: 3}
+    Group: 3
+    Volume: 0.5
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 0
+    Sequential: 0
+    FadeOut: 0
+  - Id: 22
+    Clips:
+    - {fileID: 8300000, guid: ed343b5bca607724cb6d8721bb5de65f, type: 3}
+    Group: 0
+    Volume: 0.45
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 1
+    Sequential: 0
+    FadeOut: 0
+  - Id: 29
+    Clips:
+    - {fileID: 8300000, guid: f932f209b50128a44bd2147159bdb473, type: 3}
+    Group: 1
+    Volume: 0.8
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+    FadeOut: 0
+  - Id: 32
+    Clips:
+    - {fileID: 8300000, guid: eda840e3169700445a866ecdb962392f, type: 3}
+    Group: 1
+    Volume: 0.7
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+    FadeOut: 0
+  - Id: 33
+    Clips:
+    - {fileID: 8300000, guid: eda840e3169700445a866ecdb962392f, type: 3}
+    Group: 1
+    Volume: 0.7
+    Pitch: 1
+    PitchJitter: 0.04
+    Loop: 0
+    Sequential: 0
+    FadeOut: 0

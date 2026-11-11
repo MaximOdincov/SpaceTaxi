@@ -65,6 +65,8 @@ namespace SpaceTaxi.UI
         // плеер «ЭФИР»
         private Button playerPrev, playerNext;
         private Button radioMute;
+        private Button radioWave;         // «ВОЛНА 1/2»: эфир-эмбиент против обычного плейлиста
+        private SoundId wave1Track;       // трек волны 1, запомненный при уходе на волну 2
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
@@ -804,6 +806,57 @@ namespace SpaceTaxi.UI
                 playerNext.onClick.AddListener(() => AudioManager.Instance?.PlayPlaylistNext(1));
             if (radioMute != null)
                 radioMute.onClick.AddListener(() => AudioManager.Instance?.ToggleMusicMuted());
+            BuildWaveToggle();
+        }
+
+        // «ВОЛНА 1/2» (Н6/Z): кнопка в стиле секции — копия мьют-кнопки под ней.
+        // Волна 1 — как играло (плейлист не тронут), волна 2 — станция эмбиента
+        // (MusicStation2: три эмбиента + menu_out_in_space по кругу)
+        private void BuildWaveToggle()
+        {
+            if (radioWave != null || radioMute == null)
+                return;
+            radioWave = Instantiate(radioMute.gameObject, radioMute.transform.parent).GetComponent<Button>();
+            radioWave.gameObject.name = "RadioWave";
+            SetButtonLabel(radioWave, WaveLabel());
+            UiSfx.Hook(radioWave);
+            radioWave.onClick.AddListener(ToggleRadioWave);
+        }
+
+        private static void SetButtonLabel(Button button, string text)
+        {
+            TMP_Text label = button.GetComponentInChildren<TMP_Text>();
+            if (label != null)
+                label.text = text;
+        }
+
+        private string WaveLabel()
+        {
+            bool wave2 = audioManager != null && audioManager.CurrentTrack == SoundId.MusicStation2;
+            return wave2 ? "ВОЛНА: 2" : "ВОЛНА: 1";
+        }
+
+        private void ToggleRadioWave()
+        {
+            AudioManager manager = audioManager != null ? audioManager : AudioManager.Instance;
+            if (manager == null)
+                return;
+            audioManager = manager; // метки ниже и событие читают поле, а не локальную ссылку
+            if (manager.CurrentTrack == SoundId.MusicStation2)
+            {
+                // обратно на волну 1: тот же трек, что играл до переключения;
+                // памяти нет — дорожная волна (MusicFlight)
+                SoundId back = wave1Track == SoundId.None || wave1Track == SoundId.MusicStation2
+                    ? SoundId.MusicFlight
+                    : wave1Track;
+                manager.PlayMusic(back);
+            }
+            else
+            {
+                wave1Track = manager.CurrentTrack;
+                manager.PlayMusic(SoundId.MusicStation2);
+            }
+            RefreshMusicPlayer(); // событие MusicStateChanged придёт и так — дублируем для мгновенной метки
         }
 
         // имя станции и метка мьюта по состоянию менеджера; событие MusicStateChanged
@@ -817,6 +870,8 @@ namespace SpaceTaxi.UI
                 if (muteLabel != null)
                     muteLabel.text = audioManager != null && audioManager.MusicMuted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
             }
+            if (radioWave != null)
+                SetButtonLabel(radioWave, WaveLabel()); // синхрон и при prev/next мимо волны 2
             if (audioManager == null || audioManager.MusicPlaylist.Count == 0)
             {
                 trackTitle.text = "ЭФИР · треки не найдены";

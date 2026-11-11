@@ -86,8 +86,29 @@ namespace SpaceTaxi.Audio
             src.loop = false;
             src.Play();
 
+            // затухание с голоса пула: пока играет, он не «свободен»; к концу
+            // Stop возвращает его в общий цикл
+            if (entry.FadeOut > 0f && src.clip != null)
+                StartCoroutine(FadeOneShot(src, Mathf.Min(entry.FadeOut, src.clip.length)));
+
             if (id == SoundId.Explosion)
                 DuckAll(); // взрыв «срезает» остальное
+        }
+
+        // линейный спад громкости one-shot (взлёт: рёв дюз «на выдохе»);
+        // unscaled — звук гаснет и на паузе модала
+        private IEnumerator FadeOneShot(AudioSource src, float seconds)
+        {
+            float from = src.volume;
+            for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
+            {
+                if (src == null || !src.isPlaying)
+                    yield break;
+                src.volume = Mathf.Lerp(from, 0f, t / seconds);
+                yield return null;
+            }
+            if (src != null)
+                src.Stop();
         }
 
         // --- Непрерывные звуки ---

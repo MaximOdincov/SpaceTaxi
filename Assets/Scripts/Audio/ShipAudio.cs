@@ -15,10 +15,16 @@ namespace SpaceTaxi.Audio
         private Ship ship;
         private ShipController controller;
         private HullSystem hull;
+        private LandingSystem landing;
 
         private bool fuelWarned;     // сигнал на пороге 25% уже прозвучал
         private bool fuelCritWarned; // второй сигнал на пороге 10%
         private bool hullWarned;
+
+        // завершение ремонта станции (Н6/Z): флаг «HP выросли, пока стояли на
+        // планете» — StationServiced приходит и после заправки, отличаем по нему
+        private float lastHp = -1f;
+        private bool serviceHpGain;
 
         // ввод читается через ShipController (ThrustOn/BrakeOn/StrafeLevel) —
         // свой биндинг не нужен, метод оставлен для WorldBuilder
@@ -32,6 +38,20 @@ namespace SpaceTaxi.Audio
             ship.FuelChanged += OnFuelChanged;
         }
 
+        private void OnDestroy()
+        {
+            // все издатели живут на том же объекте, но отписка симметрична
+            if (ship != null)
+                ship.FuelChanged -= OnFuelChanged;
+            if (hull != null)
+            {
+                hull.HpChanged -= OnHullChanged;
+                hull.Respawned -= OnRespawned;
+            }
+            if (landing != null)
+                landing.StationServiced -= OnStationServiced;
+        }
+
         private void Update()
         {
             if (ship == null || ship.Config == null)
@@ -42,7 +62,18 @@ namespace SpaceTaxi.Audio
             {
                 hull = GetComponent<HullSystem>();
                 if (hull != null)
+                {
                     hull.HpChanged += OnHullChanged;
+                    hull.Respawned += OnRespawned;
+                }
+            }
+
+            // LandingSystem тоже с того же объекта (ленди-бинд, как hull выше)
+            if (landing == null)
+            {
+                landing = GetComponent<LandingSystem>();
+                if (landing != null)
+                    landing.StationServiced += OnStationServiced;
             }
 
             // SetLoop идемпотентен: вызов каждый кадр дешевле флагов-переходов;
@@ -101,6 +132,16 @@ namespace SpaceTaxi.Audio
         // один сигнал до ремонта выше порога (Repair/RepairAll/респавн шлют HpChanged)
         private void OnHullChanged()
         {
+            // сервисный флаг: рост HP на планете = был ремонт пакета станции;
+            // респавн тоже растит HP на стоянке — гасится в OnRespawned
+            if (lastHp < 0f)
+                lastHp = ship.Hp;
+            else if (ship.Hp > lastHp + 0.01f && ship.State == ShipState.Landed)
+                serviceHpGain = true;
+            else if (ship.Hp < lastHp - 0.01f)
+                serviceHpGain = false;
+            lastHp = ship.Hp;
+
             float f = ship.HpFraction;
             if (f <= LowHullWarn && !hullWarned)
             {
@@ -111,6 +152,22 @@ namespace SpaceTaxi.Audio
             {
                 hullWarned = false;
             }
+        }
+
+        // сервис станции выполнен (заправка и ремонт зовут ReportServiced):
+        // щелчок металла только если починили
+        private void OnStationServiced(string stationName)
+        {
+            if (serviceHpGain)
+                Sound.Play(SoundId.PurchaseCash); // «metal click» из repair/ (Н6/Z)
+            serviceHpGain = false;
+        }
+
+        // респавн растит HP без ремонта — флаг сервиса гасим
+        private void OnRespawned()
+        {
+            serviceHpGain = false;
+            lastHp = ship.Hp;
         }
     }
 }

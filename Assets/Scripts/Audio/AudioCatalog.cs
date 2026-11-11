@@ -24,6 +24,10 @@ namespace SpaceTaxi.Audio
         public bool Loop;       // непрерывный звук (двигатель, жар, эмбиент)
         public bool Sequential; // вариации по порядку (сила удара), иначе случайные
 
+        [Min(0f)]
+        [Tooltip("Секунды затухания one-shot с момента старта (0 = без затухания): взлёт — рёв дюз на выдохе")]
+        public float FadeOut;   // > 0 — one-shot играет и линейно гаснет за это время
+
         public bool IsValid => Clips != null && Clips.Length > 0;
     }
 

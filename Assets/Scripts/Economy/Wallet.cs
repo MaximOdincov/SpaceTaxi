@@ -1,4 +1,5 @@
 using System;
+using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.Economy
 {
@@ -23,6 +24,9 @@ namespace SpaceTaxi.Economy
                 return false;
             Credits -= amount;
             CreditsChanged?.Invoke(Credits);
+            // звон монет на любое успешное списание (Н6/Z): заправка, ремонт,
+            // покупка, улучшение, штраф за отмену — точка одна, здесь
+            Sound.Play(SoundId.MoneySpend);
             return true;
         }
 
