@@ -11,9 +11,17 @@ namespace SpaceTaxi.Physics
     [DefaultExecutionOrder(200)]
     public class LandingSystem : MonoBehaviour
     {
+        // Н6 G1: предиктивная посадка — Land вызывается ДО физического контакта,
+        // когда до поверхности (в масштабе посадочного отступа) осталось меньше,
+        // чем корабль пройдёт за шаг физики с запасом. Глубина «провала» спрайта
+        // ограничена k·v·dt ≈ 2.4 юн при v = LandSpeed (75) и dt = 0.02 — вместо
+        // прежних ~8-9; жёсткие удары на скорости > LandSpeed не тронуты.
+        private const float PredictLeadFactor = 1.6f;
+
         private Ship ship;
         private HullSystem hull;
         private ShipModelVisual modelVisual;
+        private GravityField gravity; // лениво: мир собирается в Start (WorldBuilder)
 
         // лениво: HullSystem и ShipModelVisual добавляются позже Awake (WorldBuilder)
         private HullSystem Hull => hull != null ? hull : (hull = GetComponent<HullSystem>());
@@ -40,6 +48,57 @@ namespace SpaceTaxi.Physics
         {
             touchHandled = false; // каждый шаг физики предшествует своей пачке коллбэков
             preSolveVelocity = ship != null && ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
+            TryPredictiveLanding();
+        }
+
+        // Н6 G1: мягкая посадка срабатывает за шаг до физического контакта —
+        // спрайт не проваливается в планету, дожим PinchToPose стартует с
+        // безопасной высоты. Только Flying, только планеты (у звёзд/дыр/комет
+        // своя логика гибели/жара), только на сближении (радиальная скорость
+        // к планете положительна — взлёт и касательный пролёт не тронуты).
+        // На скорости ≥ LandSpeed предиктивного срабатывания нет: жёсткий
+        // контакт и смерть остаются честной физикой (OnCollisionEnter2D).
+        // Габарит корабля — посадочный отступ (полувысота капсулы покоя,
+        // ShipPlacement): сфера этого радиуса вокруг центра корабля касается
+        // планеты чуть раньше силуэта при любом курсе — глубже не провалиться.
+        private void TryPredictiveLanding()
+        {
+            if (ship == null || ship.Config == null || ship.State != ShipState.Flying || ship.Body == null)
+                return;
+            if (preSolveVelocity.magnitude >= ship.Config.LandSpeed)
+                return;
+            if (gravity == null)
+                gravity = FindAnyObjectByType<GravityField>();
+            if (gravity == null || gravity.Bodies.Count == 0)
+                return;
+
+            Vector2 pos = ship.Body.position;
+            Planet nearest = null;
+            float nearestDist = float.MaxValue;
+            foreach (CelestialBody body in gravity.Bodies)
+            {
+                if (!(body is Planet planet))
+                    continue;
+                float d = Vector2.Distance(body.transform.position, pos);
+                if (d < nearestDist)
+                {
+                    nearestDist = d;
+                    nearest = planet;
+                }
+            }
+            if (nearest == null)
+                return;
+
+            Vector2 dirToPlanet = (Vector2)nearest.transform.position - pos;
+            if (nearestDist > 1e-4f)
+                dirToPlanet /= nearestDist;
+            float approach = Vector2.Dot(preSolveVelocity, dirToPlanet); // скорость сближения
+            if (approach <= 0f)
+                return; // улетаем или летим мимо — контакта на этом шаге не будет
+
+            float gap = nearestDist - nearest.Radius - ShipPlacement.LandedExtent(Visual);
+            if (gap < approach * Time.fixedDeltaTime * PredictLeadFactor)
+                Land(nearest, dirToPlanet); // радиаль и есть фолбэк-нормаль у предиктивной посадки
         }
 
         private void Awake()
@@ -114,6 +173,14 @@ namespace SpaceTaxi.Physics
         // выжившему на посадке станция чинит и заправляет под ноль
         private void Land(Planet planet, Collision2D collision)
         {
+            Vector2 fallback = collision.contactCount > 0 ? (Vector2)collision.contacts[0].normal : Vector2.up;
+            Land(planet, fallback);
+        }
+
+        // Н6 G1: посадка без контакта — предиктивный путь; фолбэк-направление
+        // вместо нормали контакта (у вызова из OnCollisionEnter2D это нормаль)
+        private void Land(Planet planet, Vector2 fallbackDir)
+        {
             touchHandled = true; // касание обработано — параллельные пары в этом шаге молчат
 
             // целевая поза по радиали от центра планеты, не по нормали контакта:
@@ -121,7 +188,7 @@ namespace SpaceTaxi.Physics
             // рывок; радиаль совпадает с Takeoff и Ship.ApplyModelSprite
             Vector2 dir = ((Vector2)transform.position - (Vector2)planet.transform.position).normalized;
             if (dir.sqrMagnitude < 1e-6f)
-                dir = collision.contactCount > 0 ? (Vector2)collision.contacts[0].normal : Vector2.up;
+                dir = fallbackDir;
             float extent = ShipPlacement.LandedExtent(Visual);
             Vector2 targetPos = (Vector2)planet.transform.position + dir * (planet.Radius + extent);
             ShipController controller = GetComponent<ShipController>();

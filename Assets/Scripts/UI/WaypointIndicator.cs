@@ -398,17 +398,35 @@ namespace SpaceTaxi.UI
                 out targetArrowTip, out targetArrowDist);
         }
 
-        // Шеврон.png — чёрные пиксели на прозрачном: мультипликативная тонировка
-        // Image.color его чернит. Один раз перекрашиваем текстуру в белое с тем
-        // же альфа-каналом (isReadable включён у импортера) и кэшируем; остриё
-        // вверх, как у прежнего процедурного шеврона. Фолбэк — StubSprites.
-        // Публично: маркер игрока на карте (Н4.6.2) красит этот же белый шеврон.
+        // Н6 U3: спрайт владельца svrn.png — чисто белый (PNG-анализ: все
+        // непрозрачные пиксели 255,255,255) и остриём вверх, как прежний
+        // процедурный шеврон, поэтому мультипликативная тонировка Image.color
+        // работает напрямую — перекрас в белое не нужен. Текстура импортирована
+        // Multiple (два одинаковых шеврона svrn_0/svrn_1) — берём верхний
+        // суб-спрайт через LoadAll (паттерн for_mini у радара). Публично:
+        // маркер игрока на карте (Н4.6.2) красит этот же спрайт.
+        // Фолбэк — прежняя цепочка: чёрный «Шеврон» перекрашивается в белое,
+        // при нечитаемой текстуре — StubSprites.
         private static Sprite chevronSprite;
 
         public static Sprite ChevronSprite()
         {
             if (chevronSprite != null)
                 return chevronSprite;
+            var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
+            if (frames != null && frames.Length > 0)
+            {
+                foreach (var frame in frames)
+                {
+                    if (frame != null && frame.name == "svrn_0")
+                    {
+                        chevronSprite = frame;
+                        return chevronSprite;
+                    }
+                }
+                chevronSprite = frames[0];
+                return chevronSprite;
+            }
             var texture = Resources.Load<Texture2D>("Art/icons/Шеврон");
             if (texture == null)
                 return null;

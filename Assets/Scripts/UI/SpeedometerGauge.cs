@@ -12,9 +12,9 @@ namespace SpaceTaxi.UI
         private float angleAtZero;
         private float sweepDegrees;
 
-        // angleAtZero — локальный поворот стрелки при скорости 0 (остриё вниз),
-        // sweepDegrees — полный ход стрелки до MaxV. Ход по часовой (в Unity +z —
-        // против часовой, поэтому вычитаем): 0 юн/с — вниз, у MaxV — на 240° дальше.
+        // angleAtZero — локальный поворот стрелки при скорости 0 (остриё на
+        // отметке «0» шкалы, Н6 U5), sweepDegrees — полный ход стрелки до MaxV.
+        // Ход по часовой (в Unity +z — против часовой, поэтому вычитаем).
         public void Setup(RectTransform needleRect, float angleAtZero, float sweepDegrees)
         {
             needle = needleRect;

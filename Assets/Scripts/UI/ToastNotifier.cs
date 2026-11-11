@@ -10,6 +10,15 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
+    // Тон тоста (Н6 U4): Danger — деньги ушли (долг/штраф/покупка/сервис),
+    // Success — деньги пришли или успех заказа, Neutral — информационное
+    public enum ToastTone
+    {
+        Neutral,
+        Danger,
+        Success
+    }
+
     // Тосты событий заказов и корабля: вертикальный стек до 3 с шагом,
     // очередь со стаггером и дедупом, аварийные (emphasized) поверх очереди
     public class ToastNotifier : MonoBehaviour
@@ -36,11 +45,13 @@ namespace SpaceTaxi.UI
         {
             public readonly string Message;
             public readonly bool Emphasized;
+            public readonly ToastTone Tone;
 
-            public Item(string message, bool emphasized)
+            public Item(string message, bool emphasized, ToastTone tone)
             {
                 Message = message;
                 Emphasized = emphasized;
+                Tone = tone;
             }
         }
 
@@ -126,11 +137,13 @@ namespace SpaceTaxi.UI
             return new ToastView { Go = go, Rect = rect, Label = label, Group = group };
         }
 
-        public void Show(string message, bool emphasized = false)
+        // Н6 U4: tone — цвет текста по смыслу события; дефолт Neutral (жёлтый),
+        // чужие вызовы без тона остаются валидными
+        public void Show(string message, bool emphasized = false, ToastTone tone = ToastTone.Neutral)
         {
             if (string.IsNullOrEmpty(message) || IsDuplicate(message))
                 return;
-            var item = new Item(message, emphasized);
+            var item = new Item(message, emphasized, tone);
             if (emphasized)
             {
                 // поверх очереди: после уже ждущих аварийных, но впереди обычных
@@ -237,18 +250,18 @@ namespace SpaceTaxi.UI
             orders.PassengerBoarded += offer => Show("Пассажир на борту: " + offer.Passenger.DisplayName
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Greetings)));
             orders.OrderDelivered += offer => Show("ЗАКАЗ ВЫПОЛНЕН: " + offer.Passenger.DisplayName
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), true);
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), true, ToastTone.Success);
             orders.OrderFailed += offer => Show("Заказ провален"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
 
             // итог задания пассажира (П5.3): благодарность или жалоба
             orders.TaskSucceeded += offer => Show("Задание выполнено"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)));
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), false, ToastTone.Success);
             orders.TaskFailed += offer => Show("Жалоба пассажира"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true);
+                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
 
             var landing = ship.GetComponent<LandingSystem>();
-            landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен");
+            landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен", false, ToastTone.Danger);
             landing.StationHint += planet => Show("Станция: [B] — " + StationServices(planet));
             // запас топливной сети при посадке (Н-4): сколько единиц продают и по чём
             // (с районным множителем, Н4.5); пустая сеть — своё сообщение, чтобы
@@ -272,7 +285,7 @@ namespace SpaceTaxi.UI
 
             var hull = ship.GetComponent<HullSystem>();
             hull.Respawned += () => Show("Респавн на планете старта");
-            hull.ShipLost += reason => Show("КОРАБЛЬ ПОТЕРЯН — " + reason);
+            hull.ShipLost += reason => Show("КОРАБЛЬ ПОТЕРЯН — " + reason, false, ToastTone.Danger);
 
             var debt = session.Debt;
             if (debt != null)
@@ -282,7 +295,7 @@ namespace SpaceTaxi.UI
                 debt.DebtChanged += value =>
                 {
                     if (value > prevBalance)
-                        Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(value - prevBalance)} за арендный корабль", true);
+                        Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(value - prevBalance)} за арендный корабль", true, ToastTone.Danger);
                     prevBalance = value;
                 };
             }
@@ -291,9 +304,9 @@ namespace SpaceTaxi.UI
             if (session.Payout != null)
                 session.Payout.Paid += result =>
                 {
-                    Show($"Доставка: +{StationUI.Currency} {OnboardBinder.FormatCredits(result.Net)}", true);
+                    Show($"Доставка: +{StationUI.Currency} {OnboardBinder.FormatCredits(result.Net)}", true, ToastTone.Success);
                     if (result.ToDebt > 0)
-                        Show($"{StationUI.Currency} {OnboardBinder.FormatCredits(result.ToDebt)} ушло в счёт долга");
+                        Show($"{StationUI.Currency} {OnboardBinder.FormatCredits(result.ToDebt)} ушло в счёт долга", false, ToastTone.Danger);
                 };
 
             // кометы (П6.3): предупреждение за 20 с до входа в систему
@@ -312,6 +325,7 @@ namespace SpaceTaxi.UI
             pool.RemoveAt(pool.Count - 1);
 
             view.Label.text = item.Message;
+            view.Label.color = ToneColor(item.Tone);
             // важные события — крупнее и шире
             view.Label.fontSize = item.Emphasized ? 30f : 22f;
             view.Rect.sizeDelta = item.Emphasized ? EmphasizedSize : NormalSize;
@@ -350,6 +364,21 @@ namespace SpaceTaxi.UI
         private static string Prefix(string phrase)
         {
             return string.IsNullOrEmpty(phrase) ? "" : " — «" + phrase + "»";
+        }
+
+        // цвет текста по тону (Н6 U4) — палитра борткомпа: красный = списание,
+        // зелёный = приход/успех, жёлтый = нейтральное
+        private static Color ToneColor(ToastTone tone)
+        {
+            switch (tone)
+            {
+                case ToastTone.Danger:
+                    return OnboardComputerFactory.DangerColor;
+                case ToastTone.Success:
+                    return OnboardComputerFactory.BrightColor;
+                default:
+                    return OnboardComputerFactory.TaxiColor;
+            }
         }
 
         // перечень услуг станции по флагам планеты (Н-3): комбинации «есть заправка»/

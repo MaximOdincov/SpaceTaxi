@@ -10,19 +10,23 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Н-12/G-15: круглый радар-прибор. Проекция «от корабля», ориентация
-    // heading-up (G-15, вместо «север вверх» Н3.2): вверх = куда смотрит нос,
-    // вся картина поворачивается на курс, корабль в центре всегда носом вверх.
-    // Масштаб НЕлинейный по дистанции: r = R * (d / maxRange)^rangeExponent —
-    // экспонента < 1 растягивает ближнюю зону (объекты рядом крупнее) и
-    // сжимает дальнюю (обзор отдалённее линейного); рисуются ВСЕ тела —
-    // за охватом кламп к ободу с приглушением и уменьшением (без хаотичных
-    // исчезновений/мерцаний). Важные маркеры: цель заказа — жёлтый ореол
-    // (TaxiColor, как HUD/карта), waypoint — зелёный ромб (как своя метка
-    // на карте, G-15), живые кометы и предупреждение — кламп к ободу.
-    // Корабль — иконка Art/icons/for_mini.png с кольцом-подложкой. Дальше —
-    // стиль «прибора»: тёмный фон, зелёные линии, свечение — полупрозрачные
-    // спрайты без шейдеров. Вся геометрия строится кодом, сцена не трогается.
+    // Н-12/G-15/Н6: круглый радар-прибор. Проекция «от корабля», ориентация
+    // north-up (Н6 M1, решение владельца вместо heading-up Н5.22): мир НЕ
+    // вращается — север всегда вверх, кольца/крест/сетка/подпись «С» стоят
+    // статично, цель/waypoint — по мировым координатам без поворота. Иконка
+    // корабля в центре поворачивается по курсу (Н6 M2): нос = вектор скорости
+    // (стоит — последний курс); базовая ориентация арта — нос на +45° (Н6 M3,
+    // PNG-анализ for_mini). Масштаб НЕлинейный по дистанции:
+    // r = R * (d / maxRange)^rangeExponent — экспонента < 1 растягивает
+    // ближнюю зону (объекты рядом крупнее) и сжимает дальнюю (обзор
+    // отдалённее линейного); рисуются ВСЕ тела — за охватом кламп к ободу
+    // с приглушением и уменьшением (без хаотичных исчезновений/мерцаний).
+    // Важные маркеры: цель заказа — жёлтый ореол (TaxiColor, как HUD/карта),
+    // waypoint — зелёный ромб (как своя метка на карте, G-15), живые кометы
+    // и предупреждение — кламп к ободу. Корабль — иконка Art/icons/for_mini.png
+    // с кольцом-подложкой. Дальше — стиль «прибора»: тёмный фон, зелёные
+    // линии, свечение — полупрозрачные спрайты без шейдеров. Вся геометрия
+    // строится кодом, сцена не трогается.
     public class MinimapBinder : MonoBehaviour
     {
         private const float SweepSpeedDeg = 72f;  // скорость луча развёртки
@@ -44,7 +48,11 @@ namespace SpaceTaxi.UI
         private const float FarScaleMul = 0.85f;  // …и мельче на краю охвата
         private const float RimInset = 8f;        // отступ маркеров от обода при клампе
         private const float CometTailPx = 11f;    // длина хвоста кометы на радаре, px
-        private const float ShipIconDeg = -45f;   // for_mini смотрит носом в правый верх — доворот до «вверх»
+        // Н6 M3: ар for_mini смотрит носом в правый верх — PNG-анализ: главная
+        // ось силуэта +45° (Unity, от +X). Поворот иконки = курс − этот офсет.
+        private const float ShipIconNoseDeg = 45f;
+        private const float ShipIconHoldSpeed = 0.5f; // ниже — корабль «стоит»: держим последний курс
+        private const float IconTurnRate = 10f;       // сглаживание поворота иконки, 1/с
 
         // кольца дистанций от корабля, юниты мира. Подобраны под нелинейную карту
         // (maxRange 1400, exp 0.6): на приборе лежат примерно на 26/44/63/82% R —
@@ -111,7 +119,6 @@ namespace SpaceTaxi.UI
         private MapScreenBinder mapBinder;
         private GravityField gravity;
         private Ship ship;
-        private ShipController controller;
         private CometSystem cometSystem;
         private TMP_FontAsset font;
 
@@ -119,8 +126,8 @@ namespace SpaceTaxi.UI
         private float builtWidth;
         private float radarRadiusPx;   // радиус прибора в пикселях (по builtWidth)
         private float worldEdgeRadius; // граница мира — на ней стоят буи связи
-        private float headingDeg;      // курс корабля в мире (нос), градусы
-        private float rotCos, rotSin;  // кэш поворота «мир → радар» на 90° − курс
+        private float shipIconDeg = 45f;       // текущий поворот иконки корабля (старт: нос вверх)
+        private float shipIconNoseOffset;      // нос арта в системе спрайта: 45° (for_mini) или 0° (заглушка)
         private Vector2 shipPos;       // позиция корабля в этом кадре (центр проекции)
         private float sweepAngle;
         private float beltAngle;
@@ -136,13 +143,14 @@ namespace SpaceTaxi.UI
         private RectTransform sweep;
         private RectTransform bodiesRoot;
         private RectTransform shipArrow;
+        private RectTransform shipIconRect; // иконка корабля — крутится по курсу (Н6 M2)
         private RectTransform targetRing;
         private Image targetRingImage;
         private RectTransform waypointMark;
         private Image waypointImage;
         private RectTransform cometWarn;
-        private RectTransform crossRoot;   // крест мировых осей — крутится с радаром
-        private RectTransform northLabel;  // «С» ходит по ободу: вверх всегда нос
+        private RectTransform crossRoot;   // крест мировых осей — стоит статично (north-up, Н6 M1)
+        private RectTransform northLabel;  // «С» — статично наверху обода: север всегда вверх
 
         private readonly List<BodyMark> marks = new List<BodyMark>();
         private readonly List<BeltMark> belts = new List<BeltMark>();
@@ -181,13 +189,12 @@ namespace SpaceTaxi.UI
             }
 
             shipPos = ship.transform.position; // центр проекции в этом кадре
-            UpdateHeading();
+            UpdateShipIconDeg();
 
             UpdateSweep();
             UpdateBelts();
             UpdateMarks();
             UpdateBuoys();
-            UpdateHeadingUi();
             UpdateTargetRing();
             UpdateWaypointMark();
             UpdateComets();
@@ -211,8 +218,6 @@ namespace SpaceTaxi.UI
                 ship = FindAnyObjectByType<Ship>();
             if (ship == null)
                 return false; // проекция центрируется на корабле — без него рисовать нечего
-            if (controller == null)
-                controller = FindAnyObjectByType<ShipController>();
             if (font == null)
                 font = ResolveFont();
             if (orders == null && session.Orders != null)
@@ -275,6 +280,7 @@ namespace SpaceTaxi.UI
             sweep = null;
             bodiesRoot = null;
             shipArrow = null;
+            shipIconRect = null;
             targetRing = null;
             targetRingImage = null;
             waypointMark = null;
@@ -328,8 +334,8 @@ namespace SpaceTaxi.UI
 
             MakeStretchImg("Background", mask, StubSprites.Circle(diameter), PanelColor);
 
-            // крест мировых осей относительно корабля: крутится вместе с картиной
-            // (heading-up), точка под иконкой корабля — отдельно, не крутится
+            // крест мировых осей: north-up (Н6 M1) — стоит статично (вертикаль =
+            // север), точка под иконкой корабля — отдельно
             Color cross = WithAlpha(GridColor, 0.12f);
             crossRoot = MakeNode("WorldCross", mask, Vector2.zero);
             MakeImg("CrossH", crossRoot, StubSprites.Line(), cross, new Vector2(diameter, 1.6f));
@@ -361,11 +367,11 @@ namespace SpaceTaxi.UI
                 }
             }
 
-            // «вверх = нос» (G-15): метка «С» теперь ходит по ободу вслед за
-            // поворотом курса — позицию каждый кадр считает UpdateHeadingUi
+            // метка «С» (север) — статично наверху обода: north-up (Н6 M1)
             TMP_Text north = MakeLabel("North", mask, "С", WithAlpha(GridColor, 0.8f));
             northLabel = (RectTransform)north.transform;
             northLabel.sizeDelta = new Vector2(18f, 14f);
+            northLabel.anchoredPosition = Vector2.up * (radarRadiusPx - 11f);
 
             // пояса астероидов: пунктирное кольцо по осевой линии, крутится как в
             // мире; видимый диаметр зависит от дистанции (нелинейная карта) —
@@ -398,16 +404,21 @@ namespace SpaceTaxi.UI
             cometWarn.gameObject.SetActive(false);
 
             // корабль: в центре прибора, самый крупный и яркий маркер — ореол +
-            // кольцо-подложка + иконка for_mini.png (G-15), носом вверх: курс
-            // выражен поворотом всей картины, иконка не крутится
+            // кольцо-подложка + иконка for_mini.png (G-15); north-up: мир не
+            // вращается, курс выражен поворотом самой иконки каждый кадр (Н6 M2)
             shipArrow = MakeNode("ShipArrow", mask, Vector2.zero);
             MakeImg("Glow", shipArrow, StubSprites.Circle(64f), WithAlpha(ShipColor, 0.22f), Vector2.one * 44f);
             MakeImg("Backing", shipArrow, ThickRing(), WithAlpha(ShipColor, 0.9f), Vector2.one * 30f);
             Sprite icon = ShipIcon();
             RectTransform iconRect = MakeImg("Icon", shipArrow, icon != null ? icon : StubSprites.ShipTriangle(),
                 ShipColor, Vector2.one * 26f);
-            if (icon != null)
-                iconRect.localRotation = Quaternion.Euler(0f, 0f, ShipIconDeg); // ракета в арте смотрит в правый верх
+            // базовая ориентация: артовый нос на +45° (Н6 M3), заглушка
+            // ShipTriangle остриём вправо (0°); до первого вектора скорости
+            // иконка носом вверх
+            shipIconNoseOffset = icon != null ? ShipIconNoseDeg : 0f;
+            shipIconRect = iconRect;
+            shipIconDeg = 90f - shipIconNoseOffset;
+            iconRect.localRotation = Quaternion.Euler(0f, 0f, shipIconDeg);
         }
 
         // Н3.2/G-15: тела — кольца по фактическому радиусу (в номинальном масштабе
@@ -532,23 +543,23 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // G-15: кэш поворота «мир → радар» на (90° − курс): направление носа
-        // ложится на +Y прибора (вверх = куда смотрит нос). Курс = поворот корпуса
-        // + смещение носа спрайта (как у стрелки Н-12)
-        private void UpdateHeading()
+        // Н6 M2/M3: north-up — иконка корабля крутится по курсу: нос = вектор
+        // скорости (стоит — последний курс), с лёгким сглаживанием. Формула
+        // поворота: rot = atan2(vel) − нос_арта (45° для for_mini, 0° для
+        // заглушки); при движении вверх (90°) иконка повернута на 45° и нос
+        // смотрит вверх, при движении вправо (0°) — вправо.
+        private void UpdateShipIconDeg()
         {
-            headingDeg = ship.transform.eulerAngles.z + (controller != null ? controller.SpriteNoseAngle : 0f);
-            float a = (90f - headingDeg) * Mathf.Deg2Rad;
-            rotCos = Mathf.Cos(a);
-            rotSin = Mathf.Sin(a);
-        }
-
-        // элементы, привязанные к мировым осям, крутятся вместе с картиной
-        private void UpdateHeadingUi()
-        {
-            crossRoot.localRotation = Quaternion.Euler(0f, 0f, 90f - headingDeg);
-            // мировая +Y (север) в системе радара: поворот (0,1) на 90° − курс
-            northLabel.anchoredPosition = new Vector2(-rotSin, rotCos) * (radarRadiusPx - 11f);
+            if (shipIconRect == null)
+                return;
+            Vector2 velocity = ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
+            if (velocity.sqrMagnitude > ShipIconHoldSpeed * ShipIconHoldSpeed)
+            {
+                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - shipIconNoseOffset;
+                shipIconDeg = Mathf.LerpAngle(shipIconDeg, target,
+                    1f - Mathf.Exp(-IconTurnRate * Time.unscaledDeltaTime));
+            }
+            shipIconRect.localRotation = Quaternion.Euler(0f, 0f, shipIconDeg);
         }
 
         // цель активного заказа: индекс как в WaypointIndicator — при посадке за
@@ -655,13 +666,14 @@ namespace SpaceTaxi.UI
             if (!showWarn)
                 return;
             cometWarn.anchoredPosition = ClampToRim(WorldToRadar(cometWarnEntry), out _);
-            float angle = Mathf.Atan2(cometWarnDirection.y, cometWarnDirection.x) * Mathf.Rad2Deg + (90f - headingDeg);
+            // north-up (Н6 M1): направление в мире = направление на приборе
+            float angle = Mathf.Atan2(cometWarnDirection.y, cometWarnDirection.x) * Mathf.Rad2Deg;
             cometWarn.localRotation = Quaternion.Euler(0f, 0f, angle - 90f); // спрайт остриём вверх
         }
 
-        // хвост кометы: короткая линия назад по вектору скорости (в системе радара —
-        // мир повёрнут на 90° − курс); за охватом комета — просто точка на ободе,
-        // хвост прячется
+        // хвост кометы: короткая линия назад по вектору скорости (north-up —
+        // мир не поворачивается, Н6 M1); за охватом комета — просто точка на
+        // ободе, хвост прячется
         private void UpdateCometTail(Comet comet, CometDot dot, bool clamped)
         {
             Vector2 dir = comet.FlightDirection;
@@ -670,24 +682,23 @@ namespace SpaceTaxi.UI
                 dot.Tail.gameObject.SetActive(show);
             if (!show)
                 return;
-            Vector2 rd = new Vector2(dir.x * rotCos - dir.y * rotSin, dir.x * rotSin + dir.y * rotCos);
-            dot.Tail.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(rd.y, rd.x) * Mathf.Rad2Deg);
-            dot.Tail.anchoredPosition = -rd.normalized * (CometTailPx * 0.5f);
+            dot.Tail.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+            dot.Tail.anchoredPosition = -dir.normalized * (CometTailPx * 0.5f);
         }
 
         // ————— хелперы —————
 
         // мир → радар: центр прибора = позиция корабля в этом кадре (shipPos),
-        // радар «плывёт» вместе с ним. G-15: смещение поворачивается на 90° − курс
-        // (вверх = нос), затем радиус маппится нелинейно; за maxRange — обод
+        // радар «плывёт» вместе с ним. north-up (Н6 M1): смещение НЕ поворачивается —
+        // мир фиксирован, север всегда вверх; радиус маппится нелинейно,
+        // за maxRange — обод
         private Vector2 WorldToRadar(Vector2 world)
         {
             Vector2 o = world - shipPos;
-            Vector2 rot = new Vector2(o.x * rotCos - o.y * rotSin, o.x * rotSin + o.y * rotCos);
-            float d = rot.magnitude;
+            float d = o.magnitude;
             if (d < 1e-4f)
                 return Vector2.zero;
-            return rot / d * RadarDistPx(Mathf.Min(d, maxRange));
+            return o / d * RadarDistPx(Mathf.Min(d, maxRange));
         }
 
         // нелинейная карта дистанции (G-15): r = R * (d / maxRange)^rangeExponent —

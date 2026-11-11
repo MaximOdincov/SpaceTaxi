@@ -90,9 +90,58 @@ namespace SpaceTaxi.UI
             hintRect.sizeDelta = new Vector2(900f, 30f);
             hintRect.anchoredPosition = new Vector2(0f, -156f); // ниже тоста
 
+            AlignFuelBlock();
             BuildSpeedometer();
             BuildStatIcons();
             BuildSirens();
+        }
+
+        // Н6 U1/U2: топливные ячейки — высотой с иконку топлива (в сцене 16px при
+        // иконке 55px, центр ячеек на 1.5px ниже центра иконки) и по её центру;
+        // вся левая колонна статов (центр шкалы и строка корпуса считаются от
+        // FuelIcon) поднимается, пока её верхняя кромка не совпадёт с верхней
+        // кромкой миникарты (замер сцены Н6: иконка уже на уровне верхней кромки
+        // миникарты — сдвиг вычисляется и сегодня равен нулю, формула страхует
+        // против будущих правок сцены). Вызывать ДО BuildSpeedometer: центр
+        // шкалы считается от уже выровненной иконки.
+        private void AlignFuelBlock()
+        {
+            var fuelIcon = transform.Find("FuelIcon") as RectTransform;
+            var fuelTrack = transform.Find("FuelTrack") as RectTransform;
+            if (fuelIcon == null || fuelTrack == null)
+                return;
+
+            // верхняя кромка миникарты в координатах родителя (якорь верх-право,
+            // пивот центр: верх = anchoredPosition.y + (1 - pivot.y) * высота)
+            var minimap = transform.Find("Minimap") as RectTransform;
+            if (minimap != null)
+            {
+                float minimapTop = minimap.anchoredPosition.y + (1f - minimap.pivot.y) * minimap.sizeDelta.y;
+                float iconTop = fuelIcon.anchoredPosition.y + (1f - fuelIcon.pivot.y) * fuelIcon.sizeDelta.y;
+                if (minimapTop > iconTop)
+                {
+                    float shift = minimapTop - iconTop; // только вверх, вниз не двигаем
+                    fuelIcon.anchoredPosition += Vector2.up * shift;
+                    fuelTrack.anchoredPosition += Vector2.up * shift;
+                }
+            }
+
+            // ячейки: высота = высоте иконки, вертикальный центр = центру иконки
+            // (anchoredPosition.y сегмента отсчитывается от центра FuelTrack:
+            // у сегментов якорь (0, 0.5) и пивот (0, 0.5))
+            float iconCenterY = fuelIcon.anchoredPosition.y + (0.5f - fuelIcon.pivot.y) * fuelIcon.sizeDelta.y;
+            float trackCenterY = fuelTrack.anchoredPosition.y + (0.5f - fuelTrack.pivot.y) * fuelTrack.sizeDelta.y;
+            float cellHeight = fuelIcon.sizeDelta.y;
+            foreach (Image segment in fuelSegments)
+            {
+                if (segment == null)
+                    continue;
+                RectTransform rect = segment.rectTransform;
+                rect.sizeDelta = new Vector2(rect.sizeDelta.x, cellHeight);
+                Vector2 pos = rect.anchoredPosition;
+                pos.y = iconCenterY - trackCenterY;
+                rect.anchoredPosition = pos;
+            }
         }
 
         // ————— геометрия спидометра (каркас строится кодом, префаб удалён) —————
@@ -101,11 +150,15 @@ namespace SpaceTaxi.UI
         private const float NeedleScale = 0.85f;  // остриё 23.4 < радиуса шкалы 27.5 — не вылезает
         private const float GaugeTopGap = 12f;    // зазор между шкалой и строкой топлива (опущена ниже по Н4.13)
         private const float GaugeHullGap = 6f;    // зазор между стрелкой и строкой корпуса
-        // Ход стрелки: 240° из допустимых брифом 180..270. Хвост arrow.png в z=0
-        // смотрит вправо-вниз (≈ −12°), −78° ставит его строго вниз; дальше — по
-        // часовой: вниз → влево → вверх → до упора вправо-вверх у MaxV.
-        private const float NeedleAngleAtZero = -78f;
-        private const float NeedleSweep = 240f;
+        // Ход стрелки — по отметкам шкалы (Н6 U5, PNG-анализ speed.png): спицы-
+        // деления на 166.1° / 132.4° / 90.2° / 48.6° / 11.9° (Unity, против
+        // часовой от +X, центр дуги — низ спрайта 184×92), подпись «0» у левого
+        // края (центроид 165.5°), максимум у правого (12.8°). Остриё arrow.png
+        // при повороте 0 смотрит на −17.5° (главная ось спрайта от хаба).
+        // Покой: остриё на «0» → поворот 166 − (−17.5) = 183.5; дальше по
+        // часовой (в Unity вычитаем) до отметки максимума: 166 − 12 = 154.
+        private const float NeedleAngleAtZero = 183.5f;
+        private const float NeedleSweep = 154f;
         // Хаб стрелки (центр белого шара) в пикселях arrow.png 41×28 — вокруг
         // него делаем пивот, шар сидит на оси шкалы
         private static readonly Vector2 NeedleHubPx = new Vector2(13.5f, 13.5f);
