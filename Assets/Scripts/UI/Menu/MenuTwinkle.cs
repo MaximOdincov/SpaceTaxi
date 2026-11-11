@@ -21,13 +21,15 @@ namespace SpaceTaxi.UI
             public float Boost;     // добавка к волне при наведении (кнопки), 0..1
         }
 
-        // один шаг мерцания для списка звёзд; time — Time.unscaledTime вызывающего
-        public static void Step(List<Star> stars, float time)
+        // один шаг мерцания для списка звёзд; time — Time.unscaledTime
+        // вызывающего; extraBoost — общая добавка к волне списка (наведение
+        // на звёздный текст), поверх индивидуального star.Boost
+        public static void Step(List<Star> stars, float time, float extraBoost = 0f)
         {
             for (int i = 0; i < stars.Count; i++)
             {
                 Star star = stars[i];
-                float wave = Mathf.Sin(time * star.Speed + star.Phase) + star.Boost;
+                float wave = Mathf.Sin(time * star.Speed + star.Phase) + star.Boost + extraBoost;
                 float alpha = star.BaseColor.a / 255f * (1f + star.Amplitude * wave);
                 byte a = (byte)(Mathf.Clamp01(alpha) * 255f);
                 star.Image.color = new Color32(star.BaseColor.r, star.BaseColor.g, star.BaseColor.b, a);

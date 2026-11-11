@@ -18,17 +18,20 @@ namespace SpaceTaxi.UI
     //   MenuBackdrop (контроллер, ловит клики по пустому месту)
     //   ├── ClickCatcher      — невидимый Image на весь экран (IPointerClickHandler)
     //   ├── Nebula            — туманность, параллакс ×0.10
-    //   ├── StarsFar          — дальние звёзды, ×0.16
+    //   ├── StarsFar          — дальние звёзды, ×0.14 (тусклые, мерцают медленно)
     //   ├── StarsMid          — средние, ×0.38
-    //   ├── StarsNear         — ближние яркие, ×0.62
+    //   ├── StarsNear         — ближние яркие, ×0.62 (мерцают быстро)
     //   └── EggShip           — яйцо-такси (без параллакса: клик = точная цель)
     //
     // Параллакс от мыши (бриф E.1): слои смещаются ПРОТИВ мыши с разной
-    // амплитудой + лёгкий автономный дрейф; запас площади слоя ±400px скрывает края.
-    // Клик по экрану (E.3) — ловушка кликов передаёт точку яйцу (MenuEggShip).
-    // Название (E.4) — MenuStarTitle на LogoText; кнопки (E.5) — StarButtonDecorator.
-    // Оранжевый мокап-квадрат «Image» (522×522 над меню) гасится: с живым фоном
-    // он не нужен; это чистый визуал без скриптов, биндинги не затронуты.
+    // амплитудой + автономные дрейф и медленное плавание в противофазе (E4);
+    // запас площади слоя ±400px скрывает края. Клик по экрану — ловушка
+    // кликов передаёт точку яйцу (MenuEggShip). Название — MenuStarTitle,
+    // кнопки — StarButtonDecorator (E2/E3: без плашек и шрифта, только
+    // звёздная рамка и текст из звёзд). Зелёные заливки прошлой итерации
+    // (Frame/Background панели) и оранжевый мокап-квадрат «Image» гасятся:
+    // фон меню — только звёздный параллакс; это чистый визуал без скриптов,
+    // биндинги не затронуты.
     public sealed class MenuBackdropController : MonoBehaviour, IPointerClickHandler
     {
         private const string SceneName = "MainMenu";
@@ -62,6 +65,30 @@ namespace SpaceTaxi.UI
             go.transform.SetSiblingIndex(0); // позади MainMenuUI и SettingsUI
             active = go.AddComponent<MenuBackdropController>();
             HidePlaceholder(canvasGo.transform);
+            HidePanelFills(canvasGo.transform);
+        }
+
+        // бриф E1: зелёная заливка прошлой итерации — TerminalPanel несёт Frame
+        // (мятный) и Background (тёмно-зелёный), растянутые с запасом за пределы
+        // панели (sizeDelta ~1324x276) поверх звёзд. Обе плоские заливки
+        // (Image без спрайта, у объектов нет скриптов) гасим — фон меню только
+        // звёздный параллакс; контент панели (логотип, кнопки, футер) не тронут
+        private static void HidePanelFills(Transform canvas)
+        {
+            Transform panel = canvas.Find("MainMenuUI/TerminalPanel");
+            if (panel == null)
+                return;
+            for (int i = 0; i < panel.childCount; i++)
+            {
+                Transform child = panel.GetChild(i);
+                if (child.name != "Frame" && child.name != "Background")
+                    continue;
+                if (child.TryGetComponent(out Image image) && image.sprite == null)
+                {
+                    child.gameObject.SetActive(false);
+                    Debug.Log($"[MenuBackdrop] '{child.name}' панели терминала скрыт (зелёная заливка прошлой итерации)");
+                }
+            }
         }
 
         private static void HidePlaceholder(Transform canvas)
@@ -130,6 +157,11 @@ namespace SpaceTaxi.UI
 
         private void BuildLayers()
         {
+            // глубина как в игре (E4): дальние — тусклее, мельче и мерцают
+            // медленно; ближние — ярче, крупнее, мерцают быстро и искрят.
+            // PhaseShift разводит слои по фазе (far 0.75π vs near 1.75π —
+            // противофаза), медленное плавание Drift* — у слоёв встречные
+            // направления, глубина читается и без мыши
             layers.Add(MakeLayer("Nebula", new MenuStarLayer.Config
             {
                 Count = 5, SizeMin = 700f, SizeMax = 1400f,
@@ -138,33 +170,41 @@ namespace SpaceTaxi.UI
                 SoftCore = 0f,
                 ParallaxFactor = 0.10f, ParallaxAmplitude = 26f,
                 SwayAmplitude = 10f, SwaySpeed = 0.05f,
+                PhaseShift = 0f,
+                DriftAmplitude = 30f, DriftSpeed = 0.045f, DriftAngleDeg = 15f,
                 Palette = NebulaPalette
             }));
             layers.Add(MakeLayer("StarsFar", new MenuStarLayer.Config
             {
                 Count = 80, SizeMin = 5f, SizeMax = 13f,
-                AlphaMin = 0.30f, AlphaMax = 0.75f, TwinkleAmp = 0.30f,
-                SpeedMin = 0.7f, SpeedMax = 2.2f, SparkleChance = 0.06f,
-                ParallaxFactor = 0.16f, ParallaxAmplitude = 42f,
+                AlphaMin = 0.22f, AlphaMax = 0.55f, TwinkleAmp = 0.30f,
+                SpeedMin = 0.5f, SpeedMax = 1.3f, SparkleChance = 0.06f,
+                ParallaxFactor = 0.14f, ParallaxAmplitude = 42f,
                 SwayAmplitude = 8f, SwaySpeed = 0.08f,
+                PhaseShift = Mathf.PI * 0.75f,
+                DriftAmplitude = 36f, DriftSpeed = 0.06f, DriftAngleDeg = 200f,
                 Palette = StarPalette
             }));
             layers.Add(MakeLayer("StarsMid", new MenuStarLayer.Config
             {
                 Count = 36, SizeMin = 10f, SizeMax = 24f,
-                AlphaMin = 0.35f, AlphaMax = 0.85f, TwinkleAmp = 0.32f,
-                SpeedMin = 0.8f, SpeedMax = 2.6f, SparkleChance = 0.25f,
+                AlphaMin = 0.35f, AlphaMax = 0.85f, TwinkleAmp = 0.34f,
+                SpeedMin = 0.9f, SpeedMax = 2.2f, SparkleChance = 0.30f,
                 ParallaxFactor = 0.38f, ParallaxAmplitude = 84f,
                 SwayAmplitude = 12f, SwaySpeed = 0.10f,
+                PhaseShift = Mathf.PI * 0.25f,
+                DriftAmplitude = 46f, DriftSpeed = 0.08f, DriftAngleDeg = 340f,
                 Palette = StarPalette
             }));
             layers.Add(MakeLayer("StarsNear", new MenuStarLayer.Config
             {
                 Count = 14, SizeMin = 22f, SizeMax = 44f,
-                AlphaMin = 0.70f, AlphaMax = 1f, TwinkleAmp = 0.35f,
-                SpeedMin = 1.1f, SpeedMax = 3.0f, SparkleChance = 0.6f,
+                AlphaMin = 0.70f, AlphaMax = 1f, TwinkleAmp = 0.42f,
+                SpeedMin = 1.4f, SpeedMax = 3.2f, SparkleChance = 0.7f,
                 ParallaxFactor = 0.62f, ParallaxAmplitude = 132f,
                 SwayAmplitude = 14f, SwaySpeed = 0.12f,
+                PhaseShift = Mathf.PI * 1.75f,
+                DriftAmplitude = 58f, DriftSpeed = 0.10f, DriftAngleDeg = 150f,
                 Palette = BrightPalette
             }));
         }
@@ -201,7 +241,7 @@ namespace SpaceTaxi.UI
             var eggRect = (RectTransform)go.transform;
             eggRect.anchorMin = new Vector2(0.5f, 0.5f);
             eggRect.anchorMax = new Vector2(0.5f, 0.5f);
-            eggRect.sizeDelta = new Vector2(220f, 220f);
+            eggRect.sizeDelta = new Vector2(96f, 96f); // бриф E5: было 220 — скромнее и ленивее
 
             Image image = go.GetComponent<Image>();
             Sprite sprite = MenuEggShip.LoadSprite();
@@ -278,8 +318,13 @@ namespace SpaceTaxi.UI
                 Vector2 sway = new(
                     Mathf.Sin(time * layer.SwaySpeed) * layer.SwayAmplitude,
                     Mathf.Cos(time * layer.SwaySpeed * 0.7f) * layer.SwayAmplitude);
+                // медленное плавание слоя в своём направлении (E4): период ~минута,
+                // у слоёв встречные углы — слои расходятся/сходятся, глубина
+                // читается и без мыши; фазовый сдвиг i*2.4 рад разводит соседние
+                float drift = Mathf.Sin(time * layer.DriftSpeed + i * 2.4f) * layer.DriftAmplitude;
+                Vector2 driftOffset = new(Mathf.Cos(layer.DriftAngleRad) * drift, Mathf.Sin(layer.DriftAngleRad) * drift);
                 Vector2 parallax = new(-smoothParallax.x * layer.ParallaxAmplitude, -smoothParallax.y * layer.ParallaxAmplitude);
-                layer.ApplyOffset(parallax + sway);
+                layer.ApplyOffset(parallax + sway + driftOffset);
             }
         }
 

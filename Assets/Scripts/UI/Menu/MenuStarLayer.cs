@@ -22,6 +22,10 @@ namespace SpaceTaxi.UI
             public float ParallaxAmplitude;     // px сдвига при мыши у края экрана
             public float SwayAmplitude;         // px автономного дрейфа
             public float SwaySpeed;             // рад/с автономного дрейфа
+            public float PhaseShift;            // сдвиг фазы мерцания слоя — слои сверкают в противофазе (E4)
+            public float DriftAmplitude;        // px медленного «плавания» слоя (E4)
+            public float DriftSpeed;            // рад/с медленного плавания (период ~минута)
+            public float DriftAngleDeg;         // направление плавания, градусы (у слоёв встречные)
             public Color[] Palette;
         }
 
@@ -33,6 +37,9 @@ namespace SpaceTaxi.UI
         public float ParallaxAmplitude => config.ParallaxAmplitude;
         public float SwayAmplitude => config.SwayAmplitude;
         public float SwaySpeed => config.SwaySpeed;
+        public float DriftAmplitude => config.DriftAmplitude;
+        public float DriftSpeed => config.DriftSpeed;
+        public float DriftAngleRad => config.DriftAngleDeg * Mathf.Deg2Rad;
 
         public void Configure(Config value) => config = value;
 
@@ -59,7 +66,7 @@ namespace SpaceTaxi.UI
                 MenuTwinkle.CreateStar(rect, position, size, color,
                     config.TwinkleAmp * Random.Range(0.6f, 1.4f),
                     Random.Range(config.SpeedMin, config.SpeedMax),
-                    Random.Range(0f, pi2), sparkle, stars, config.SoftCore);
+                    Random.Range(0f, pi2) + config.PhaseShift, sparkle, stars, config.SoftCore);
             }
         }
 
