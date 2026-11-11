@@ -57,7 +57,7 @@ namespace SpaceTaxi.UI
         // — лист и бортовой компьютер (Н5.21) —
         private const float SheetMargin = 12f;          // поля листа от краёв доступной области
         private const float ContentMargin = 26f;        // окно вида внутри листа (маска клипует всё внутри)
-        private const float OnboardGap = 18f;           // зазор между борткомпом и листом
+        private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
         private const float PaperOversize = 3f;         // запас бумаги за краями окна (×3 от окна)
         private const float RefIconPx = 64f;            // диаметр иконки тела с наибольшим радиусом уровня
@@ -208,6 +208,14 @@ namespace SpaceTaxi.UI
             mapRect = (RectTransform)transform;
             Canvas canvas = GetComponentInParent<Canvas>();
             canvasCam = canvas != null ? canvas.worldCamera : null;
+
+            // корень карты — на весь канвас: сценическая заготовка несла старые
+            // отступы «под борткомп», из-за чего резерв ширины панели в LayoutSheet
+            // складывался с ними и карта не доставала до борткомпа (Н5.26)
+            mapRect.anchorMin = Vector2.zero;
+            mapRect.anchorMax = Vector2.one;
+            mapRect.offsetMin = Vector2.zero;
+            mapRect.offsetMax = Vector2.zero;
 
             // заготовку из сцены стираем целиком — лист рисуем кодом
             ClearChildren(transform);
