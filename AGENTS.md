@@ -30,6 +30,7 @@
 `unity-analyst` (plan, read-only) → `unity-scripter` (C#) and/or `unity-ui-builder` (uGUI scenes/prefabs) → `unity-qa` (compile + diff review + smoke build gate).
 
 ## Hard-won rules (incidents)
+- **Play mode is started by agents and stopped by agents — nobody else will stop it** (owner asleep/away; other agents don't touch it). ALWAYS run `unity command editor.playmode stop` before finishing a session or handing work over. (2026-11-11, Н5: session started with the editor left in play mode since 22:29 the previous evening.)
 - **Never `git switch`/`checkout` while a Unity Editor is open on this project.** A branch switch under a live editor leaves the open scene's in-memory object graph stale: components hot-relink, some serialized refs silently become null (2026-11-09: `GameSession.passengerCatalog`/`currentShip` → orders stopped spawning; fixed by reloading the scene from disk). After ANY branch switch: ask the user to close the editor first, or reload the open scene and verify wiring (e.g. via `unity-cli` `script eval` on `SerializedObject` fields) before playing.
 - Editor + CLI: project has `com.unity.pipeline` (old command names; `unity pipeline upgrade` suggested). Live-state checks beat log-guessing: `unity command script eval --caller plugin --skill unity-cli '<C# with return>'`.
 - **Known corrupt asset in the branch:** `Assets/Prefabs/Resources/UI/Speedometer.prefab` fails YAML parse ("Parser Failure at line 7/58", serializedVersion 1 < minimum 6) → HUD speedometer throws at `HudBinder.cs:92`. Needs rebuild or restore from history.
