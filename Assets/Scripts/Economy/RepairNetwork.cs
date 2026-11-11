@@ -2,10 +2,11 @@ using UnityEngine;
 
 namespace SpaceTaxi.Economy
 {
-    // Сеть ремонта станции (Н-5): тир планеты задаёт максимальный пакет и потолок
-    // визита (PricingConfig). Пакет — доля от НУЖНОГО (недостающего) HP, зажатая
-    // потолком сети: бедная станция может починить меньше, чем просит пакет, —
-    // эффективные проценты и цена считаются заранее и видны на карточках.
+    // Сеть ремонта станции (Н-5): тир планеты задаёт максимальный пакет
+    // (PricingConfig). Пакет — доля от НУЖНОГО (недостающего) HP; эффективные
+    // проценты и цена считаются заранее и видны на карточках. S6 (решение
+    // владельца): «потолок визита» (GetRepairTierCap) убран — ремонт
+    // ограничен ТОЛЬКО деньгами, чиним сколько просит пакет.
     public static class RepairNetwork
     {
         public const int PackCount = 3; // мелкий / средний / полный
@@ -48,22 +49,19 @@ namespace SpaceTaxi.Economy
             return Mathf.Max(0f, hpMax - hp);
         }
 
-        // эффективная доля пакета: пакет не может превысить потолок сети за визит
+        // эффективная доля пакета: доля пакета от недостающего HP (S6: кап тира
+        // сети больше не зажимает — ремонт ограничен только деньгами)
         public static float EffectiveFraction(int packIndex, int tier, PricingConfig pricing)
         {
             float pack = pricing != null ? pricing.GetRepairPackFraction(packIndex) : 1f;
-            float cap = pricing != null ? pricing.GetRepairTierCap(tier) : 1f;
-            return Mathf.Min(Mathf.Max(0f, pack), Mathf.Max(0f, cap));
+            return Mathf.Max(0f, pack);
         }
 
-        // сколько HP восстановит пакет: пакет от ТЕКУЩЕГО недостающего, зажатый
-        // остатком бюджета визита (кап × недостающее на момент посадки) — иначе
-        // повторные мелкие пакеты от нового недостающего собирают 100% на любом тире
+        // сколько HP восстановит пакет: доля от ТЕКУЩЕГО недостающего
         public static float RepairAmount(float hpMax, float hp, int packIndex, int tier,
-            PricingConfig pricing, float visitBudget)
+            PricingConfig pricing)
         {
-            float pack = MissingHp(hpMax, hp) * EffectiveFraction(packIndex, tier, pricing);
-            return Mathf.Min(pack, Mathf.Max(0f, visitBudget));
+            return MissingHp(hpMax, hp) * EffectiveFraction(packIndex, tier, pricing);
         }
 
         // ceil(HP × множитель пакета × наценка тира сети): базовая цена 1 Đ/HP,

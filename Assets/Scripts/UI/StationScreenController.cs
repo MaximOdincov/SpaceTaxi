@@ -22,8 +22,9 @@ namespace SpaceTaxi.UI
     // ширину панели, слайдер объёма, сумма «Đ», ОДНА кнопка подтверждения —
     // по умолчанию выбран весь доступный объём («ЗАПРАВИТЬ ДО ПОЛНОГО»),
     // пресеты убраны. Ремонт (С4): HP-бар и ОДНА кнопка «Починить» — полный
-    // пакет, зажатый потолком визита; цена = HP × множитель пакета × наценка
-    // тира сети (RepairTierSurchargeMul). Правило тиров мастерских: T1 берёт
+    // пакет (S6: потолок визита убран, ремонт ограничен ТОЛЬКО деньгами);
+    // цена = HP × множитель пакета × наценка тира сети (RepairTierSurchargeMul).
+    // Правило тиров мастерских: T1 берёт
     // корабли 1–2, T2 — 1–3, T3+ — 4–5 (RepairNetwork.ShipTierAccepted),
     // чужой корабль — отказ с текстом борткомпа. Магазин (C2): слева таблица
     // статов — полоска рассматриваемой модели с риской (засечкой) твоего
@@ -53,18 +54,21 @@ namespace SpaceTaxi.UI
         private const int MaxUnpaidAccidents = 3;
 
         // витрина (C2): слева таблица статов с риской текущего значения, справа
-        // большая модель в выбранной расцветке
-        private const float ShowcaseSpriteW = 250f;
-        private const float ShowcaseSpriteH = 200f;
+        // большая модель в выбранной расцветке; S3 — модель крупнее (+20-30%)
+        private const float ShowcaseSpriteW = 310f;
+        private const float ShowcaseSpriteH = 260f;
         private const int StatCount = 6; // Thrust, MaxV, FuelMax, HpMax, Retro, StrafeAcc
         // ширины колонок строки стата: подпись — под «Мощность торможения»
-        // (самая длинная строка), справа округлённое значение модели
-        private const float StatLabelWidth = 165f;
-        private const float StatValueWidth = 44f;
-        // свотчи расцветок: 30px влезает при ≤5 вариантах, 26px при 6 (в колонке
-        // статов под свотчи ~220px)
-        private const float SwatchSize = 30f;
-        private const float SwatchSizeSmall = 26f;
+        // (самая длинная строка, 17pt), справа округлённое значение модели
+        private const float StatLabelWidth = 200f;
+        private const float StatValueWidth = 48f;
+        // зазор между подписью/значением и полоской стата (воздух 8-10)
+        private const float StatBarGap = 8f;
+        private const float StatRowHeight = 24f; // строка 17pt ≈ 22.4 — правило 1.32
+        // свотчи расцветок (S3: крупнее, своей строкой на всю колонку):
+        // 38px — 9 штук влезает в колонку 434px, при большем числе — 32px
+        private const float SwatchSize = 38f;
+        private const float SwatchSizeSmall = 32f;
 
         // подписи статов витрины (C2); ВСЕ статы «больше = лучше»: тормозной
         // путь переименован в «Мощность торможения» (поле Retro, больше =
@@ -116,14 +120,10 @@ namespace SpaceTaxi.UI
         private TMP_Text fuelOfferLabel; // «Заправить: X ед · Đ Y»
         private Slider fuelSlider;
         // ремонт (С4): одна кнопка «Починить» вместо трёх пакетов
-        private TMP_Text repairTierLine; // «Мастерская тир N — за визит ≤X% · наценка ×K»
+        private TMP_Text repairTierLine; // «Мастерская тир N · наценка ×K»
         private TMP_Text repairOffer;    // «Починка: +N HP · Đ M» или отказ по тиру корабля
         private Button repairButton;
         private TMP_Text repairButtonLabel;
-        // бюджет «за визит не более X%»: кап × недостающее на момент посадки;
-        // покупки минусуют его, иначе повторные мелкие пакеты собирают 100%
-        private Planet repairBudgetPlanet;
-        private float repairBudgetRemaining;
 
         // окна-вкладки: видимость переключает SelectTab, состав — ApplyTabs
         private GameObject fuelWindow;
@@ -514,9 +514,9 @@ namespace SpaceTaxi.UI
         // --- Ремонт (С4): HP-бар + ОДНА кнопка «Починить» вместо карточек
         // пакетов. Правило тиров мастерских (RepairNetwork.ShipTierAccepted):
         // T1 берёт корабли 1–2, T2 — 1–3, T3+ — 4–5; чужой корабль не чинится,
-        // на экране отказ текстом борткомпа. Кнопка = полный пакет, зажатый
-        // потолком визита (InitRepairBudget); цена = HP × множитель пакета ×
-        // наценка тира сети (RepairTierSurchargeMul, С4) ---
+        // на экране отказ текстом борткомпа. Кнопка = полный пакет (S6: потолок
+        // визита убран — ремонт ограничен ТОЛЬКО деньгами); цена = HP ×
+        // множитель пакета × наценка тира сети (RepairTierSurchargeMul, С4) ---
 
         // тир корабля таксиста для правила тиров мастерских (FleetService.Current)
         private int ShipTier
@@ -528,25 +528,15 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // бюджет визита считается от недостающего HP на момент посадки и
-        // уменьшается покупками — «за визит не более X%» выполняется ровно
-        private void InitRepairBudget()
-        {
-            repairBudgetPlanet = currentPlanet;
-            float cap = Pricing.GetRepairTierCap(RepairTier);
-            repairBudgetRemaining = cap * RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
-        }
-
-        // потолок станции, круг тиров и предложение — при каждом Refresh:
+        // тир сети, круг тиров и предложение — при каждом Refresh:
         // ремонт, урон, деньги
         private void UpdateRepairWindow()
         {
             int tier = RepairTier;
             float missing = RepairNetwork.MissingHp(ship.Eff.HpMax, ship.Hp);
-            float cap = Pricing.GetRepairTierCap(tier);
             float surcharge = Pricing.GetRepairTierSurcharge(tier);
 
-            repairTierLine.text = $"Мастерская тир {tier} — за визит не более {Mathf.RoundToInt(cap * 100f)}% починки · наценка ×{surcharge:0.##}";
+            repairTierLine.text = $"Мастерская тир {tier} · наценка ×{surcharge:0.##}";
 
             if (missing <= 0f)
             {
@@ -571,20 +561,11 @@ namespace SpaceTaxi.UI
                 return;
             }
 
-            // полный пакет от текущего недостающего, зажатый остатком бюджета визита
+            // полный пакет от текущего недостающего (S6: потолок визита убран —
+            // ремонт ограничен ТОЛЬКО деньгами)
             float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp,
-                RepairNetwork.PackCount - 1, tier, Pricing, repairBudgetRemaining);
+                RepairNetwork.PackCount - 1, tier, Pricing);
             int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
-
-            if (amount <= 0.01f)
-            {
-                repairOffer.text = "Потолок визита исчерпан — приходите после нового урона";
-                repairOffer.color = OnboardComputerFactory.LabelColor;
-                repairButton.interactable = false;
-                repairButtonLabel.text = "ЛИМИТ ВИЗИТА";
-                hullStatus.text = "";
-                return;
-            }
 
             repairOffer.text = $"Починка: +{Mathf.RoundToInt(amount)} HP · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
             repairOffer.color = OnboardComputerFactory.BrightColor;
@@ -606,15 +587,14 @@ namespace SpaceTaxi.UI
             if (missing <= 0f)
                 return;
             float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp,
-                RepairNetwork.PackCount - 1, tier, Pricing, repairBudgetRemaining);
+                RepairNetwork.PackCount - 1, tier, Pricing);
             int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
             if (amount <= 0.01f || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
             hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — экран пересчитается
-            repairBudgetRemaining = Mathf.Max(0f, repairBudgetRemaining - amount);
             int pct = Mathf.RoundToInt(amount / missing * 100f);
             hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
-            ShowToast($"Отремонтировано на {pct}%");
+            ShowToast($"Отремонтировано на {pct}%", tone: ToastTone.Danger); // Н6 U4: списание — красный
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
 
@@ -635,12 +615,6 @@ namespace SpaceTaxi.UI
             {
                 currentPlanet = ship.LandedOn;
                 ApplyTabs();
-                InitRepairBudget();
-            }
-            else if (repairBudgetPlanet != currentPlanet)
-            {
-                // экран пересоздан в рамках того же визита — бюджет тот же
-                InitRepairBudget();
             }
 
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();
@@ -773,8 +747,9 @@ namespace SpaceTaxi.UI
             var panelRect = (RectTransform)panel.transform;
             panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            // C2: панель шире (640 → 700) — витрина: слева статы, справа большая модель
-            panelRect.sizeDelta = new Vector2(700f, 0f); // высоту подберёт fitter
+            // C2: панель шире (700 → 800, S3 — витрина крупнее): слева статы,
+            // справа большая модель
+            panelRect.sizeDelta = new Vector2(800f, 0f); // высоту подберёт fitter
             panel.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(24, 24, 20, 18);
@@ -1013,7 +988,9 @@ namespace SpaceTaxi.UI
                 var rowGo = new GameObject("Row_" + (i + 1), typeof(RectTransform));
                 rowGo.transform.SetParent(upgradesOwned.transform, false);
                 var rowLayout = rowGo.AddComponent<VerticalLayoutGroup>();
-                rowLayout.spacing = 4f;
+                // S5: 12, не 4 — кнопка КУПИТЬ не должна слипаться с линией
+                // прогресса уровней под ней (правило воздуха 10-12)
+                rowLayout.spacing = 12f;
                 rowLayout.childControlWidth = true;
                 rowLayout.childControlHeight = true;
                 rowLayout.childForceExpandWidth = true;
@@ -1117,6 +1094,12 @@ namespace SpaceTaxi.UI
                     ? "МАКС."
                     : $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(price)}";
                 row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
+                // S4: гаснет и текстом — при нехватке кредитов подпись тускнеет
+                // (в том же стиле, что «Не хватает Đ N» магазина); Refresh
+                // перечитывает кошелёк на каждое изменение баланса
+                row.BuyLabel.color = row.Buy.interactable
+                    ? OnboardComputerFactory.BrightColor
+                    : OnboardComputerFactory.LabelColor;
             }
         }
 
@@ -1208,7 +1191,7 @@ namespace SpaceTaxi.UI
                 return;
             session.Debt.Repay(balance); // DebtChanged скроет блок, счётчик аварий обнулится сам
             Sound.Play(SoundId.DebtTone); // П9.3: тон расчёта по долгу
-            ShowToast("Долг погашен", emphasized: true);
+            ShowToast("Долг погашен", emphasized: true, tone: ToastTone.Danger); // Н6 U4: списание — красный
         }
 
         // --- Н-3а: витрина магазина — одна модель на экране, листание,
@@ -1264,16 +1247,15 @@ namespace SpaceTaxi.UI
 
             // выбор расцветки: свотчи (заводская + PaintVariants); клик меняет
             // большой спрайт, покупка берёт выбранный вариант (механика бывшего
-            // FlipPaint — индекс живёт в showcasePaintIndex)
-            var paintRow = OnboardComputerFactory.H("PaintRow", statsColumn.transform);
-            OnboardComputerFactory.FixedHeight(paintRow.gameObject, 34f);
-            paintRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
-            var paintCaption = OnboardComputerFactory.Text(paintRow, "РАСКРАВКА", 15f,
+            // FlipPaint — индекс живёт в showcasePaintIndex). S3: подпись своей
+            // строкой, свотчи — своей строкой на всю ширину колонки: крупным
+            // свотчам (38px) не тесно в одной строке с подписью
+            var paintCaption = OnboardComputerFactory.Text(statsColumn, "РАСКРАВКА", 15f,
                 OnboardComputerFactory.LabelColor, "PaintCaption");
-            OnboardComputerFactory.FixedWidth(paintCaption.gameObject, StatLabelWidth);
-            paintSwatchRow = OnboardComputerFactory.H("Swatches", paintRow.transform);
+            OnboardComputerFactory.FixedHeight(paintCaption.gameObject, 20f);
+            paintSwatchRow = OnboardComputerFactory.H("Swatches", statsColumn.transform);
             paintSwatchRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
-            OnboardComputerFactory.Flexible(paintSwatchRow);
+            OnboardComputerFactory.FixedHeight(paintSwatchRow.gameObject, SwatchSize);
 
             showcasePaint = OnboardComputerFactory.Text(statsColumn, "", 15f,
                 OnboardComputerFactory.LabelColor, "PaintLine");
@@ -1336,22 +1318,37 @@ namespace SpaceTaxi.UI
 
         // строка таблицы статов (C2): подпись | полоска | значение модели.
         // Полоска: дорожка → нейтральный fill модели → подкрашенный отрезок
-        // разницы → янтарная риска текущего значения (поверх всех слоёв)
+        // разницы → янтарная риска текущего значения (поверх всех слоёв).
+        // S1: полоска на ВСЮ ширину колонки — дети посажены явными якорями:
+        // HorizontalLayoutGroup с childForceExpandWidth принудительно делает
+        // flexible ≥ 1 у ВСЕХ детей (LayoutGroup.GetChildSizes) и lerp-дистрибуция
+        // по min/preferred между TMP-текстами и LayoutElement сжимала полоску
+        // до ~60px при живом месте слева и справа
         private ShowStatRowRefs BuildStatRow(Transform parent, int index, string label)
         {
-            var rowGo = OnboardComputerFactory.H("Stat_" + index, parent);
-            OnboardComputerFactory.FixedHeight(rowGo.gameObject, 22f);
+            var rowGo = new GameObject("Stat_" + index, typeof(RectTransform));
+            rowGo.transform.SetParent(parent, false);
+            OnboardComputerFactory.FixedHeight(rowGo.gameObject, StatRowHeight);
 
             var refs = new ShowStatRowRefs();
-            refs.Label = OnboardComputerFactory.Text(rowGo, label, 15f, OnboardComputerFactory.LabelColor, "Label");
-            OnboardComputerFactory.FixedWidth(refs.Label.gameObject, StatLabelWidth);
-            OnboardComputerFactory.FixedHeight(refs.Label.gameObject, 22f);
+
+            // подпись: слева, фиксированная ширина, высота строки
+            refs.Label = OnboardComputerFactory.Text(rowGo, label, 17f, OnboardComputerFactory.LabelColor, "Label");
+            var labelRect = (RectTransform)refs.Label.transform;
+            labelRect.anchorMin = new Vector2(0f, 0f);
+            labelRect.anchorMax = new Vector2(0f, 1f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = new Vector2(StatLabelWidth, 0f);
             refs.Label.alignment = TextAlignmentOptions.Left;
 
+            // полоска: всё место между подписью и значением (S1)
             var bar = new GameObject("Bar", typeof(RectTransform));
             bar.transform.SetParent(rowGo.transform, false);
-            var barElement = bar.AddComponent<LayoutElement>();
-            barElement.flexibleWidth = 1f;
+            var barRect = (RectTransform)bar.transform;
+            barRect.anchorMin = Vector2.zero;
+            barRect.anchorMax = Vector2.one;
+            barRect.offsetMin = new Vector2(StatLabelWidth + StatBarGap, 0f);
+            barRect.offsetMax = new Vector2(-(StatValueWidth + StatBarGap), 0f);
             var dim = OnboardComputerFactory.LabelColor;
             var track = new GameObject("Track", typeof(RectTransform), typeof(Image));
             track.transform.SetParent(bar.transform, false);
@@ -1365,9 +1362,13 @@ namespace SpaceTaxi.UI
             refs.DeltaImage = refs.DeltaFill.GetComponent<Image>();
             refs.Tick = BuildTick(track.transform);
 
-            refs.Value = OnboardComputerFactory.Text(rowGo, "", 14f, OnboardComputerFactory.LabelColor, "Value");
-            OnboardComputerFactory.FixedWidth(refs.Value.gameObject, StatValueWidth);
-            OnboardComputerFactory.FixedHeight(refs.Value.gameObject, 22f);
+            // значение модели: справа, у правого края колонки
+            refs.Value = OnboardComputerFactory.Text(rowGo, "", 16f, OnboardComputerFactory.LabelColor, "Value");
+            var valueRect = (RectTransform)refs.Value.transform;
+            valueRect.anchorMin = new Vector2(1f, 0f);
+            valueRect.anchorMax = new Vector2(1f, 1f);
+            valueRect.offsetMin = new Vector2(-StatValueWidth, 0f);
+            valueRect.offsetMax = Vector2.zero;
             refs.Value.alignment = TextAlignmentOptions.Right;
             return refs;
         }
@@ -1459,7 +1460,8 @@ namespace SpaceTaxi.UI
                 Destroy(paintSwatchRow.transform.GetChild(i).gameObject);
             int count = config.PaintVariantCount + 1;
             paintSwatchIcons = new Image[count];
-            float size = count > 5 ? SwatchSizeSmall : SwatchSize;
+            // крупный свотч 38px: 9 штук влезают в колонку 434px; больше — мелкий
+            float size = count > 9 ? SwatchSizeSmall : SwatchSize;
             for (int i = 0; i < count; i++)
                 paintSwatchIcons[i] = BuildPaintSwatch(config, i, size);
             UpdatePaintSwatches();
@@ -1757,7 +1759,7 @@ namespace SpaceTaxi.UI
             if (!session.Fleet.TryBuy(config, session.Wallet, paintIndex))
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
-            ShowToast($"Куплен «{config.DisplayName}» (−{StationUI.Currency} {OnboardBinder.FormatCredits(price)})", emphasized: true);
+            ShowToast($"Куплен «{config.DisplayName}» (−{StationUI.Currency} {OnboardBinder.FormatCredits(price)})", emphasized: true, tone: ToastTone.Danger); // Н6 U4
             // купленной модели «нет в продаже» — витрина листается дальше,
             // сама модель остаётся в списке серой с подписью «ВАШ · В АНГАРЕ»
             FlipShowcase(1);
@@ -1773,12 +1775,12 @@ namespace SpaceTaxi.UI
             ShowToast($"Пересел в «{config.DisplayName}»");
         }
 
-        private void ShowToast(string message, bool emphasized = false)
+        private void ShowToast(string message, bool emphasized = false, ToastTone tone = ToastTone.Neutral)
         {
             if (toast == null)
                 toast = FindAnyObjectByType<ToastNotifier>();
             if (toast != null)
-                toast.Show(message, emphasized);
+                toast.Show(message, emphasized, tone);
         }
     }
 }
