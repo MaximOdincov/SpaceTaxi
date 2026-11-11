@@ -56,6 +56,7 @@ namespace SpaceTaxi.UI
 
         // — лист и бортовой компьютер (Н5.21) —
         private const float SheetMargin = 12f;          // поля листа от краёв доступной области
+        private const float ContentMargin = 26f;        // окно вида внутри листа (маска клипует всё внутри)
         private const float OnboardGap = 18f;           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
         private const float PaperOversize = 3f;         // запас бумаги за краями окна (×3 от окна)
@@ -118,9 +119,9 @@ namespace SpaceTaxi.UI
         private Camera canvasCam; // null для Screen Space Overlay — так и нужно утилитам
 
         private RectTransform sheetRect;   // лист бумаги: ровно окно карты минус борткомп
-        private RectTransform paperClip;   // маска бумаги: ровно лист (бумага не вылезает)
-        private RectTransform paperRect;   // фон-бумага внутри зума: панится и зумится с контентом
-        private RectTransform content;     // зум-контейнер: всё нарисованное на листе
+        private RectTransform viewport;    // фиксированное окно вида (маска): клип не движется с камерой
+        private RectTransform paperRect;   // фон-бумага — ребёнок зум-контента: «один слой» с миром
+        private RectTransform content;     // зум-контейнер: бумага + весь нарисованный мир
         private RectTransform sectorRoot;  // подписи районов
         private RectTransform edgeRoot;    // буи границы мира, тревожные пометки
         private RectTransform beltsRoot;   // камни поясов астероидов
@@ -352,22 +353,22 @@ namespace SpaceTaxi.UI
             sheetImage.raycastTarget = false; // клики сквозь лист уходят в Backdrop
             LayoutSheet();
 
-            // бумага — часть «бумаги»: лежит внутри зум-контейнера (Н5.21-2), пан
-            // двигает её, зум зумит вместе со всем. Запас ×3 от окна — при пан/зум
-            // в пределах диапазона края бумаги не видны.
-            paperClip = MakeRect("PaperClip", sheetRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            paperClip.gameObject.AddComponent<RectMask2D>(); // бумага не вылезает за лист
-            paperRect = MakeRect("Paper", paperClip, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
+            // «один слой» (Н5.26): фиксированное окно вида с маской, внутри — единственный
+            // зум-контейнер; бумага и весь мир — его дети. Камера (пан/зум) двигает
+            // контейнер целиком; клип стоит на месте, ничто не выезжает за лист.
+            viewport = MakeRect("Viewport", sheetRect, Vector2.zero, Vector2.one,
+                new Vector2(ContentMargin, ContentMargin), new Vector2(-ContentMargin, -ContentMargin));
+            viewport.gameObject.AddComponent<RectMask2D>(); // окно вида не движется с камерой
+
+            content = MakeRect("MapRoot", viewport, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            paperRect = MakeRect("Paper", content, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
             Image paperImage = paperRect.gameObject.AddComponent<Image>();
             Sprite paperArt = PaperMapArt.SheetArt();
             paperImage.sprite = paperArt;
             paperImage.color = paperArt != null ? Color.white : PaperMapArt.Paper;
             paperImage.raycastTarget = false;
-            paperRect.sizeDelta = sheetRect.rect.size * PaperOversize;
-
-            // карта живёт внутри листа с полями: не залезает на рукописную рамку
-            content = MakeRect("MapRoot", sheetRect, Vector2.zero, Vector2.one, new Vector2(26f, 26f), new Vector2(-26f, -26f));
-            content.gameObject.AddComponent<RectMask2D>(); // содержимое не вылезает за поля листа
+            paperRect.sizeDelta = sheetRect.rect.size * PaperOversize; // панится/зумится вместе с контентом
 
             BuildCompass();
             BuildTitle();
@@ -1075,7 +1076,7 @@ namespace SpaceTaxi.UI
             // содержимое листа рисуется в sheet-координатах как zoomOffset + zoom * p,
             // маркер — напрямую в sheet-координатах: контр-масштаб не нужен
             Vector2 sheetPos = zoomOffset + zoom * WorldToMap(shipT.position);
-            Vector2 half = sheetRect.rect.size * 0.5f;
+            Vector2 half = sheetRect.rect.size * 0.5f - new Vector2(ContentMargin, ContentMargin); // кламп внутрь окна вида
             Vector2 clamped = new Vector2(
                 Mathf.Clamp(sheetPos.x, -half.x + ViewInset, half.x - ViewInset),
                 Mathf.Clamp(sheetPos.y, -half.y + ViewInset, half.y - ViewInset));
@@ -1551,12 +1552,7 @@ namespace SpaceTaxi.UI
             if (content == null)
                 return;
             content.localScale = Vector3.one * s;
-            content.anchoredPosition = offset;
-            if (paperRect != null) // бумага — часть контента: пан двигает, зум зумит её вместе со всем (Н5.21-2)
-            {
-                paperRect.localScale = Vector3.one * s;
-                paperRect.anchoredPosition = offset;
-            }
+            content.anchoredPosition = offset; // бумага — ребёнок контента: двигается одним слоем (Н5.26)
         }
 
         // зум/пан не выносят содержимое за экран; margin > 1 — резиновый вынос при перетаскивании
@@ -1755,7 +1751,7 @@ namespace SpaceTaxi.UI
         {
             ClearChildren(transform);
             sheetRect = null;
-            paperClip = null;
+            viewport = null;
             paperRect = null;
             content = null;
             sectorRoot = null;
