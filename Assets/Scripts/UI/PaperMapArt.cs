@@ -341,43 +341,8 @@ namespace SpaceTaxi.UI
             return s;
         }
 
-        // курсор-pointer на hover: белая стрелка с тёмной кромкой
-        public static Texture2D CursorTexture()
-        {
-            if (cache.TryGetValue("cursor_tex", out Sprite s) && s != null)
-                return s.texture;
-            const int size = 24;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point };
-            var pixels = new Color32[size * size];
-            Vector2 a = new Vector2(4f, 22f), b = new Vector2(4f, 3f), c = new Vector2(19f, 13f);
-            Vector2 centroid = (a + b + c) / 3f;
-            for (int iy = 0; iy < size; iy++)
-            {
-                for (int ix = 0; ix < size; ix++)
-                {
-                    var p = new Vector2(ix + 0.5f, iy + 0.5f);
-                    Color32 col = new Color32(0, 0, 0, 0);
-                    if (InTriangle(p, a, b, c))
-                    {
-                        var inner = centroid + (p - centroid) / 0.68f;
-                        bool edge = !InTriangle(inner, a, b, c);
-                        col = edge
-                            ? new Color32(35, 28, 22, 255)
-                            : (Color32)new Color(0.95f, 0.93f, 0.86f, 1f);
-                    }
-                    pixels[iy * size + ix] = col;
-                }
-            }
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
-            s = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
-            cache["cursor_tex"] = s;
-            return tex;
-        }
-
-        public static Vector2 CursorHotspot => new Vector2(4f, 20f);
-
         // — внутреннее —
+        // (курсор-pointer убран: Н6.K8 — курсор системный всегда)
 
         private static Sprite LoadSingle(string name)
         {

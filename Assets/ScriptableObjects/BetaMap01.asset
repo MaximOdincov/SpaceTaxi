@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BetaMap01
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.World.LevelAsset
   LevelName: "\u0411\u0415\u0422\u0410: \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u041C\u0422\u041E"
-  WorldRadius: 8300
+  WorldRadius: 6000
   Bodies:
   - DisplayName: "\u041F\u043B\u0430\u043D\u0435\u0442\u0430 \u041C\u0422\u041E"
     Type: 0
@@ -23,7 +23,7 @@ MonoBehaviour:
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
-      Sprite: {fileID: 21300000, guid: 0d69cffae0fc5474b43f8fdde8f05f71, type: 3}
+      Sprite: {fileID: 21300000, guid: 156fb5b0b9a864aa7af22c41e98a4ca7, type: 3}
       Material: {fileID: 0}
       UseColor: 0
       Color: {r: 1, g: 0.83, b: 0.3, a: 1}
@@ -40,7 +40,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041A\u043E\u043B\u044B\u0431\u0435\u043B\u044C"
     Type: 0
-    Position: {x: 430, y: 160}
+    Position: {x: 340, y: 85}
     Radius: 20
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -63,7 +63,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041C\u0438\u0448\u0435\u043D\u044C"
     Type: 0
-    Position: {x: 240, y: -400}
+    Position: {x: 182, y: -304}
     Radius: 18
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -86,7 +86,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0422\u0438\u0445\u0430\u044F"
     Type: 0
-    Position: {x: -330, y: -330}
+    Position: {x: -252, y: -260}
     Radius: 22
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -109,7 +109,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041B\u0443\u0433"
     Type: 0
-    Position: {x: -460, y: 120}
+    Position: {x: -351, y: 67}
     Radius: 24
     VisualSizeMul: 1.5
     MassMultiplier: 1
@@ -132,7 +132,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0424\u043E\u043D\u0430\u0440\u044C"
     Type: 0
-    Position: {x: -180, y: 440}
+    Position: {x: -156, y: 329}
     Radius: 16
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -155,7 +155,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041E\u0434\u0443\u0432\u0430\u043D\u0447\u0438\u043A"
     Type: 0
-    Position: {x: 250, y: 420}
+    Position: {x: 163, y: 350}
     Radius: 20
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -178,7 +178,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0423\u0442\u0440\u0435\u043D\u043D\u044F\u044F"
     Type: 1
-    Position: {x: 920, y: 880}
+    Position: {x: 534, y: 510}
     Radius: 52
     VisualSizeMul: 0
     MassMultiplier: 4.5
@@ -201,7 +201,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0412\u0435\u0441\u0442\u0430"
     Type: 0
-    Position: {x: 1250, y: 350}
+    Position: {x: 725, y: 203}
     Radius: 28
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -224,7 +224,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041A\u0443\u0437\u043D\u044F"
     Type: 0
-    Position: {x: 1950, y: 750}
+    Position: {x: 1131, y: 435}
     Radius: 32
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -247,7 +247,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u042F\u043D\u0442\u0430\u0440\u044C"
     Type: 0
-    Position: {x: 2450, y: 150}
+    Position: {x: 1421, y: 87}
     Radius: 24
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -270,7 +270,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0413\u0440\u0430\u043D\u044C"
     Type: 0
-    Position: {x: 2150, y: -550}
+    Position: {x: 1247, y: -319}
     Radius: 30
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -293,7 +293,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0421\u0438\u0442\u043E"
     Type: 0
-    Position: {x: 1450, y: -900}
+    Position: {x: 841, y: -522}
     Radius: 22
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -316,7 +316,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0422\u043E\u043B\u043E\u043A\u0430"
     Type: 0
-    Position: {x: 850, y: -250}
+    Position: {x: 522, y: -187}
     Radius: 26
     VisualSizeMul: 1.5
     MassMultiplier: 1
@@ -339,7 +339,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0424\u0430\u043A\u0435\u043B"
     Type: 1
-    Position: {x: 2900, y: -1500}
+    Position: {x: 1682, y: -870}
     Radius: 54
     VisualSizeMul: 0
     MassMultiplier: 4.5
@@ -362,7 +362,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0411\u0443\u0439"
     Type: 0
-    Position: {x: 1500, y: 1900}
+    Position: {x: 870, y: 1102}
     Radius: 16
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -385,7 +385,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041F\u043E\u043B\u044B\u043D\u044C"
     Type: 0
-    Position: {x: 900, y: 3100}
+    Position: {x: 522, y: 1798}
     Radius: 26
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -408,7 +408,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0421\u0442\u0443\u0436\u0430"
     Type: 0
-    Position: {x: 150, y: 3600}
+    Position: {x: 87, y: 2088}
     Radius: 30
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -431,7 +431,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0413\u043D\u0435\u0437\u0434\u043E"
     Type: 0
-    Position: {x: -650, y: 4000}
+    Position: {x: -377, y: 2320}
     Radius: 24
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -454,7 +454,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0412\u043E\u0440\u043E\u043D"
     Type: 0
-    Position: {x: -1500, y: 3400}
+    Position: {x: -870, y: 1972}
     Radius: 34
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -477,7 +477,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0422\u043E\u043D\u043D\u0435\u043B\u044C"
     Type: 0
-    Position: {x: -900, y: 2600}
+    Position: {x: -522, y: 1508}
     Radius: 26
     VisualSizeMul: 1.5
     MassMultiplier: 1
@@ -500,7 +500,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041F\u043E\u043B\u044F\u0440\u043D\u0430\u044F"
     Type: 1
-    Position: {x: 1500, y: 3800}
+    Position: {x: 870, y: 2204}
     Radius: 58
     VisualSizeMul: 0
     MassMultiplier: 4.5
@@ -523,7 +523,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041C-14"
     Type: 0
-    Position: {x: -2800, y: 3900}
+    Position: {x: -1624, y: 2262}
     Radius: 18
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -546,7 +546,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0414-2"
     Type: 0
-    Position: {x: -3700, y: 4900}
+    Position: {x: -2146, y: 2842}
     Radius: 32
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -569,7 +569,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0414-4/\u0411\u0438\u0441"
     Type: 0
-    Position: {x: -4900, y: 4600}
+    Position: {x: -2842, y: 2668}
     Radius: 38
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -592,7 +592,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041A-77"
     Type: 0
-    Position: {x: -5300, y: 3400}
+    Position: {x: -3074, y: 1972}
     Radius: 28
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -615,7 +615,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0421-9"
     Type: 0
-    Position: {x: -4600, y: 2300}
+    Position: {x: -2668, y: 1334}
     Radius: 24
     VisualSizeMul: 0
     MassMultiplier: 1
@@ -638,7 +638,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0413\u043E\u0440\u043D"
     Type: 1
-    Position: {x: -4300, y: 3700}
+    Position: {x: -2494, y: 2146}
     Radius: 62
     VisualSizeMul: 0
     MassMultiplier: 4.5
@@ -661,7 +661,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0427\u0451\u0440\u043D\u0430\u044F \u0434\u044B\u0440\u0430"
     Type: 10
-    Position: {x: -2200, y: 4600}
+    Position: {x: -1276, y: 2668}
     Radius: 55
     VisualSizeMul: 0
     MassMultiplier: 8
@@ -684,8 +684,8 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041F\u043E\u044F\u0441 \u0422\u043E\u043B\u043E\u043A\u0430-\u0421\u0438\u0442\u043E"
     Type: 11
-    Position: {x: 1150, y: -575}
-    Radius: 442.3
+    Position: {x: 681.5, y: -354.5}
+    Radius: 231.3
     VisualSizeMul: 0
     MassMultiplier: 1
     HeatRadius: 0
@@ -707,8 +707,8 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u041F\u043E\u044F\u0441 \u0411\u0443\u0439-\u041F\u043E\u043B\u044B\u043D\u044C"
     Type: 11
-    Position: {x: 1200, y: 2500}
-    Radius: 670.8
+    Position: {x: 696, y: 1450}
+    Radius: 389.1
     VisualSizeMul: 0
     MassMultiplier: 1
     HeatRadius: 0
@@ -733,5 +733,5 @@ MonoBehaviour:
   SpawnAngleDeg: 90
   SpawnPoint: {x: 0, y: 0}
   SpawnHeading: 0
-  CometAreaCenter: {x: 0, y: -1300}
+  CometAreaCenter: {x: -3649, y: 3250}
   CometAreaRadius: 700

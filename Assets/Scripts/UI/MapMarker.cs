@@ -5,9 +5,10 @@ using UnityEngine.UI;
 
 namespace SpaceTaxi.UI
 {
-    // Кликабельный маркер карты: hover ×1.15 + подсветка + курсор-pointer, клик — наружу.
+    // Кликабельный маркер карты: hover ×1.15 + подсветка, клик — наружу.
     // Вешается на корень группы маркера; события приходят с дочерней иконки (пузырём).
-    // Фоновым ловушкам клика — hoverEnabled = false.
+    // Фоновым ловушкам клика — hoverEnabled = false. Курсор системный всегда (Н6.K8):
+    // собственный курсор-pointer менялся «криво» — убран.
     public class MapMarker : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         public bool hoverEnabled = true;
@@ -31,7 +32,6 @@ namespace SpaceTaxi.UI
             transform.localScale = baseScale * 1.15f;
             if (visual != null)
                 visual.color = Color.Lerp(baseColor, Color.white, 0.35f);
-            Cursor.SetCursor(PaperMapArt.CursorTexture(), PaperMapArt.CursorHotspot, CursorMode.Auto);
             HoverEntered?.Invoke();
         }
 
@@ -43,7 +43,6 @@ namespace SpaceTaxi.UI
             transform.localScale = baseScale;
             if (visual != null)
                 visual.color = baseColor;
-            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             HoverExited?.Invoke();
         }
 
