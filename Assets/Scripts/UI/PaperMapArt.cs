@@ -33,6 +33,12 @@ namespace SpaceTaxi.UI
         public static readonly Color HeroPencil = new Color(0.16f, 0.33f, 0.55f);       // «ВЫ»: синие чернила на тёплой бумаге
         public static readonly Color CometPencil = new Color(0.40f, 0.50f, 0.62f, 0.92f); // карандаш комет
 
+        // — карандаши целей/меток (Н5.F): ничего из палитры борткомпа —
+        public static readonly Color Desk = new Color(0.115f, 0.088f, 0.062f, 0.985f);    // тёмный стол вокруг листа
+        public static readonly Color YellowPencil = new Color(0.68f, 0.46f, 0.02f);       // цель заказа
+        public static readonly Color GreenPencil = new Color(0.13f, 0.42f, 0.19f);        // своя метка (waypoint)
+        public static readonly Color RedPencil = new Color(0.60f, 0.19f, 0.12f);          // тревожные пометки «от руки»
+
         private static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
 
         // Лист/записка: Sprite-ресурс, иначе полная текстура, иначе null (фолбэк — цвет Paper)
@@ -44,6 +50,41 @@ namespace SpaceTaxi.UI
         public static Sprite Note()
         {
             return LoadSingle("paper_note");
+        }
+
+        // Жёлтая бумага карты — фон владельца Art/background.png (Resources/Art).
+        // null — фолбэк: ровный цвет Paper.
+        public static Sprite SheetArt()
+        {
+            return LoadArt("background");
+        }
+
+        // Иконки тел владельца из Assets/Resources/Art/map: map_planet, map_sun,
+        // map_black_hole, map_gas_station, map_repair, map_taxi_planet,
+        // map_asteroid, map_rocket, map_cometa, map_for_fun_1/2.
+        // Импорт бывает Single/Multiple — пробуем Sprite, потом "<имя>_0", потом текстуру.
+        public static Sprite MapSprite(string name)
+        {
+            return LoadArt("map/" + name);
+        }
+
+        private static Sprite LoadArt(string relativeName)
+        {
+            string key = "art:" + relativeName;
+            if (cache.TryGetValue(key, out Sprite s) && s != null)
+                return s;
+            string path = "Art/" + relativeName;
+            s = Resources.Load<Sprite>(path);
+            if (s == null)
+                s = Resources.Load<Sprite>(path + "_0");
+            if (s == null)
+            {
+                Texture2D tex = Resources.Load<Texture2D>(path);
+                if (tex != null)
+                    s = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), tex.width);
+            }
+            cache[key] = s;
+            return s;
         }
 
         // Ячейка коллажа map_icons (0..8) или map_stamps (0..5); null — арта нет
@@ -281,6 +322,38 @@ namespace SpaceTaxi.UI
             });
             s = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f);
             cache["pin"] = s;
+            return s;
+        }
+
+        // чернильная клякса-уголок: неровное пятно для соединений рамок «от руки»
+        public static Sprite InkDot()
+        {
+            if (cache.TryGetValue("inkdot", out Sprite s) && s != null)
+                return s;
+            var tex = StubSprites.CreateMaskTexture(64, (x, y) =>
+            {
+                float r = Mathf.Sqrt(x * x + y * y);
+                float wob = 1f + 0.10f * Mathf.Sin(Mathf.Atan2(y, x) * 5f + 2.1f);
+                return r <= 0.34f * wob;
+            });
+            s = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
+            cache["inkdot"] = s;
+            return s;
+        }
+
+        // маленькая звёздочка-отметка: буи на границе мира
+        public static Sprite BuoyStar()
+        {
+            if (cache.TryGetValue("buoystar", out Sprite s) && s != null)
+                return s;
+            var tex = StubSprites.CreateMaskTexture(64, (x, y) =>
+            {
+                float ax = Mathf.Abs(x), ay = Mathf.Abs(y);
+                return (ax <= 0.055f && ay <= 0.52f) || (ay <= 0.055f && ax <= 0.52f)
+                    || ax + ay <= 0.16f;
+            });
+            s = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
+            cache["buoystar"] = s;
             return s;
         }
 

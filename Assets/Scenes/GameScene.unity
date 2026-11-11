@@ -10848,7 +10848,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8257660fae8464174b968ebf99119b5e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapScreenBinder
-  mapFont: {fileID: 0}
+  mapFont: {fileID: 11400000, guid: c84a4d74a0caeec47b9a6352452a67bb, type: 2}
 --- !u!1 &1912225535
 GameObject:
   m_ObjectHideFlags: 0
