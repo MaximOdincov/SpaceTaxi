@@ -14,25 +14,26 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Карта (M) — «нарисованная от руки на старой жёлтой бумаге» (Н5.F). На тёмном
-    // столе лежит лист (Art/background.png), на нём чернилами и карандашами —
-    // система в масштабе мира: тела — арт владельца (Art/map: планета, заправка,
-    // мастерская, хаб-такси, солнце, чёрная дыра), пояс — ОДИН спрайт
-    // map_asteroid с поворотами/размерами по пунктирной осевой, кометы —
-    // map_cometa по живым CometSystem.ActiveComets, игрок — map_rocket (виден
-    // всегда: размер не зависит от зума, за краем вида клампится с указателем).
-    // Районы — выпуклые рамки «от руки» с крупными подписями (БЛИЖНИЙ,
-    // СРЕДНИЙ I…). Клик по телу — сильный зум + «уголок листа» с рукописными
-    // записями (PaperMapLore: радиус, район, услуги, цена топлива, дистанция,
-    // лорные факты); сухие заправки и перечёркивания убраны — outage отключён
-    // (FuelOutageChancePct = 0). Цель заказа — жёлтый пульсирующий ореол, своя
-    // метка — зелёный (булавка + ореол на теле). Публичный контракт сохранён:
-    // Waypoint + WaypointChanged + Set/Clear/ToggleWaypoint (WaypointIndicator,
-    // MinimapBinder), SetView/SelectBody (оркестратор), Esc-договорённость с
-    // MapScreenController. Вид: колесо — зум к курсору ×1.2 (весь мир ↔ одна
-    // планета), ЛКМ-драг и WASD — пан (игра под картой живёт: W на карте =
-    // тяга кораблю, конфликт известен — см. отчёт Н5.F). Подписи разводит
-    // ResolveLabels с учётом иконок тел, поясов, декора и рамок районов.
+    // Карта (M) — «нарисованная от руки на старой жёлтой бумаге» (Н5.F + фиксы Н5.21).
+    // Лист ровно вписан в окно карты минус зона бортового компьютера (панель 480 px
+    // слева; TAB убирает панель — лист каждый раз перекладывается). Бумага
+    // (Art/background.png) лежит ВНУТРИ зум-контента: пан двигает бумагу, зум
+    // зумит её вместе с телами, запас ×3 от окна — края бумаги не видны.
+    // Нарисованные линии убраны (рамки районов, орбиты, кольца дистанций, сетка,
+    // пунктирные пути, кольца мира/поясов/хаба) — остались иконки тел (диаметр
+    // пропорционален радиусу, максимум уровня = опорный), подписи «на бумаге»
+    // у своих планет (панятся и зумятся с контентом, без разводок), камни поясов,
+    // кометы, буи, декор for_fun, ореолы цели/метки и ракета игрока (видна всегда:
+    // размер не зависит от зума, за краем вида клампится с указателем). Весь текст
+    // карты — только Excalifont (mapFont из сцены, фолбэк — Resources). Клик по
+    // телу — зум + «уголок листа» с записями (PaperMapLore); сухие заправки и
+    // перечёркивания убраны. Цель заказа — жёлтый пульсирующий ореол, своя метка —
+    // зелёный. Карта открывается ПРИБЛИЖЕННОЙ К ИГРОКУ (зум 9; нет корабля —
+    // планета старта). Публичный контракт сохранён: Waypoint + WaypointChanged +
+    // Set/Clear/ToggleWaypoint (WaypointIndicator, MinimapBinder), SetView/
+    // SelectBody (оркестратор), Esc-договорённость с MapScreenController. Вид:
+    // колесо — зум к курсору ×1.2 (весь мир ↔ одна планета), ЛКМ-драг и WASD —
+    // пан (игра под картой живёт: W на карте = тяга кораблю, конфликт известен).
     public class MapScreenBinder : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [SerializeField] private TMP_FontAsset mapFont; // Excalifont-Regular SDF — назначен в сцене
@@ -40,19 +41,26 @@ namespace SpaceTaxi.UI
         // — вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору —
         private const float MinViewZoom = 1f;      // из базового вида не отдаляемся
         private const float MaxViewZoom = 14f;     // от «весь мир» до одной планеты крупно
+        private const float InitialViewZoom = 9f;  // карта открывается приближенной к игроку
         private const float ClickZoom = 8f;        // клик по телу — сильный зум (видны записи)
         private const float ZoomDuration = 0.22f;
         private const float WheelStep = 1.2f;
         private const float ButtonZoomStep = 1.35f;
         private const float ClickDragGuard = 6f;   // сдвиг больше этого — пан, а не выбор
         private const float FitMargin = 1.10f;     // bbox тел занимает 90% листа
-        private const float LabelFontSize = 14f;   // кегль подписей тел (Excalifont)
-        private const float LabelHoverFont = 17f;
-        private const float RouteDashPeriod = 15f; // шаг пунктира маршрута, экранных px
-        private const int RouteDashMax = 80;
+        private const float LabelFontSize = 16f;   // кегль подписей тел (Excalifont, на бумаге)
+        private const float LabelHoverFont = 20f;
         private const float ViewInset = 56f;       // отступ клампа ракеты от края листа, px (ракета 48 + подпись «ВЫ» внизу)
         private const float RubberMargin = 1.15f;  // мягкий вынос за край при перетаскивании
         private const float MapPanSpeed = 640f;    // WASD-пан, экранных px/с (делится на зум)
+
+        // — лист и бортовой компьютер (Н5.21) —
+        private const float SheetMargin = 12f;          // поля листа от краёв доступной области
+        private const float OnboardGap = 18f;           // зазор между борткомпом и листом
+        private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
+        private const float PaperOversize = 3f;         // запас бумаги за краями окна (×3 от окна)
+        private const float RefIconPx = 64f;            // диаметр иконки тела с наибольшим радиусом уровня
+        private const float MinIconPx = 16f;            // минимальный читаемый диаметр иконки
 
         // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
         // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
@@ -109,15 +117,16 @@ namespace SpaceTaxi.UI
         private float builtWidth;
         private Camera canvasCam; // null для Screen Space Overlay — так и нужно утилитам
 
-        private RectTransform sheetRect;   // лист бумаги
+        private RectTransform sheetRect;   // лист бумаги: ровно окно карты минус борткомп
+        private RectTransform paperClip;   // маска бумаги: ровно лист (бумага не вылезает)
+        private RectTransform paperRect;   // фон-бумага внутри зума: панится и зумится с контентом
         private RectTransform content;     // зум-контейнер: всё нарисованное на листе
-        private RectTransform sectorRoot;  // рамки и подписи районов
-        private RectTransform orbitsRoot;  // пунктирные орбиты планет
-        private RectTransform edgeRoot;    // граница мира, буи, штриховка
-        private RectTransform beltsRoot;   // пояса астероидов
+        private RectTransform sectorRoot;  // подписи районов
+        private RectTransform edgeRoot;    // буи границы мира, тревожные пометки
+        private RectTransform beltsRoot;   // камни поясов астероидов
         private RectTransform decoRoot;    // безделушки на свободных местах
         private RectTransform bodiesRoot;  // иконки тел
-        private RectTransform labelsRoot;  // подписи тел/поясов (над иконками)
+        private RectTransform labelsRoot;  // подписи тел (в плоскости бумаги)
         private RectTransform cometsRoot;  // живые кометы
         private GameObject noteRoot;       // «уголок листа» с записями
         private RectTransform legendRoot;
@@ -126,14 +135,19 @@ namespace SpaceTaxi.UI
         private RectTransform zoomRoot;
         private RectTransform titleRoot;
 
+        private OnboardComputerPanel onboardPanel; // его зона вычитается из окна карты
+        private bool onboardShown;                 // последнее известное состояние панели
+        private bool relayoutPending;              // экран изменился — пересчитать лист
+
         private readonly Dictionary<CelestialBodyData, RectTransform> markers = new Dictionary<CelestialBodyData, RectTransform>();
         private readonly Dictionary<CelestialBodyData, float> bodySizes = new Dictionary<CelestialBodyData, float>();
+        private float maxBodyRadius; // опорный радиус для нормировки иконок (Н5.21-6)
 
         private RectTransform playerMarker;      // на sheetRect (вне зум-контента): RectMask2D не режет, размер постоянен
         private RectTransform playerArrowRoot; // вращается по курсу; подпись «ВЫ» не крутится
         private RectTransform targetRing;
         private RectTransform targetRingPulse;   // жёлтый пульс: сплошное кольцо
-        private RectTransform targetRingWide;    // и второе, пунктирное — видно издалека
+        private RectTransform targetRingWide;    // и второе — видно издалека
         private Image targetRingPulseImage;      // кэш: пульс обновляется каждый кадр
         private Image targetRingWideImage;
         private TMP_Text targetLabel;
@@ -146,30 +160,10 @@ namespace SpaceTaxi.UI
         private CelestialBodyData lastTargetBody; // чья подпись спрятана под «ЦЕЛЬ: …»
         private float playerHeading;
 
-        // маршрут активного заказа: лёгкая пунктирная дуга корабль → пассажир/цель
-        private RectTransform routeRoot;
-        private readonly List<RectTransform> routeDashes = new List<RectTransform>();
-        private readonly List<Image> routeDashImages = new List<Image>(); // параллельно routeDashes — без GetComponent в кадре
-        private readonly Vector2[] routePts = new Vector2[33];
-        private readonly float[] routeCum = new float[33];
-        private bool routeShown;
-
         // hover по телу: круги радиусов посадки/захвата + имя крупнее
         private RectTransform hoverCaptureRing;
         private RectTransform hoverLandingRing;
         private readonly Dictionary<CelestialBodyData, TMP_Text> bodyLabels = new Dictionary<CelestialBodyData, TMP_Text>();
-
-        // подписи тел: раскладка без наложений
-        private sealed class MapLabel
-        {
-            public RectTransform Rect;
-            public float Width;   // точная ширина текста (GetPreferredValues), px
-            public Vector2 Below; // позиция под иконкой
-            public float AboveY;  // y позиции над иконкой
-        }
-        private readonly List<MapLabel> mapLabels = new List<MapLabel>();
-        // препятствия для подписей: иконки тел, камни поясов, декор, подписи районов
-        private readonly List<Rect> labelObstacles = new List<Rect>();
 
         // живые кометы (по ActiveComets CometSystem — как точки миникарты)
         private CometSystem cometSystem;
@@ -220,12 +214,20 @@ namespace SpaceTaxi.UI
             BuildChrome();
         }
 
-        // шрифт: сцена (Excalifont) → старый ресурс → HUD → дефолт TMP
+        private void OnEnable()
+        {
+            FocusOnPlayer(); // повторные открытия — карта сразу приближена к игроку (Н5.21-8)
+        }
+
+        // шрифт: сцена (Excalifont) → ресурсы Excalifont → HUD → дефолт TMP.
+        // Н5.21-3: на карте только Excalifont — все тексты идут через MakeLabel.
         private TMP_FontAsset ResolveFont()
         {
             if (mapFont != null)
                 return mapFont;
-            TMP_FontAsset res = Resources.Load<TMP_FontAsset>("Excalifont SDF");
+            TMP_FontAsset res = Resources.Load<TMP_FontAsset>("Excalifont-Regular SDF");
+            if (res == null)
+                res = Resources.Load<TMP_FontAsset>("Excalifont SDF");
             if (res != null)
                 return res;
             HudBinder hud = FindAnyObjectByType<HudBinder>();
@@ -241,6 +243,12 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
+            if (SyncOnboardPanel())
+            {
+                RebuildAll(); // лист переложен — контент пересобрать под новую область
+                return;
+            }
+
             if (!built)
             {
                 if (session == null)
@@ -258,6 +266,14 @@ namespace SpaceTaxi.UI
                 return;
             }
 
+            if (relayoutPending)
+            {
+                relayoutPending = false;
+                LayoutSheet();
+                RebuildAll();
+                return;
+            }
+
             if (Mathf.Abs(mapRect.rect.width - builtWidth) > 2f)
             {
                 RebuildAll();
@@ -270,9 +286,27 @@ namespace SpaceTaxi.UI
             UpdatePlayerMarker();
             UpdateTargetRing();
             UpdateWaypointVisual();
-            UpdateRoute();
             UpdateComets();
             UpdateNoteDistance();
+        }
+
+        // экран изменился — лист и контент пересчитываются в следующем кадре
+        private void OnRectTransformDimensionsChange()
+        {
+            if (built && mapRect != null)
+                relayoutPending = true;
+        }
+
+        // борткомп выезжает/убирается по TAB — окно карты меняется, лист перекладываем
+        private bool SyncOnboardPanel()
+        {
+            if (onboardPanel == null)
+                onboardPanel = FindAnyObjectByType<OnboardComputerPanel>();
+            if (onboardPanel == null || onboardPanel.IsShown == onboardShown)
+                return false;
+            onboardShown = onboardPanel.IsShown;
+            LayoutSheet();
+            return built;
         }
 
         private void OnDisable()
@@ -283,6 +317,7 @@ namespace SpaceTaxi.UI
                 noteRoot.SetActive(false);
             dragging = false;
             suppressClick = false;
+            relayoutPending = false;
             if (hoverCaptureRing != null)
                 hoverCaptureRing.gameObject.SetActive(false);
             if (hoverLandingRing != null)
@@ -293,7 +328,7 @@ namespace SpaceTaxi.UI
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
         }
 
-        // ————— каркас: стол, лист, экранное (вне зум-контейнера) —————
+        // ————— каркас: стол, лист, бумага, экранное (вне зум-контейнера) —————
 
         private void BuildChrome()
         {
@@ -310,17 +345,29 @@ namespace SpaceTaxi.UI
                     Deselect();
             };
 
-            // лист жёлтой бумаги
-            sheetRect = MakeRect("Sheet", mapRect, Vector2.zero, Vector2.one, new Vector2(10f, 10f), new Vector2(-10f, -10f));
+            // лист жёлтой бумаги: ровно окно карты минус зона борткомпа (Н5.21-1)
+            sheetRect = MakeRect("Sheet", mapRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image sheetImage = sheetRect.gameObject.AddComponent<Image>();
-            Sprite paper = PaperMapArt.SheetArt();
-            sheetImage.sprite = paper;
-            sheetImage.color = paper != null ? Color.white : PaperMapArt.Paper;
+            sheetImage.color = PaperMapArt.Paper; // подложка; текстура бумаги панится в PaperClip
             sheetImage.raycastTarget = false; // клики сквозь лист уходят в Backdrop
+            LayoutSheet();
+
+            // бумага — часть «бумаги»: лежит внутри зум-контейнера (Н5.21-2), пан
+            // двигает её, зум зумит вместе со всем. Запас ×3 от окна — при пан/зум
+            // в пределах диапазона края бумаги не видны.
+            paperClip = MakeRect("PaperClip", sheetRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            paperClip.gameObject.AddComponent<RectMask2D>(); // бумага не вылезает за лист
+            paperRect = MakeRect("Paper", paperClip, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
+            Image paperImage = paperRect.gameObject.AddComponent<Image>();
+            Sprite paperArt = PaperMapArt.SheetArt();
+            paperImage.sprite = paperArt;
+            paperImage.color = paperArt != null ? Color.white : PaperMapArt.Paper;
+            paperImage.raycastTarget = false;
+            paperRect.sizeDelta = sheetRect.rect.size * PaperOversize;
 
             // карта живёт внутри листа с полями: не залезает на рукописную рамку
             content = MakeRect("MapRoot", sheetRect, Vector2.zero, Vector2.one, new Vector2(26f, 26f), new Vector2(-26f, -26f));
-            content.gameObject.AddComponent<RectMask2D>(); // орбиты/пояса не вылезают за лист
+            content.gameObject.AddComponent<RectMask2D>(); // содержимое не вылезает за поля листа
 
             BuildCompass();
             BuildTitle();
@@ -329,13 +376,41 @@ namespace SpaceTaxi.UI
             BuildNotePanel();
         }
 
+        // Н5.21-1: лист = доступная область окна карты минус зона борткомпа.
+        // Пересчитывается при смене экрана (OnRectTransformDimensionsChange)
+        // и при TAB-переключении панели (SyncOnboardPanel).
+        private void LayoutSheet()
+        {
+            if (sheetRect == null || mapRect == null)
+                return;
+            sheetRect.offsetMin = new Vector2(ReservedLeftInset() + OnboardGap, SheetMargin);
+            sheetRect.offsetMax = new Vector2(-SheetMargin, -SheetMargin);
+            if (paperRect != null) // запас бумаги от текущего окна
+                paperRect.sizeDelta = sheetRect.rect.size * PaperOversize;
+        }
+
+        // ширина зоны борткомпа слева (панель — корень префаба OnboardComputer, 480 px)
+        private float ReservedLeftInset()
+        {
+            if (onboardPanel == null)
+                onboardPanel = FindAnyObjectByType<OnboardComputerPanel>();
+            if (onboardPanel == null || !onboardPanel.IsShown)
+                return 0f;
+            RectTransform panelRect = onboardPanel.transform as RectTransform;
+            float width = panelRect != null ? panelRect.rect.width : OnboardFallbackWidth;
+            return width > 1f ? width : OnboardFallbackWidth;
+        }
+
         // ————— содержимое листа —————
 
         private void BuildMap()
         {
+            LayoutSheet(); // размеры окна уже известны — лист и бумага актуальны
+
             // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin)
             mapRadius = level.WorldRadius;
             float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
+            maxBodyRadius = 0f;         // опорный радиус для нормировки иконок
             foreach (CelestialBodyData body in level.Bodies)
             {
                 float edge = body.Position.magnitude + body.Radius;
@@ -343,6 +418,8 @@ namespace SpaceTaxi.UI
                     mapRadius = edge + 100f;
                 extX = Mathf.Max(extX, Mathf.Abs(body.Position.x) + body.Radius);
                 extY = Mathf.Max(extY, Mathf.Abs(body.Position.y) + body.Radius);
+                if (body.Type != BodyType.AsteroidBelt && body.Radius > maxBodyRadius)
+                    maxBodyRadius = body.Radius;
             }
             if (level.CometAreaRadius > 0f) // зона комет — тоже часть содержимого
             {
@@ -353,6 +430,8 @@ namespace SpaceTaxi.UI
                 extX = mapRadius;
             if (extY <= 1f)
                 extY = mapRadius;
+            if (maxBodyRadius <= 0f)
+                maxBodyRadius = 1f;
             worldCenter = Vector2.zero;
 
             // «весь мир на листе»: bbox тел уровня + поля 10% вписывается целиком
@@ -363,21 +442,22 @@ namespace SpaceTaxi.UI
             // рамка листа «от руки» — когда размер известен
             MakeSketchFrame(sheetRect, WithAlpha(PaperMapArt.Ink, 0.75f), 2.6f, 1042);
 
-            // слои снизу вверх: маршрут → районы → орбиты → край мира → пояса →
-            // декор → тела → подписи → hover → кометы → метка/цель (игрок — на листе, выше всех)
-            routeRoot = MakeRect("RouteLine", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            routeRoot.SetAsFirstSibling();
+            // слои снизу вверх: районы → край мира → пояса → декор → тела →
+            // подписи → hover → кометы → метка/цель (игрок — на листе, выше всех).
+            // Нарисованные линии (рамки районов, орбиты, кольца дистанций, сетка,
+            // пунктирные пути) убраны совсем — Н5.21-5.
             sectorRoot = MakeRect("Sectors", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            orbitsRoot = MakeRect("Orbits", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             edgeRoot = MakeRect("WorldEdge", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             beltsRoot = MakeRect("Belts", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             decoRoot = MakeRect("Deco", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             bodiesRoot = MakeRect("Bodies", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             labelsRoot = MakeRect("Labels", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-            BuildGrid();
-            BuildSectorFrames();
-            BuildOrbits();
+            // чернильная клякса в origin мира (отметка центра, не линия)
+            MakeImage("WorldCenter", content, PaperMapArt.InkDot(),
+                WithAlpha(PaperMapArt.Ink, 0.5f), Vector2.one * 7f, false);
+
+            BuildSectorLabels();
             BuildCometZone();
             BuildWorldEdge();
             foreach (CelestialBodyData body in level.Bodies)
@@ -387,9 +467,8 @@ namespace SpaceTaxi.UI
             foreach (CelestialBodyData body in level.Bodies)
                 if (body.Type != BodyType.AsteroidBelt)
                     CreateBody(body);
-            ResolveLabels();
 
-            hoverCaptureRing = MakeImage("HoverCapture", content, PaperMapArt.OrbitRing(),
+            hoverCaptureRing = MakeImage("HoverCapture", content, PaperMapArt.TargetRing(),
                 WithAlpha(PaperMapArt.Graphite, 0.7f), Vector2.zero, false);
             hoverCaptureRing.gameObject.SetActive(false);
             hoverLandingRing = MakeImage("HoverLanding", content, PaperMapArt.TargetRing(),
@@ -403,7 +482,7 @@ namespace SpaceTaxi.UI
             BuildTargetRing();
             BuildPlayerMarker();
 
-            ApplyZoom(1f, Vector2.zero);
+            FocusOnPlayer(); // Н5.21-8: карта открывается приближенной к игроку
             BuildRuler(); // линейка зависит от scale — известен только здесь
             if (titleRoot != null)
             {
@@ -413,29 +492,9 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // кольца дистанций от origin — карандашная разметка для сверки в полёте
-        private void BuildGrid()
-        {
-            MakeImage("GridCenter", content, PaperMapArt.InkDot(),
-                WithAlpha(PaperMapArt.Ink, 0.5f), Vector2.one * 7f, false);
+        // ————— районы: крупные рукописные подписи (рамки-линии убраны, Н5.21-5) —————
 
-            int[] steps = { 500, 1000, 2000, 5000, 10000, 20000, 50000 };
-            int drawn = 0;
-            foreach (int step in steps)
-            {
-                float px = step * scale;
-                if (px < 70f || px > mapRadius * scale * 0.98f || drawn >= 4)
-                    continue;
-                RectTransform ring = MakeImage("GridRing_" + step, orbitsRoot, PaperMapArt.OrbitRing(),
-                    WithAlpha(PaperMapArt.Ink, 0.13f), Vector2.one * (px * 2f), false);
-                ring.anchoredPosition = Vector2.zero;
-                drawn++;
-            }
-        }
-
-        // ————— районы: выпуклые рамки «от руки» + крупные подписи —————
-
-        private void BuildSectorFrames()
+        private void BuildSectorLabels()
         {
             var groups = new Dictionary<Sector, List<CelestialBodyData>>();
             foreach (CelestialBodyData body in level.Bodies)
@@ -449,93 +508,24 @@ namespace SpaceTaxi.UI
 
             foreach (var pair in groups)
             {
-                var pts = new List<Vector2>(pair.Value.Count);
-                Vector2 center = Vector2.zero;
-                float maxRadius = 60f;
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
                 foreach (CelestialBodyData body in pair.Value)
                 {
-                    pts.Add(body.Position);
-                    center += body.Position;
-                    maxRadius = Mathf.Max(maxRadius, body.Radius);
-                }
-                center /= pair.Value.Count;
-                float pad = maxRadius + 130f; // рамка не прижимается к телам
-
-                Vector2 labelPos;
-                var hull = ConvexHull(pts);
-                if (hull.Count < 3)
-                {
-                    // одинокое тело (хаб) или отрезок — рамка по bbox
-                    float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
-                    foreach (Vector2 p in pts)
-                    {
-                        minX = Mathf.Min(minX, p.x - pad);
-                        maxX = Mathf.Max(maxX, p.x + pad);
-                        minY = Mathf.Min(minY, p.y - pad);
-                        maxY = Mathf.Max(maxY, p.y + pad);
-                    }
-                    hull = new List<Vector2>
-                    {
-                        new Vector2(minX, minY), new Vector2(maxX, minY),
-                        new Vector2(maxX, maxY), new Vector2(minX, maxY)
-                    };
-                    labelPos = WorldToMap(new Vector2((minX + maxX) * 0.5f, maxY)) + Vector2.up * 22f;
-                }
-                else
-                {
-                    // расширяю вершины от центра района — тела остаются внутри с запасом
-                    for (int i = 0; i < hull.Count; i++)
-                    {
-                        Vector2 dir = hull[i] - center;
-                        if (dir.sqrMagnitude > 0.001f) // вершина в центре района — normalized дал бы NaN
-                            hull[i] += dir.normalized * pad;
-                    }
-                    Vector2 top = hull[0];
-                    foreach (Vector2 p in hull)
-                        if (p.y > top.y)
-                            top = p;
-                    labelPos = WorldToMap(top) + Vector2.up * 24f;
+                    Vector2 p = body.Position;
+                    minX = Mathf.Min(minX, p.x);
+                    maxX = Mathf.Max(maxX, p.x);
+                    minY = Mathf.Min(minY, p.y);
+                    maxY = Mathf.Max(maxY, p.y);
                 }
 
-                var mapped = new List<Vector2>(hull.Count);
-                foreach (Vector2 p in hull)
-                    mapped.Add(WorldToMap(p));
-                DrawSketchPolygon(sectorRoot, mapped, WithAlpha(PaperMapArt.Ink, 0.5f), 2.4f, 31 + (int)pair.Key * 17);
-
-                // крупная рукописная подпись района, чуть с наклоном — как на старых картах
-                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), 21f,
+                // крупная рукописная подпись района над группой тел, чуть с наклоном
+                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), 24f,
                     WithAlpha(PaperMapArt.Ink, 0.55f));
                 RectTransform labelRect = (RectTransform)label.transform;
-                labelRect.sizeDelta = new Vector2(340f, 30f);
-                labelRect.anchoredPosition = labelPos;
+                labelRect.sizeDelta = new Vector2(360f, 34f);
+                labelRect.anchoredPosition = WorldToMap(new Vector2((minX + maxX) * 0.5f, maxY)) + Vector2.up * 26f;
                 labelRect.localRotation = Quaternion.Euler(0f, 0f, (Hash01((int)pair.Key * 7 + 3) - 0.5f) * 4f);
                 label.characterSpacing = 5f;
-                labelObstacles.Add(RectCentered(labelPos, new Vector2(280f, 30f)));
-            }
-        }
-
-        // замкнутый пунктир «от руки»: по ребрам — дэши с дрожью перпендикуляра
-        private static void DrawSketchPolygon(RectTransform parent, List<Vector2> pts, Color color, float thickness, int seed)
-        {
-            var rng = new System.Random(seed);
-            for (int i = 0; i < pts.Count; i++)
-            {
-                Vector2 a = pts[i];
-                Vector2 b = pts[(i + 1) % pts.Count];
-                float len = Vector2.Distance(a, b);
-                if (len < 2f)
-                    continue;
-                Vector2 dir = (b - a) / len;
-                Vector2 perp = new Vector2(-dir.y, dir.x);
-                int dashes = Mathf.Max(2, Mathf.RoundToInt(len / 26f));
-                for (int j = 0; j < dashes; j++)
-                {
-                    float t0 = (j + 0.08f) / dashes;
-                    float t1 = (j + 0.60f) / dashes; // дэш ~52% шага
-                    Vector2 da = a + dir * (len * t0) + perp * (Wob(rng) * 3.0f);
-                    Vector2 db = a + dir * (len * t1) + perp * (Wob(rng) * 3.0f);
-                    MakeSegment(parent, da, db, color, thickness);
-                }
             }
         }
 
@@ -613,126 +603,23 @@ namespace SpaceTaxi.UI
             return (h & 0xFFFFFF) / (float)0xFFFFFF;
         }
 
-        // выпуклая оболочка (монотонная цепочка) — рамка района без самопересечений
-        private static List<Vector2> ConvexHull(List<Vector2> points)
-        {
-            if (points.Count <= 2)
-                return new List<Vector2>(points);
-            points.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
-            var hull = new List<Vector2>(2 * points.Count);
-            for (int i = 0; i < points.Count; i++)
-            {
-                while (hull.Count >= 2 && Cross(hull[hull.Count - 2], hull[hull.Count - 1], points[i]) <= 0f)
-                    hull.RemoveAt(hull.Count - 1);
-                hull.Add(points[i]);
-            }
-            int lower = hull.Count + 1;
-            for (int i = points.Count - 2; i >= 0; i--)
-            {
-                while (hull.Count >= lower && Cross(hull[hull.Count - 2], hull[hull.Count - 1], points[i]) <= 0f)
-                    hull.RemoveAt(hull.Count - 1);
-                hull.Add(points[i]);
-            }
-            hull.RemoveAt(hull.Count - 1);
-            return hull;
-        }
-
-        private static float Cross(Vector2 o, Vector2 a, Vector2 b)
-        {
-            return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-        }
-
-        // ————— орбиты / кометная зона / край мира —————
-
-        // орбиты: пунктирные окружности вокруг звёзд, радиус = фактическая дистанция планет
-        private void BuildOrbits()
-        {
-            var stars = new List<CelestialBodyData>();
-            var planets = new List<CelestialBodyData>();
-            foreach (CelestialBodyData body in level.Bodies)
-            {
-                if (body.Type == BodyType.Star)
-                    stars.Add(body);
-                else if (body.Type == BodyType.Planet)
-                    planets.Add(body);
-            }
-            if (stars.Count == 0)
-                return;
-
-            var inkFaint = WithAlpha(PaperMapArt.Ink, 0.20f);
-            foreach (CelestialBodyData star in stars)
-            {
-                var radii = new List<float>();
-                foreach (CelestialBodyData planet in planets)
-                {
-                    if (NearestStar(planet, stars) != star)
-                        continue;
-                    float r = Vector2.Distance(planet.Position, star.Position);
-                    if (r <= 1f || r > mapRadius)
-                        continue;
-                    bool duplicate = false;
-                    foreach (float have in radii)
-                        if (Mathf.Abs(have - r) < r * 0.04f)
-                        {
-                            duplicate = true;
-                            break;
-                        }
-                    if (duplicate)
-                        continue;
-                    radii.Add(r);
-                    RectTransform orbit = MakeImage("Orbit_" + star.DisplayName + radii.Count, orbitsRoot,
-                        PaperMapArt.OrbitRing(), inkFaint, Vector2.one * r * 2f * scale, false);
-                    orbit.anchoredPosition = WorldToMap(star.Position);
-                }
-            }
-        }
-
-        private CelestialBodyData NearestStar(CelestialBodyData body, List<CelestialBodyData> stars)
-        {
-            CelestialBodyData best = null;
-            float bestDist = float.MaxValue;
-            foreach (CelestialBodyData star in stars)
-            {
-                float d = Vector2.Distance(body.Position, star.Position);
-                if (d < bestDist)
-                {
-                    bestDist = d;
-                    best = star;
-                }
-            }
-            return best;
-        }
+        // ————— кометная зона / край мира —————
 
         private void BuildCometZone()
         {
-            if (level.CometAreaRadius <= 0f) // хорды по всему миру — зону не рисуем
+            if (level.CometAreaRadius <= 0f) // хорды по всему миру — зону не подписываем
                 return;
-            float diameter = level.CometAreaRadius * 2f * scale;
-            RectTransform ring = MakeImage("CometZone", edgeRoot, PaperMapArt.NetworkRing(),
-                WithAlpha(PaperMapArt.CometPencil, 0.65f), Vector2.one * diameter, false);
-            ring.anchoredPosition = WorldToMap(level.CometAreaCenter);
-
             Vector2 pos = WorldToMap(level.CometAreaCenter);
-            TMP_Text label = MakeLabel("CometZoneLabel", edgeRoot, "кометная зона", 13f,
+            TMP_Text label = MakeLabel("CometZoneLabel", edgeRoot, "кометная зона", 16f,
                 WithAlpha(PaperMapArt.CometPencil, 0.95f));
-            ((RectTransform)label.transform).sizeDelta = new Vector2(220f, 20f);
-            ((RectTransform)label.transform).anchoredPosition = pos + Vector2.up * (diameter * 0.5f + 14f);
-            labelObstacles.Add(RectCentered(pos + Vector2.up * (diameter * 0.5f + 14f), new Vector2(140f, 20f)));
+            ((RectTransform)label.transform).sizeDelta = new Vector2(240f, 22f);
+            ((RectTransform)label.transform).anchoredPosition = pos + Vector2.up * (level.CometAreaRadius * scale + 16f);
         }
 
-        // граница мира: рукописный пунктир + штриховка снаружи + буи-звёздочки
+        // граница мира: буи-звёздочки + две тревожные пометки «от руки»
+        // (пунктирное кольцо и штриховка снаружи убраны — линии, Н5.21-5)
         private void BuildWorldEdge()
         {
-            float netDiameter = mapRadius * 2f * scale;
-
-            RectTransform ring = MakeImage("NetworkRing", edgeRoot, PaperMapArt.NetworkRing(),
-                WithAlpha(PaperMapArt.Ink, 0.6f), Vector2.one * netDiameter, false);
-            ring.anchoredPosition = Vector2.zero;
-
-            RectTransform hatch = MakeImage("EdgeHatch", edgeRoot, PaperMapArt.HatchRing(),
-                WithAlpha(PaperMapArt.Ink, 0.28f), Vector2.one * (netDiameter * 1.07f), false);
-            hatch.anchoredPosition = Vector2.zero;
-
             Sprite star = PaperMapArt.BuoyStar();
             for (int i = 0; i < 12; i++)
             {
@@ -744,30 +631,34 @@ namespace SpaceTaxi.UI
                 buoy.localRotation = Quaternion.Euler(0f, 0f, i * 17f);
             }
 
-            // две тревожные пометки «от руки» — не стакаются (NE и SW)
             var warnColor = WithAlpha(PaperMapArt.RedPencil, 0.8f);
             for (int i = 0; i < 2; i++)
             {
                 float ang = (45f + 180f * i) * Mathf.Deg2Rad;
                 var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
-                TMP_Text warn = MakeLabel("NoSignal_" + i, edgeRoot, "за кругом — потеря связи", 12f, warnColor);
-                ((RectTransform)warn.transform).sizeDelta = new Vector2(240f, 18f);
-                ((RectTransform)warn.transform).anchoredPosition = dir * (mapRadius * scale + 24f);
+                TMP_Text warn = MakeLabel("NoSignal_" + i, edgeRoot, "за кругом — потеря связи", 15f, warnColor);
+                ((RectTransform)warn.transform).sizeDelta = new Vector2(280f, 22f);
+                ((RectTransform)warn.transform).anchoredPosition = dir * (mapRadius * scale + 26f);
                 ((RectTransform)warn.transform).localRotation = Quaternion.Euler(0f, 0f, i == 0 ? -2.5f : 2.5f);
             }
         }
 
-        // ————— пояса астероидов: один спрайт, повороты, размеры, пунктирный путь —————
+        // ————— пояса астероидов: камни map_asteroid по кольцу, клик-зона без линии —————
 
         private void CreateBelt(CelestialBodyData body)
         {
             float diameter = Mathf.Max(12f, body.Radius * 2f * scale);
             Vector2 pos = WorldToMap(body.Position);
 
-            // пунктирная осевая линия — путь пояса (кликабельна)
-            RectTransform ring = MakeImage("BeltPath_" + body.DisplayName, beltsRoot, PaperMapArt.BeltRing(),
-                WithAlpha(PaperMapArt.BeltPencil, 0.85f), Vector2.one * diameter, true);
-            ring.anchoredPosition = pos;
+            // клик-зона пояса: прозрачный прямоугольник по кольцу.
+            // Пунктирная осевая линия-путь убрана (Н5.21-5), кликабельность сохранена.
+            RectTransform hit = MakeRect("BeltHit_" + body.DisplayName, beltsRoot,
+                Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
+            hit.sizeDelta = Vector2.one * diameter;
+            hit.anchoredPosition = pos;
+            Image hitImage = hit.gameObject.AddComponent<Image>();
+            hitImage.color = new Color(0f, 0f, 0f, 0f);
+            hitImage.raycastTarget = true;
             bodySizes[body] = diameter;
 
             // камни: ОДИН спрайт map_asteroid — детерминированный разброс по кольцу
@@ -787,12 +678,11 @@ namespace SpaceTaxi.UI
                     stone.localRotation = Quaternion.Euler(0f, 0f, (float)rng.NextDouble() * 360f);
                     if (rng.NextDouble() < 0.5)
                         stone.localScale = new Vector3(-1f, 1f, 1f); // зеркалим — меньше повтора
-                    labelObstacles.Add(RectCentered(p, Vector2.one * size));
                 }
             }
 
-            var marker = ring.gameObject.AddComponent<MapMarker>();
-            marker.visual = ring.GetComponent<Image>();
+            var marker = hit.gameObject.AddComponent<MapMarker>();
+            marker.visual = hitImage;
             CelestialBodyData captured = body;
             marker.Clicked += () =>
             {
@@ -809,12 +699,12 @@ namespace SpaceTaxi.UI
             string beltName = body.DisplayName;
             if (!beltName.ToLower().Contains("пояс"))
                 beltName = "пояс " + beltName;
+            // подпись «на бумаге»: чуть ниже и правее кольца пояса (Н5.21-4)
             TMP_Text label = MakeLabel("Label_" + body.DisplayName, labelsRoot, beltName, LabelFontSize,
                 WithAlpha(PaperMapArt.Ink, 0.85f));
             RectTransform labelRect = (RectTransform)label.transform;
-            labelRect.sizeDelta = new Vector2(240f, 20f);
-            labelRect.anchoredPosition = pos + Vector2.up * (diameter * 0.5f + 14f);
-            RegisterLabel(labelRect, label, labelRect.anchoredPosition, pos);
+            labelRect.sizeDelta = new Vector2(240f, 28f);
+            labelRect.anchoredPosition = pos + new Vector2(diameter * 0.5f + 10f, -(diameter * 0.5f + 15f));
             bodyLabels[body] = label;
         }
 
@@ -832,14 +722,17 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // ————— тела: арт владельца с чернильной тенью-«наклейкой» —————
+        // ————— тела: арт владельца, диаметр пропорционален радиусу —————
 
         private void CreateBody(CelestialBodyData body)
         {
-            bool star = body.Type == BodyType.Star;
-            bool hole = body.Type == BodyType.BlackHole;
             Sprite art = BodySprite(body);
-            float d = Mathf.Max(star || hole ? 26f : 20f, body.Radius * 2f * scale * (star ? 1.55f : hole ? 1.35f : 1.5f));
+            // Н5.21-6: диаметр иконки пропорционален data.Radius; тело с наибольшим
+            // радиусом уровня = опорный размер (RefIconPx), минимум — MinIconPx.
+            // Звезда/дыра/станции нормируются тем же максимумом — относительные
+            // размеры строги и внутри типа, и между типами.
+            float ratio = maxBodyRadius > 0f ? body.Radius / maxBodyRadius : 1f;
+            float d = Mathf.Max(MinIconPx, RefIconPx * ratio);
             Vector2 spr = art != null ? new Vector2(art.rect.width, art.rect.height) : Vector2.one;
             float fit = d / Mathf.Max(spr.x, spr.y);
             Vector2 size = Vector2.Scale(spr, Vector2.one * fit); // большая сторона = d
@@ -857,13 +750,8 @@ namespace SpaceTaxi.UI
 
             RectTransform icon = MakeImage("Icon", group, art, Color.white, size, true);
             Image iconImage = icon.GetComponent<Image>();
-
-            if (body.IsHub) // хаб — ржавно-карандашный пунктир вокруг, виден с базового зума
-            {
-                RectTransform hubRing = MakeImage("HubRing", group, PaperMapArt.OrbitRing(),
-                    WithAlpha(PaperMapArt.Rust, 0.65f), Vector2.one * (d + 16f), false);
-                hubRing.anchoredPosition = Vector2.zero;
-            }
+            // пунктирное кольцо вокруг хаба убрано — линия (Н5.21-5); хаб читается
+            // по своей иконке (map_taxi_planet) и легенде
 
             var marker = group.gameObject.AddComponent<MapMarker>();
             marker.visual = iconImage;
@@ -882,15 +770,14 @@ namespace SpaceTaxi.UI
             markers[body] = group;
             bodySizes[body] = d;
 
-            labelObstacles.Add(RectCentered(pos, size * 0.92f));
-
-            // подпись под иконкой; точную раскладку разводит ResolveLabels
+            // подпись «написана на бумаге» (Н5.21-4): чуть ниже и правее иконки,
+            // живёт в системе координат контента — панится и зумится вместе с ней.
+            // Никаких разводок и подставок «над иконкой» — просто у своей планеты.
             TMP_Text label = MakeLabel("Label_" + body.DisplayName, labelsRoot, body.DisplayName, LabelFontSize,
                 WithAlpha(PaperMapArt.Ink, 0.95f));
             RectTransform labelRect = (RectTransform)label.transform;
-            labelRect.sizeDelta = new Vector2(200f, 20f);
-            labelRect.anchoredPosition = pos + Vector2.down * (size.y * 0.5f + 13f);
-            RegisterLabel(labelRect, label, labelRect.anchoredPosition, pos);
+            labelRect.sizeDelta = new Vector2(220f, 28f); // высота ≥ fontSize×1.32 и для hover-кегля
+            labelRect.anchoredPosition = pos + new Vector2(size.x * 0.5f + 10f, -(size.y * 0.5f + 15f));
             bodyLabels[body] = label;
         }
 
@@ -943,7 +830,6 @@ namespace SpaceTaxi.UI
                     WithAlpha(PaperMapArt.Ink, 0.55f), Vector2.one * 46f, false);
                 stamp.anchoredPosition = WorldToMap(c);
                 stamp.localRotation = Quaternion.Euler(0f, 0f, (Hash01(77 + placedCount) - 0.5f) * 60f);
-                labelObstacles.Add(RectCentered(stamp.anchoredPosition, Vector2.one * 50f));
                 if (++placedCount >= 2)
                     break;
             }
@@ -966,77 +852,8 @@ namespace SpaceTaxi.UI
             return true;
         }
 
-        // ————— подписи: раскладка без наложений —————
-
-        // регистрация подписи: ширина по GetPreferredValues (точная для Excalifont);
-        // iconPos — центр иконки, запасная позиция «над» зеркалит базовую относительно НЕЁ
-        private void RegisterLabel(RectTransform rect, TMP_Text label, Vector2 basePos, Vector2 iconPos)
-        {
-            float prefW = label.GetPreferredValues().x;
-            var ml = new MapLabel
-            {
-                Rect = rect,
-                Width = Mathf.Clamp(prefW, 30f, 300f),
-                Below = basePos,
-                AboveY = 2f * iconPos.y - basePos.y // по другую сторону иконки
-            };
-            mapLabels.Add(ml);
-        }
-
-        // разводим подписи: базово под иконкой; занято — над, дальше, сбоку.
-        // Препятствия: иконки тел, камни поясов, декор, подписи районов.
-        private void ResolveLabels()
-        {
-            const float h = 20f, pad = 4f;
-            mapLabels.Sort((a, b) => b.Below.y.CompareTo(a.Below.y)); // сверху вниз — стабильная раскладка
-            var placed = new List<Rect>(labelObstacles);
-            foreach (MapLabel ml in mapLabels)
-            {
-                float halfW = ml.Width * 0.5f + pad;
-
-                Rect RectAt(Vector2 c) => new Rect(c.x - halfW, c.y - h * 0.5f - pad, ml.Width + pad * 2f, h + pad * 2f);
-                var candidates = new[]
-                {
-                    ml.Below,
-                    new Vector2(ml.Below.x, ml.AboveY),
-                    ml.Below + Vector2.down * 22f,
-                    new Vector2(ml.Below.x, ml.AboveY + 22f),
-                    ml.Below + Vector2.down * 44f,
-                    new Vector2(ml.Below.x, ml.AboveY + 44f),
-                    ml.Below + Vector2.left * (halfW + 20f),
-                    ml.Below + Vector2.right * (halfW + 20f)
-                };
-                Vector2 chosen = ml.Below;
-                foreach (Vector2 c in candidates)
-                {
-                    Rect r = RectAt(c);
-                    bool hit = false;
-                    foreach (Rect p in placed)
-                    {
-                        if (r.Overlaps(p))
-                        {
-                            hit = true;
-                            break;
-                        }
-                    }
-                    if (!hit)
-                    {
-                        chosen = c;
-                        break;
-                    }
-                }
-                // даже fallback-позицию регистрируем, иначе плотный кластер наложится
-                placed.Add(RectAt(chosen));
-                ml.Rect.anchoredPosition = chosen;
-            }
-        }
-
-        private static Rect RectCentered(Vector2 c, Vector2 size)
-        {
-            return new Rect(c.x - size.x * 0.5f, c.y - size.y * 0.5f, size.x, size.y);
-        }
-
-        // hover по телу: круги радиусов захвата/посадки + подпись крупнее
+        // hover по телу: круги радиусов захвата/посадки (сплошные карандашные
+        // кольца-ореолы, не пунктирные линии) + подпись крупнее
         private void ShowHoverRings(CelestialBodyData body, bool on)
         {
             if (hoverCaptureRing == null || hoverLandingRing == null || body == null)
@@ -1133,12 +950,12 @@ namespace SpaceTaxi.UI
             targetRing = MakeRect("TargetRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             targetRingPulse = MakeImage("Ring", targetRing, PaperMapArt.TargetRing(),
                 PaperMapArt.YellowPencil, Vector2.one * 46f, false);
-            targetRingWide = MakeImage("RingWide", targetRing, PaperMapArt.OrbitRing(),
+            targetRingWide = MakeImage("RingWide", targetRing, PaperMapArt.TargetRing(),
                 WithAlpha(PaperMapArt.YellowPencil, 0.7f), Vector2.one * 70f, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
-            targetLabel = MakeLabel("TargetLabel", targetRing, "", 15f, PaperMapArt.YellowPencil);
-            ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(260f, 20f);
+            targetLabel = MakeLabel("TargetLabel", targetRing, "", 16f, PaperMapArt.YellowPencil);
+            ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(280f, 24f);
             targetLabel.characterSpacing = 2f;
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
@@ -1173,7 +990,7 @@ namespace SpaceTaxi.UI
                 float size = Mathf.Max(52f, IconSizeOf(body) + 30f);
                 targetRingPulse.sizeDelta = Vector2.one * size;
                 targetRingWide.sizeDelta = Vector2.one * (size + 26f);
-                ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 16f);
+                ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 18f);
                 targetLabel.text = "ЦЕЛЬ: " + body.DisplayName.ToUpper();
             }
             targetRing.anchoredPosition = WorldToMap(body.Position);
@@ -1235,9 +1052,9 @@ namespace SpaceTaxi.UI
                 MakeImage("Rocket", playerArrowRoot, chev, PaperMapArt.Ink, Vector2.one * 30f, false);
             }
 
-            TMP_Text youLabel = MakeLabel("YouLabel", playerMarker, "ВЫ", 12f, PaperMapArt.Ink);
-            ((RectTransform)youLabel.transform).sizeDelta = new Vector2(40f, 16f);
-            ((RectTransform)youLabel.transform).anchoredPosition = new Vector2(0f, -31f);
+            TMP_Text youLabel = MakeLabel("YouLabel", playerMarker, "ВЫ", 18f, PaperMapArt.Ink);
+            ((RectTransform)youLabel.transform).sizeDelta = new Vector2(60f, 26f);
+            ((RectTransform)youLabel.transform).anchoredPosition = new Vector2(0f, -37f);
         }
 
         // ракета видна всегда: размер не зависит от зума (маркер вне зум-контента),
@@ -1284,87 +1101,6 @@ namespace SpaceTaxi.UI
             if (ship == null)
                 ship = FindAnyObjectByType<Ship>();
             return ship != null ? ship.transform : null;
-        }
-
-        // ————— маршрут активного заказа: лёгкая пунктирная дуга корабль → цель —————
-
-        private void UpdateRoute()
-        {
-            int index = ActiveOrderTargetIndex();
-            Transform shipT = ShipPosition();
-            if (routeRoot == null || index < 0 || index >= level.Bodies.Count || shipT == null)
-            {
-                HideRoute();
-                return;
-            }
-
-            Vector2 a = WorldToMap(shipT.position);
-            Vector2 b = WorldToMap(level.Bodies[index].Position);
-            Vector2 span = b - a;
-            float len = span.magnitude;
-            // лёгкая дуга: квадратичная кривая с перпендикулярным прогибом ~12% длины
-            Vector2 perp = len > 1f ? new Vector2(-span.y, span.x) / len : Vector2.right;
-            Vector2 ctrl = (a + b) * 0.5f + perp * Mathf.Min(len * 0.12f, 260f) * (index % 2 == 0 ? 1f : -1f);
-            float step = 1f / (routePts.Length - 1);
-            float total = 0f;
-            routePts[0] = a;
-            routeCum[0] = 0f;
-            for (int i = 1; i < routePts.Length; i++)
-            {
-                float t = i * step;
-                float u = 1f - t;
-                routePts[i] = u * u * a + 2f * u * t * ctrl + t * t * b;
-                total += Vector2.Distance(routePts[i - 1], routePts[i]);
-                routeCum[i] = total;
-            }
-
-            // плотность пунктира постоянна на экране: шаг и толщина делятся на зум
-            float period = RouteDashPeriod / Mathf.Max(zoom, 0.001f);
-            float dashLen = 9f / Mathf.Max(zoom, 0.001f);
-            float dashThick = 2.6f / Mathf.Max(zoom, 0.001f);
-            int count = Mathf.Clamp(Mathf.CeilToInt(total / period), 1, RouteDashMax);
-            if (count == RouteDashMax)
-                period = total / RouteDashMax;
-
-            var routeColor = WithAlpha(PaperMapArt.YellowPencil, 0.75f);
-            routeShown = true;
-            for (int i = 0; i < count; i++)
-            {
-                if (i >= routeDashes.Count) // пул растёт лениво, только пока карта открыта
-                {
-                    RectTransform dash = MakeImage("RouteDash_" + i, routeRoot, PaperMapArt.RouteDash(),
-                        routeColor, new Vector2(dashLen, dashThick), false);
-                    routeDashes.Add(dash);
-                    routeDashImages.Add(dash.GetComponent<Image>());
-                }
-                RectTransform d = routeDashes[i];
-                d.gameObject.SetActive(true);
-                d.sizeDelta = new Vector2(dashLen, dashThick);
-                routeDashImages[i].color = routeColor;
-
-                // равномерно по длине дуги: ищем сегмент с накопленной длиной
-                float target = Mathf.Min((i + 0.5f) * period, total);
-                int seg = 0;
-                while (seg < routePts.Length - 2 && routeCum[seg + 1] < target)
-                    seg++;
-                float segLen = Mathf.Max(routeCum[seg + 1] - routeCum[seg], 0.0001f);
-                float k = Mathf.Clamp01((target - routeCum[seg]) / segLen);
-                d.anchoredPosition = Vector2.Lerp(routePts[seg], routePts[seg + 1], k);
-                Vector2 dir = routePts[seg + 1] - routePts[seg];
-                if (dir.sqrMagnitude > 0.0001f)
-                    d.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
-            }
-            for (int i = count; i < routeDashes.Count; i++)
-                routeDashes[i].gameObject.SetActive(false);
-        }
-
-        private void HideRoute()
-        {
-            if (routeRoot == null || !routeShown)
-                return;
-            routeShown = false;
-            foreach (RectTransform dash in routeDashes)
-                dash.gameObject.SetActive(false);
         }
 
         // ————— живые кометы: map_cometa по курсу —————
@@ -1426,7 +1162,7 @@ namespace SpaceTaxi.UI
         private void BuildNotePanel()
         {
             noteRoot = new GameObject("NotePanel", typeof(RectTransform));
-            noteRoot.transform.SetParent(mapRect, false);
+            noteRoot.transform.SetParent(sheetRect, false);
             RectTransform note = (RectTransform)noteRoot.transform;
             note.anchorMin = new Vector2(1f, 1f);
             note.anchorMax = new Vector2(1f, 1f);
@@ -1447,7 +1183,7 @@ namespace SpaceTaxi.UI
             noteServices = NoteRow("Services", note, 104f, 14f, PaperMapArt.Ink);
             noteFuel = NoteRow("Fuel", note, 148f, 13f, PaperMapArt.YellowPencil);
             noteRadius = NoteRow("Radius", note, 172f, 12f, PaperMapArt.Graphite);
-            noteDistance = NoteRow("Distance", note, 196f, 13f, PaperMapArt.Graphite);
+            noteDistance = NoteRow("Distance", note, 196f, 15f, PaperMapArt.Graphite); // счётчик дистанции — крупнее
             MakeDivider(note, 218f);
             TMP_Text factsHeader = NoteRow("FactsHeader", note, 240f, 11f, WithAlpha(PaperMapArt.Graphite, 0.9f));
             factsHeader.text = "заметки на полях:";
@@ -1490,7 +1226,7 @@ namespace SpaceTaxi.UI
             return t;
         }
 
-        // волнистый разделитель — карандашный штрих
+        // волнистый разделитель — карандашный штрих (часть записки, не линии карты)
         private static void MakeDivider(RectTransform parent, float y)
         {
             RectTransform div = MakeImage("Divider", parent, PaperMapArt.RouteDash(),
@@ -1580,6 +1316,33 @@ namespace SpaceTaxi.UI
             CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
             if (start.Type == BodyType.Planet)
                 SelectBody(start);
+        }
+
+        // ————— стартовый вид: приближено к игроку (Н5.21-8) —————
+
+        // карта открывается сфокусированной на позиции игрока (Ship); корабль
+        // недоступен — планета старта; зум InitialViewZoom: окрестности игрока,
+        // ближайшие планеты и подписи читаются
+        private void FocusOnPlayer()
+        {
+            if (!built || content == null || level == null)
+                return;
+            Vector2 mapPos = WorldToMap(PlayerWorldPosition());
+            ApplyZoom(InitialViewZoom, ClampZoomOffset(-mapPos * InitialViewZoom, InitialViewZoom));
+        }
+
+        private Vector2 PlayerWorldPosition()
+        {
+            Transform shipT = ShipPosition();
+            if (shipT != null)
+                return shipT.position;
+            if (level != null && level.StartPlanetIndex >= 0 && level.StartPlanetIndex < level.Bodies.Count)
+            {
+                CelestialBodyData start = level.Bodies[level.StartPlanetIndex];
+                if (start != null)
+                    return start.Position;
+            }
+            return worldCenter;
         }
 
         // ————— выбор и записки —————
@@ -1789,6 +1552,11 @@ namespace SpaceTaxi.UI
                 return;
             content.localScale = Vector3.one * s;
             content.anchoredPosition = offset;
+            if (paperRect != null) // бумага — часть контента: пан двигает, зум зумит её вместе со всем (Н5.21-2)
+            {
+                paperRect.localScale = Vector3.one * s;
+                paperRect.anchoredPosition = offset;
+            }
         }
 
         // зум/пан не выносят содержимое за экран; margin > 1 — резиновый вынос при перетаскивании
@@ -1804,10 +1572,11 @@ namespace SpaceTaxi.UI
 
         // ————— экранное: компас, заголовок, легенда, линейка, кнопки —————
 
-        // компас — роза ветров владельца (map_for_fun_1) с «С»
+        // компас — роза ветров владельца (map_for_fun_1) с «С»; живёт на листе,
+        // поэтому при перекладке листа не уезжает под борткомп
         private void BuildCompass()
         {
-            compassRoot = MakeRect("Compass", mapRect, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
+            compassRoot = MakeRect("Compass", sheetRect, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
             compassRoot.anchoredPosition = new Vector2(66f, -80f);
             compassRoot.sizeDelta = new Vector2(76f, 84f);
 
@@ -1823,21 +1592,21 @@ namespace SpaceTaxi.UI
 
         private void BuildTitle()
         {
-            titleRoot = MakeRect("Title", mapRect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            titleRoot = MakeRect("Title", sheetRect, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
             titleRoot.anchoredPosition = new Vector2(0f, -18f);
-            titleRoot.sizeDelta = new Vector2(620f, 30f);
+            titleRoot.sizeDelta = new Vector2(880f, 40f);
             titleRoot.localRotation = Quaternion.Euler(0f, 0f, 0.4f);
-            TMP_Text title = MakeLabel("T", titleRoot, "маршрутный лист", 17f, WithAlpha(PaperMapArt.Ink, 0.7f));
+            TMP_Text title = MakeLabel("T", titleRoot, "маршрутный лист", 26f, WithAlpha(PaperMapArt.Ink, 0.7f));
             title.characterSpacing = 3f;
         }
 
-        // легенда-клочок: две колонки, только значки владельца
+        // легенда-клочок: две колонки крупных значков (Н5.21-7 — читаемость)
         private void BuildLegend()
         {
-            legendRoot = MakeRect("Legend", mapRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+            legendRoot = MakeRect("Legend", sheetRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
-            legendRoot.sizeDelta = new Vector2(296f, 140f);
+            legendRoot.sizeDelta = new Vector2(490f, 280f);
 
             RectTransform bg = MakeRect("Bg", legendRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image bgImage = bg.gameObject.AddComponent<Image>();
@@ -1854,32 +1623,31 @@ namespace SpaceTaxi.UI
             LegendRow(18f, ref y, PaperMapArt.MapSprite("map_black_hole"), Color.white, "чёрная дыра");
 
             y = 0;
-            LegendRow(158f, ref y, PaperMapArt.MapSprite("map_asteroid"), Color.white, "пояс");
-            LegendRow(158f, ref y, PaperMapArt.MapSprite("map_cometa"), Color.white, "комета");
-            LegendRow(158f, ref y, PaperMapArt.TargetRing(), PaperMapArt.YellowPencil, "цель заказа", 16f);
-            LegendRow(158f, ref y, PaperMapArt.TargetRing(), PaperMapArt.GreenPencil, "своя метка", 16f);
+            LegendRow(254f, ref y, PaperMapArt.MapSprite("map_asteroid"), Color.white, "пояс");
+            LegendRow(254f, ref y, PaperMapArt.MapSprite("map_cometa"), Color.white, "комета");
+            LegendRow(254f, ref y, PaperMapArt.TargetRing(), PaperMapArt.YellowPencil, "цель заказа", 26f);
+            LegendRow(254f, ref y, PaperMapArt.TargetRing(), PaperMapArt.GreenPencil, "своя метка", 26f);
             Sprite rocket = PaperMapArt.MapSprite("map_rocket");
-            LegendRow(158f, ref y, rocket, Color.white, "вы здесь",
-                rocket != null ? 15f : 13f);
+            LegendRow(254f, ref y, rocket, Color.white, "вы здесь", 28f);
         }
 
-        private void LegendRow(float x, ref int row, Sprite icon, Color color, string text, float iconSize = 17f)
+        private void LegendRow(float x, ref int row, Sprite icon, Color color, string text, float iconSize = 30f)
         {
-            float y = 122f - row * 21f;
+            float y = 250f - row * 40f;
             RectTransform iconRect = MakeRect("I", legendRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
-            iconRect.sizeDelta = Vector2.one * 18f;
-            iconRect.anchoredPosition = new Vector2(x + 9f, y);
+            iconRect.sizeDelta = Vector2.one * 34f;
+            iconRect.anchoredPosition = new Vector2(x + 17f, y);
             MakeImage("G", iconRect, icon, color, Vector2.one * iconSize, false);
             if (icon == null)
-                MakeImage("F", iconRect, StubSprites.Circle(64f), WithAlpha(PaperMapArt.Ink, 0.7f), Vector2.one * 12f, false);
+                MakeImage("F", iconRect, StubSprites.Circle(64f), WithAlpha(PaperMapArt.Ink, 0.7f), Vector2.one * 22f, false);
 
-            TMP_Text rowLabel = MakeLabel("R", legendRoot, text, 12f, WithAlpha(PaperMapArt.Ink, 0.9f),
+            TMP_Text rowLabel = MakeLabel("R", legendRoot, text, 24f, WithAlpha(PaperMapArt.Ink, 0.9f),
                 TextAlignmentOptions.Left);
-            ((RectTransform)rowLabel.transform).sizeDelta = new Vector2(110f, 16f);
+            ((RectTransform)rowLabel.transform).sizeDelta = new Vector2(190f, 34f);
             ((RectTransform)rowLabel.transform).anchorMin = new Vector2(0f, 0f);
             ((RectTransform)rowLabel.transform).anchorMax = new Vector2(0f, 0f);
             ((RectTransform)rowLabel.transform).pivot = new Vector2(0f, 0.5f);
-            ((RectTransform)rowLabel.transform).anchoredPosition = new Vector2(x + 24f, y);
+            ((RectTransform)rowLabel.transform).anchoredPosition = new Vector2(x + 44f, y);
             row++;
         }
 
@@ -1895,10 +1663,10 @@ namespace SpaceTaxi.UI
             }
             float px = step * scale;
 
-            rulerRoot = MakeRect("Ruler", mapRect, new Vector2(1f, 0f), new Vector2(1f, 0f), Vector2.zero, Vector2.zero);
+            rulerRoot = MakeRect("Ruler", sheetRect, new Vector2(1f, 0f), new Vector2(1f, 0f), Vector2.zero, Vector2.zero);
             rulerRoot.pivot = new Vector2(0.5f, 0f);
-            rulerRoot.anchoredPosition = new Vector2(-28f - px * 0.5f, 24f);
-            rulerRoot.sizeDelta = new Vector2(px + 8f, 34f);
+            rulerRoot.anchoredPosition = new Vector2(-28f - px * 0.5f, 30f);
+            rulerRoot.sizeDelta = new Vector2(px + 8f, 44f);
             var ink = WithAlpha(PaperMapArt.Ink, 0.8f);
 
             RectTransform line = MakeRect("Line", rulerRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
@@ -1917,24 +1685,24 @@ namespace SpaceTaxi.UI
                 tickImage.raycastTarget = false;
             }
 
-            TMP_Text label = MakeLabel("T", rulerRoot, step + " юн", 12f, ink);
-            ((RectTransform)label.transform).sizeDelta = new Vector2(px + 40f, 18f);
-            ((RectTransform)label.transform).anchoredPosition = new Vector2(0f, 12f);
+            TMP_Text label = MakeLabel("T", rulerRoot, step + " юн", 18f, ink);
+            ((RectTransform)label.transform).sizeDelta = new Vector2(px + 60f, 26f);
+            ((RectTransform)label.transform).anchoredPosition = new Vector2(0f, 14f);
         }
 
-        // кнопки зума: +/− к центру листа, «сброс» — вид «весь мир»
+        // кнопки зума: +/− к центру листа, «сброс» — вид «весь мир» (Н5.21-7: крупнее)
         private void BuildZoomButtons()
         {
-            zoomRoot = MakeRect("ZoomButtons", mapRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            zoomRoot = MakeRect("ZoomButtons", sheetRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
             zoomRoot.pivot = new Vector2(0.5f, 0f);
             zoomRoot.anchoredPosition = new Vector2(0f, 16f);
-            zoomRoot.sizeDelta = new Vector2(200f, 44f);
+            zoomRoot.sizeDelta = new Vector2(260f, 64f);
 
-            MakePaperButton("BtnZoomIn", zoomRoot, new Vector2(44f, 40f), new Vector2(-76f, 0f), "+", 20f,
+            MakePaperButton("BtnZoomIn", zoomRoot, new Vector2(52f, 48f), new Vector2(-84f, 8f), "+", 26f,
                 () => ZoomStep(ButtonZoomStep), 701);
-            MakePaperButton("BtnZoomOut", zoomRoot, new Vector2(44f, 40f), new Vector2(-26f, 0f), "-", 20f,
+            MakePaperButton("BtnZoomOut", zoomRoot, new Vector2(52f, 48f), new Vector2(-26f, 8f), "-", 26f,
                 () => ZoomStep(1f / ButtonZoomStep), 702);
-            MakePaperButton("BtnZoomReset", zoomRoot, new Vector2(96f, 40f), new Vector2(52f, 0f), "сброс", 13f,
+            MakePaperButton("BtnZoomReset", zoomRoot, new Vector2(124f, 48f), new Vector2(66f, 8f), "сброс", 20f,
                 () => AnimateZoom(1f, Vector2.zero), 703);
         }
 
@@ -1987,9 +1755,10 @@ namespace SpaceTaxi.UI
         {
             ClearChildren(transform);
             sheetRect = null;
+            paperClip = null;
+            paperRect = null;
             content = null;
             sectorRoot = null;
-            orbitsRoot = null;
             edgeRoot = null;
             beltsRoot = null;
             decoRoot = null;
@@ -2005,13 +1774,8 @@ namespace SpaceTaxi.UI
             markers.Clear();
             bodySizes.Clear();
             bodyLabels.Clear();
-            mapLabels.Clear();
-            labelObstacles.Clear();
             cometIcons.Clear();
             cometLastPos.Clear();
-            routeRoot = null;
-            routeDashes.Clear();
-            routeDashImages.Clear();
             hoverCaptureRing = null;
             hoverLandingRing = null;
             playerMarker = null;
@@ -2029,7 +1793,6 @@ namespace SpaceTaxi.UI
             waypointPinImage = null;
             targetIndex = -1;
             lastTargetBody = null;
-            routeShown = false;
             selectedBody = null;
             noteName = null;
             noteSubtitle = null;
@@ -2092,7 +1855,8 @@ namespace SpaceTaxi.UI
             return rect;
         }
 
-        // все подписи карты одним рукописным шрифтом; высоты узлов ≥ fontSize*1.32 (урок ночи 4)
+        // все подписи карты одним рукописным шрифтом (Н5.21-3 — только Excalifont);
+        // высоты узлов ≥ fontSize*1.32 (урок ночи 4)
         private TMP_Text MakeLabel(string name, Transform parent, string text, float size, Color color,
             TextAlignmentOptions align = TextAlignmentOptions.Center)
         {

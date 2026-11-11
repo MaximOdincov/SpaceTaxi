@@ -99,26 +99,10 @@ namespace SpaceTaxi.UI
         }
 
         // — процедурные карандашные спрайты (кэш в статике) —
+        // Н5.21-5: пунктирные кольца-линии (орбиты, сеть, пояс, штриховка) убраны
+        // вместе с их генераторами — остались только ореолы и штрих разделителя.
 
-        // тонкий частый пунктир орбит
-        public static Sprite OrbitRing()
-        {
-            return RingSprite("orbit", 256, 0.955f, 0.985f, 0.55f, 90f, 0.004f);
-        }
-
-        // пунктир сети буёв / кометной зоны
-        public static Sprite NetworkRing()
-        {
-            return RingSprite("network", 256, 0.95f, 0.99f, 0.62f, 44f, 0.006f);
-        }
-
-        // штриховая каракуля-дуга пояса
-        public static Sprite BeltRing()
-        {
-            return RingSprite("belt", 256, 0.93f, 0.985f, 0.5f, 28f, 0.01f);
-        }
-
-    // сплошной карандашный обвод (цель заказа)
+    // сплошной карандашный обвод (цель заказа, ореолы)
     public static Sprite TargetRing()
     {
         return RingSprite("target", 256, 0.94f, 0.99f, 1f, 1f, 0.012f);
@@ -287,26 +271,6 @@ namespace SpaceTaxi.UI
         cache[key] = s;
         return s;
     }
-
-        // штриховка снаружи сети (зона потери связи)
-        public static Sprite HatchRing()
-        {
-            if (cache.TryGetValue("hatch", out Sprite s) && s != null)
-                return s;
-            var tex = StubSprites.CreateMaskTexture(256, (x, y) =>
-            {
-                float r = Mathf.Sqrt(x * x + y * y);
-                float wob = 1f + 0.008f * Mathf.Sin(Mathf.Atan2(y, x) * 4f + 0.7f);
-                r /= wob;
-                if (r < 0.86f || r > 1f)
-                    return false;
-                float stripe = Mathf.Repeat((x + y) * 16f, 1f); // диагональная штриховка
-                return stripe < 0.55f;
-            });
-            s = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f);
-            cache["hatch"] = s;
-            return s;
-        }
 
         // метка-waypoint: булавка (головка + остриё)
         public static Sprite Pin()
