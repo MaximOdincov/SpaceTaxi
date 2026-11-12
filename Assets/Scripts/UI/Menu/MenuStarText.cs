@@ -88,6 +88,20 @@ namespace SpaceTaxi.UI
         // Общая добавка к яркости (наведение на кнопку), 0..1
         public void SetBoost(float value) => boost = value;
 
+        // Н6: перекрасить все глифы (rgb) — белый базовый / жёлтый под
+        // наведение; индивидуальная альфа каждой звезды сохраняется
+        public void SetGlyphColor(Color color)
+        {
+            var rgb = (Color32)color;
+            for (int i = 0; i < stars.Count; i++)
+            {
+                MenuTwinkle.Star star = stars[i];
+                star.BaseColor = new Color32(rgb.r, rgb.g, rgb.b, star.BaseColor.a);
+                stars[i] = star;
+                star.Image.color = star.BaseColor; // до ближайшего шага мерцания
+            }
+        }
+
         private void Update() => MenuTwinkle.Step(stars, Time.unscaledTime, boost);
 
         private static float MeasureColumns(string text)

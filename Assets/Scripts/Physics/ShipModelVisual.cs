@@ -26,6 +26,14 @@ namespace SpaceTaxi.Physics
 
         private Transform visual;
         private float contentHeight; // высота контента в юнитах корня (после масштаба визуала)
+        // Н6 хотфикс: у артов есть прозрачный отступ снизу — в позе Landed корабль
+        // «парит» над поверхностью. Топим ТОЛЬКО визуал (в мировых юнитах): капсула,
+        // поза физики и предиктивная посадка (G1) не тронуты; на взлёте — обратно.
+        private const float LandedSinkWorld = 2.5f;
+
+        private Ship ship;
+        private Vector3 baseVisualLocalPos; // центрирование контента из Apply
+        private bool sinkApplied;
 
         public bool HasVisual => visual != null;
         public Transform VisualRoot => visual;
@@ -52,6 +60,7 @@ namespace SpaceTaxi.Physics
             }
             visual = null;
             contentHeight = 0f;
+            sinkApplied = false; // новый визуал — синк переприменится в LateUpdate
 
             GameObject prefab = LoadPrefab(config != null ? config.Id : null);
             var rootRenderer = GetComponent<SpriteRenderer>();
@@ -78,6 +87,7 @@ namespace SpaceTaxi.Physics
             visual.name = "ModelVisual";
             visual.localPosition = Vector3.zero;
             visual.localRotation = Quaternion.identity;
+            baseVisualLocalPos = Vector3.zero;
 
             var renderer = visual.GetComponentInChildren<SpriteRenderer>();
             if (renderer != null && renderer.sprite != null)
@@ -97,6 +107,7 @@ namespace SpaceTaxi.Physics
                     // центр контента на оси корабля (localPosition в осях корня,
                     // родительский масштаб применится сам)
                     visual.localPosition = -(content.center * s);
+                    baseVisualLocalPos = visual.localPosition;
                     contentHeight = content.height * s;
 
                     var circle = GetComponent<CircleCollider2D>();
@@ -115,6 +126,27 @@ namespace SpaceTaxi.Physics
 
             GetComponent<EngineEffects>()?.Rebind(); // слоты переехали в новый визуал
             GetComponent<SpeedTrail>()?.Rebuild(); // шлейфы — по setup новой модели
+        }
+
+        // присдвиг визуала к земле только в позе Landed (см. LandedSinkWorld);
+        // LateUpdate — после Apply/эффектов, чтобы сдвиг не сбрасывался кадром
+        private void Awake()
+        {
+            ship = GetComponent<Ship>();
+        }
+
+        private void LateUpdate()
+        {
+            if (visual == null)
+                return;
+            bool landed = ship != null && ship.State == ShipState.Landed;
+            if (landed == sinkApplied)
+                return;
+            sinkApplied = landed;
+            Vector3 p = baseVisualLocalPos;
+            if (landed)
+                p.y -= LandedSinkWorld / Mathf.Max(Mathf.Abs(transform.lossyScale.y), 0.0001f);
+            visual.localPosition = p;
         }
 
         private static GameObject LoadPrefab(string id)

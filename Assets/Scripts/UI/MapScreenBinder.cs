@@ -21,10 +21,11 @@ namespace SpaceTaxi.UI
     // Тёмный стол (Backdrop) начинается ПРАВЕЕ борткомпа — панель остаётся яркой
     // при открытой карте (Н6.K1). Декор for_fun и компас-роза убраны (Н6.K2),
     // легенда — без подложки, чернила прямо на бумаге (Н6.K3).
-    // Записки тел (PaperMapLore) нацарапаны ПРЯМО на карте возле тел: издалека
-    // почти не видны, крупным планом читаются; клик по телу приближает и
-    // подсвечивает его записку (Н6.K4); уголок-записка снесён, «пометить» —
-    // маленькая чернильная кнопка у верхнего края листа.
+    // Записки тел (PaperMapLore) нацарапаны ПРЯМО на карте возле тел и СКРЫТЫ,
+    // пока тело не выбрано: клик по телу приближает карту и выводит только его
+    // записку (кегль ×1.3, плотные чернила), снятие выбора прячет снова —
+    // Н6.K4 + Н6.HF2; уголок-записка снесён, «пометить» — маленькая чернильная
+    // кнопка у верхнего края листа.
     // Нарисованные линии убраны (рамки районов, орбиты, кольца дистанций, сетка,
     // пунктирные пути, кольца мира/поясов/хаба) — остались иконки тел (диаметр
     // пропорционален радиусу, максимум уровня = опорный), подписи «на бумаге»
@@ -35,7 +36,11 @@ namespace SpaceTaxi.UI
     // (mapFont из сцены, фолбэк — Resources). Взрыв корабля — расходящееся
     // кольцо с искрами в точке ракеты, стоянка — мягкая тень-подставка (Н6.K7).
     // Курсор системный всегда (Н6.K8); зоны клика подписей = размер текста,
-    // пояс ловит клик по кольцу, не по квадрату (Н6.K9). Карта открывается
+    // пояс ловит клик по кольцу, не по квадрату (Н6.K9). Н6.HF: зона подписи
+    // ужата до текста +3/2 px, пересекшиеся подписи разводит солвер записок
+    // (8 направлений × 4 дистанции), иконки в рейкасте выше подписей; отдаление
+    // клампится раньше — при минимальном зуме видно ≤ 62% диаметра мира.
+    // Карта открывается
     // ПРИБЛИЖЕННОЙ К ИГРОКУ (зум 9; нет корабля — планета старта). Публичный
     // контракт сохранён: Waypoint + WaypointChanged + Set/Clear/ToggleWaypoint
     // (WaypointIndicator, MinimapBinder), SetView/SelectBody (оркестратор),
@@ -47,8 +52,13 @@ namespace SpaceTaxi.UI
         [SerializeField] private TMP_FontAsset mapFont; // Excalifont-Regular SDF — назначен в сцене
 
         // — вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору —
-        private const float MinViewZoom = 1f;      // из базового вида не отдаляемся
-        private const float MaxViewZoom = 14f;     // от «весь мир» до одной планеты крупно
+        // Н6.HF1: прежний MinViewZoom = 1 означал «из базового вида не отдаляемся»,
+        // но мир стал компактным (×0.58, край тела ~3936 юн от старта) и целиком
+        // влезал даже на максимальном отъезде. Минимальный зум больше не константа:
+        // он считается в BuildMap от реального окна (поле minViewZoom) так, чтобы
+        // при полном отдалении по каждой оси было видно ≤ 62% диаметра мира
+        private const float MinZoomWorldFraction = 0.62f; // доля диаметра мира в окне при минимальном зуме
+        private const float MaxViewZoom = 14f;     // от максимального отъезда до одной планеты крупно
         private const float InitialViewZoom = 9f;  // карта открывается приближенной к игроку
         private const float ClickZoom = 8f;        // клик по телу — сильный зум (видны записи)
         private const float ZoomDuration = 0.22f;
@@ -177,6 +187,7 @@ namespace SpaceTaxi.UI
         private RectTransform hoverCaptureRing;
         private RectTransform hoverLandingRing;
         private readonly Dictionary<CelestialBodyData, TMP_Text> bodyLabels = new Dictionary<CelestialBodyData, TMP_Text>();
+        private readonly Dictionary<CelestialBodyData, Vector2> labelOffsets = new Dictionary<CelestialBodyData, Vector2>(); // разводка подписей (Н6.HF3): смещение от точки посадки, живёт между пересборками
 
         // живые кометы (по ActiveComets CometSystem — как точки миникарты)
         private CometSystem cometSystem;
@@ -188,6 +199,7 @@ namespace SpaceTaxi.UI
         private float scale = 1f;
 
         private float zoom = 1f;
+        private float minViewZoom = 1f; // нижний порог зума отдаления; считается в BuildMap (Н6.HF1)
         private float zoomFrom = 1f;
         private float zoomTo = 1f;
         private float zoomT = 1f;
@@ -356,6 +368,7 @@ namespace SpaceTaxi.UI
         {
             // карта закрылась — вид и панель сбрасываем, следующий вход с чистого экрана
             selectedBody = null;
+            HighlightSelectedNote(); // Н6.HF2: при закрытии карты записки снова скрыты
             if (markButtonRoot != null)
                 markButtonRoot.gameObject.SetActive(false);
             dragging = false;
@@ -489,18 +502,27 @@ namespace SpaceTaxi.UI
             scale = Mathf.Min(w / (2f * extX * FitMargin), h / (2f * extY * FitMargin));
             scale = Mathf.Max(scale, 0.012f);
 
+            // Н6.HF1: порог отдаления — при минимальном зуме по каждой оси видно
+            // ≤ MinZoomWorldFraction диаметра мира (нормируем на bbox тел; т.к.
+            // scale вписывает bbox с полем FitMargin, порог никогда не ниже ≈1.77)
+            float minByWidth = w / (scale * 2f * extX * MinZoomWorldFraction);
+            float minByHeight = h / (scale * 2f * extY * MinZoomWorldFraction);
+            minViewZoom = Mathf.Min(MaxViewZoom, Mathf.Max(minByWidth, minByHeight));
+
             // рамка листа «от руки» — когда размер известен
             MakeSketchFrame(sheetRect, WithAlpha(PaperMapArt.Ink, 0.75f), 2.6f, 1042);
 
-            // слои снизу вверх: районы → край мира → пояса → декор → тела →
-            // подписи → hover → кометы → метка/цель (игрок — на листе, выше всех).
+            // слои снизу вверх: районы → край мира → пояса → подписи → тела →
+            // hover → кометы → метка/цель (игрок — на листе, выше всех).
             // Нарисованные линии (рамки районов, орбиты, кольца дистанций, сетка,
-            // пунктирные пути) убраны совсем — Н5.21-5.
+            // пунктирные пути) убраны совсем — Н5.21-5. Н6.HF3: подписи НИЖЕ
+            // иконок — при пересечении клик-зон рейкаст первым ловит иконку тела,
+            // а не чужую подпись (разводка убирает почти все пересечения).
             sectorRoot = MakeRect("Sectors", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             edgeRoot = MakeRect("WorldEdge", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             beltsRoot = MakeRect("Belts", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            bodiesRoot = MakeRect("Bodies", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             labelsRoot = MakeRect("Labels", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            bodiesRoot = MakeRect("Bodies", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             // чернильная клякса в origin мира (отметка центра, не линия)
             MakeImage("WorldCenter", content, PaperMapArt.InkDot(),
@@ -515,7 +537,8 @@ namespace SpaceTaxi.UI
             foreach (CelestialBodyData body in level.Bodies)
                 if (body.Type != BodyType.AsteroidBelt)
                     CreateBody(body);
-            BuildBodyNotes(); // Н6.K4: записки «на полях» после тел и подписей
+            ResolveLabelOverlaps(); // Н6.HF3: развести пересекшиеся подписи — до записок
+            BuildBodyNotes(); // Н6.K4: записки «на полях» после тел, подписей и их разводки
 
             hoverCaptureRing = MakeImage("HoverCapture", content, PaperMapArt.TargetRing(),
                 WithAlpha(PaperMapArt.Graphite, 0.7f), Vector2.zero, false);
@@ -758,7 +781,7 @@ namespace SpaceTaxi.UI
                 WithAlpha(PaperMapArt.Ink, 0.85f));
             RectTransform labelRect = (RectTransform)label.transform;
             labelRect.sizeDelta = new Vector2(240f, 28f);
-            labelRect.anchoredPosition = pos + new Vector2(diameter * 0.5f + 10f, -(diameter * 0.5f + 15f));
+            labelRect.anchoredPosition = LabelPlacement(body, pos + new Vector2(diameter * 0.5f + 10f, -(diameter * 0.5f + 15f)));
             bodyLabels[body] = label;
             MakeLabelSelectable(label, body); // Н6.K9: зона = размер текста
         }
@@ -832,20 +855,21 @@ namespace SpaceTaxi.UI
                 WithAlpha(PaperMapArt.Ink, 0.95f));
             RectTransform labelRect = (RectTransform)label.transform;
             labelRect.sizeDelta = new Vector2(220f, 28f); // высота ≥ fontSize×1.32 и для hover-кегля
-            labelRect.anchoredPosition = pos + new Vector2(size.x * 0.5f + 10f, -(size.y * 0.5f + 15f));
+            labelRect.anchoredPosition = LabelPlacement(body, pos + new Vector2(size.x * 0.5f + 10f, -(size.y * 0.5f + 15f)));
             bodyLabels[body] = label;
             MakeLabelSelectable(label, body); // Н6.K9: зона = размер текста
         }
 
-        // Н6.K9: клик/hover-зона подписи = размер текста + 5-6px. TMP включается
-        // в рейкаст, рект сжимается до preferred-размера (был широкий квадрат-планка),
-        // hover ведёт себя как у иконки — те же кольца радиусов и увеличение
+        // Н6.K9 → Н6.HF3: клик/hover-зона подписи = размер текста + 3/2 px (прежде
+        // 6×5 — прямоугольная ловушка была заметно шире текста, у близких планет
+        // наведение попадало на соседнюю подпись). TMP включается в рейкаст, рект
+        // сжат до preferred-размера, hover ведёт себя как у иконки — кольца радиусов
         private void MakeLabelSelectable(TMP_Text label, CelestialBodyData body)
         {
             if (label == null)
                 return;
             RectTransform rect = (RectTransform)label.transform;
-            rect.sizeDelta = label.GetPreferredValues() + new Vector2(6f, 5f);
+            rect.sizeDelta = label.GetPreferredValues() + new Vector2(3f, 2f);
             label.raycastTarget = true;
             var marker = label.gameObject.AddComponent<MapMarker>();
             CelestialBodyData captured = body;
@@ -860,6 +884,94 @@ namespace SpaceTaxi.UI
             };
             marker.HoverEntered += () => ShowHoverRings(captured, true);
             marker.HoverExited += () => ShowHoverRings(captured, false);
+        }
+
+        // точка посадки подписи + запомненное солвером разводки смещение (Н6.HF3):
+        // применяется при построении, чтобы пересборки карты не прыгали подписями
+        private Vector2 LabelPlacement(CelestialBodyData body, Vector2 attach)
+        {
+            return labelOffsets.TryGetValue(body, out Vector2 offset) ? attach + offset : attach;
+        }
+
+        // Н6.HF3: разводка подписей — тот же перебор, что у записок (8 направлений ×
+        // 4 дистанции). Подпись, чья зона налезает на чужую подпись, чужую иконку
+        // или пометки края/районов, сдвигается по первому свободному направлению от
+        // своего тела; смещение запоминается в labelOffsets. Разводка выполняется
+        // ПОСЛЕ всех тел и подписей и ДО записок — они учитывают сдвинутые подписи
+        private void ResolveLabelOverlaps()
+        {
+            var iconRects = new Dictionary<CelestialBodyData, Rect>(level.Bodies.Count);
+            foreach (CelestialBodyData body in level.Bodies)
+                iconRects[body] = CenteredRect(WorldToMap(body.Position), Vector2.one * IconSizeOf(body));
+
+            var staticBlocked = new List<Rect>();
+            CollectRects(sectorRoot, staticBlocked); // рукописные подписи районов
+            CollectRects(edgeRoot, staticBlocked);   // буи края, «потеря связи», кометная зона
+
+            foreach (CelestialBodyData body in level.Bodies)
+            {
+                if (!bodyLabels.TryGetValue(body, out TMP_Text label) || label == null)
+                    continue;
+                RectTransform rect = (RectTransform)label.transform;
+                Rect current = CenteredRect(rect.anchoredPosition, rect.sizeDelta);
+                if (!LabelBlocked(current, body, iconRects, staticBlocked))
+                    continue; // стоит свободно — не трогаем
+
+                labelOffsets.TryGetValue(body, out Vector2 prevOffset);
+                Vector2 anchor = rect.anchoredPosition - prevOffset; // точка посадки без смещения
+                Vector2 center = WorldToMap(body.Position);
+                float iconHalf = IconSizeOf(body) * 0.5f;
+                bool placed = false;
+                for (int dirIndex = 0; dirIndex < 8 && !placed; dirIndex++)
+                {
+                    float ang = dirIndex * 45f * Mathf.Deg2Rad;
+                    var dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                    for (int step = 0; step < 4 && !placed; step++)
+                    {
+                        float dist = iconHalf + 14f + step * 16f;
+                        Vector2 candidateCenter = center + dir * dist;
+                        Rect candidate = CenteredRect(candidateCenter, rect.sizeDelta);
+                        if (candidate.Overlaps(CenteredRect(center, Vector2.one * (iconHalf * 2f + 10f))))
+                            continue; // собственную иконку не накрывать
+                        if (LabelBlocked(candidate, body, iconRects, staticBlocked))
+                            continue;
+                        rect.anchoredPosition = candidateCenter;
+                        labelOffsets[body] = candidateCenter - anchor; // запомнить смещение
+                        placed = true;
+                    }
+                }
+                // свободных направлений нет — подпись остаётся как стоит: приоритет
+                // иконки в рейкасте (подписи ниже иконок) защищает клик по самому телу
+            }
+        }
+
+        private static void CollectRects(RectTransform root, List<Rect> into)
+        {
+            if (root == null)
+                return;
+            foreach (Transform child in root)
+                if (child is RectTransform rect)
+                    into.Add(CenteredRect(rect.anchoredPosition, rect.sizeDelta));
+        }
+
+        // пересечение зоны с чужой подписью, чужой иконкой или статичной пометкой
+        private bool LabelBlocked(Rect rect, CelestialBodyData self,
+            Dictionary<CelestialBodyData, Rect> iconRects, List<Rect> staticBlocked)
+        {
+            if (OverlapsAny(rect, staticBlocked))
+                return true;
+            foreach (var pair in iconRects)
+                if (pair.Key != self && rect.Overlaps(pair.Value))
+                    return true;
+            foreach (var pair in bodyLabels)
+            {
+                if (pair.Key == self || pair.Value == null)
+                    continue;
+                RectTransform other = (RectTransform)pair.Value.transform;
+                if (rect.Overlaps(CenteredRect(other.anchoredPosition, other.sizeDelta)))
+                    return true;
+            }
+            return false;
         }
 
         // спрайт тела: хаб — планета-такси, заправка/мастерская — «планеты со
@@ -1399,6 +1511,11 @@ namespace SpaceTaxi.UI
                 bodyNotes[body] = note;
                 blocked.Add(noteRect);
             }
+
+            // Н6.HF2: записки скрыты, пока тело не выбрано — SelectBody покажет
+            // только записку выбранного тела, Deselect спрячет обратно
+            foreach (TMP_Text note in bodyNotes.Values)
+                note.enabled = false;
         }
 
         private static Rect CenteredRect(Vector2 center, Vector2 size)
@@ -1427,13 +1544,15 @@ namespace SpaceTaxi.UI
             return false;
         }
 
-        // выбор тела: записка подсвечивается чернилами (клик по планете «открывает»
-        // её записи на карте), у верхнего края появляется кнопка «пометить»
+        // Н6.HF2: записки скрыты по умолчанию; выбор тела «проявляет» ТОЛЬКО его
+        // записку (кегль ×1.3, плотные чернила), снятие выбора прячет снова.
+        // Единая точка show/hide: вызывается из SelectBody/Deselect
         private void HighlightSelectedNote()
         {
             foreach (var pair in bodyNotes)
             {
                 bool on = pair.Key == selectedBody;
+                pair.Value.enabled = on;
                 pair.Value.color = on ? WithAlpha(PaperMapArt.Ink, 0.95f) : WithAlpha(PaperMapArt.Ink, NoteAlpha);
                 pair.Value.fontSize = on ? NoteFontSize * 1.3f : NoteFontSize;
             }
@@ -1499,7 +1618,10 @@ namespace SpaceTaxi.UI
         {
             followMode = false;
             RefreshFollowButton();
-            float s = zoom < 1.4f ? ClickZoom : zoom;
+            // с минимального отдаления клик по телу всегда даёт сильный зум —
+            // иначе записка останется нечитаемой (Н6.HF1: прежний порог 1.4
+            // стал ниже минимального зума)
+            float s = zoom < minViewZoom + 0.1f ? ClickZoom : zoom;
             AnimateZoom(s, -targetInContent * s);
         }
 
@@ -1528,7 +1650,7 @@ namespace SpaceTaxi.UI
             if (content == null || sheetRect == null || !TryScreenToSheet(screenPos, out Vector2 m))
                 return;
             zoomAnim = false;
-            float s = Mathf.Clamp(zoom * factor, MinViewZoom, MaxViewZoom);
+            float s = Mathf.Clamp(zoom * factor, minViewZoom, MaxViewZoom);
             if (Mathf.Abs(s - zoom) < 0.0001f)
                 return;
             Vector2 c = sheetRect.rect.center;
@@ -1541,7 +1663,7 @@ namespace SpaceTaxi.UI
         {
             if (content == null)
                 return;
-            float s = Mathf.Clamp(zoom * factor, MinViewZoom, MaxViewZoom);
+            float s = Mathf.Clamp(zoom * factor, minViewZoom, MaxViewZoom);
             if (Mathf.Abs(s - zoom) < 0.0001f)
                 return;
             AnimateZoom(s, zoomOffset * (s / zoom));
@@ -1552,7 +1674,7 @@ namespace SpaceTaxi.UI
         {
             if (!built || content == null)
                 return;
-            float s = Mathf.Clamp(viewZoom, MinViewZoom, MaxViewZoom);
+            float s = Mathf.Clamp(viewZoom, minViewZoom, MaxViewZoom);
             zoomAnim = false;
             ApplyZoom(s, ClampZoomOffset(sheetOffset, s));
         }
@@ -1808,8 +1930,9 @@ namespace SpaceTaxi.UI
             ((RectTransform)label.transform).anchoredPosition = new Vector2(0f, 14f);
         }
 
-        // кнопки зума: +/− к центру листа, «сброс» — вид «весь мир», «следить» —
-        // фиксация камеры на ракете (Н5.21-7: крупнее; Н6.K6: кнопка следования)
+        // кнопки зума: +/− к центру листа, «сброс» — максимальный отъезд
+        // (Н6.HF1: вид «весь мир» больше не существует), «следить» — фиксация
+        // камеры на ракете (Н5.21-7: крупнее; Н6.K6: кнопка следования)
         private void BuildZoomButtons()
         {
             zoomRoot = MakeRect("ZoomButtons", sheetRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
@@ -1822,7 +1945,7 @@ namespace SpaceTaxi.UI
             MakePaperButton("BtnZoomOut", zoomRoot, new Vector2(52f, 48f), new Vector2(-104f, 8f), "-", 26f,
                 () => ZoomStep(1f / ButtonZoomStep), 702);
             MakePaperButton("BtnZoomReset", zoomRoot, new Vector2(124f, 48f), new Vector2(-10f, 8f), "сброс", 20f,
-                () => AnimateZoom(1f, Vector2.zero), 703);
+                () => AnimateZoom(minViewZoom, Vector2.zero), 703); // Н6.HF1: сброс = максимальный отъезд, не «весь мир»
             followButton = MakePaperButton("BtnFollow", zoomRoot, new Vector2(150f, 48f), new Vector2(130f, 8f),
                 "следить: выкл", 15f, ToggleFollow, 704);
             followLabel = followButton.GetComponentInChildren<TMP_Text>();

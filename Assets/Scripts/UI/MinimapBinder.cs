@@ -29,7 +29,6 @@ namespace SpaceTaxi.UI
     // строится кодом, сцена не трогается.
     public class MinimapBinder : MonoBehaviour
     {
-        private const float SweepSpeedDeg = 72f;  // скорость луча развёртки
         private const int BuoyCount = 12;         // буи связи по границе мира
         private const float RebuildWidthEps = 2f; // пересборка при заметной смене ширины
 
@@ -129,7 +128,6 @@ namespace SpaceTaxi.UI
         private float shipIconDeg = 45f;       // текущий поворот иконки корабля (старт: нос вверх)
         private float shipIconNoseOffset;      // нос арта в системе спрайта: 45° (for_mini) или 0° (заглушка)
         private Vector2 shipPos;       // позиция корабля в этом кадре (центр проекции)
-        private float sweepAngle;
         private float beltAngle;
         private float beltSpinDeg = 0.12f * Mathf.Rad2Deg;
         private float cometWarnUntil;
@@ -491,8 +489,14 @@ namespace SpaceTaxi.UI
 
         private void UpdateSweep()
         {
-            sweepAngle = (sweepAngle + SweepSpeedDeg * Time.unscaledDeltaTime) % 360f;
-            sweep.localRotation = Quaternion.Euler(0f, 0f, -sweepAngle); // по часовой, как классический радар
+            if (sweep == null)
+                return;
+            // Н6 хотфикс: сектор не «ищет» по кругу, а смотрит по носу корабля —
+            // тот же сглаженный курс, что у иконки (shipIconDeg = курс − нос арта).
+            // Арт сектора «остриём вверх» (интринсик 90°), у иконки нос скомпенсирован
+            // на 45° — доворот сектора = shipIconDeg − 45; стоит корабль — сектор
+            // держит последний курс, как и иконка.
+            sweep.localRotation = Quaternion.Euler(0f, 0f, shipIconDeg - 45f);
         }
 
         private void UpdateBelts()

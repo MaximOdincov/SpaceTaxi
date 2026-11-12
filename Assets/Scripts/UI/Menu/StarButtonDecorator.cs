@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -7,56 +6,77 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI
 {
-    // Кнопка «из звёзд» (бриф E2/E3): плашек и шрифта нет — прячу сценические
-    // Frame/Background с плоской заливкой и TMP-Label, вместо них звёздная
-    // рамка по периметру кнопки и текст, выложенный звёздами (MenuStarText
-    // по маскам 5x7). Наведение: масштаб 1 → 1.06 (рамка и текст растут
-    // вместе с кнопкой), гало проявляется, звёзды рамки и текста ярче.
-    // Клик НЕ хукаем через UiSfx: у сценических кнопок звук уже повешен ПЕРВЫМ
-    // слушателем (AudioSource.Play из инспектора, клип ui_click) — повторный хук
-    // дал бы двойной щелчок (см. предупреждение в UiSfx.cs). Биндинги не тронуты.
+    // Кнопка «из звёзд» (бриф E2/E3, хотфикс Н6): плашек и шрифта нет — прячу
+    // сценические Frame/Background с плоской заливкой и TMP-Label; текст
+    // выложен звёздами (MenuStarText по маскам 5x7). Звёздной рамки по
+    // периметру больше НЕТ (Н6: кнопка = только звёздный текст).
+    //
+    // Цвет (Н6): все глифы кнопки базово ЧИСТО БЕЛЫЕ; при наведении —
+    // такси-жёлтый, при уходе — обратно белый. Заголовок «SPACE TAXI» не
+    // тронут (MenuStarTitle красит сам). Наведение: масштаб 1 → 1.06,
+    // гало проявляется — как раньше.
+    //
+    // Хотфикс Н6 (кликабельность): после гашения Frame/Background/Label под
+    // кнопкой не оставалось НИ ОДНОГО raycastTarget (звёзды MenuTwinkle
+    // создаются с raycastTarget=false, гало тоже) — pointer-события вообще
+    // не доходили до Button: клики падали сквозь кнопку в ClickCatcher
+    // (яйцо летело вместо нажатия, hover не включался). Лечение:
+    // прозрачный Image на весь прямоугольник кнопки с raycastTarget=true —
+    // клики и hover ловятся по всей площади. Клик НЕ хукаем через UiSfx:
+    // у сценических кнопок AudioSource.Play уже ПЕРВЫЙ слушатель в сцене
+    // (клип ui_click), повторный хук дал бы двойной щелчок. onClick-биндинги
+    // сцены (SceneFlowButtons) не тронуты.
     public sealed class StarButtonDecorator : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         private const float HoverScale = 1.06f;
         private const float HaloAlpha = 0.22f;
         private const float GlowSpeed = 0.18f; // сек на полное проявление гало
-        private const float FrameStep = 46f;   // шаг звёзд рамки, px
-        private const float FrameJitter = 3f;  // дрожание звезды рамки, px
-        private const float CornerSizeMin = 14f;
-        private const float CornerSizeMax = 18f;
-        private const float EdgeSizeMin = 7f;
-        private const float EdgeSizeMax = 12f;
         private const float BoostMax = 0.9f;   // добавка к волне звёзд при наведении
 
-        private static readonly Color[] Palette =
-        {
-            new(0.659f, 1f, 0.796f),   // мятный
-            new(1f, 0.95f, 0.8f),      // тёплый белый
-            new(1f, 0.831f, 0.302f),   // такси-жёлтый
-            new(0.80f, 0.88f, 1f)      // холодный голубой
-        };
+        // Н6: глифы кнопок — белый базовый и жёлтый под наведение
+        // (такси-жёлтый проекта, как у гало: 1, 0.831, 0.302)
+        private static readonly Color GlyphWhite = Color.white;
+        private static readonly Color GlyphYellow = new(1f, 0.831f, 0.302f);
+        private static readonly Color[] GlyphPalette = { GlyphWhite };
 
-        private readonly List<MenuTwinkle.Star> stars = new();
         private RectTransform rect;
         private Button button;
         private Image halo;
         private MenuStarText starText;
-        private float glow; // текущая сила подсветки 0..1
+        private float glow;         // текущая сила подсветки 0..1
         private bool hovered;
+        private bool glyphsYellow;  // Н6: текущая перекраска глифов
 
         public void Build()
         {
             rect = (RectTransform)transform;
             button = GetComponent<Button>();
 
+            BuildClickTarget();
             HidePlaques();
             BuildHalo();
             BuildLabel();
-            BuildFrame();
+        }
+
+        // хотфикс Н6: единственный raycast-таргет кнопки — невидимый Image на
+        // всю площадь (первым ребёнком, под звёздами). Без него после гашения
+        // плашек/лейбла клики проваливаются сквозь кнопку в ClickCatcher
+        private void BuildClickTarget()
+        {
+            var clickGo = new GameObject("ClickTarget", typeof(RectTransform), typeof(Image));
+            clickGo.transform.SetParent(rect, false);
+            var clickRect = (RectTransform)clickGo.transform;
+            clickRect.anchorMin = Vector2.zero;
+            clickRect.anchorMax = Vector2.one;
+            clickRect.offsetMin = Vector2.zero;
+            clickRect.offsetMax = Vector2.zero;
+            Image clickImage = clickGo.GetComponent<Image>();
+            clickImage.color = new Color(0f, 0f, 0f, 0f); // невидим
+            clickImage.raycastTarget = true;
         }
 
         // бриф E2: плашки — прямые дети кнопки Frame/Background с плоской
-        // заливкой (Image без спрайта); прячу объекты, кнопки держат звёзды
+        // заливкой (Image без спрайта); прячу объекты, кнопка держит звёзды
         private void HidePlaques()
         {
             for (int i = 0; i < rect.childCount; i++)
@@ -69,7 +89,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // гало за кнопкой: в индекс 0 — под звёздами рамки и текста
+        // гало за кнопкой: в индекс 0 — под звёздами текста
         private void BuildHalo()
         {
             var haloGo = new GameObject("StarHalo", typeof(RectTransform), typeof(Image));
@@ -88,7 +108,8 @@ namespace SpaceTaxi.UI
 
         // бриф E3: текст кнопки — звёздами по маскам, TMP-Label гасится.
         // Надпись строится по центру КНОПКИ (не Label — у сценических Label
-        // разные размеры/поля), высота букв ~54px при кнопке 108px
+        // разные размеры/поля), высота букв ~54px при кнопке 108px.
+        // Н6: палитра глифов — чистый белый (без мяты/золота/голубого)
         private void BuildLabel()
         {
             string text = null;
@@ -101,44 +122,7 @@ namespace SpaceTaxi.UI
                 text = gameObject.name; // страховка: имя кнопки
 
             starText = gameObject.AddComponent<MenuStarText>();
-            starText.Build(rect, text.Trim(), Palette, maxWidthFactor: 0.86f, maxHeightFactor: 0.62f);
-        }
-
-        // звёздная рамка: звёзды по периметру с дрожанием, углы — крупными
-        // блик-искрами; шаг ~46px даёт ~34 звезды на кнопку 679x108
-        private void BuildFrame()
-        {
-            float halfWidth = rect.rect.width * 0.5f;
-            float halfHeight = rect.rect.height * 0.5f;
-
-            int columns = Mathf.Max(2, Mathf.RoundToInt(rect.rect.width / FrameStep));
-            for (int i = 0; i <= columns; i++)
-            {
-                float x = Mathf.Lerp(-halfWidth, halfWidth, i / (float)columns);
-                bool corner = i == 0 || i == columns;
-                AddFrameStar(new Vector2(x, halfHeight), corner);
-                AddFrameStar(new Vector2(x, -halfHeight), corner);
-            }
-            int rows = Mathf.Max(2, Mathf.RoundToInt(rect.rect.height / FrameStep));
-            for (int i = 1; i < rows; i++) // углы уже поставлены горизонтальными рядами
-            {
-                float y = Mathf.Lerp(-halfHeight, halfHeight, i / (float)rows);
-                AddFrameStar(new Vector2(-halfWidth, y), false);
-                AddFrameStar(new Vector2(halfWidth, y), false);
-            }
-        }
-
-        private void AddFrameStar(Vector2 position, bool corner)
-        {
-            bool sparkle = corner || Random.value < 0.3f;
-            float size = corner
-                ? Random.Range(CornerSizeMin, CornerSizeMax)
-                : Random.Range(EdgeSizeMin, EdgeSizeMax);
-            Color color = Palette[Random.Range(0, Palette.Length)];
-            color.a *= Random.Range(0.55f, 0.9f);
-            Vector2 jitter = new(Random.Range(-FrameJitter, FrameJitter), Random.Range(-FrameJitter, FrameJitter));
-            MenuTwinkle.CreateStar(rect, position + jitter, size, color, 0.4f,
-                Random.Range(1.2f, 3.0f), Random.Range(0f, Mathf.PI * 2f), sparkle, stars);
+            starText.Build(rect, text.Trim(), GlyphPalette, maxWidthFactor: 0.86f, maxHeightFactor: 0.62f);
         }
 
         public void OnPointerEnter(PointerEventData eventData) => hovered = true;
@@ -156,13 +140,13 @@ namespace SpaceTaxi.UI
             c.a = HaloAlpha * glow;
             halo.color = c;
 
-            for (int i = 0; i < stars.Count; i++)
+            // Н6: при наведении все глифы кнопки жёлтые, при уходе — белые;
+            // погашенная «Продолжить» остаётся белой
+            if (starText != null && glyphsYellow != target)
             {
-                MenuTwinkle.Star star = stars[i];
-                star.Boost = glow * BoostMax;
-                stars[i] = star;
+                glyphsYellow = target;
+                starText.SetGlyphColor(target ? GlyphYellow : GlyphWhite);
             }
-            MenuTwinkle.Step(stars, Time.unscaledTime);
             if (starText != null)
                 starText.SetBoost(glow * BoostMax);
         }
