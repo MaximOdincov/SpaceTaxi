@@ -37,11 +37,17 @@ namespace SpaceTaxi.UI
     // мелкие с ≥ 0.32 (contentScale = zoom/MaxViewZoom); при пересечении порога
     // подписи переразмещаются — скрытые не занимают слоты у видимых, выноска
     // прячется вместе со своей подписью.
-    // Иконки тел — чистая графика (raycastTarget=false), размер
-    // пропорционален радиусу (максимум уровня = опорный). Весь текст карты —
-    // только Excalifont (mapFont из сцены, фолбэк — Resources). Взрыв корабля —
-    // расходящееся кольцо с искрами в точке ракеты, стоянка — мягкая
-    // тень-подставка (Н6.K7). Курсор системный всегда (Н6.K8). Отдаление
+    // Иконки тел — чистая графика (raycastTarget=false), М7.2: честный размер —
+    // диаметр px = 2 × игровой радиус × scale (игровой радиус = построенное тело
+    // из GravityField: data.Radius × PlanetSizeMul/VisualSizeMul), спрайт —
+    // реальный игровой (K10-подход), вписан контентом арта как в Init.
+    // М7.1: цель заказа и метка — константный ЭКРАННЫЙ размер (counter-scale).
+    // Весь текст карты — только Excalifont (mapFont из сцены, фолбэк —
+    // Resources). Взрыв корабля — два расходящихся кольца с искрами и
+    // чернильный крест «здесь я погиб» до закрытия карты (Н6.K7 + M7.4,
+    // подписка не ленивая — ловит смерть и при закрытой карте), стоянка —
+    // тень-подставка (Н6.K7) и чернильное кольцо вокруг планеты (M7.3).
+    // Курсор системный всегда (Н6.K8). Отдаление
     // клампится — при минимальном зуме видно ≤ 62% диаметра мира (Н6.HF1).
     // Карта открывается ПРИБЛИЖЕННОЙ К ИГРОКУ (зум 9; нет корабля — планета
     // старта). Публичный контракт: Waypoint + WaypointChanged +
@@ -84,8 +90,20 @@ namespace SpaceTaxi.UI
         private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
         private const float PaperOversize = 3f;         // запас бумаги за краями окна (×3 от окна)
-        private const float RefIconPx = 64f;            // диаметр иконки тела с наибольшим радиусом уровня
-        private const float MinIconPx = 16f;            // минимальный читаемый диаметр иконки
+        // M7.2: относительная нормировка (RefIconPx/maxBodyRadius) убрана — иконка
+        // = честный игровой диаметр 2 × Radius_game × scale; минимум — различимая
+        // точка (4 px контента ≈ 9 px экрана на минимальном зуме; при 6 px
+        // «минимальные» планеты уровня раздувались до 1.8× и отношение
+        // «px карты / радиус мира» переставало быть единым)
+        private const float MinIconPx = 4f;
+
+        // M7.1: маркеры цели/метки — константный ЭКРАННЫЙ размер (скайрим-урок):
+        // рут в зум-контенте несёт counter-scale 1/zoom (как кометы), дети
+        // заданы в экранных px и не растут при приближении
+        private const float TargetRingPx = 64f;
+        private const float TargetRingWidePx = 90f;
+        private const float WaypointHaloPx = 44f;
+        private const float WaypointPinPx = 20f;
 
         // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
         // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
@@ -161,7 +179,10 @@ namespace SpaceTaxi.UI
         private bool relayoutPending;              // экран изменился — пересчитать лист
 
         private readonly Dictionary<CelestialBodyData, float> bodySizes = new Dictionary<CelestialBodyData, float>();
-        private float maxBodyRadius; // опорный радиус для нормировки иконок (Н5.21-6)
+        // M7.2: построенные тела уровня (ключ — DisplayName, совпадает с именем
+        // GameObject): источник честного радиуса (Radius уже с PlanetSizeMul)
+        // и реального игрового спрайта
+        private readonly Dictionary<string, CelestialBody> gameBodies = new Dictionary<string, CelestialBody>();
 
         private RectTransform playerMarker;      // на sheetRect (вне зум-контента): RectMask2D не режет, размер постоянен
         private RectTransform playerArrowRoot; // вращается по курсу; подпись «ВЫ» не крутится
@@ -218,15 +239,28 @@ namespace SpaceTaxi.UI
         private HullSystem hull;
         private RectTransform landedPad;
         private Image landedPadImage;
+        private RectTransform landedRing;       // M7.3: чернильное кольцо «припаркованы здесь»
+        private RectTransform landedRingNote;   // подпись под кольцом — константного экранного размера
+        private CelestialBody landedRingBody;   // вокруг какого тела построено
         private sealed class MapBurst
         {
             public RectTransform Root;
             public Image Ring;
+            public Image RingLate;              // второе кольцо, отстаёт на задержку (M7.4)
             public readonly List<Image> Sparks = new List<Image>();
             public readonly List<Vector2> SparkVel = new List<Vector2>();
             public float Age;
+            public Vector2 World;               // мировая точка гибели — для кляксы после кольца
         }
         private readonly List<MapBurst> bursts = new List<MapBurst>();
+
+        // M7.4: смерть при закрытой/недостроенной карте — burst доигрывает при
+        // открытии, кляксы-кресты «здесь я погиб» живут до закрытия карты
+        private const int BurstSparks = 18;     // искр на взрыв (было 10 — заметность)
+        private Vector2? pendingDeathWorld;
+        private const int MaxDeathMarks = 4;    // память листа: последние гибели
+        private readonly List<Vector2> deathMarkWorlds = new List<Vector2>();
+        private readonly List<RectTransform> deathMarkRects = new List<RectTransform>();
 
         private void Awake()
         {
@@ -246,10 +280,12 @@ namespace SpaceTaxi.UI
             ClearChildren(transform);
             font = ResolveFont();
             BuildChrome();
+            DeathListener.Ensure(this);
         }
 
         private void OnEnable()
         {
+            BindHullDeath(); // M7.4: подписка не ленивая — смерть до первого Update тоже ловится
             FocusOnPlayer(); // повторные открытия — карта сразу приближена к игроку (Н5.21-8)
         }
 
@@ -277,6 +313,8 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
+            BindHullDeath(); // дешёвый полл: корабль появляется после карты (GameSession.Start)
+
             if (SyncOnboardPanel())
             {
                 RebuildAll(); // лист переложен — контент пересобрать под новую область
@@ -320,6 +358,7 @@ namespace SpaceTaxi.UI
             SyncLabelVisibility(); // decluttering: переразмещение подписей при смене тира зума
             UpdateFollow();
             UpdatePlayerMarker();
+            UpdateLandedRing();    // M7.3: кольцо стоянки вокруг планеты
             UpdateTargetRing();
             UpdateWaypointVisual();
             UpdateComets();
@@ -354,12 +393,19 @@ namespace SpaceTaxi.UI
 
         private void OnDisable()
         {
-            // карта закрылась — вид сбрасываем, следующий вход с чистого экрана
+            // карта закрылась — вид сбрасываем, следующий вход с чистого экрана;
+            // кляксы гибелей и отложенный burst живут «до закрытия карты» (M7.4)
             dragging = false;
             relayoutPending = false;
             if (content != null)
                 ApplyZoom(1f, Vector2.zero);
             zoomAnim = false;
+            foreach (RectTransform mark in deathMarkRects)
+                if (mark != null)
+                    Destroy(mark.gameObject);
+            deathMarkRects.Clear();
+            deathMarkWorlds.Clear();
+            pendingDeathWorld = null;
         }
 
         // ————— каркас: стол, лист, бумага, экранное (вне зум-контейнера) —————
@@ -444,7 +490,6 @@ namespace SpaceTaxi.UI
             // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin)
             mapRadius = level.WorldRadius;
             float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
-            maxBodyRadius = 0f;         // опорный радиус для нормировки иконок
             foreach (CelestialBodyData body in level.Bodies)
             {
                 float edge = body.Position.magnitude + body.Radius;
@@ -452,8 +497,6 @@ namespace SpaceTaxi.UI
                     mapRadius = edge + 100f;
                 extX = Mathf.Max(extX, Mathf.Abs(body.Position.x) + body.Radius);
                 extY = Mathf.Max(extY, Mathf.Abs(body.Position.y) + body.Radius);
-                if (body.Type != BodyType.AsteroidBelt && body.Radius > maxBodyRadius)
-                    maxBodyRadius = body.Radius;
             }
             if (level.CometAreaRadius > 0f) // зона комет — тоже часть содержимого
             {
@@ -464,9 +507,16 @@ namespace SpaceTaxi.UI
                 extX = mapRadius;
             if (extY <= 1f)
                 extY = mapRadius;
-            if (maxBodyRadius <= 0f)
-                maxBodyRadius = 1f;
             worldCenter = Vector2.zero;
+
+            // M7.2: реальные тела уровня — радиус (уже с PlanetSizeMul) и игровой
+            // спрайт; имя тела = имя GameObject (WorldBuilder)
+            gameBodies.Clear();
+            GravityField gravity = FindAnyObjectByType<GravityField>();
+            if (gravity != null)
+                foreach (CelestialBody gameBody in gravity.Bodies)
+                    if (gameBody != null && !string.IsNullOrEmpty(gameBody.DisplayName))
+                        gameBodies[gameBody.DisplayName] = gameBody;
 
             // «весь мир на листе»: bbox тел уровня + поля 10% вписывается целиком
             float w = content.rect.width, h = content.rect.height;
@@ -690,6 +740,8 @@ namespace SpaceTaxi.UI
             bodySizes[body] = diameter;
 
             // камни: ОДИН спрайт map_asteroid — детерминированный разброс по кольцу.
+            // M7.2: ширина кольца честная — в игре камни летят в Radius ± BeltWidth/2
+            // (AsteroidBeltSystem.Init), карта больше не расширяет пояс ×1.7.
             // Кликовая зона пояса снесена (Н6.HF4): карта без кликов по телам;
             // подпись строится в PlaceAllLabels
             Sprite rock = PaperMapArt.MapSprite("map_asteroid");
@@ -700,7 +752,7 @@ namespace SpaceTaxi.UI
                 for (int i = 0; i < count; i++)
                 {
                     float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
-                    float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.85f) * scale;
+                    float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.5f) * scale;
                     Vector2 p = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
                     float size = 9f + (float)rng.NextDouble() * 9f;
                     RectTransform stone = MakeImage("Rock_" + i, beltsRoot, rock, Color.white, Vector2.one * size, false);
@@ -726,20 +778,25 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // ————— тела: арт владельца, диаметр пропорционален радиусу —————
+        // ————— тела: реальный игровой облик, честный размер (M7.2) —————
 
         private void CreateBody(CelestialBodyData body)
         {
-            Sprite art = BodySprite(body);
-            // Н5.21-6: диаметр иконки пропорционален data.Radius; тело с наибольшим
-            // радиусом уровня = опорный размер (RefIconPx), минимум — MinIconPx.
-            // Звезда/дыра/станции нормируются тем же максимумом — относительные
-            // размеры строги и внутри типа, и между типами.
-            float ratio = maxBodyRadius > 0f ? body.Radius / maxBodyRadius : 1f;
-            float d = Mathf.Max(MinIconPx, RefIconPx * ratio);
-            Vector2 spr = art != null ? new Vector2(art.rect.width, art.rect.height) : Vector2.one;
-            float fit = d / Mathf.Max(spr.x, spr.y);
-            Vector2 size = Vector2.Scale(spr, Vector2.one * fit); // большая сторона = d
+            // диаметр px = 2 × игровой радиус × scale: игровой радиус берём у
+            // построенного тела (CelestialBody.Init умножил data.Radius на
+            // PlanetSizeMul/VisualSizeMul — жалоба «по карте влетишь, а в игре
+            // пролетаешь мимо»). Относительная нормировка maxBodyRadius убрана:
+            // отношение «px карты / радиус мира» одно для всех тел.
+            float d = Mathf.Max(MinIconPx, GameRadiusOf(body) * 2f * scale);
+            Sprite art = GameSpriteOf(body, out Color tint);
+            // вписываем КОНТЕНТ арта (альфа-границы, в мировых юнитах спрайта),
+            // как вписывает тело CelestialBody.Init — видимый шар карты = шар игры
+            Vector2 spr = art != null ? art.bounds.size : Vector2.one;
+            Vector2 artContent = art != null ? SpriteArt.ContentSize(art) : Vector2.one;
+            float contentMax = Mathf.Max(artContent.x, artContent.y);
+            if (contentMax <= 0.0001f)
+                contentMax = Mathf.Max(Mathf.Max(spr.x, spr.y), 0.0001f);
+            Vector2 size = Vector2.Scale(spr, Vector2.one * (d / contentMax)); // видимая сторона = d
 
             RectTransform group = MakeRect("Body_" + body.DisplayName, bodiesRoot, new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
@@ -752,10 +809,39 @@ namespace SpaceTaxi.UI
             shadow.SetAsFirstSibling();
 
             // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
-            // хаб читается по своей иконке (map_taxi_planet) и легенде
-            MakeImage("Icon", group, art, Color.white, size, false);
+            // цвет — как в игре (тинт планеты, заглушки звёзд/дыры)
+            MakeImage("Icon", group, art, tint, size, false);
             bodySizes[body] = d;
             // подпись строится в PlaceAllLabels — блоками «иконка+имя» по приоритету
+        }
+
+        // игровой радиус тела: у построенного тела Radius уже с множителем;
+        // мир ещё не построен (карта открыта раньше) — зеркало логики Init по данным
+        private float GameRadiusOf(CelestialBodyData body)
+        {
+            if (gameBodies.TryGetValue(body.DisplayName, out CelestialBody gameBody) && gameBody != null)
+                return gameBody.Radius;
+            float mul = body.Type == BodyType.Planet
+                ? (body.VisualSizeMul > 0f ? body.VisualSizeMul : WorldSprites.PlanetSizeMul(body.DisplayName))
+                : 1f;
+            return body.Radius * mul;
+        }
+
+        // спрайт и цвет — как тело выглядит В ИГРЕ (K10-подход: у хаба уже так);
+        // тела нет или спрайта нет — картографическая генерация (map_planet/…)
+        private Sprite GameSpriteOf(CelestialBodyData body, out Color tint)
+        {
+            tint = Color.white;
+            if (gameBodies.TryGetValue(body.DisplayName, out CelestialBody gameBody) && gameBody != null)
+            {
+                SpriteRenderer renderer = gameBody.GetComponent<SpriteRenderer>();
+                if (renderer != null && renderer.sprite != null)
+                {
+                    tint = renderer.color;
+                    return renderer.sprite;
+                }
+            }
+            return BodySprite(body);
         }
 
         private static void CollectRects(RectTransform root, List<Rect> into)
@@ -908,11 +994,11 @@ namespace SpaceTaxi.UI
         }
 
         // половина «иконки» для слотов и коллизий: у пояса — кольцо камней
-        // (реальный разброс), у остальных — вписанный квадрат иконки
+        // (честная ширина, как в игре ±BeltWidth/2), у остальных — иконка
         private float PlacementIconHalf(CelestialBodyData body)
         {
             return body.Type == BodyType.AsteroidBelt
-                ? (body.Radius + body.BeltWidth * 0.85f) * scale
+                ? (body.Radius + body.BeltWidth * 0.5f) * scale
                 : IconSizeOf(body) * 0.5f;
         }
 
@@ -1079,11 +1165,14 @@ namespace SpaceTaxi.UI
 
         private void BuildWaypoint()
         {
+            // M7.1: константный экранный размер — рут несёт counter-scale 1/zoom,
+            // дети заданы в экранных px и больше не растут от IconSizeOf×zoom
             waypointRoot = MakeRect("WaypointRoot", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             waypointHalo = MakeImage("Halo", waypointRoot, PaperMapArt.TargetRing(),
-                PaperMapArt.GreenPencil, Vector2.one * 40f, false);
+                PaperMapArt.GreenPencil, Vector2.one * WaypointHaloPx, false);
             waypointPin = MakeImage("Pin", waypointRoot, PaperMapArt.Pin(),
-                PaperMapArt.GreenPencil, Vector2.one * 20f, false);
+                PaperMapArt.GreenPencil, Vector2.one * WaypointPinPx, false);
+            waypointPin.anchoredPosition = Vector2.up * (WaypointHaloPx * 0.5f + 16f);
             waypointHaloImage = waypointHalo.GetComponent<Image>(); // кэш для кадра
             waypointPinImage = waypointPin.GetComponent<Image>();
             waypointRoot.gameObject.SetActive(false);
@@ -1104,9 +1193,7 @@ namespace SpaceTaxi.UI
                 waypointRoot.gameObject.SetActive(true);
 
             waypointRoot.anchoredPosition = WorldToMap(Waypoint.Position);
-            float d = IconSizeOf(Waypoint);
-            waypointHalo.sizeDelta = Vector2.one * (d + 24f);
-            waypointPin.anchoredPosition = Vector2.up * (d * 0.5f + 16f);
+            waypointRoot.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранный px постоянны
 
             float t = Time.unscaledTime;
             float pulse = 0.5f + 0.3f * Mathf.Sin(t * 2.8f);
@@ -1118,20 +1205,23 @@ namespace SpaceTaxi.UI
 
         private void BuildTargetRing()
         {
+            // M7.1: константный экранный размер (руту ставит counter-scale в Update)
             targetRing = MakeRect("TargetRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             targetRingPulse = MakeImage("Ring", targetRing, PaperMapArt.TargetRing(),
-                PaperMapArt.YellowPencil, Vector2.one * 46f, false);
+                PaperMapArt.YellowPencil, Vector2.one * TargetRingPx, false);
             targetRingWide = MakeImage("RingWide", targetRing, PaperMapArt.TargetRing(),
-                WithAlpha(PaperMapArt.YellowPencil, 0.7f), Vector2.one * 70f, false);
+                WithAlpha(PaperMapArt.YellowPencil, 0.7f), Vector2.one * TargetRingWidePx, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
             targetLabel = MakeLabel("TargetLabel", targetRing, "", 16f, PaperMapArt.YellowPencil);
             ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(280f, 24f);
+            ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (TargetRingPx * 0.5f + 18f);
             targetLabel.characterSpacing = 2f;
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
         }
 
+        // честный диаметр иконки на карте (px контента) — читают слоты подписей
         private float IconSizeOf(CelestialBodyData body)
         {
             return bodySizes.TryGetValue(body, out float size) ? size : 22f;
@@ -1162,13 +1252,10 @@ namespace SpaceTaxi.UI
                     if (labelLeaders.TryGetValue(body, out RectTransform leader) && leader != null)
                         leader.gameObject.SetActive(false); // выноска прячется вместе с подписью
                 }
-                float size = Mathf.Max(52f, IconSizeOf(body) + 30f);
-                targetRingPulse.sizeDelta = Vector2.one * size;
-                targetRingWide.sizeDelta = Vector2.one * (size + 26f);
-                ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (size * 0.5f + 18f);
                 targetLabel.text = "ЦЕЛЬ: " + body.DisplayName.ToUpper();
             }
             targetRing.anchoredPosition = WorldToMap(body.Position);
+            targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // M7.1: экранные px постоянны
             // пульс: кольца дышат размером и альфой
             float t = Time.unscaledTime;
             targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 4.2f));
@@ -1275,10 +1362,7 @@ namespace SpaceTaxi.UI
             // содержимое листа рисуется в sheet-координатах как zoomOffset + zoom * p,
             // маркер — напрямую в sheet-координатах: контр-масштаб не нужен
             Vector2 sheetPos = zoomOffset + zoom * WorldToMap(shipT.position);
-            Vector2 half = sheetRect.rect.size * 0.5f - new Vector2(ContentMargin, ContentMargin); // кламп внутрь окна вида
-            Vector2 clamped = new Vector2(
-                Mathf.Clamp(sheetPos.x, -half.x + ViewInset, half.x - ViewInset),
-                Mathf.Clamp(sheetPos.y, -half.y + ViewInset, half.y - ViewInset));
+            Vector2 clamped = SheetClampView(sheetPos); // кламп внутрь окна вида
             playerMarker.anchoredPosition = clamped;
 
             bool offView = (sheetPos - clamped).sqrMagnitude > 1f;
@@ -1296,6 +1380,57 @@ namespace SpaceTaxi.UI
                 playerArrowRoot.localRotation = Quaternion.Euler(0f, 0f, angle);
         }
 
+        // M7.3: фиксация при посадке — чернильное кольцо «вы припаркованы здесь»
+        // вокруг планеты стоянки (в content-координатах: «территория», скейлится
+        // зумом честно, как иконка). Пересоздаётся на смену LandedOn; стоялка
+        // читается поллом — событие взлёта не существует
+        private void UpdateLandedRing()
+        {
+            if (content == null)
+                return;
+            CelestialBody parkedOn = ship != null && ship.State == ShipState.Landed
+                ? ship.LandedOn
+                : null;
+            if (parkedOn == null)
+            {
+                if (landedRing != null && landedRing.gameObject.activeSelf)
+                    landedRing.gameObject.SetActive(false);
+                landedRingBody = null;
+                return;
+            }
+
+            if (landedRing == null)
+            {
+                landedRing = MakeRect("LandedRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+                Image ring = landedRing.gameObject.AddComponent<Image>();
+                ring.sprite = PaperMapArt.TargetRing(); // кольцо «от руки»
+                ring.color = WithAlpha(PaperMapArt.HeroPencil, 0.85f); // синие чернила «ВЫ»
+                ring.raycastTarget = false;
+                TMP_Text note = MakeLabel("ParkNote", landedRing, "припаркованы", 14f,
+                    WithAlpha(PaperMapArt.HeroPencil, 0.9f));
+                landedRingNote = (RectTransform)note.transform;
+                landedRingNote.sizeDelta = new Vector2(150f, 20f);
+            }
+
+            // кольцо — «территория» (честно скейлится зумом, как иконка планеты),
+            // подпись — константный экранный размер (counter-scale, как маркеры M7.1)
+            if (landedRingNote != null)
+                landedRingNote.localScale = Vector3.one / Mathf.Max(zoom, 0.001f);
+
+            if (landedRingBody != parkedOn) // новая стоянка — перерисовать кольцо по её радиусу
+            {
+                landedRingBody = parkedOn;
+                landedRing.gameObject.SetActive(true);
+                float d = parkedOn.Radius * 2f * scale + 9f; // честный диаметр + 8-10px зазор
+                Image ring = landedRing.GetComponent<Image>();
+                if (ring != null)
+                    ring.rectTransform.sizeDelta = Vector2.one * d;
+                if (landedRingNote != null)
+                    landedRingNote.anchoredPosition = Vector2.down * (d * 0.5f + 12f);
+            }
+            landedRing.anchoredPosition = WorldToMap(parkedOn.transform.position);
+        }
+
         private Transform ShipPosition()
         {
             if (ship == null)
@@ -1304,34 +1439,63 @@ namespace SpaceTaxi.UI
             return ship != null ? ship.transform : null;
         }
 
-        // взрыв на карте (Н6.K7): подписка на смерть корабля; ленивая — корабль
-        // спавнится после карты. Симметричная отписка в OnDestroy
+        // взрыв на карте (Н6.K7 + M7.4): подписка на смерть корабля — НЕ ленивая:
+        // вешается в OnEnable, поллится в Update и дублируется постоянным
+        // DeathListener (карта-то неактивна, пока закрыта). -=+ += идемпотентны:
+        // domain reload в пле стирает delegate-списки событий (не сериализуются),
+        // ранний early-return после этого молча терял смерть (найдено приёмкой Н7)
         private void BindHullDeath()
         {
-            if (hull != null)
+            if (hull == null)
+                hull = FindAnyObjectByType<HullSystem>();
+            if (hull == null)
                 return;
-            hull = FindAnyObjectByType<HullSystem>();
-            if (hull != null)
-                hull.Died += OnShipDied;
+            hull.Died -= OnShipDied;
+            hull.Died += OnShipDied;
         }
 
-        // расширяющееся кольцо + искры в точке ракеты (маркер всегда виден на листе)
+        // точка гибели: корпус ещё на месте (телепорт респавна — через 0.6с).
+        // Карта открыта — burst сразу; закрыта/не построена — burst доиграет при
+        // открытии, клякса-крест «здесь я погиб» появляется в любом случае
         private void OnShipDied()
+        {
+            Vector2 world = hull != null && hull.transform != null
+                ? (Vector2)hull.transform.position
+                : ship != null ? (Vector2)ship.transform.position : worldCenter;
+            AddDeathMark(world);
+            if (!built || sheetRect == null || !gameObject.activeInHierarchy)
+            {
+                pendingDeathWorld = world;
+                return;
+            }
+            SpawnDeathBurst(world);
+        }
+
+        // два расходящихся кольца + искры в точке гибели; позиция клампится как у
+        // ракеты — за ViewInset точка рисуется у края вида, а не прячется
+        private void SpawnDeathBurst(Vector2 world)
         {
             if (playerMarker == null || sheetRect == null)
                 return;
-            Vector2 center = playerMarker.anchoredPosition;
-            var burst = new MapBurst { Root = MakeRect("MapBurst", sheetRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero) };
+            Vector2 center = SheetClampView(zoomOffset + zoom * WorldToMap(world));
+            var burst = new MapBurst
+            {
+                Root = MakeRect("MapBurst", sheetRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero),
+                World = world
+            };
             burst.Root.anchoredPosition = center;
             burst.Root.SetAsLastSibling();
 
             burst.Ring = MakeImage("Ring", burst.Root, PaperMapArt.TargetRing(),
                 WithAlpha(PaperMapArt.RedPencil, 0.9f), Vector2.one * 14f, false).GetComponent<Image>();
+            burst.RingLate = MakeImage("RingLate", burst.Root, PaperMapArt.TargetRing(),
+                WithAlpha(PaperMapArt.RedPencil, 0.75f), Vector2.one * 10f, false).GetComponent<Image>();
+            burst.RingLate.gameObject.SetActive(false); // родится с задержкой RingLateDelay
             var rng = new System.Random(StableHash("burst") + (int)(Time.unscaledTime * 1000f));
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < BurstSparks; i++)
             {
                 float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
-                float speed = 70f + (float)rng.NextDouble() * 110f;
+                float speed = 70f + (float)rng.NextDouble() * 150f;
                 Image spark = MakeImage("Spark_" + i, burst.Root,
                     i % 3 == 0 ? PaperMapArt.InkDot() : PaperMapArt.MapSprite("map_asteroid"),
                     WithAlpha(PaperMapArt.RedPencil, 0.9f), Vector2.one * (5f + (float)rng.NextDouble() * 6f), false)
@@ -1342,11 +1506,18 @@ namespace SpaceTaxi.UI
             bursts.Add(burst);
         }
 
-        // кадр жизни эффектов: кольцо растёт и бледнеет, искры разлетаются
+        // кадр жизни эффектов (M7.4): заметнее — 1.2с, кольцо до 180px, второе
+        // кольцо с задержкой 0.2с, 18 искр; в конце — клякса-крест до закрытия карты
         private void UpdateMapEffects()
         {
-            const float Duration = 0.65f;
-            const float RingMaxPx = 110f;
+            const float Duration = 1.2f;
+            const float RingMaxPx = 180f;
+            const float LateDelay = 0.2f;
+            if (pendingDeathWorld.HasValue) // смерть при закрытой карте — burst при открытии
+            {
+                SpawnDeathBurst(pendingDeathWorld.Value);
+                pendingDeathWorld = null;
+            }
             for (int i = bursts.Count - 1; i >= 0; i--)
             {
                 MapBurst burst = bursts[i];
@@ -1364,6 +1535,20 @@ namespace SpaceTaxi.UI
                     c.a = 0.9f * (1f - k);
                     burst.Ring.color = c;
                 }
+                if (burst.RingLate != null)
+                {
+                    bool lateOn = burst.Age >= LateDelay;
+                    if (burst.RingLate.gameObject.activeSelf != lateOn)
+                        burst.RingLate.gameObject.SetActive(lateOn);
+                    if (lateOn)
+                    {
+                        float k2 = Mathf.Clamp01((burst.Age - LateDelay) / Duration);
+                        burst.RingLate.rectTransform.sizeDelta = Vector2.one * Mathf.Lerp(10f, RingMaxPx * 0.7f, Mathf.SmoothStep(0f, 1f, k2));
+                        var c = burst.RingLate.color;
+                        c.a = 0.75f * (1f - k2);
+                        burst.RingLate.color = c;
+                    }
+                }
                 for (int s = 0; s < burst.Sparks.Count; s++)
                 {
                     Image spark = burst.Sparks[s];
@@ -1379,6 +1564,103 @@ namespace SpaceTaxi.UI
                     Destroy(burst.Root.gameObject);
                     bursts.RemoveAt(i);
                 }
+            }
+            SyncDeathMarks(); // кляксы живы до закрытия карты, переживают пересборку
+        }
+
+        // ————— кляксы «здесь я погиб» (M7.4) —————
+
+        private void AddDeathMark(Vector2 world)
+        {
+            deathMarkWorlds.Add(world);
+            deathMarkRects.Add(null);
+            while (deathMarkWorlds.Count > MaxDeathMarks)
+            {
+                deathMarkWorlds.RemoveAt(0);
+                if (deathMarkRects[0] != null)
+                    Destroy(deathMarkRects[0].gameObject);
+                deathMarkRects.RemoveAt(0);
+            }
+        }
+
+        // чернильная клякса + крест в точке гибели (RedPencil, до закрытия карты);
+        // позиция клампится как у ракеты и пересчитывается при пан/зуме
+        private void SyncDeathMarks()
+        {
+            if (sheetRect == null)
+                return;
+            for (int i = 0; i < deathMarkWorlds.Count; i++)
+            {
+                if (i >= deathMarkRects.Count)
+                    deathMarkRects.Add(null);
+                RectTransform rect = deathMarkRects[i];
+                if (rect == null) // пересборка карты стёрла — перерисовать
+                    deathMarkRects[i] = rect = MakeDeathMark();
+                rect.anchoredPosition = SheetClampView(zoomOffset + zoom * WorldToMap(deathMarkWorlds[i]));
+            }
+        }
+
+        private RectTransform MakeDeathMark()
+        {
+            RectTransform root = MakeRect("DeathMark", sheetRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            root.SetAsLastSibling();
+            var ink = WithAlpha(PaperMapArt.RedPencil, 0.9f);
+            MakeImage("Blot", root, PaperMapArt.InkDot(), WithAlpha(PaperMapArt.RedPencil, 0.8f), Vector2.one * 26f, false);
+            MakeSegment(root, new Vector2(-8f, -8f), new Vector2(8f, 8f), ink, 2f);
+            MakeSegment(root, new Vector2(-8f, 8f), new Vector2(8f, -8f), ink, 2f);
+            return root;
+        }
+
+        // кламп точки вида внутрь окна листа — как у маркера ракеты: точка за
+        // ViewInset рисуется у края, «кламп не прячет событие»
+        private Vector2 SheetClampView(Vector2 sheetPos)
+        {
+            Vector2 half = sheetRect.rect.size * 0.5f - new Vector2(ContentMargin, ContentMargin);
+            return new Vector2(
+                Mathf.Clamp(sheetPos.x, -half.x + ViewInset, half.x - ViewInset),
+                Mathf.Clamp(sheetPos.y, -half.y + ViewInset, half.y - ViewInset));
+        }
+
+        // M7.4: постоянный слушатель смерти — сам байндер неактивен, пока карта
+        // закрыта, и не словил бы смерть до первого открытия карты. Живёт в
+        // DontDestroyOnLoad, самоуничтожается при смерти владельца (смена сцены);
+        // переподписка идемпотентна — переживает domain reload в пле
+        private sealed class DeathListener : MonoBehaviour
+        {
+            private MapScreenBinder owner;
+            private HullSystem hull;
+
+            public static void Ensure(MapScreenBinder binder)
+            {
+                DeathListener listener = FindAnyObjectByType<DeathListener>();
+                if (listener == null)
+                {
+                    var go = new GameObject("MapDeathListener");
+                    DontDestroyOnLoad(go);
+                    listener = go.AddComponent<DeathListener>();
+                }
+                listener.owner = binder;
+            }
+
+            private void Update()
+            {
+                if (owner == null)
+                {
+                    Destroy(gameObject); // владелец умер (смена сцены) — слушатель не нужен
+                    return;
+                }
+                if (hull == null)
+                    hull = FindAnyObjectByType<HullSystem>();
+                if (hull == null)
+                    return;
+                hull.Died -= owner.OnShipDied;
+                hull.Died += owner.OnShipDied;
+            }
+
+            private void OnDestroy()
+            {
+                if (hull != null && owner != null)
+                    hull.Died -= owner.OnShipDied; // симметричная отписка (конвенция проекта)
             }
         }
 
@@ -1854,6 +2136,10 @@ namespace SpaceTaxi.UI
             playerArrowRoot = null;
             landedPad = null;
             landedPadImage = null;
+            landedRing = null;
+            landedRingNote = null;
+            landedRingBody = null;
+            deathMarkRects.Clear(); // мировые точки гибелей живут — перерисуются на новом листе
             targetRing = null;
             targetRingPulse = null;
             targetRingWide = null;
