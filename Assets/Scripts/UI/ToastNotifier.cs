@@ -289,16 +289,13 @@ namespace SpaceTaxi.UI
 
             var debt = session.Debt;
             if (debt != null)
-            {
-                int prevBalance = debt.Balance;
-                // рост долга — новая авария; гашение (П3.3/П4.2) тоста не даёт
-                debt.DebtChanged += value =>
-                {
-                    if (value > prevBalance)
-                        Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(value - prevBalance)} за арендный корабль", true, ToastTone.Danger);
-                    prevBalance = value;
-                };
-            }
+                // Н7 A-FIX: «за арендный корабль» — только на аварию аренды
+                // (RegisterAccident → AccidentRegistered). Недостача штрафа идёт
+                // в AddCharge (GameSession.ChargePenalty уже тостует штраф сам) —
+                // без второго тоста и без ложной причины; гашение (П3.3/П4.2)
+                // тоста не даёт, как и раньше
+                debt.AccidentRegistered += amount =>
+                    Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(amount)} за арендный корабль", true, ToastTone.Danger);
 
             // выплата за доставку (П4.2): сумма на руки + уход в долг
             if (session.Payout != null)

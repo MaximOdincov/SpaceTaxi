@@ -16,6 +16,10 @@ namespace SpaceTaxi.Audio
         private const float LoopPitchRange = 0.22f;
         private const float LoopFadeTime = 0.15f;   // нарастание/затухание лупа, без щелчков
         private const float MusicFadeTime = 1.5f;   // кроссфейд треков
+        // Н7 A7.1: не-музыкальные группы (Sfx/Ui/Engine) громче музыки на ~35%:
+        // события «не пробивались» сквозь станцию. Одна точка — GroupFactor,
+        // действует на one-shots и лупы; Music не трогается
+        private const float SfxBoost = 1.35f;
         private const float DuckFactor = 0.2f;      // приглушение групп при взрыве
         private const float DuckTime = 1.2f;
         private const int MaxOneShotVoices = 12;
@@ -280,18 +284,42 @@ namespace SpaceTaxi.Audio
         // смена трека/паузы — имя и состояние для UI плеера
         private void Update()
         {
-            // конец трека станции — следующий клип этой же станции по кругу
-            if (musicActive != null && !musicPaused && !musicActive.loop
-                && musicActive.clip != null && !musicActive.isPlaying)
-            {
-                SoundEntry entry = GetEntry(currentMusic);
-                if (entry != null && entry.Clips != null && entry.Clips.Length > 0)
-                {
-                    stationClipIndex = (stationClipIndex + 1) % entry.Clips.Length;
-                    musicActive.clip = entry.Clips[stationClipIndex];
-                    musicActive.Play();
-                }
-            }
+            // Н7 A7.2: конец трека станции — следующий клип этой же станции
+            // КРОСФЕЙДОМ, не обрывом: стартуем за MusicFadeTime до конца клипа,
+            // второй канал подхватывает — треки перекрываются. Фолбэк — уже
+            // закончившийся канал (лаг/смена станции посреди фейда): тот же
+            // кроссфейд, но от тишины
+            if (musicActive == null || musicPaused || musicActive.loop
+                || musicActive.clip == null || activeMusicFades > 0)
+                return;
+            SoundEntry entry = GetEntry(currentMusic);
+            if (entry == null || entry.Clips == null || entry.Clips.Length == 0)
+                return;
+            bool ended = !musicActive.isPlaying;
+            bool ending = !ended
+                && musicActive.clip.length > MusicFadeTime
+                && musicActive.clip.length - musicActive.time <= MusicFadeTime;
+            if (ended || ending)
+                AdvanceStationTrack(entry);
+        }
+
+        // Н7 A7.2: следующий клип станции — на втором канале под кроссфейд,
+        // тот же механизм чередования, что в PlayMusic. Фейдится только музыка:
+        // одноразовые SFX и лупы (отдельные голоса) не затрагиваются
+        private void AdvanceStationTrack(SoundEntry entry)
+        {
+            AudioSource fadeIn = musicActive == musicA ? musicB : musicA;
+            AudioSource fadeOut = musicActive;
+            stationClipIndex = (stationClipIndex + 1) % entry.Clips.Length;
+            fadeIn.clip = entry.Clips[stationClipIndex];
+            fadeIn.loop = false;
+            fadeIn.pitch = entry.Pitch;
+            fadeIn.mute = musicPaused || MusicMuted; // пауза/мьют переживают смену трека
+            fadeIn.volume = 0f;
+            fadeIn.Play();
+            musicActive = fadeIn;
+            StopAllMusicFades();
+            musicFades.Add(StartCoroutine(Crossfade(fadeIn, fadeOut, CurrentMusicVolume())));
         }
 
         public event System.Action MusicStateChanged;
@@ -531,7 +559,7 @@ namespace SpaceTaxi.Audio
         {
             float vol = groupVolumes.TryGetValue(group, out float v) ? v : 1f;
             float duck = groupDuck.TryGetValue(group, out float d) ? d : 1f;
-            return vol * duck;
+            return vol * duck * (group == AudioGroup.Music ? 1f : SfxBoost);
         }
 
         private SoundEntry GetEntry(SoundId id)

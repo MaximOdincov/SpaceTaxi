@@ -14,8 +14,9 @@ namespace SpaceTaxi.UI
     // north-up (Н6 M1, решение владельца вместо heading-up Н5.22): мир НЕ
     // вращается — север всегда вверх, кольца/крест/сетка/подпись «С» стоят
     // статично, цель/waypoint — по мировым координатам без поворота. Иконка
-    // корабля в центре поворачивается по курсу (Н6 M2): нос = вектор скорости
-    // (стоит — последний курс); базовая ориентация арта — нос на +45° (Н6 M3,
+    // корабля в центре поворачивается по курсу (Н6 M2): нос = вектор скорости,
+    // на месте/в посадке — ориентация корпуса (Н7 G7.2, вес непрерывен по
+    // скорости); базовая ориентация арта — нос на +45° (Н6 M3,
     // PNG-анализ for_mini). Масштаб НЕлинейный по дистанции:
     // r = R * (d / maxRange)^rangeExponent — экспонента < 1 растягивает
     // ближнюю зону (объекты рядом крупнее) и сжимает дальнюю (обзор
@@ -50,7 +51,8 @@ namespace SpaceTaxi.UI
         // Н6 M3: ар for_mini смотрит носом в правый верх — PNG-анализ: главная
         // ось силуэта +45° (Unity, от +X). Поворот иконки = курс − этот офсет.
         private const float ShipIconNoseDeg = 45f;
-        private const float ShipIconHoldSpeed = 0.5f; // ниже — корабль «стоит»: держим последний курс
+        private const float ShipIconHoldSpeed = 0.5f; // ниже — корабль «стоит»: курс из ориентации корпуса
+        private const float ShipIconBlendSpeed = 12f; // выше — иконка целиком по вектору скорости (Н7 G7.2)
         private const float IconTurnRate = 10f;       // сглаживание поворота иконки, 1/с
 
         // кольца дистанций от корабля, юниты мира. Подобраны под нелинейную карту
@@ -118,6 +120,7 @@ namespace SpaceTaxi.UI
         private MapScreenBinder mapBinder;
         private GravityField gravity;
         private Ship ship;
+        private ShipController controller; // кэш для SpriteNoseAngle (Н7 G7.2)
         private CometSystem cometSystem;
         private TMP_FontAsset font;
 
@@ -547,23 +550,42 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // Н6 M2/M3: north-up — иконка корабля крутится по курсу: нос = вектор
-        // скорости (стоит — последний курс), с лёгким сглаживанием. Формула
-        // поворота: rot = atan2(vel) − нос_арта (45° для for_mini, 0° для
-        // заглушки); при движении вверх (90°) иконка повернута на 45° и нос
-        // смотрит вверх, при движении вправо (0°) — вправо.
+        // Н6 M2/M3 + Н7 G7.2: north-up — иконка корабля крутится по курсу с
+        // лёгким сглаживанием. При движении нос = вектор скорости (rot =
+        // atan2(vel) − нос_арта); при развороте на месте/посадке вектор не
+        // отражает разворот корпуса, поэтому вес источника непрерывен по
+        // скорости: t = clamp((|v| − hold)/(blend − hold)), курс = LerpAngle(
+        // курс корпуса, курс из вектора, t) — без скачка на пересечении порога.
+        // Курс корпуса = body.rotation + SpriteNoseAngle (та же конвенция, что
+        // в ShipController.UpdateHeading; headingDir у контроллера приватен) —
+        // сектор радара после Н6.8 читает тот же сглаженный shipIconDeg,
+        // UpdateSweep не менялся.
         private void UpdateShipIconDeg()
         {
             if (shipIconRect == null)
                 return;
             Vector2 velocity = ship.Body != null ? ship.Body.linearVelocity : Vector2.zero;
-            if (velocity.sqrMagnitude > ShipIconHoldSpeed * ShipIconHoldSpeed)
-            {
-                float target = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - shipIconNoseOffset;
-                shipIconDeg = Mathf.LerpAngle(shipIconDeg, target,
-                    1f - Mathf.Exp(-IconTurnRate * Time.unscaledDeltaTime));
-            }
+            float speed = velocity.magnitude;
+            float velocityDeg = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg - shipIconNoseOffset;
+            float hullDeg = HullHeadingDeg() - shipIconNoseOffset;
+            float t = Mathf.Clamp01(
+                (speed - ShipIconHoldSpeed) / (ShipIconBlendSpeed - ShipIconHoldSpeed));
+            float target = Mathf.LerpAngle(hullDeg, velocityDeg, t);
+            shipIconDeg = Mathf.LerpAngle(shipIconDeg, target,
+                1f - Mathf.Exp(-IconTurnRate * Time.unscaledDeltaTime));
             shipIconRect.localRotation = Quaternion.Euler(0f, 0f, shipIconDeg);
+        }
+
+        // ориентация корпуса в мировых градусах; без физики — текущий
+        // сглаженный курс (иконка стоит на месте, не дёргается)
+        private float HullHeadingDeg()
+        {
+            if (ship.Body == null)
+                return shipIconDeg + shipIconNoseOffset;
+            if (controller == null)
+                controller = ship.GetComponent<ShipController>();
+            float nose = controller != null ? controller.SpriteNoseAngle : 0f;
+            return ship.Body.rotation + nose;
         }
 
         // цель активного заказа: индекс как в WaypointIndicator — при посадке за

@@ -212,12 +212,22 @@ namespace SpaceTaxi.Orders
                     if (body.DisplayName != bodyName)
                         continue;
                     var bodyRenderer = body.GetComponent<SpriteRenderer>();
-                    // диаметр круга — от реального спрайта планеты: круг чуть больше тела
+                    // диаметр круга — от реального размера планеты: круг чуть
+                    // больше тела. Видимый шар = bodyScale × контент арта
+                    // (вписывание в Radius делает CelestialBody.Init, шар в мире
+                    // = 2·Radius); SoftDot(128) при масштабе 1 = bounds 128 юн
+                    // (PPU 64/128 = 0.5), делим на размер спрайта ореола и
+                    // масштаб тела-родителя
+                    float softDotUnits = glowRenderer.sprite != null
+                        ? glowRenderer.sprite.bounds.size.x
+                        : 128f;
+                    float bodyScale = Mathf.Max(Mathf.Abs(body.transform.localScale.x), 0.0001f);
                     float planetUnits = bodyRenderer != null && bodyRenderer.sprite != null
-                        ? bodyRenderer.sprite.bounds.size.x
-                        : 2f;
+                        ? Mathf.Max(SpriteArt.ContentSize(bodyRenderer.sprite).x,
+                                    SpriteArt.ContentSize(bodyRenderer.sprite).y)
+                        : 2f * body.Radius / bodyScale;
                     targetGlow.SetParent(body.transform, false);
-                    glowScaleBase = planetUnits * 1.25f / 1.28f; // SoftDot(128) = 1.28 юн при масштабе 1
+                    glowScaleBase = planetUnits * 1.25f / (softDotUnits * bodyScale);
                     break;
                 }
             }
