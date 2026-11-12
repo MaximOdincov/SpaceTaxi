@@ -20,24 +20,18 @@ namespace SpaceTaxi.UI
         public const int StampGridX = 2; // map_stamps: 2×3
         public const int StampGridY = 3;
 
-        // — палитра тёплых карандашей —
-        public static readonly Color Ink = new Color(0.24f, 0.19f, 0.15f);
+        // — палитра «бумага + чернила + 1 акцент» (M7.5, скайрим-дисциплина R) —
+        // Бумага — арт владельца (Art/background.png, тёплая сепия, не трогается) + фолбэки.
+        // Контент листа — ЕДИНОЕ чернильное семейство: тела/подписи/буи/метки различаются
+        // формой и альфой, не цветом. Насыщенный цвет один — янтарный акцент цели заказа;
+        // красный зарезервирован за смертью.
+        public static readonly Color Ink = new Color(0.243f, 0.184f, 0.137f);     // #3E2F23 — основные чернила
+        public static readonly Color InkSoft = new Color(0.420f, 0.329f, 0.235f); // #6B543C — вторичные (периферия, пояса, кромка)
+        public static readonly Color Accent = new Color(0.706f, 0.325f, 0.035f);  // #B45309 — жжёный янтарь: ТОЛЬКО цель заказа
+        public static readonly Color Alarm = new Color(0.549f, 0.169f, 0.118f);   // #8C2B1E — красный: ТОЛЬКО смерть
         public static readonly Color Paper = new Color(0.89f, 0.80f, 0.59f);
         public static readonly Color PaperDark = new Color(0.80f, 0.70f, 0.50f);
-        public static readonly Color Night = new Color(0.10f, 0.09f, 0.11f);
-        public static readonly Color Rust = new Color(0.68f, 0.32f, 0.17f);   // акцент: метки/тревога
-        public static readonly Color Graphite = new Color(0.44f, 0.41f, 0.37f);
-        public static readonly Color StarPencil = new Color(0.83f, 0.60f, 0.25f);
-        public static readonly Color HolePencil = new Color(0.15f, 0.12f, 0.16f);
-        public static readonly Color BeltPencil = new Color(0.45f, 0.40f, 0.34f, 0.6f);
-        public static readonly Color HeroPencil = new Color(0.16f, 0.33f, 0.55f);       // «ВЫ»: синие чернила на тёплой бумаге
-        public static readonly Color CometPencil = new Color(0.40f, 0.50f, 0.62f, 0.92f); // карандаш комет
-
-        // — карандаши целей/меток (Н5.F): ничего из палитры борткомпа —
-        public static readonly Color Desk = new Color(0.115f, 0.088f, 0.062f, 0.985f);    // тёмный стол вокруг листа
-        public static readonly Color YellowPencil = new Color(0.68f, 0.46f, 0.02f);       // цель заказа
-        public static readonly Color GreenPencil = new Color(0.13f, 0.42f, 0.19f);        // своя метка (waypoint)
-        public static readonly Color RedPencil = new Color(0.60f, 0.19f, 0.12f);          // тревожные пометки «от руки»
+        public static readonly Color Desk = new Color(0.115f, 0.088f, 0.062f, 0.985f); // тёмный стол вокруг листа
 
         private static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
 
@@ -319,6 +313,57 @@ namespace SpaceTaxi.UI
             s = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
             cache["buoystar"] = s;
             return s;
+        }
+
+        // край мира (M7.5): туманная кромка — бумага «растворяется» к границе.
+        // RGBA-текстура с плавной альфой (не бинарный крап CreateMaskTexture:
+        // при зуме 9 один техель крапа — 34px блоб), лёгкая мраморность синусами
+        // — читается как пятно старой бумаги на любом зуме. ВНУТРЕННИЙ край
+        // полосы лежит на доле EdgeFogBorderFrac радиуса спрайта — вызывающий
+        // счcитает картинку так, чтобы растворение начиналось ЗАРАНЕЕ, до
+        // кольца буёв (пан-клампы листа не дают заглянуть дальше ~R, Н6.HF1)
+        public const float EdgeFogBorderFrac = 0.575f;
+        public static Sprite EdgeFog()
+        {
+            if (cache.TryGetValue("edgefog", out Sprite s) && s != null)
+                return s;
+            const int size = 512;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color[size * size];
+            for (int j = 0; j < size; j++)
+            {
+                for (int i = 0; i < size; i++)
+                {
+                    float x = (i + 0.5f) / size * 2f - 1f;
+                    float y = (j + 0.5f) / size * 2f - 1f;
+                    float r = Mathf.Sqrt(x * x + y * y);
+                    float t = (r - EdgeFogBorderFrac) / (1f - EdgeFogBorderFrac);
+                    float a = 0f;
+                    if (t > 0f)
+                    {
+                        float ramp = Mathf.SmoothStep(0f, 1f, t); // плавный набор плотности
+                        a = 0.85f * ramp * Mottle(x, y);
+                    }
+                    pixels[j * size + i] = new Color(1f, 1f, 1f, a); // тинтует Image (Ink)
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            s = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
+            cache["edgefog"] = s;
+            return s;
+        }
+
+        // плавная «мраморность» [0.5..1]: сумма несоизмеримых синусов — без
+        // решётки и без блобов при растяжении текстуры
+        private static float Mottle(float x, float y)
+        {
+            float n = Mathf.Sin(x * 8.3f + y * 3.1f) * 0.5f
+                    + Mathf.Sin(x * 17.7f - y * 11.3f + 2.1f) * 0.3f
+                    + Mathf.Sin(x * 5.1f - y * 23.7f + 4.2f) * 0.2f;
+            return Mathf.Clamp01(0.75f + 0.25f * n);
         }
 
         // карандашная рамка (кнопки/записка): прозрачная середина, рваный контур

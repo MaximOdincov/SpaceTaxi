@@ -265,7 +265,9 @@ namespace SpaceTaxi.Orders
             // пульс масштабом и альфой — заметный жёлтый круг за планетой (Н6)
             float wave = Mathf.Sin(Time.time * 3f);
             targetGlow.localScale = Vector3.one * glowScaleBase * (1f + 0.06f * wave);
-            glowRenderer.color = new Color(1f, 0.94f, 0.3f, Mathf.Lerp(0.38f, 0.62f, 0.5f + 0.5f * wave));
+            // Н7 M7.5 (оркестратор, строка M2): акцент карты #B45309 — единственный
+            // насыщенный цвет (цель заказа); кислотно-жёлтый выбивался из палитры
+            glowRenderer.color = new Color(0.706f, 0.325f, 0.035f, Mathf.Lerp(0.38f, 0.62f, 0.5f + 0.5f * wave));
         }
 
         public bool Accept(OrderOffer offer)
