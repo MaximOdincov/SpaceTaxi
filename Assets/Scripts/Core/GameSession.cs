@@ -38,6 +38,7 @@ namespace SpaceTaxi.Core
         public ShipConfig CurrentShip => Fleet.Current;
 
         private bool accidentRegistered; // один инцидент = один долг
+        private bool passengerAboardAtLoss; // пассажир был на борту при потере корабля (Н7 Q7.5)
         private OrderCompleteScreenController orderComplete; // спавнится сам (стиль Dismissal)
 
         private void Awake()
@@ -83,6 +84,10 @@ namespace SpaceTaxi.Core
             Orders = gameObject.AddComponent<OrderService>();
             Orders.Init(level, passengerCatalog, Ship);
             Orders.Bind(Rating);
+            // Н7 Q7.8: порог увольнения по сумме долга — константа прайс-конфига
+            // (те же числа, что считают цену карточек); DebtService проверяет
+            // его после каждого роста долга
+            Debt.ConfigureDismissalDebtThreshold(Orders.Pricing.DebtDismissalThreshold);
             // доставка платит (16_BETA_PLAN §3.5): цена с карточки, штраф по
             // столкновениям заказа, комиссия на аренде; оффер приходит в аргументе
             // события (Active уже обнулён) — отдельный доступ не нужен
@@ -157,13 +162,11 @@ namespace SpaceTaxi.Core
                 Rating.AddCollisionPenalty();
         }
 
-        // штраф за отмену заказа оператором: 25% цены, округление вниз.
-        // Кошелёк в минус не уходит (правило Wallet): платим чем есть, недостача —
-        // в долг (DebtService.AddCharge — не авария, счётчик аварий не растёт);
-        // рейтинг-штраф за высадку пассажира уже в OrderCancelled-хендлере выше
-        private void ChargeCancelPenalty(OrderOffer offer)
+        // единый путь штрафов (Н7 Q7.5): сколько есть — с кошелька (Wallet.TrySpend —
+        // единственная точка списания), недостача — в долг (DebtService.AddCharge —
+        // не авария, счётчик аварий не растёт); тон тостов — Danger (Н6 U4)
+        private void ChargePenalty(int penalty, string reason, bool emphasized = false)
         {
-            int penalty = OrderService.CancelPenalty(offer.Price);
             if (penalty <= 0)
                 return;
             int fromWallet = Mathf.Min(penalty, Wallet.Credits);
@@ -173,9 +176,16 @@ namespace SpaceTaxi.Core
             if (toDebt > 0)
                 Debt.AddCharge(toDebt);
             FindAnyObjectByType<UI.ToastNotifier>()?.Show(
-                $"Отказ от заказа: штраф −{UI.StationUI.Currency} {UI.OnboardBinder.FormatCredits(penalty)}",
-                false, UI.ToastTone.Danger);
-            Debug.Log($"[Economy] штраф за отмену: {penalty} Đ (кошелёк {fromWallet}, долг {toDebt})");
+                $"{reason}: штраф −{UI.StationUI.Currency} {UI.OnboardBinder.FormatCredits(penalty)}",
+                emphasized, UI.ToastTone.Danger);
+            Debug.Log($"[Economy] {reason}: {penalty} Đ (кошелёк {fromWallet}, долг {toDebt})");
+        }
+
+        // штраф за отмену заказа оператором: 25% цены, округление вниз.
+        // Рейтинг-штраф за высадку пассажира уже в OrderCancelled-хендлере выше
+        private void ChargeCancelPenalty(OrderOffer offer)
+        {
+            ChargePenalty(OrderService.CancelPenalty(offer.Price), "Отказ от заказа");
         }
 
         // потеря корабля: арендный — долг за аварию. Проверка владения ДО
@@ -188,6 +198,11 @@ namespace SpaceTaxi.Core
             if (accidentRegistered)
                 return;
             accidentRegistered = true;
+            // пассажир на борту в момент гибели/отключения корпуса: FailActive
+            // (OrderService) подписан позже и обнулит Active — состояние
+            // ловим только здесь (Н7 Q7.5)
+            passengerAboardAtLoss = Orders != null && Orders.Active != null
+                && Orders.Active.State == SpaceTaxi.Orders.OrderState.Aboard;
         }
 
         private void OnRespawned()
@@ -196,9 +211,20 @@ namespace SpaceTaxi.Core
                 return;
             if (!Fleet.IsOwned(Fleet.Current))
                 Debt.RegisterAccident();
+            // пассажир погиб или оставлен вместе с корпусом — штраф сверх долга
+            // за аренду, на своём корабле тоже (Н7 Q7.5); списание после
+            // респавна — как и долг за аренду, чтобы тосты не сыпались в момент взрыва
+            if (passengerAboardAtLoss)
+                ChargePenalty(PenaltyPricing.PassengerLossPenalty,
+                    "Пассажир погиб вместе с кораблём", emphasized: true);
             Fleet.NotifyShipLost();
             accidentRegistered = false; // следующая потеря — новый инцидент
+            passengerAboardAtLoss = false;
         }
+
+        // прайс-конфиг той же цепочки, что считает цену заказа (Orders.Pricing):
+        // поле сцены → ассет из Resources → кодовый дефолт, null не бывает
+        private PricingConfig PenaltyPricing => Orders != null ? Orders.Pricing : PricingConfig.Default;
     }
 }
 

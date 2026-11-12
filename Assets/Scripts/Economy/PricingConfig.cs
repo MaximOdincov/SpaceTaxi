@@ -35,6 +35,12 @@ namespace SpaceTaxi.Economy
         [Tooltip("% выплаты, автоматически уходящий в счёт долга (пока долг > 0)")]
         public int DebtRepaySharePct = 50;
 
+        [Header("Штрафы происшествий и увольнение (Н7 Q7.5/Q7.8): списание — кошелёк, недостача — в долг")]
+        [Tooltip("Пассажир погиб или оставлен вместе с кораблём (гибель корпуса/отключение с пассажиром на борту); платится сверх долга за аренду")]
+        public int PassengerLossPenalty = 300;
+        [Tooltip("Долг свыше этой суммы — увольнение (экран «УВОЛЕН», забег сбрасывается)")]
+        public int DebtDismissalThreshold = 2000;
+
         [Header("Эффекты рейтинга (§3.7)")]
         [Tooltip("Рейтинг ≥ порога — наценка к цене предложения")]
         public float RatingPriceBonusThreshold = 4.0f;

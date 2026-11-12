@@ -11,6 +11,7 @@ namespace SpaceTaxi.UI
         public TMP_Text Clock, MoneyValue, RatingValue;
         public GameObject DebtRow;         // строка долга под шапкой — скрыта при нуле
         public TMP_Text DebtValue;
+        public Button DebtRepayButton;     // «ПОГАСИТЬ · Đ N» в строке долга (Н7 Q7.6)
         public GameObject ActiveSection;   // секция целиком — скрывается без активного заказа
         public RectTransform ActiveArea;   // карточка активного заказа (ведёт биндер)
         public RectTransform OrderArea;    // контент скролла входящих карточек (ведёт биндер)
@@ -133,10 +134,21 @@ namespace SpaceTaxi.UI
             AnchorHeaderEdge(refs.RatingValue.transform as RectTransform, isLeft: false);
             refs.RatingValue.alignment = TextAlignmentOptions.Right;
 
-            // --- Строка долга: пустая → скрыта, секции ниже поднимаются ---
-            refs.DebtValue = Text(root, "Текущий долг: Đ 0", 22f, DebtCalmColor, "DebtRow");
-            FixedHeight(refs.DebtValue.gameObject, 30f);
-            refs.DebtRow = refs.DebtValue.gameObject;
+            // --- Строка долга: значение слева + кнопка досрочного гашения (Н7 Q7.6);
+            // пустая → скрыта, секции ниже поднимаются ---
+            var debtRow = H("DebtRow", root.transform);
+            FixedHeight(debtRow, 30f);
+            // forceExpandWidth делил бы излишек поровну и «плыл» бы шириной кнопки —
+            // как в PlayerRow: текст забирает всё лишнее, кнопка строго своя
+            debtRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+            refs.DebtValue = Text(debtRow, "Текущий долг: Đ 0", 22f, DebtCalmColor, "DebtValue");
+            Flexible(refs.DebtValue.gameObject); // текст забирает остаток ширины строки
+            // сумма на кнопке ставит биндер: min(долг, кошелёк) — списывает
+            // сколько есть, остаток остаётся долгом; без денег гаснет (С4)
+            var debtRepay = Button(debtRow.transform, "ПОГАСИТЬ · Đ 0", ButtonColor, BrightColor, 16f, "DebtRepayButton");
+            FixedSize(debtRepay, 176f, 30f);
+            refs.DebtRepayButton = debtRepay.GetComponent<Button>();
+            refs.DebtRow = debtRow;
             refs.DebtRow.SetActive(false);
 
             // --- АКТИВНЫЙ ЗАКАЗ: всегда в детальном виде, строит биндер ---

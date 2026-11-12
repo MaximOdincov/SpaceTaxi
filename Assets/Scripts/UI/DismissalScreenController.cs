@@ -8,12 +8,12 @@ using SpaceTaxi.Economy;
 
 namespace SpaceTaxi.UI
 {
-    // Экран увольнения (проигрыш): 3 аварии с непогашенными долгами.
-    // Показ по DebtService.Dismissal: timeScale = 0 (как пауза), панель
-    // поверх всего, кнопка «В МЕНЮ» сбрасывает забег (сейвов нет, инвалидацию
-    // добавит П10.2). Контроллера в каркасах сцен нет — он появляется сам на
-    // каждую сцену; в меню сессии нет и просто ждёт. Панель строится кодом
-    // при первом показе и повторно не открывается.
+    // Экран увольнения (проигрыш): 3 аварии с непогашенными долгами или долг
+    // свыше порога (Н7 Q7.8). Показ по DebtService.Dismissal: timeScale = 0
+    // (как пауза), панель поверх всего, кнопка «В МЕНЮ» сбрасывает забег
+    // (сейвов нет, инвалидацию добавит П10.2). Контроллера в каркасах сцен нет —
+    // он появляется сам на каждую сцену; в меню сессии нет и просто ждёт.
+    // Панель строится кодом при первом показе и повторно не открывается.
     public class DismissalScreenController : MonoBehaviour
     {
         private const int SortingOrder = 200; // поверх всех канвасов сцены
@@ -21,6 +21,7 @@ namespace SpaceTaxi.UI
         private bool bound;
         private bool shown;
         private GameObject screen;
+        private TMP_Text reasonText; // причина увольнения — по триггеру (долг/аварии)
         private DebtService debt;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -54,6 +55,12 @@ namespace SpaceTaxi.UI
             debt = session.Debt;
             debt.Dismissal += ShowDismissal; // подписка одна за жизнь сессии
             bound = true;
+            // Н7 Q7.8: сейв мог сохранить долг выше порога (Save знает только
+            // про счётчик аварий) — событие на загрузке не файрится, проверяем
+            // при бинде. Первый кадр сцены — безопасный момент: открытых
+            // экранов станции/борткомпа ещё нет
+            if (debt.IsOverDismissalThreshold)
+                ShowDismissal();
         }
 
         private void ShowDismissal()
@@ -65,6 +72,11 @@ namespace SpaceTaxi.UI
 
             if (screen == null)
                 screen = BuildScreen();
+            // причина по триггеру: долг свыше порога или счётчик аварий (§3.2)
+            if (reasonText != null)
+                reasonText.text = debt.IsOverDismissalThreshold
+                    ? $"МТО расторгает договор.\nДолг {StationUI.Currency} {OnboardBinder.FormatCredits(debt.Balance)} превысил допустимые {StationUI.Currency} {OnboardBinder.FormatCredits(debt.DismissalDebtThreshold)}."
+                    : "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.";
             screen.SetActive(true);
             Time.timeScale = 0f; // как пауза: до выхода в меню мир не живёт
 
@@ -137,6 +149,7 @@ namespace SpaceTaxi.UI
                 "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.",
                 26f, OnboardComputerFactory.BrightColor, "Reason");
             reason.alignment = TextAlignmentOptions.Center;
+            reasonText = reason; // текст причины подменяется при показе (Н7 Q7.8)
             var stats = OnboardComputerFactory.Text(content,
                 $"Непогашенный долг: {StationUI.Currency} {OnboardBinder.FormatCredits(debt.Balance)} · аварий: {debt.UnpaidAccidents}",
                 20f, OnboardComputerFactory.LabelColor, "Stats");

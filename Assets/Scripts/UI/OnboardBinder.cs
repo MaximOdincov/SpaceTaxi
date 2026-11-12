@@ -33,6 +33,8 @@ namespace SpaceTaxi.UI
         // строка долга: катится значением, цвет «дышит» — рост горячее погашения
         private GameObject debtRow;
         private TMP_Text debtValue;
+        // «ПОГАСИТЬ · Đ N» рядом с долгом (Н7 Q7.6): списывает min(долг, кошелёк)
+        private Button debtRepayButton;
         private float debtShown = -1f;
         private int debtTarget;
         private bool debtRising;
@@ -129,6 +131,11 @@ namespace SpaceTaxi.UI
             ratingValue = refs.RatingValue;
             debtRow = refs.DebtRow;
             debtValue = refs.DebtValue;
+            // клик-хук при бинде каркаса (как плеер «ЭФИР»): сумма/доступность
+            // читаются в момент клика, когда wallet/debt уже привязаны
+            debtRepayButton = refs.DebtRepayButton;
+            if (debtRepayButton != null)
+                debtRepayButton.onClick.AddListener(RepayDebtNow);
             activeSection = refs.ActiveSection;
             activeArea = refs.ActiveArea;
             orderArea = refs.OrderArea;
@@ -681,6 +688,8 @@ namespace SpaceTaxi.UI
             if (moneyShown < 0f)
                 moneyShown = credits;
             UpdateMoneyText();
+            // сумма на кнопке гашения = min(долг, кошелёк) — кошелёк изменился
+            RefreshDebtRepay();
         }
 
         private void AnimateMoney()
@@ -769,6 +778,7 @@ namespace SpaceTaxi.UI
             if (debtRow != null)
                 debtRow.SetActive(value > 0 || debtShown > 0.5f);
             UpdateDebtText();
+            RefreshDebtRepay(); // сумма/доступность кнопки гашения по новому долгу
         }
 
         private void AnimateDebt()
@@ -792,6 +802,46 @@ namespace SpaceTaxi.UI
             debtValue.color = debtRising && debtTarget > debtShown + 0.5f
                 ? OnboardComputerFactory.DangerColor
                 : OnboardComputerFactory.DebtCalmColor;
+        }
+
+        // кнопка «ПОГАСИТЬ · Đ N» (Н7 Q7.6): N = min(долг, кошелёк) — сколько
+        // реально спишется сейчас; без денег гаснет (лейбл в цвет лейблов,
+        // паттерн «КУПИТЬ» станции, Н6 S4). Показанные числа — фактические,
+        // без анимации докатки (как строка долга на станции)
+        private void RefreshDebtRepay()
+        {
+            if (debtRepayButton == null || debt == null || wallet == null || debt.Balance <= 0)
+                return;
+            int amount = Mathf.Min(debt.Balance, wallet.Credits);
+            TMP_Text label = debtRepayButton.GetComponentInChildren<TMP_Text>();
+            if (label != null)
+            {
+                label.text = "ПОГАСИТЬ · " + Currency + " " + FormatCredits(amount);
+                label.color = amount > 0
+                    ? OnboardComputerFactory.BrightColor
+                    : OnboardComputerFactory.LabelColor;
+            }
+            debtRepayButton.interactable = amount > 0;
+        }
+
+        // досрочное гашение из борткомпа: списывает сколько есть — min(долг,
+        // кошелёк), остаток остаётся долгом. Полный расчёт — тост Success (Н7 Q7.6),
+        // частичное — Danger (деньги ушли, U4); тон расчёта — как на станции
+        private void RepayDebtNow()
+        {
+            if (debt == null || wallet == null || debt.Balance <= 0)
+                return;
+            int amount = Mathf.Min(debt.Balance, wallet.Credits);
+            if (amount <= 0 || !wallet.TrySpend(amount))
+                return;
+            debt.Repay(amount);
+            bool full = debt.Balance <= 0;
+            Sound.Play(SoundId.DebtTone); // П9.3: тон расчёта по долгу
+            FindAnyObjectByType<ToastNotifier>()?.Show(
+                full
+                    ? "Долг погашен"
+                    : $"Долг уменьшен: −{Currency} {FormatCredits(amount)} · осталось {Currency} {FormatCredits(debt.Balance)}",
+                full, full ? ToastTone.Success : ToastTone.Danger);
         }
 
         // --- Плеер «ЭФИР» ---
