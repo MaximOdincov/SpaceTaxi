@@ -4,10 +4,13 @@ using UnityEngine.UI;
 
 namespace SpaceTaxi.UI
 {
-    // Яйцо-такси на фоне меню (бриф E.2/E.3 + E5): дрейфует по плавной
+    // Яйцо-такси на фоне меню (бриф E.2/E.3 + E5 + E7.3): дрейфует по плавной
     // траектории (сумма двух синусоид — Лиссажу), по клику ЛЕНИВО летит в
     // точку клика с easing smoothstep — скорость и доворот заметно ниже
     // прежних; по прибытии медленно продолжает дрейф вокруг новой точки.
+    // E7.3: при наведении курсора (без клика) яйцо слабо тянется к нему —
+    // вес HoverWeight от клик-поведения, поверх дрейфа Лиссажу; клик всегда
+    // в приоритете (в полёте hover-смещение заморожено на нуле).
     // Спрайт смотрит носом вверх — визуальный угол = atan2(velocity) − 90°,
     // сглаживается LerpAngle.
     public sealed class MenuEggShip : MonoBehaviour
@@ -19,6 +22,14 @@ namespace SpaceTaxi.UI
         private const float DriftRampTime = 2.6f;   // разгон дрейфа после прибытия (ленивый)
         private const float FadeInTime = 1.2f;      // появление при входе в меню
         private const float BoundsMargin = 150f;    // запас от краёв канваса
+
+        // E7.3, ручки владельца: слабое следование за курсором при наведении.
+        // HoverWeight — доля от клик-поведения: и путь к курсору (30%), и
+        // скорость подтягивания (FlySpeed * HoverWeight); HoverMaxOffset —
+        // потолок смещения от траектории Лиссажу, чтобы далёкий курсор не
+        // утаскивал яйцо за полэкрана
+        private const float HoverWeight = 0.3f;
+        private const float HoverMaxOffset = 160f;
 
         private enum State { Drift, Fly }
 
@@ -40,6 +51,12 @@ namespace SpaceTaxi.UI
         // перелёт к точке клика
         private Vector2 flyFrom, flyTo;
         private float flyDuration, flyTime;
+
+        // E7.3: hover-дрейф к курсору — точка курсора (в координатах канваса),
+        // активность и текущее смещение поверх траектории Лиссажу
+        private Vector2 hoverPoint;
+        private bool hoverActive;
+        private Vector2 hoverOffset;
 
         private float currentAngle;
         private Vector3 baseScale = Vector3.one;
@@ -88,7 +105,9 @@ namespace SpaceTaxi.UI
         }
 
         // Клик по экрану: лететь в точку (локальные координаты канваса).
-        // Повторный клик в полёте перенацеливает из текущей позиции
+        // Повторный клик в полёте перенацеливает из текущей позиции.
+        // hover-смещение обнуляем: оно уже «запечено» в flyFrom (текущая
+        // отрисованная позиция), в полёте клик — в приоритете
         public void FlyTo(Vector2 localPoint)
         {
             if (!ready)
@@ -98,8 +117,23 @@ namespace SpaceTaxi.UI
             float distance = Vector2.Distance(flyFrom, flyTo);
             flyDuration = Mathf.Clamp(distance / FlySpeed, FlySpeedMin, FlySpeedMax);
             flyTime = 0f;
+            hoverOffset = Vector2.zero;
             state = State.Fly;
         }
+
+        // E7.3: курсор над меню — яйцо слегка тянется к нему (вес HoverWeight
+        // от клик-поведения). Скорость и клампы те же, что у клика, но с
+        // весом; вызывается каждый кадр из MenuBackdropController
+        public void HoverAt(Vector2 localPoint)
+        {
+            if (!ready)
+                return;
+            hoverPoint = ClampToBounds(localPoint);
+            hoverActive = true;
+        }
+
+        // мышь исчезла (например, ввод с геймпада) — дрейф к курсору гаснет
+        public void HoverOff() => hoverActive = false;
 
         private void Update()
         {
@@ -136,6 +170,22 @@ namespace SpaceTaxi.UI
                 velocity = new Vector2(
                     driftAmplitude.x * driftFrequency.x * Mathf.Cos(driftFrequency.x * driftTime),
                     driftAmplitude.y * driftFrequency.y * Mathf.Cos(driftFrequency.y * driftTime + driftPhase)) * ramp;
+            }
+
+            // E7.3: слабый дрейф к курсору при наведении — только в покое
+            // (в полёте приоритет клика), поверх дрейфа Лиссажу. Смещение
+            // подтягивается к цели с «клик-скоростью», умноженной на вес,
+            // а его производная подмешивается в velocity — нос слегка
+            // подаётся в сторону курсора
+            if (state == State.Drift)
+            {
+                Vector2 hoverTarget = hoverActive ? (hoverPoint - position) * HoverWeight : Vector2.zero;
+                if (hoverTarget.sqrMagnitude > HoverMaxOffset * HoverMaxOffset)
+                    hoverTarget = hoverTarget.normalized * HoverMaxOffset;
+                Vector2 previous = hoverOffset;
+                hoverOffset = Vector2.MoveTowards(hoverOffset, hoverTarget, FlySpeed * HoverWeight * dt);
+                velocity += dt > 1e-5f ? (hoverOffset - previous) / dt : Vector2.zero;
+                position += hoverOffset;
             }
 
             rect.anchoredPosition = position;

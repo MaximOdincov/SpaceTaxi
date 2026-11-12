@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
-using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI
 {
@@ -14,7 +13,8 @@ namespace SpaceTaxi.UI
     // Цвет (Н6): все глифы кнопки базово ЧИСТО БЕЛЫЕ; при наведении —
     // такси-жёлтый, при уходе — обратно белый. Заголовок «SPACE TAXI» не
     // тронут (MenuStarTitle красит сам). Наведение: масштаб 1 → 1.06,
-    // гало проявляется — как раньше.
+    // подсветка — мягкая полоса по периметру (E7.2, MenuGlowSprite),
+    // проявляется плавно.
     //
     // Хотфикс Н6 (кликабельность): после гашения Frame/Background/Label под
     // кнопкой не оставалось НИ ОДНОГО raycastTarget (звёзды MenuTwinkle
@@ -29,7 +29,11 @@ namespace SpaceTaxi.UI
     public sealed class StarButtonDecorator : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         private const float HoverScale = 1.06f;
-        private const float HaloAlpha = 0.22f;
+        // E7.2: подсветка наведения — мягкая полоса по периметру кнопки
+        // (MenuGlowSprite, Image.type Sliced), не пятно. Итог на кромке =
+        // PeakAlpha текстуры * HaloAlpha; отступ полосы за габарит — HaloSpread
+        private const float HaloAlpha = 0.34f;
+        private const float HaloSpread = 10f;  // px, насколько полоса выходит за края кнопки
         private const float GlowSpeed = 0.18f; // сек на полное проявление гало
         private const float BoostMax = 0.9f;   // добавка к волне звёзд при наведении
 
@@ -89,7 +93,10 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // гало за кнопкой: в индекс 0 — под звёздами текста
+        // E7.2: свечение наведения — полоса по периметру кнопки (в индекс 0,
+        // под звёздами текста), а не пятно в центре: спрайт с рамкой BorderPx
+        // + Image.type Sliced держит толщину полосы постоянной у кнопок любой
+        // ширины
         private void BuildHalo()
         {
             var haloGo = new GameObject("StarHalo", typeof(RectTransform), typeof(Image));
@@ -97,10 +104,15 @@ namespace SpaceTaxi.UI
             haloRect.SetParent(rect, false);
             haloRect.anchorMin = Vector2.zero;
             haloRect.anchorMax = Vector2.one;
-            haloRect.offsetMin = new Vector2(-70f, -55f); // растяжка с запасом за края кнопки
-            haloRect.offsetMax = new Vector2(70f, 55f);
+            haloRect.offsetMin = new Vector2(-HaloSpread, -HaloSpread); // запас под хвост свечения наружу
+            haloRect.offsetMax = new Vector2(HaloSpread, HaloSpread);
             halo = haloGo.GetComponent<Image>();
-            halo.sprite = StubSprites.SoftDot(64f, 0f); // большое мягкое пятно
+            // PPU спрайта = Reference Pixels Per Unit канваса: uGUI делит
+            // border спрайта на PPU/ReferencePPU, при чужом PPU толщина полосы
+            // уехала бы в разы (в MainMenu ReferencePPU = 1000)
+            Canvas buttonCanvas = haloGo.GetComponentInParent<Canvas>();
+            halo.sprite = MenuGlowSprite.Rim(buttonCanvas != null ? buttonCanvas.referencePixelsPerUnit : 100f);
+            halo.type = Image.Type.Sliced;
             halo.color = new Color(1f, 0.831f, 0.302f, 0f); // такси-жёлтый, прозрачен до наведения
             halo.raycastTarget = false;
             halo.transform.SetSiblingIndex(0);

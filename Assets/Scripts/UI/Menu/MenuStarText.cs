@@ -20,6 +20,19 @@ namespace SpaceTaxi.UI
         private const float SparkleChance = 0.18f;
         private const float MinCell = 1.5f;    // px, ниже текст перестаёт читаться
 
+        // --- E7.1, ручки владельца: форма/плотность точек-звёзд глифов ---
+        // Форма точки: Diamond — 4-лучевая «искра» (ромб с вогнутыми
+        // сторонами + горячее ядро), Circle — прежняя мягкая точка.
+        // Сетка и маски 5x7 от стиля не зависят; искры-блики (18%) и мерцание
+        // общие для обоих стилей.
+        private const StarGlyphStyle GlyphStyle = StarGlyphStyle.Diamond;
+        private const float DiamondFatness = 0.60f; // полнота лучей: меньше — тоньше/острее, 1 — простой ромб
+        private const float DiamondCore = 0.30f;    // радиус горячего ядра (доля полуширины) — плотность букв
+        private const float DiamondSizeMin = 1.15f; // множители клетки для Diamond — чуть крупнее кружков
+        private const float DiamondSizeMax = 1.60f; // (кружки были 1.05-1.5): компенсация вогнутых сторон
+        private const float CircleSizeMin = 1.05f;  // прежние множители для стиля Circle
+        private const float CircleSizeMax = 1.5f;
+
         private readonly List<MenuTwinkle.Star> stars = new();
         private float boost;
 
@@ -51,6 +64,14 @@ namespace SpaceTaxi.UI
             container.sizeDelta = new Vector2(Width, Height);
 
             float cursor = -Width * 0.5f; // левый край текущей буквы
+
+            // E7.1: спрайт точки глифа строится один раз на текст; для Circle
+            // остаётся мягкая точка StubSprites (baseSprite = null)
+            bool diamond = GlyphStyle == StarGlyphStyle.Diamond;
+            Sprite glyphDot = diamond ? MenuTwinkle.DiamondSparkle(DiamondFatness, DiamondCore) : null;
+            float sizeMin = diamond ? DiamondSizeMin : CircleSizeMin;
+            float sizeMax = diamond ? DiamondSizeMax : CircleSizeMax;
+
             foreach (char character in text)
             {
                 if (character == ' ')
@@ -75,9 +96,9 @@ namespace SpaceTaxi.UI
                         bool sparkle = Random.value < SparkleChance;
                         Color color = palette[Random.Range(0, palette.Length)];
                         color.a *= Random.Range(0.75f, 1f);
-                        MenuTwinkle.CreateStar(container, position, cell * Random.Range(1.05f, 1.5f),
+                        MenuTwinkle.CreateStar(container, position, cell * Random.Range(sizeMin, sizeMax),
                             color, 0.22f * Random.Range(0.7f, 1.3f), Random.Range(0.8f, 2.2f),
-                            Random.Range(0f, Mathf.PI * 2f), sparkle, stars);
+                            Random.Range(0f, Mathf.PI * 2f), sparkle, stars, baseSprite: glyphDot);
                     }
                 }
                 cursor += (GlyphColumns + LetterGap) * cell;
