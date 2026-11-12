@@ -203,14 +203,6 @@ namespace SpaceTaxi.Economy
             return ArrayAt(RepairPackPriceMul, packIndex, 1f);
         }
 
-        // потолок ремонта за визит, доля нужного HP; тир 0/некорректный — базовая сеть (полный)
-        public float GetRepairTierCap(int tier)
-        {
-            var caps = RepairTierCapByTier;
-            int index = RepairTierIndex(tier, caps != null ? caps.Length : 0);
-            return index >= 0 ? caps[index] : 1f;
-        }
-
         // наценка мастерской по тиру сети (С4); кривой/пустой массив — без наценки,
         // тир 0/некорректный — базовая сеть (средняя)
         public float GetRepairTierSurcharge(int tier)
