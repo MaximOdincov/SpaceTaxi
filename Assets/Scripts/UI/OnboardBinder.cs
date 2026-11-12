@@ -72,8 +72,8 @@ namespace SpaceTaxi.UI
         // плеер «ЭФИР»
         private Button playerPrev, playerNext;
         private Button radioMute;
-        private Button radioWave;         // «ВОЛНА 1/2»: эфир-эмбиент против обычного плейлиста
-        private SoundId wave1Track;       // трек волны 1, запомненный при уходе на волну 2
+        private Button radioWave;         // «ВОЛНА 1/2/3»: плейлист → эмбиент-станция → классика
+        private SoundId wave1Track;       // трек волны 1, запомненный при уходе в эфир (волны 2/3)
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
@@ -952,9 +952,10 @@ namespace SpaceTaxi.UI
             BuildWaveToggle();
         }
 
-        // «ВОЛНА 1/2» (Н6/Z): кнопка в стиле секции — копия мьют-кнопки под ней.
-        // Волна 1 — как играло (плейлист не тронут), волна 2 — станция эмбиента
-        // (MusicStation2: три эмбиента + menu_out_in_space по кругу)
+        // «ВОЛНА 1/2/3» (Н6/Z, Н7 A7.3): кнопка в стиле секции — копия мьют-кнопки под
+        // ней. Волна 1 — как играло (плейлист не тронут), волна 2 — станция эмбиента
+        // (MusicStation2: три эмбиента + menu_out_in_space по кругу), волна 3 —
+        // классическая станция (MusicStation3, PD-микс Packs_N7_classical)
         private void BuildWaveToggle()
         {
             if (radioWave != null || radioMute == null)
@@ -975,8 +976,12 @@ namespace SpaceTaxi.UI
 
         private string WaveLabel()
         {
-            bool wave2 = audioManager != null && audioManager.CurrentTrack == SoundId.MusicStation2;
-            return wave2 ? "ВОЛНА: 2" : "ВОЛНА: 1";
+            SoundId track = audioManager != null ? audioManager.CurrentTrack : SoundId.None;
+            if (track == SoundId.MusicStation2)
+                return "ВОЛНА: 2";
+            if (track == SoundId.MusicStation3)
+                return "ВОЛНА: 3";
+            return "ВОЛНА: 1";
         }
 
         private void ToggleRadioWave()
@@ -985,21 +990,55 @@ namespace SpaceTaxi.UI
             if (manager == null)
                 return;
             audioManager = manager; // метки ниже и событие читают поле, а не локальную ссылку
-            if (manager.CurrentTrack == SoundId.MusicStation2)
+            if (manager.CurrentTrack == SoundId.MusicStation3)
             {
-                // обратно на волну 1: тот же трек, что играл до переключения;
+                // волна 3 → волна 1: тот же трек, что играл до эфира;
                 // памяти нет — дорожная волна (MusicFlight)
-                SoundId back = wave1Track == SoundId.None || wave1Track == SoundId.MusicStation2
-                    ? SoundId.MusicFlight
-                    : wave1Track;
-                manager.PlayMusic(back);
+                manager.PlayMusic(Wave1Track());
+            }
+            else if (manager.CurrentTrack == SoundId.MusicStation2)
+            {
+                // волна 2 → волна 3 (классика). Записи может не быть в каталоге:
+                // плейлист менеджера собирается только из записей с клипами, а
+                // PlayMusic пустую станцию молча пропускает — мёртвую волну не
+                // включаем, остаёмся на месте и предупреждаем тостом
+                if (!StationInPlaylist(manager, SoundId.MusicStation3))
+                {
+                    FindAnyObjectByType<ToastNotifier>()?.Show(
+                        "ВОЛНА 3: ещё не настроена", false, ToastTone.Neutral);
+                    return;
+                }
+                manager.PlayMusic(SoundId.MusicStation3);
             }
             else
             {
+                // волна 1 → волна 2: запоминаем, куда вернуться по кругу на волну 1
                 wave1Track = manager.CurrentTrack;
                 manager.PlayMusic(SoundId.MusicStation2);
             }
             RefreshMusicPlayer(); // событие MusicStateChanged придёт и так — дублируем для мгновенной метки
+        }
+
+        // трек волны 1: запомненный при уходе в эфир; памяти нет (или в памяти
+        // сама волна эфира) — дорожная волна (MusicFlight)
+        private SoundId Wave1Track()
+        {
+            return wave1Track == SoundId.None
+                || wave1Track == SoundId.MusicStation2
+                || wave1Track == SoundId.MusicStation3
+                ? SoundId.MusicFlight
+                : wave1Track;
+        }
+
+        // у станции есть клипы: плейлист менеджера содержит только валидные записи
+        // группы Music; каталог собран до игры — в сессии состав не меняется
+        private static bool StationInPlaylist(AudioManager manager, SoundId station)
+        {
+            IReadOnlyList<SoundId> tracks = manager.MusicPlaylist;
+            for (int i = 0; i < tracks.Count; i++)
+                if (tracks[i] == station)
+                    return true;
+            return false;
         }
 
         // имя станции и метка мьюта по состоянию менеджера; событие MusicStateChanged
@@ -1014,7 +1053,7 @@ namespace SpaceTaxi.UI
                     muteLabel.text = audioManager != null && audioManager.MusicMuted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
             }
             if (radioWave != null)
-                SetButtonLabel(radioWave, WaveLabel()); // синхрон и при prev/next мимо волны 2
+                SetButtonLabel(radioWave, WaveLabel()); // синхрон и при prev/next мимо волн 2/3
             if (audioManager == null || audioManager.MusicPlaylist.Count == 0)
             {
                 trackTitle.text = "ЭФИР · треки не найдены";
@@ -1035,7 +1074,7 @@ namespace SpaceTaxi.UI
                 case SoundId.MusicFlight: return "Дорожная волна";
                 case SoundId.MusicStation1: return "Космо-классика";
                 case SoundId.MusicStation2: return "Ретро-волна";
-                case SoundId.MusicStation3: return "Механика драйв";
+                case SoundId.MusicStation3: return "Классика"; // Н7 A7.3: волна 3 — PD-микс классики (была заглушка «Механика драйв»)
                 case SoundId.MusicStation4: return "Ночная частота";
                 default: return "—";
             }

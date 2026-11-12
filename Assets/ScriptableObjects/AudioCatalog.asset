@@ -218,3 +218,24 @@ MonoBehaviour:
     Loop: 0
     Sequential: 0
     FadeOut: 0
+  - Id: 19
+    Clips:
+    - {fileID: 8300000, guid: 4dc119e6e1703e146888a23d6dfaecde, type: 3}
+    - {fileID: 8300000, guid: 73efa4bba3e45ba4ba17eb5a9baaada8, type: 3}
+    - {fileID: 8300000, guid: 991e63e2668ae3049ae592abb8ea30ca, type: 3}
+    - {fileID: 8300000, guid: a6402da15a2c54a4b8fcd3481306eeec, type: 3}
+    - {fileID: 8300000, guid: 0fbd165823ab1da46b6801ef5ccaf296, type: 3}
+    - {fileID: 8300000, guid: 052208214bb7b93488ec2d0e8609d44b, type: 3}
+    - {fileID: 8300000, guid: 3c462efe1a5aabd4ba0acd399e850046, type: 3}
+    - {fileID: 8300000, guid: 36fd4e78fd692c74dae929f376733558, type: 3}
+    - {fileID: 8300000, guid: 9736e1cb28c637d4996435f4dee01b0c, type: 3}
+    - {fileID: 8300000, guid: 3b0683b7d1683454899932bf1ee97cff, type: 3}
+    - {fileID: 8300000, guid: 4e3ab999f6579bf469b0f6a0765f3bce, type: 3}
+    - {fileID: 8300000, guid: 80bff7fb508bbf64e8ad751153cfd28c, type: 3}
+    Group: 3
+    Volume: 0.5
+    Pitch: 1
+    PitchJitter: 0
+    Loop: 0
+    Sequential: 0
+    FadeOut: 0
