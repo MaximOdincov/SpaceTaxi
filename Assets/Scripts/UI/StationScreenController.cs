@@ -1241,6 +1241,12 @@ namespace SpaceTaxi.UI
             var statsElement = statsColumn.AddComponent<LayoutElement>();
             statsElement.flexibleWidth = 1f;
 
+            // Н7 U7.3: одна короткая легенда-подпись — янтарная риска на каждой
+            // полоске это ТВОЙ эффективный стат (владелец: «непонятна»)
+            var tickCaption = OnboardComputerFactory.Text(statsColumn, "ЯНТАРНАЯ РИСКА — ТВОЙ ТЕКУЩИЙ СТАТ",
+                14f, OnboardComputerFactory.TaxiColor, "TickCaption");
+            OnboardComputerFactory.FixedHeight(tickCaption.gameObject, 18f);
+
             showcaseStatRows = new ShowStatRowRefs[StatCount];
             for (int i = 0; i < StatCount; i++)
                 showcaseStatRows[i] = BuildStatRow(statsColumn.transform, i, StatLabels[i]);
@@ -1384,8 +1390,9 @@ namespace SpaceTaxi.UI
             fill.offsetMax = Vector2.zero;
         }
 
-        // риска-засечка текущего значения (C2): вертикальная полоска 3px,
-        // ширину стата показывает от всей дорожки
+        // риска-засечка текущего значения (C2): вертикальная полоска, ширину
+        // стата показывает от всей дорожки. Н7 U7.3 (владелец: «непонятна») —
+        // крупнее (6px) и с выносом ±2px за дорожку, чтобы читалась маркером
         private static RectTransform BuildTick(Transform track)
         {
             var tick = new GameObject("Tick", typeof(RectTransform), typeof(Image));
@@ -1393,7 +1400,10 @@ namespace SpaceTaxi.UI
             var image = tick.GetComponent<Image>();
             image.color = OnboardComputerFactory.TaxiColor;
             image.raycastTarget = false;
-            return (RectTransform)tick.transform;
+            var rect = (RectTransform)tick.transform;
+            rect.offsetMin = new Vector2(0f, -2f);  // вынос вниз за дорожку
+            rect.offsetMax = new Vector2(0f, 2f);   // вынос вверх
+            return rect;
         }
 
         private static void SetTick(RectTransform tick, float fraction)
@@ -1401,7 +1411,7 @@ namespace SpaceTaxi.UI
             float x = Mathf.Clamp01(fraction);
             tick.anchorMin = new Vector2(x, 0f);
             tick.anchorMax = new Vector2(x, 1f);
-            tick.sizeDelta = new Vector2(3f, 0f); // высоту дают якоря, ширина — 3px
+            tick.sizeDelta = new Vector2(6f, 0f); // высоту дают якоря (+вынос BuildTick), ширина — 6px (Н7 U7.3)
         }
 
         // fill-дочка: левый край закреплён, правый двигает SetFill (доля 0..1)
