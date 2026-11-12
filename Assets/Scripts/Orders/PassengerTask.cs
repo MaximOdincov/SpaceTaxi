@@ -11,6 +11,8 @@ namespace SpaceTaxi.Orders
         NoRefuel,     // без заправки на станциях в пути
         NoCollision,  // без столкновений
         SpeedLimit,   // не быстрее лимита весь полёт
+        FragileCargo, // хрупкая посылка: сильные удары ломают груз (Н7 Q7.4)
+        NervousSpeed, // нервный пассажир: превышения копят замечания (Н7 Q7.4)
         CometFlyby,   // пролететь близко к комете (П8.1)
         RingVisit,    // зайти в capture-кольцо планеты
         StarBackside, // побывать за звездой относительно центра мира
@@ -30,6 +32,12 @@ namespace SpaceTaxi.Orders
         public int TargetBodyIndex;     // цель — индекс в LevelAsset.Bodies (RingVisit/StarBackside/WaitOnPlanet)
         public float WaitSeconds;       // сколько сидеть (WaitOnPlanet)
         public float WaitAccumulated;   // накоплено ожидания, копится с прерываниями (внутреннее)
+
+        // накопительные условия (Н7 Q7.4); в сейв не пишутся — до загрузки
+        // счёт начинается заново, флаг Failed при этом сохраняется
+        public int CargoHits;           // сильных ударов по борту с грузом (FragileCargo)
+        public int SpeedStrikes;        // замечаний за превышение (NervousSpeed)
+        public bool SpeedExceeded;      // эпизод превышения открыт — замечание уже засчитано
 
         // внутреннее отслеживание исхода; итог подводится при доставке
         public bool Succeeded;
@@ -65,10 +73,19 @@ namespace SpaceTaxi.Orders
         private const float HoleFlybyDistance = 800f;   // юн — подлететь к дыре (§3.6)
         private const float WaitOnPlanetSeconds = 10f;  // с — сидеть на планете (§3.6)
 
+        // Н7 Q7.4: накопительные задания; публичные — OnboardBinder показывает счёт
+        public const int CargoHitLimit = 3;    // сильных ударов — посылка разбита
+        public const int SpeedStrikeLimit = 3; // превышений — жалоба пассажира
+
+        // Н7 Q7.1: шанс «паникёра» при генерации профиля (таймер-срыв на заказ)
+        public const float HurryChance = 0.2f;
+        private const float HurrySlack = 75f;   // с — прибавка к чистому времени срыва
+
         // Равномерный случайный тип из доступных (Н-14); шанс задания вообще — 50%,
         // иначе null (UI трактует как «задания нет»). Точкам интереса (П8.1) нужен
         // уровень: цель ищется по типу тела; объекта нет — тип выпадает из выбора,
-        // ядро условий (Deadline/NoRefuel/NoCollision/SpeedLimit) доступно всегда
+        // ядро условий (Deadline/NoRefuel/NoCollision/SpeedLimit/FragileCargo/
+        // NervousSpeed) доступно всегда
         public static PassengerTask CreateRandom(float routeDistance,
             int pickupIndex, int dropoffIndex, LevelAsset level, bool cometsAvailable)
         {
@@ -79,12 +96,14 @@ namespace SpaceTaxi.Orders
             int star = RandomBodyIndex(level, BodyType.Star);
             int hole = RandomBodyIndex(level, BodyType.BlackHole);
 
-            var kinds = new List<PassengerTaskKind>(9)
+            var kinds = new List<PassengerTaskKind>(11)
             {
                 PassengerTaskKind.Deadline,
                 PassengerTaskKind.NoRefuel,
                 PassengerTaskKind.NoCollision,
                 PassengerTaskKind.SpeedLimit,
+                PassengerTaskKind.FragileCargo,
+                PassengerTaskKind.NervousSpeed,
             };
             if (cometsAvailable)
                 kinds.Add(PassengerTaskKind.CometFlyby);
@@ -127,6 +146,19 @@ namespace SpaceTaxi.Orders
                     {
                         Kind = PassengerTaskKind.SpeedLimit,
                         Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с весь полёт.",
+                        SpeedLimit = QuietSpeedLimit,
+                    };
+                case PassengerTaskKind.FragileCargo:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.FragileCargo,
+                        Text = $"Везу посылку — хрупкая! Больше {CargoHitLimit} сильных ударов не выдержит.",
+                    };
+                case PassengerTaskKind.NervousSpeed:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.NervousSpeed,
+                        Text = $"Нервный я: {SpeedStrikeLimit} превышений {QuietSpeedLimit:0} юн/с — и выхожу с жалобой.",
                         SpeedLimit = QuietSpeedLimit,
                     };
                 case PassengerTaskKind.CometFlyby:
@@ -173,6 +205,14 @@ namespace SpaceTaxi.Orders
         public static bool IsInterestPoint(PassengerTaskKind kind)
         {
             return kind >= PassengerTaskKind.CometFlyby;
+        }
+
+        // Н7 Q7.1: жёсткий дедлайн «паникёра» — та же формула «дистанция × коэф»,
+        // что у задания-дедлайна, но с бо́льшим запасом: срыв убивает весь заказ,
+        // а не только рейтинг, время должно быть достижимым
+        public static float HurrySecondsFor(float routeDistance)
+        {
+            return routeDistance / DeadlineSpeedUnit + HurrySlack;
         }
 
         // случайное тело типа (исключения — концы маршрута); нет — -1

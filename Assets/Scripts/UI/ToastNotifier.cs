@@ -251,14 +251,28 @@ namespace SpaceTaxi.UI
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Greetings)));
             orders.OrderDelivered += offer => Show("ЗАКАЗ ВЫПОЛНЕН: " + offer.Passenger.DisplayName
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), true, ToastTone.Success);
-            orders.OrderFailed += offer => Show("Заказ провален"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
+            orders.OrderFailed += offer => Show(
+                // Н7 Q7.1/Q7.4: срыв по таймеру или разбитый груз называют причину
+                string.IsNullOrEmpty(offer.FailReason)
+                    ? "Заказ провален" + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints))
+                    : "СРЫВ ЗАКАЗА: " + offer.FailReason + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)),
+                true, ToastTone.Danger);
 
             // итог задания пассажира (П5.3): благодарность или жалоба
             orders.TaskSucceeded += offer => Show("Задание выполнено"
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), false, ToastTone.Success);
             orders.TaskFailed += offer => Show("Жалоба пассажира"
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
+
+            // Н7 Q7.3: тост принятия заказа; «паникёр» предупреждает сразу (Н7 Q7.1)
+            orders.OrderAccepted += offer => Show("Заказ принят: " + offer.Passenger.DisplayName
+                + (offer.HurrySeconds > 0f
+                    ? " · ПАССАЖИР ТОРОПИТСЯ: " + OnboardBinder.FormatClock(offer.HurrySeconds) + " на доставку"
+                    : ""));
+
+            // Н7 Q7.4: промежуточные предупреждения задания (повреждение посылки,
+            // замечание нервному пилоту)
+            orders.OrderWarning += message => Show(message, false, ToastTone.Danger);
 
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен", false, ToastTone.Danger);

@@ -444,6 +444,17 @@ namespace SpaceTaxi.UI
                     + orders.PlanetName(index).ToUpper()
                     + " (" + orders.DistanceToPlanet(index, ship.transform.position).ToString("0") + " юн)";
             }
+
+            // таймер «паникёра» (Н7 Q7.1): остаток mm:ss рядом с маршрутом,
+            // цвет плывёт к Danger по мере истечения; на нуле — срыв заказа
+            if (active.HurrySeconds > 0f && active.HurryStartedAt >= 0f)
+            {
+                float remaining = active.HurryRemaining(Time.time);
+                Color timerColor = Color.Lerp(OnboardComputerFactory.TaxiColor, OnboardComputerFactory.DangerColor,
+                    1f - Mathf.Clamp01(remaining / OnboardBinder.HurryWarnSeconds));
+                goalHint.text += $"<color=#{ColorUtility.ToHtmlStringRGB(timerColor)}> · ОСТАЛОСЬ "
+                    + OnboardBinder.FormatClock(remaining) + " · срыв заказа</color>";
+            }
         }
 
         private void UpdateHull()

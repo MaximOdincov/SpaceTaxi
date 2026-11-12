@@ -28,6 +28,10 @@ namespace SpaceTaxi.Orders
         [Tooltip("Сид портрета генератора NPC (восстановление из сейва); 0 — нет")]
         public int PortraitSeed;
 
+        [Header("Темп")]
+        [Tooltip("Пассажир торопится (Н7 Q7.1): на заказ идёт жёсткий таймер — время вышло, заказ срывается")]
+        public bool Hurries;
+
         [Header("Фразы (покажется случайная из списка)")]
         [TextArea(2, 4)]
         [Tooltip("Пассажир сел на борт")]

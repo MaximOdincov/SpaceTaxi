@@ -89,6 +89,9 @@ namespace SpaceTaxi.Orders
             profile.Portrait = NpcPortrait.Generate(seed);
             profile.PortraitTint = Color.white; // цвета запечены в портрет
             profile.DisplayName = BuildFunnyName();
+            // «паникёр» (Н7 Q7.1): шанс — PassengerTasks.HurryChance, на заказе
+            // включит жёсткий таймер срыва (OrderService.CheckHurry)
+            profile.Hurries = Random.value < PassengerTasks.HurryChance;
 
             // общие пулы фраз (Н-14): полные копии массивов — реплика выбирается
             // случайно при показе (PickPhrase), офферы не делят состояние

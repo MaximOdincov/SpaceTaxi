@@ -27,6 +27,30 @@ namespace SpaceTaxi.Orders
         public float TipsFraction; // доля чаевых заказа (Н-14): случайные 10–25%, бросок при спавне
         public PassengerTask Task; // задание пассажира (П5.3); null — задания нет
         public OrderState State = OrderState.Offered;
+
+        // таймер «паникёра» (Н7 Q7.1): жёсткий дедлайн заказа, время вышло —
+        // срыв (FailActive, штрафа деньгами нет). 0 — пассажир не торопится
+        public float HurrySeconds;
+        public float HurryStartedAt = -1f; // Time.time в момент Accept; < 0 — не запущен
+        public bool HurryMissed;           // срыв по таймеру (для тоста)
+        public string FailReason;          // причина провала для тоста (срыв/груз); null — обычный провал
+
+        // остаток таймера «паникёра»; без таймера — MaxValue, до Accept — полный лимит
+        public float HurryRemaining(float now)
+        {
+            if (HurrySeconds <= 0f)
+                return float.MaxValue;
+            return HurryStartedAt < 0f
+                ? HurrySeconds
+                : Mathf.Max(0f, HurrySeconds - (now - HurryStartedAt));
+        }
+
+        // таймер стартует один раз — при принятии заказа (как StartDeadline у задания)
+        public void StartHurry(float now)
+        {
+            if (HurryStartedAt < 0f)
+                HurryStartedAt = now;
+        }
     }
 
     // Поток входящих карточек, один активный заказ; посадка — взятие/сдача пассажира
@@ -117,6 +141,8 @@ namespace SpaceTaxi.Orders
         public event Action<OrderOffer> OrderCancelled;
         public event Action<OrderOffer> TaskSucceeded; // задание выполнено (П5.3)
         public event Action<OrderOffer> TaskFailed;    // задание провалено — жалоба
+        public event Action<OrderOffer> OrderAccepted; // принят игроком (тост Н7 Q7.3); RestoreActive не зовёт
+        public event Action<string> OrderWarning;      // промежуточное предупреждение задания (Н7 Q7.4) — тост Danger
 
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
         {
@@ -167,6 +193,7 @@ namespace SpaceTaxi.Orders
 
             UpdateTargetGlow();
             TrackTask();
+            CheckHurry();
         }
 
         // подсветка планеты назначения (А — пока ждёт, Б — на борту): компактный
@@ -250,9 +277,11 @@ namespace SpaceTaxi.Orders
             Active = offer;
             CollisionsOfActive = 0; // новый заказ — счёт с нуля
             offer.Task?.StartDeadline(Time.time); // дедлайн пошёл (П5.3)
+            offer.StartHurry(Time.time);          // таймер «паникёра» пошёл (Н7 Q7.1)
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
+            OrderAccepted?.Invoke(offer); // тост принятия (Н7 Q7.3); RestoreActive его минует
 
             // корабль уже стоит на планете пикапа — пассажир сразу на борт,
             // без требования взлететь и сесть повторно (A6)
@@ -339,6 +368,24 @@ namespace SpaceTaxi.Orders
                 CollisionsOfActive++;
             if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.NoCollision))
                 Active.Task.Failed = true;
+            // хрупкая посылка (Н7 Q7.4): CrashImpact приходит только на удар
+            // с уроном (скорость выше посадочной) — это и есть «сильный удар»
+            if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.FragileCargo))
+                OnCargoHit(Active);
+        }
+
+        // удар по борту с грузом: копит повреждения, третий — срыв заказа
+        // (посылка разбита — без выплаты). Промежуточные удары — тост Danger
+        private void OnCargoHit(OrderOffer active)
+        {
+            active.Task.CargoHits++;
+            if (active.Task.CargoHits < PassengerTasks.CargoHitLimit)
+            {
+                OrderWarning?.Invoke($"Посылка повреждена ({active.Task.CargoHits}/{PassengerTasks.CargoHitLimit}) — везите плавнее");
+                return;
+            }
+            active.FailReason = $"посылка разбита ({PassengerTasks.CargoHitLimit} удара)";
+            FailActive();
         }
 
         // платный сервис (заправка/ремонт) на станции при пассажире — задание
@@ -372,11 +419,58 @@ namespace SpaceTaxi.Orders
                 && ship.Body.linearVelocity.magnitude > task.SpeedLimit)
                 task.Failed = true;
 
+            // нервный пассажир (Н7 Q7.4): превышения копят замечания (эпизод = одно
+            // замечание), предел — жалоба при доставке; заказ не срывается
+            if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.NervousSpeed
+                && !task.Failed && ship != null && ship.Body != null)
+                TrackSpeedStrikes(task);
+
             // точки интереса (П8.1): трекинг в тот же период Aboard→доставка,
             // успех фиксируется один раз — провалить задание может только гибель заказа
             if (active.State == OrderState.Aboard
                 && PassengerTasks.IsInterestPoint(task.Kind) && !task.Succeeded && !task.Failed)
                 TrackInterestPoint(task);
+        }
+
+        // замечания нервного пассажира: одно замечание на эпизод превышения —
+        // «висеть» над лимитом весь полёт == одно замечание (Н7 Q7.4)
+        private void TrackSpeedStrikes(PassengerTask task)
+        {
+            bool over = ship.Body.linearVelocity.magnitude > task.SpeedLimit;
+            if (!over)
+            {
+                task.SpeedExceeded = false; // эпизод закрыт — новое превышение даст новое замечание
+                return;
+            }
+            if (task.SpeedExceeded)
+                return; // тот же эпизод — замечание уже засчитано
+            task.SpeedExceeded = true;
+            task.SpeedStrikes++;
+            if (task.SpeedStrikes >= PassengerTasks.SpeedStrikeLimit)
+            {
+                task.Failed = true;
+                OrderWarning?.Invoke($"Пассажир в ярости: превышений {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit} — будет жалоба");
+            }
+            else
+            {
+                OrderWarning?.Invoke($"Пассажир нервничает: замечание {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit} — сбавьте скорость");
+            }
+        }
+
+        // срыв заказа «паникёра» (Н7 Q7.1): время вышло — заказ провален
+        // (FailActive тостит через OrderFailed, рейтинг-штраф — обычный путь);
+        // штрафа деньгами нет
+        private void CheckHurry()
+        {
+            OrderOffer active = Active;
+            if (active == null || active.HurrySeconds <= 0f
+                || active.HurryStartedAt < 0f || active.HurryMissed)
+                return;
+            if (active.HurryRemaining(Time.time) > 0f)
+                return;
+            active.HurryMissed = true;
+            active.FailReason = "время вышло";
+            FailActive();
         }
 
         // трекинг точек интереса (П8.1, §3.6): комета/кольцо/тыл звезды/дыра/ожидание
@@ -599,6 +693,9 @@ namespace SpaceTaxi.Orders
             // чаевые (Н-14): случайные 10–25% на заказ, бросок один раз при спавне —
             // число живёт до выплаты и не «перебрасывается»
             offer.TipsFraction = UnityEngine.Random.Range(0.10f, 0.25f);
+            // «паникёр» (Н7 Q7.1): пассажир торопится — жёсткий таймер на весь заказ
+            if (passenger.Hurries)
+                offer.HurrySeconds = PassengerTasks.HurrySecondsFor(RouteDistance(offer));
             // задание пассажира (П5.3): случайный тип с шансом 50% (Н-14); дедлайну
             // нужна дальность маршрута, точкам интереса (П8.1) — концы маршрута
             // и контекст уровня. У «жирного» задание обязательно (D2 §3) — добрасываем

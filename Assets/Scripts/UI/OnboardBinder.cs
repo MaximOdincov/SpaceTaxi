@@ -47,6 +47,11 @@ namespace SpaceTaxi.UI
         private Button abandonButton;
         private OrderOffer builtActiveOffer; // карточка актива перестраивается только при смене заказа
         private GameObject activeCardGo;
+        // мини-строка выполнения под карточкой актива (Н7 Q7.2): этапы ЗАБРАТЬ/ВЕЗИ
+        // и таймер «паникёра» (Н7 Q7.1); текст ведёт SlowUpdate
+        private TMP_Text activeProgress;
+        // галочка этапа: «✓» есть не в каждом атласе (паттерн clockGlyph) — иначе «+»
+        private string doneGlyph = "+";
         // раскрытие: входящая карточка разворачивается прямо в ленте скролла
         private OrderOffer expandedOffer;
 
@@ -79,6 +84,10 @@ namespace SpaceTaxi.UI
         private const float ExpandDuration = 0.22f; // как Slide панели, ease-out cubic
 
         private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
+        // таймер «паникёра» (Н7 Q7.1): с этого остатка цвет плывёт к Danger;
+        // публичная — HudBinder красит той же логикой подсказку цели
+        public const float HurryWarnSeconds = 60f;
+        private const float ProgressRowHeight = 26f; // высота строк сводки (17pt + запас)
         // §3.2: увольнение после третьей непогашенной аварии (как в StationScreenController)
         private const int MaxUnpaidAccidents = 3;
 
@@ -149,6 +158,8 @@ namespace SpaceTaxi.UI
                 clockGlyph = clock.font.HasCharacter('⏲');
             if (refs.Font != null && refs.Font.HasCharacter('★'))
                 ratingPrefix = "★ ";
+            if (refs.Font != null && refs.Font.HasCharacter('✓'))
+                doneGlyph = "✓";
         }
 
         private static void SetText(GameObject root, string path, string value)
@@ -183,6 +194,7 @@ namespace SpaceTaxi.UI
                     Destroy(child);
                 activeAreaChildren.Clear();
                 activeCardGo = null;
+                activeProgress = null; // строка выполнения гибнет вместе с карточкой
                 if (hasActive)
                     BuildActiveOrder();
                 builtActiveOffer = hasActive ? orders.Active : null;
@@ -283,6 +295,7 @@ namespace SpaceTaxi.UI
             }
 
             FillCard(card.transform, offer, activeMode: true);
+            BuildActiveProgressRow();
         }
 
         // единое заполнение карточки (входящей или активной): аватары, верх, сводка
@@ -636,6 +649,7 @@ namespace SpaceTaxi.UI
             {
                 RefreshLiveDistances(activeCardGo.transform, orders.Active);
                 UpdateActiveWish();
+                UpdateActiveProgressRow();
                 RefreshCancelState();
             }
         }
@@ -655,6 +669,11 @@ namespace SpaceTaxi.UI
             if (task.Kind == PassengerTaskKind.WaitOnPlanet)
                 return "Посидели " + Mathf.Min(task.WaitAccumulated, task.WaitSeconds).ToString("0")
                     + "/" + task.WaitSeconds.ToString("0") + " с";
+            // накопительные задания (Н7 Q7.4): счёт показываем, только когда он открыт
+            if (task.Kind == PassengerTaskKind.FragileCargo && task.CargoHits > 0)
+                return $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Повреждений: {task.CargoHits}/{PassengerTasks.CargoHitLimit}</color>";
+            if (task.Kind == PassengerTaskKind.NervousSpeed && task.SpeedStrikes > 0)
+                return $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Замечаний: {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit}</color>";
             return null;
         }
 
@@ -671,6 +690,72 @@ namespace SpaceTaxi.UI
                 return;
             string progress = TaskProgress(task);
             wishText.text = StatLine("Пожелание клиента:", task.Text + (progress != null ? " · " + progress : ""));
+        }
+
+        // --- Строка выполнения активного заказа (Н7 Q7.2) ---
+
+        // мини-строка под карточкой актива: «ВЫПОЛНЕНИЕ: ЗАБРАТЬ: А → ВЕЗИ: Б»
+        // со состоянием этапов и таймером «паникёра». Рядовой элемент activeArea —
+        // гибнет вместе с карточкой при смене заказа (activeAreaChildren)
+        private void BuildActiveProgressRow()
+        {
+            var row = new GameObject("ActiveProgress", typeof(RectTransform), typeof(LayoutElement));
+            row.transform.SetParent(activeArea, false);
+            activeAreaChildren.Add(row);
+            LayoutElement le = row.GetComponent<LayoutElement>();
+            le.preferredHeight = ProgressRowHeight;
+            le.flexibleWidth = 1f;
+            activeProgress = OnboardComputerFactory.Text(row, "", 17f, OnboardComputerFactory.BrightColor);
+            activeProgress.alignment = TextAlignmentOptions.Left;
+            UpdateActiveProgressRow();
+        }
+
+        // этапы: галочка — готово (Bright), стрелка — текущий (Taxi), точки —
+        // ожидает (приглушённый); текст ведёт SlowUpdate (смена состояния заказа
+        // видна в четверть секунды, карточка при этом не перестраивается)
+        private void UpdateActiveProgressRow()
+        {
+            if (activeProgress == null || orders.Active == null)
+                return;
+            OrderOffer offer = orders.Active;
+            bool aboard = offer.State == OrderState.Aboard;
+            string pickupLabel = "ЗАБРАТЬ: " + orders.PlanetName(offer.PickupIndex).ToUpper();
+            string dropLabel = "ВЕЗИ: " + orders.PlanetName(offer.DropoffIndex).ToUpper();
+            string pickup = aboard ? StageDone(pickupLabel) : StageCurrent(pickupLabel);
+            string drop = aboard ? StageCurrent(dropLabel) : StagePending(dropLabel);
+            string text = $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>ВЫПОЛНЕНИЕ:</color> {pickup} → {drop}";
+            string hurry = HurryText(offer);
+            if (hurry != null)
+                text += " · " + hurry;
+            activeProgress.text = text;
+        }
+
+        private string StageDone(string label)
+        {
+            return $"<color={ColorHex(OnboardComputerFactory.BrightColor)}>{doneGlyph} {label}</color>";
+        }
+
+        private string StageCurrent(string label)
+        {
+            return $"<color={ColorHex(OnboardComputerFactory.TaxiColor)}>→ {label}</color>";
+        }
+
+        private string StagePending(string label)
+        {
+            return $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>·· {label}</color>";
+        }
+
+        // таймер «паникёра» для строки выполнения (Н7 Q7.1); null — пассажир
+        // не торопится. Цвет плывёт к Danger по мере истечения (HurryWarnSeconds),
+        // приписка «срыв заказа» объясняет, что будет на нуле
+        private string HurryText(OrderOffer offer)
+        {
+            if (offer.HurrySeconds <= 0f || offer.HurryStartedAt < 0f)
+                return null;
+            float remaining = offer.HurryRemaining(Time.time);
+            Color color = Color.Lerp(OnboardComputerFactory.TaxiColor, OnboardComputerFactory.DangerColor,
+                1f - Mathf.Clamp01(remaining / HurryWarnSeconds));
+            return $"<color={ColorHex(color)}>ТОРОПИТСЯ: {FormatClock(remaining)} · срыв заказа</color>";
         }
 
         private static string ColorHex(Color color)
@@ -717,6 +802,14 @@ namespace SpaceTaxi.UI
             if (value >= 1000)
                 return (value / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
             return value.ToString();
+        }
+
+        // таймеры заказов в mm:ss (Н7 Q7.1): округление вверх — «0:59» не висит
+        // две секунды; используется и HudBinder-ом в подсказке цели
+        public static string FormatClock(float seconds)
+        {
+            int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
+            return total / 60 + ":" + (total % 60).ToString("00", CultureInfo.InvariantCulture);
         }
 
         // рейтинг догоняет целевое значение, цвет — динамика (красный/зелёный)
