@@ -101,7 +101,7 @@ namespace SpaceTaxi.World
                 go.transform.position = data.Position;
 
                 var stubRenderer = go.AddComponent<SpriteRenderer>();
-                stubRenderer.sprite = StubSprites.Circle(data.Radius * 2f);
+                stubRenderer.sprite = BodyStubSprite(data);
                 // звезда — тёплая заглушка, дыра — тёмное ядро (UseColor перекрасит)
                 stubRenderer.color = data.Type == BodyType.BlackHole ? BlackHole.CoreColor : new Color(1f, 0.82f, 0.35f);
                 stubRenderer.sortingOrder = 1;
@@ -135,7 +135,7 @@ namespace SpaceTaxi.World
                 var heatGo = new GameObject("HeatZone");
                 heatGo.transform.SetParent(go.transform, false);
                 var heatRenderer = heatGo.AddComponent<SpriteRenderer>();
-                heatRenderer.sprite = StubSprites.Circle(data.HeatRadius * 2f);
+                heatRenderer.sprite = StubSprites.Zone(data.HeatRadius * 2f);
                 heatRenderer.color = new Color(1f, 0.45f, 0.2f, 0.07f);
                 heatRenderer.sortingOrder = -1;
             }
@@ -146,12 +146,30 @@ namespace SpaceTaxi.World
                 var zoneGo = new GameObject("EffectZone");
                 zoneGo.transform.SetParent(go.transform, false);
                 var zoneRenderer = zoneGo.AddComponent<SpriteRenderer>();
-                zoneRenderer.sprite = StubSprites.Circle(hole.EffectRadius * 2f);
+                zoneRenderer.sprite = StubSprites.Zone(hole.EffectRadius * 2f);
                 zoneRenderer.color = BlackHole.ZoneColor;
                 zoneRenderer.sortingOrder = -1;
             }
 
             return body;
+        }
+
+        // процедурный спрайт тела без префаба: звезда — светящееся ядро с плавной
+        // короной, дыра — чёткий чёрный диск, остальное — круг-заглушка. Текстуры
+        // звезды/дыры нарисованы так, что альфа-контент = вся канва: масштаб тела
+        // в CelestialBody.Init остаётся 1 и мировые размеры зон не меняются
+        private static Sprite BodyStubSprite(CelestialBodyData data)
+        {
+            float diameter = data.Radius * 2f;
+            switch (data.Type)
+            {
+                case BodyType.Star:
+                    return StubSprites.StarBody(diameter);
+                case BodyType.BlackHole:
+                    return StubSprites.HoleCore(diameter);
+                default:
+                    return StubSprites.Circle(diameter);
+            }
         }
 
         private static void ApplyVisuals(SpriteRenderer renderer, BodyVisuals visuals)

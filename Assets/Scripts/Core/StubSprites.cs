@@ -10,6 +10,9 @@ namespace SpaceTaxi.Core
         private static readonly Dictionary<int, Sprite> softDots = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> sparkles = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> clusters = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> zones = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> starBodies = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<int, Sprite> holeCores = new Dictionary<int, Sprite>();
         private static Sprite shipTriangle;
         private static Sprite line;
         public static Sprite Circle(float diameter)
@@ -52,6 +55,54 @@ namespace SpaceTaxi.Core
                 var tex = CreateSoftDotTexture(64, core);
                 sprite = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f / diameter);
                 softDots[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // мягкая зона эффекта (жар звезды, сияние дыры): плато от центра до core
+        // (доля радиуса), дальше гладкий спад ровно в ноль на краю канвы — без
+        // ступеней и квадратного края. Канва = диаметр зоны (PPU = size/diameter),
+        // видимый край совпадает с логическим радиусом (HeatRadius/EffectRadius)
+        public static Sprite Zone(float diameter, float core = 0.32f)
+        {
+            core = Mathf.Clamp(core, 0f, 0.95f);
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter)) * 1000 + Mathf.RoundToInt(core * 100f);
+            if (!zones.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateZoneTexture(512, core);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 512f, 512f), new Vector2(0.5f, 0.5f), 512f / diameter);
+                zones[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // тело звезды: яркое ядро с плавной экспоненциальной короной — без лучей,
+        // ступеней и тёмной обводки круга-заглушки. Хвост у края канвы держится
+        // выше альфа-порога SpriteArt.ContentSize, поэтому контент = вся канва,
+        // масштаб тела в CelestialBody.Init остаётся 1 и зоны-дети не растут
+        public static Sprite StarBody(float diameter)
+        {
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
+            if (!starBodies.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateStarTexture(256);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f / diameter);
+                starBodies[key] = sprite;
+            }
+            return sprite;
+        }
+
+        // ядро чёрной дыры: чистый тёмный диск с ровной (но сглаженной) границей.
+        // Спад у края канвы — выше альфа-порога SpriteArt: контент = вся канва,
+        // масштаб тела = 1, зона эффекта сохраняет прежний мировой размер
+        public static Sprite HoleCore(float diameter)
+        {
+            int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
+            if (!holeCores.TryGetValue(key, out Sprite sprite) || sprite == null)
+            {
+                var tex = CreateHoleCoreTexture(256);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 256f, 256f), new Vector2(0.5f, 0.5f), 256f / diameter);
+                holeCores[key] = sprite;
             }
             return sprite;
         }
@@ -189,6 +240,89 @@ namespace SpaceTaxi.Core
                     float t = Mathf.Clamp01((1f - dist) / Mathf.Max(0.001f, edge));
                     byte a = (byte)(Mathf.SmoothStep(0f, 1f, t) * 255f);
                     pixels[iy * size + ix] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        // зона эффекта: плато до core, дальше smoothstep-спад ровно в ноль у края
+        // канвы (C1-кривая без ступеней, альфа 0 в крайнем кольце пикселей)
+        public static Texture2D CreateZoneTexture(int size, float core)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var pixels = new Color32[size * size];
+            float span = Mathf.Max(0.001f, 1f - core);
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float dist = Mathf.Sqrt(x * x + y * y);
+                    float t = Mathf.Clamp01((dist - core) / span);
+                    float alpha = 1f - t * t * (3f - 2f * t);
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        // кривая короны звезды: плато до StarCoreEnd, дальше экспоненциальный
+        // спад к StarTailAlpha на краю канвы; хвост специально выше альфа-порога
+        // SpriteArt (8/255), чтобы альфа-контент оставался равным всей канве
+        private const float StarCoreEnd = 0.55f;
+        private const float StarTailAlpha = 0.05f;
+
+        public static Texture2D CreateStarTexture(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var pixels = new Color32[size * size];
+            float k = Mathf.Log(1f / StarTailAlpha) / (1f - StarCoreEnd);
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float dist = Mathf.Sqrt(x * x + y * y);
+                    float alpha = dist <= StarCoreEnd ? 1f : Mathf.Exp(-k * (dist - StarCoreEnd));
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        // кривая ядра дыры: плотный диск до HoleCoreSolid, короткий smoothstep-
+        // спад к HoleCoreTailAlpha у края канвы — ровная сглаженная граница,
+        // край канвы не читается как квадрат (тёмное ядро на тёмном фоне)
+        private const float HoleCoreSolid = 0.94f;
+        private const float HoleCoreTailAlpha = 0.05f;
+
+        public static Texture2D CreateHoleCoreTexture(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            var pixels = new Color32[size * size];
+            float span = 1f - HoleCoreSolid;
+            for (int iy = 0; iy < size; iy++)
+            {
+                for (int ix = 0; ix < size; ix++)
+                {
+                    float x = (ix + 0.5f) / size * 2f - 1f;
+                    float y = (iy + 0.5f) / size * 2f - 1f;
+                    float dist = Mathf.Sqrt(x * x + y * y);
+                    float alpha = dist <= HoleCoreSolid
+                        ? 1f
+                        : dist < 1f
+                            ? Mathf.SmoothStep(1f, HoleCoreTailAlpha, (dist - HoleCoreSolid) / span)
+                            : 0f; // за канвой диска альфы нет: SmoothStep клампит t и
+                                  // без гейта залил бы углы канвы слабым «квадратом»
+                    pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(alpha * 255f));
                 }
             }
             tex.SetPixels32(pixels);
