@@ -18,7 +18,7 @@ MonoBehaviour:
   Thrust: 118
   StrafeAcc: 110
   MaxV: 410
-  FuelMax: 170
+  FuelMax: 450
   HpMax: 140
   ShipSprite: {fileID: 21300000, guid: cd659bcae0b05828a509b0c8ceb154bf, type: 3}
   PaintVariants:
@@ -29,7 +29,9 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 5e2596ac3e1d5cf6a119b1b134335b37, type: 3}
   - {fileID: 21300000, guid: f9ca518d1de85fd7b614d1053b161b5e, type: 3}
   VisualLength: 55
-  Price: 7800
+  Price: 4200
   IsRental: 0
   Description: "\u041A\u043E\u043C\u0444\u043E\u0440\u0442-\u043A\u043B\u0430\u0441\u0441: \u0431\u0430\u043B\u0430\u043D\u0441+"
   Retro: 208
+  ServiceClass: 2
+  FuelDrainPerSecond: 3.8

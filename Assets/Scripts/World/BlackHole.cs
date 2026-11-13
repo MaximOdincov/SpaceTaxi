@@ -28,8 +28,10 @@ namespace SpaceTaxi.World
         // полный множитель ×8 упирался бы в кламп 240 и не пускал никого
         public const float FieldGravityScale = 0.03f;
 
-        // кривая воронки: притяжение растёт как depth^Power от края зоны к горизонту
-        private const float PullDepthPower = 3f;
+        // кривая воронки: притяжение растёт как depth^Power от края зоны к горизонту.
+        // §1.6 (градиент риска): степень 2 — край воронки прощает всем,
+        // середина оставляет шанс комфорту+, глубина убивает
+        private const float PullDepthPower = 2f;
         // сжатие-спагетти быстрее у горизонта: множитель скорости сжатия по глубине
         private const float ShrinkRateNearEdge = 0.7f;
         private const float ShrinkRateNearHorizon = 2.2f;

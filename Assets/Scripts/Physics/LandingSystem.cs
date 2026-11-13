@@ -282,8 +282,10 @@ namespace SpaceTaxi.Physics
         // квадратичный рост без капа: мягкое касание почти бесплатно,
         // средняя скорость — ощутимо, полная — смерть любому корпусу
         // (старый кап 30 делал 100 и 330 км/ч одинаково больно);
-        // 0.0032: удар на MaxV снимает ≥ HP любого корпуса, вкл. Кабан 150×1.6 = 240 (Н3.1)
-        private const float CrashDamagePerSpeedSq = 0.0032f;
+        // 0.0022 (22_BALANCE_REWORK §1.5, пересчёт BALANCE_N5): бытовые удары
+        // прощает; лоб на MaxV смертелен всем — Яйцо@330 = 143 > 100 HP,
+        // Барин@485 = 370 > 190 HP
+        private const float CrashDamagePerSpeedSq = 0.0022f;
 
         private float CrashDamage(float v)
         {

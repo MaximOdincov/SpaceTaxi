@@ -3,25 +3,26 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Economy
 {
-    // Числа модели цены заказа (16_BETA_PLAN §3.5; Н3.1 добавил премиальность тира):
-    // цена = (база + min(дальность, кап) × ставка) × класс сектора × премиальность тира таксиста
+    // Числа модели цены заказа (22_BALANCE_REWORK §1.1 — тарифные классы):
+    // цена = (посадка_класса + ставка_класса × d_смягч) × множитель сектора назначения;
+    // d_смягч = min(d, SoftCapDistance) + SoftCapTailFactor × max(0, d − SoftCapDistance)
     [CreateAssetMenu(fileName = "PricingConfig", menuName = "Space Taxi/Pricing Config")]
     public sealed class PricingConfig : ScriptableObject
     {
-        [Header("Формула цены предложения")]
-        public int BasePrice = 45;
-        public float PricePerDistanceUnit = 0.28f;
-        [Tooltip("Кап дальности: заказ «через всю карту» не делает богатым")]
-        public float DistanceCap = 1500f;
-
-        [Header("Премиальность тира таксиста (Н3.1): индекс = тир корабля − 1")]
-        [Tooltip("Множитель оплаты заказа: переход на следующий тир окупается за 6-10 заказов")]
-        public float[] TierPrestigeMul = { 1f, 1.26f, 1.52f, 2.26f, 4.28f };
+        [Header("Тарифы классов (§1.1): индекс = ServiceClass корабля (0..3)")]
+        [Tooltip("Посадка по классам эконом/комфорт/комфорт+/бизнес, кр")]
+        public float[] ClassBaseFare = { 15f, 30f, 55f, 90f };
+        [Tooltip("Ставка кр/юн по классам эконом/комфорт/комфорт+/бизнес")]
+        public float[] ClassRatePerUnit = { 0.16f, 0.24f, 0.36f, 0.54f };
+        [Tooltip("Смягчение дальности: дальше капа хвост считается с множителем SoftCapTailFactor")]
+        public float SoftCapDistance = 2800f;
+        [Tooltip("Множитель хвоста дальности за SoftCapDistance (0 — жёсткий кап)")]
+        public float SoftCapTailFactor = 0.4f;
 
         [Header("Класс сектора планеты назначения")]
         public float SectorHubMul = 1.0f;
-        public float SectorNearMul = 1.0f;
-        public float SectorMid1Mul = 1.3f;
+        public float SectorNearMul = 1.15f;
+        public float SectorMid1Mul = 1.35f;
         public float SectorMid2Mul = 1.6f;
         public float SectorFarMul = 2.0f;
 
@@ -57,7 +58,7 @@ namespace SpaceTaxi.Economy
 
         [Header("Топливные сети (21 §3.7): индекс = тир сети − 1")]
         [Tooltip("Цена Đ/ед по тиру сети: 1 — дёшево и меньше всех, 4 — люкс (полный бак, оверпрайс)")]
-        public float[] FuelPricePerUnitByTier = { 0.8f, 1f, 1.3f, 1.8f };
+        public float[] FuelPricePerUnitByTier = { 0.6f, 0.8f, 1f, 1.3f };
         [Tooltip("Запас топлива сети за один визит, доля бака корабля: бедная сеть продаёт меньше всех, но не ноль")]
         public float[] FuelStockFractionByTier = { 0.75f, 1f, 1f, 1f };
 
@@ -81,9 +82,11 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель базовой цены ремонта: бедные мастерские дешевле, лучшие берут дороже (наценка выше в лучших мастерских)")]
         public float[] RepairTierSurchargeMul = { 0.9f, 1f, 1.25f };
 
-        [Header("Прогрессия заказов (D2): индекс = Sector (Hub..Far)")]
-        [Tooltip("Минимальный тир корабля для офферов в район: бедный Near всегда открыт с 1-го тира (тиры 1-2 — только бедный район), богатые окраины — с прокачкой корабля: Стрела 3 → Mid1, Игла 4 → Mid2, Барин 5 → Far")]
-        public int[] SectorMinShipTier = { 1, 1, 3, 4, 5 };
+        [Header("Престиж-фильтр заказов (§1.2): индекс = Sector (Hub..Far)")]
+        [Tooltip("Класс пассажиров сектора: ХАБ/БЛИЖНИЙ — эконом, МИД-1 — комфорт, МИД-2 — комфорт+, ДАЛЬНИЙ — бизнес; кораблю ниже класса дропофф в секторе не виден (кроме нетребовательных)")]
+        public int[] SectorRequiredClass = { 0, 0, 1, 2, 3 };
+        [Tooltip("Доля нетребовательных пассажиров, %: согласны на класс ниже — дропофф без гейта")]
+        [Range(0f, 100f)] public float LenientPassengerChancePct = 20f;
 
         [Header("Близость пикапа (D2)")]
         [Tooltip("Радиус «рядом с игроком», юн: ближе вес пикапа максимален, дальше линейно спадает к нулю")]
@@ -125,14 +128,23 @@ namespace SpaceTaxi.Economy
             }
         }
 
-        // множитель премиальности по тиру корабля-таксиста; кривой тир/пустой
-        // массив — кламп в 1..5 (короткий массив ассета — верхний кламп)
-        public float GetTierPrestigeMul(int tier)
+        // посадка по классу обслуживания; кривой индекс/пустой массив — кламп
+        // в 0..3 (короткий массив ассета — верхний кламп)
+        public float GetClassBaseFare(int serviceClass)
         {
-            var muls = TierPrestigeMul;
-            if (muls == null || muls.Length == 0)
-                return 1f;
-            return muls[Mathf.Clamp(tier, 1, muls.Length) - 1];
+            var fares = ClassBaseFare;
+            if (fares == null || fares.Length == 0)
+                return 0f;
+            return fares[Mathf.Clamp(serviceClass, 0, fares.Length - 1)];
+        }
+
+        // ставка кр/юн по классу обслуживания; кламп как в GetClassBaseFare
+        public float GetClassRatePerUnit(int serviceClass)
+        {
+            var rates = ClassRatePerUnit;
+            if (rates == null || rates.Length == 0)
+                return 0f;
+            return rates[Mathf.Clamp(serviceClass, 0, rates.Length - 1)];
         }
 
         // цена единицы топлива сети; тир 0/некорректный → базовая сеть (1 Đ/ед)
@@ -161,14 +173,14 @@ namespace SpaceTaxi.Economy
             return muls[Mathf.Clamp((int)sector, 0, muls.Length - 1)];
         }
 
-        // минимальный тир корабля, которому район даёт офферы (D2); кривой/пустой
-        // массив — всё открыто с 1-го тира (гейт не ломает спавн)
-        public int GetSectorMinShipTier(Sector sector)
+        // класс пассажиров сектора (§1.2); кривой/пустой массив — эконом
+        // (гейт не закрывает спавн наглухо, сектор открывается всем)
+        public int GetSectorRequiredClass(Sector sector)
         {
-            var tiers = SectorMinShipTier;
-            if (tiers == null || tiers.Length == 0)
-                return 1;
-            return tiers[Mathf.Clamp((int)sector, 0, tiers.Length - 1)];
+            var classes = SectorRequiredClass;
+            if (classes == null || classes.Length == 0)
+                return 0;
+            return classes[Mathf.Clamp((int)sector, 0, classes.Length - 1)];
         }
 
         // индекс массива 0..n-1: незаданный тир считаем базовым, верхний кламп — на короткий массив

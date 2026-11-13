@@ -11,22 +11,16 @@ namespace SpaceTaxi.Economy
         Maneuver = 3,
     }
 
-    // Цены и максимальные эффекты улучшений (16_BETA_PLAN §3.4, числа не менять).
-    // Эффект растёт линейно по уровням: ур.1 = 1/3, ур.2 = 2/3, ур.3 = максимум —
+    // Цены и максимальные эффекты улучшений (16_BETA_PLAN §3.4; цены уровней —
+    // по классу корабля, 22_BALANCE_REWORK §1.9). Эффект растёт линейно по
+    // уровням: ур.1 = 1/3, ур.2 = 2/3, ур.3 = максимум —
     // интерполяция в ShipStats.Compute. Улучшения только на купленные корабли
     [CreateAssetMenu(fileName = "UpgradeConfig", menuName = "Space Taxi/Upgrade Config")]
     public sealed class UpgradeConfig : ScriptableObject
     {
-        [Header("Цены за уровень (индекс = уровень - 1)")]
-        public int[] PricesPerLevel = { 300, 700, 1500 };
-
-        // По-линейные цены (D1/BALANCE_N4): 0 или пустой массив — фолбэк на общий
-        // PricesPerLevel (старые ассеты). Индекс = уровень - 1
-        [Header("Цены по линиям (индекс = уровень - 1; 0/пусто — общий PricesPerLevel)")]
-        public int[] EnginePrices = { 10, 30, 40 };
-        public int[] TankPrices = { 1110, 1930, 2580 };
-        public int[] HullPrices = { 70, 150, 230 };
-        public int[] ManeuverPrices = { 40, 40, 40 };
+        [Header("Цены уровней по классу корабля (§1.9): индекс = ServiceClass (0..3)")]
+        [Tooltip("Цена ЛЮБОГО уровня = значение по классу корабля (эконом/комфорт/комфорт+/бизнес) — уровень накапливается за один заказ своего класса")]
+        public int[] ClassLevelPrices = { 250, 450, 800, 1500 };
 
         [Header("Названия линий (для магазина П3.3)")]
         public string EngineName = "Двигатель";
@@ -50,32 +44,16 @@ namespace SpaceTaxi.Economy
         [Tooltip("Прибавка боковой тяги, %")]
         public float ManeuverStrafePct = 35f;
 
-        // Цена уровня level (1..3) линии lineIndex (порядок UpgradeLine):
-        // если массив линии задан ненулевым — его значение, иначе общий
-        // PricesPerLevel[level - 1] (обратная совместимость); нет данных — 0
-        public int GetPrice(int lineIndex, int level)
+        // Цена ЛЮБОГО уровня (1..3) ЛЮБОЙ линии — по классу корабля (§1.9):
+        // цена не зависит от линии и номера уровня. Кривой класс/пустой
+        // массив — кламп в 0..3 (короткий массив ассета — верхний кламп);
+        // нет данных — 0 (кнопка недоступна, покупка не проходит)
+        public int GetPrice(int serviceClass)
         {
-            if (level < 1 || level > ShipStats.MaxLevel)
+            var prices = ClassLevelPrices;
+            if (prices == null || prices.Length == 0)
                 return 0;
-            int[] perLine = LinePrices(lineIndex);
-            if (perLine != null && level <= perLine.Length && perLine[level - 1] > 0)
-                return perLine[level - 1];
-            int[] common = PricesPerLevel;
-            return common != null && level <= common.Length && common[level - 1] > 0
-                ? common[level - 1]
-                : 0;
-        }
-
-        private int[] LinePrices(int lineIndex)
-        {
-            switch (lineIndex)
-            {
-                case (int)UpgradeLine.Engine: return EnginePrices;
-                case (int)UpgradeLine.Tank: return TankPrices;
-                case (int)UpgradeLine.Hull: return HullPrices;
-                case (int)UpgradeLine.Maneuver: return ManeuverPrices;
-                default: return null;
-            }
+            return prices[Mathf.Clamp(serviceClass, 0, prices.Length - 1)];
         }
 
         private static UpgradeConfig fallback;

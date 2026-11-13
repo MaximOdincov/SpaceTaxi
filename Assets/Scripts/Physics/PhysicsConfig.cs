@@ -40,17 +40,17 @@ namespace SpaceTaxi.Physics
         [Header("Качель")]
         public float GravityBoost = 1.15f;    // буст на входе в кольцо при v > vEsc
 
-        [Header("Чёрная дыра (Н7 G7.1)")]
+        [Header("Чёрная дыра (Н7 G7.1; §1.6 — градиент риска)")]
         [Tooltip("Воронка: притяжение на краю зоны эффекта, ед/с²")]
-        public float BlackHolePullEdge = 60f;
+        public float BlackHolePullEdge = 45f;
         [Tooltip("Воронка: притяжение у горизонта, ед/с² — глубже кольца вырваться не может никто")]
-        public float BlackHolePullHorizon = 600f;
+        public float BlackHolePullHorizon = 300f;
         [Tooltip("Порог вырывания: корабль не считается застрявшим, если его тяга выше притяжения × это значение. Стоковый Барин (140) > притяжение на кольце (~119) × 1.15 — вырывается; Игла (135) — уже нет")]
         public float BlackHoleEscapeThrustFraction = 1.15f;
         [Tooltip("Удержание «застрял»: скорость гашения радиального ВЫЛЕТА на кольце захвата, ед/с² (должно быть больше тяги корабля)")]
-        public float BlackHoleRadialHoldEdge = 260f;
+        public float BlackHoleRadialHoldEdge = 160f;
         [Tooltip("Удержание у горизонта, ед/с²")]
-        public float BlackHoleRadialHoldHorizon = 620f;
+        public float BlackHoleRadialHoldHorizon = 380f;
         [Tooltip("Закрутка орбиты на кольце захвата, ед/с² — скорость вращения по орбите растёт")]
         public float BlackHoleSwirlEdge = 45f;
         [Tooltip("Закрутка у горизонта, ед/с²")]

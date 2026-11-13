@@ -2,6 +2,18 @@ using UnityEngine;
 
 namespace SpaceTaxi.Economy
 {
+    // Класс обслуживания корабля (22_BALANCE_REWORK §1.1): тариф заказа,
+    // фильтр пассажиров, цены улучшений. Индекс = позиция в массивах
+    // PricingConfig (ClassBaseFare/ClassRatePerUnit/SectorRequiredClass)
+    // и UpgradeConfig (ClassLevelPrices)
+    public enum ServiceClass
+    {
+        Economy = 0,
+        Comfort = 1,
+        ComfortPlus = 2,
+        Business = 3,
+    }
+
     // Параметры модели корабля: тяга, манёвр, бак, HP, цена.
     // Общие константы полёта остаются в PhysicsConfig
     [CreateAssetMenu(fileName = "ShipConfig", menuName = "Space Taxi/Ship Config")]
@@ -15,6 +27,9 @@ namespace SpaceTaxi.Economy
         [Range(1, 5)]
         public int Tier = 2;
 
+        [Tooltip("Класс обслуживания: тариф заказа, фильтр пассажиров, цены улучшений")]
+        public ServiceClass ServiceClass = ServiceClass.Economy;
+
         [Header("Полёт")]
         public float Thrust;    // тяга W — разгон вдоль вектора скорости
         public float StrafeAcc; // боковая тяга A/D
@@ -23,6 +38,9 @@ namespace SpaceTaxi.Economy
         [Header("Бак и корпус")]
         public float FuelMax;
         public float HpMax;
+
+        [Tooltip("Расход топлива, ед/с тяги (0 — глобальный PhysicsConfig.FuelDrainPerSecond)")]
+        public float FuelDrainPerSecond = 0f;
 
         [Tooltip("Спрайт модели (арт А1/А2, 512×512 PPU 32, нос вправо); пусто — заглушка")]
         public Sprite ShipSprite;
@@ -81,10 +99,12 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.Id = "egg_rental";
                 eggRentalFallback.DisplayName = "Яйцо";
                 eggRentalFallback.Tier = 2;
+                eggRentalFallback.ServiceClass = ServiceClass.Economy;
                 eggRentalFallback.Thrust = 95f;
                 eggRentalFallback.StrafeAcc = 85f;
                 eggRentalFallback.MaxV = 330f;
-                eggRentalFallback.FuelMax = 85f;
+                eggRentalFallback.FuelMax = 220f;
+                eggRentalFallback.FuelDrainPerSecond = 3f;
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;

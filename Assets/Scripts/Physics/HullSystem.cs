@@ -206,7 +206,7 @@ namespace SpaceTaxi.Physics
         {
             if (level == null || level.StartPlanetIndex >= level.Bodies.Count)
                 return null;
-            foreach (Planet planet in FindObjectsByType<Planet>(FindObjectsSortMode.None))
+            foreach (Planet planet in FindObjectsByType<Planet>())
                 if (planet.name == level.Bodies[level.StartPlanetIndex].DisplayName)
                     return planet;
             return null;

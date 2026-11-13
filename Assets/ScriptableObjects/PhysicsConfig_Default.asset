@@ -28,3 +28,7 @@ MonoBehaviour:
   HeadingMaxTurnSpeed: 260
   MinControlSpeed: 1
   GravityBoost: 1.15
+  BlackHolePullEdge: 45
+  BlackHolePullHorizon: 300
+  BlackHoleRadialHoldEdge: 160
+  BlackHoleRadialHoldHorizon: 380

@@ -115,7 +115,7 @@ namespace SpaceTaxi.Economy
         }
 
         // Улучшение: только на купленный (аренда всегда сток), уровень < 3,
-        // цена следующего уровня — UpgradeConfig.GetPrice (по-линейные цены).
+        // цена уровня — UpgradeConfig.GetPrice по классу корабля (§1.9).
         // Пересадки нет, но живой корпус этого корабля сразу пересчитывает Eff
         // (полные HP/бак — семантика Reconfigure «нового корпуса»)
         public bool TryUpgrade(ShipConfig config, UpgradeLine line, Wallet wallet)
@@ -128,7 +128,7 @@ namespace SpaceTaxi.Economy
             if (idx < 0 || idx >= ShipStats.LineCount
                 || levels[idx] >= ShipStats.MaxLevel)
                 return false;
-            int price = upgradeConfig.GetPrice(idx, levels[idx] + 1);
+            int price = upgradeConfig.GetPrice((int)config.ServiceClass);
             if (price <= 0)
                 return false;
             if (wallet == null || !wallet.TrySpend(price))

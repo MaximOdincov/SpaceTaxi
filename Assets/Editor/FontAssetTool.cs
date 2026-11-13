@@ -93,7 +93,7 @@ namespace SpaceTaxi.Core.Tools
                 if (!scene.isLoaded)
                     continue;
                 foreach (MapScreenBinder binder in Object.FindObjectsByType<MapScreenBinder>(
-                    FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    FindObjectsInactive.Include))
                 {
                     var so = new SerializedObject(binder);
                     SerializedProperty prop = so.FindProperty("mapFont");

@@ -178,7 +178,7 @@ MonoBehaviour:
     CaptureRingRadius: 0
   - DisplayName: "\u0423\u0442\u0440\u0435\u043D\u043D\u044F\u044F"
     Type: 1
-    Position: {x: 534, y: 510}
+    Position: {x: 1300, y: 880}
     Radius: 52
     VisualSizeMul: 0
     MassMultiplier: 4.5

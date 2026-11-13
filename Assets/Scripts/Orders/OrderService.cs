@@ -100,9 +100,9 @@ namespace SpaceTaxi.Orders
         // где поле цены ещё не писалось (иначе штраф отмены показывал «−Đ 0»)
         public int PriceFor(OrderOffer offer)
         {
-            int taxiTier = ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
+            int serviceClass = ShipServiceClass();
             int basePrice = OrderPricing.ComputePrice(Pricing,
-                RouteDistance(offer), SectorOf(offer.DropoffIndex), taxiTier);
+                RouteDistance(offer), SectorOf(offer.DropoffIndex), serviceClass);
             return PriceWithRatingBonus(basePrice);
         }
 
@@ -655,7 +655,7 @@ namespace SpaceTaxi.Orders
                 return;
 
             PricingConfig pricing = Pricing;
-            int taxiTier = ShipTier();
+            int serviceClass = ShipServiceClass();
             float ratingValue = CurrentRating();
 
             // D2 §3: редкий «жирный» заказ — дальний, с заданием и наценкой;
@@ -665,16 +665,25 @@ namespace SpaceTaxi.Orders
             // секторов; отказаться можно бесплатно (Decline без штрафа)
             bool ignoreGate = fat && UnityEngine.Random.value * 100f < pricing.FatOrderLockedSectorChancePct;
 
-            List<int> pool = OfferPlanets(taxiTier, ignoreGate);
-            if (pool.Count < 2)
+            // §1.2 (престиж-фильтр): пикап — любая планета; дропофф — только
+            // сектора, чей класс пассажира по силам кораблю. Нетребовательный
+            // пассажир (один бросок на заказ) согласен на класс ниже — дропофф
+            // без гейта; жирный заказ — без гейта и без броска
+            bool lenient = !ignoreGate
+                && UnityEngine.Random.value * 100f < pricing.LenientPassengerChancePct;
+            List<int> pickupPool = OfferPlanets();
+            List<int> dropoffPool = ignoreGate || lenient
+                ? pickupPool
+                : OfferPlanets(serviceClass);
+            if (dropoffPool.Count < 2)
             {
                 // D2 §4: пустая доска хуже дальнего заказа — гейт ослабляется
                 Debug.LogWarning("[Orders] гейт районов отсеял почти все планеты — ослабляю фильтр");
-                pool = OfferPlanets(taxiTier, true);
+                dropoffPool = pickupPool;
             }
 
-            int pickup = PickPickup(pool, pricing);
-            int dropoff = PickDropoff(pool, pickup, fat, pricing);
+            int pickup = PickPickup(pickupPool, pricing);
+            int dropoff = PickDropoff(dropoffPool, pickup, fat, pricing);
             if (pickup < 0 || dropoff < 0)
                 return;
 
@@ -686,9 +695,10 @@ namespace SpaceTaxi.Orders
                 ExpiresAt = Time.time + offerLifetime,
             };
             // цена фиксируется в момент спавна карточки и дальше не меняется;
-            // премиальность — по тиру корабля-таксиста (Н3.1), без корабля — тир арендного Яйца
+            // тариф — по классу обслуживания корабля-таксиста (§1.1),
+            // без корабля — эконом (аренда «Яйца»)
             int basePrice = OrderPricing.ComputePrice(pricing,
-                RouteDistance(offer), SectorOf(offer.DropoffIndex), taxiTier);
+                RouteDistance(offer), SectorOf(offer.DropoffIndex), serviceClass);
             if (fat)
                 basePrice = (int)Math.Round(basePrice * pricing.FatOrderPriceMul, MidpointRounding.AwayFromZero);
             offer.Price = PriceWithRatingBonus(basePrice);
@@ -713,10 +723,11 @@ namespace SpaceTaxi.Orders
                       (fat ? " [жирный]" : ""));
         }
 
-        // тир корабля-таксиста; без корабля — тир арендного Яйца (Н3.1)
-        private int ShipTier()
+        // класс обслуживания корабля-таксиста (§1.1); без корабля — эконом
+        // (аренда «Яйца» всегда эконом, §1.3)
+        private int ShipServiceClass()
         {
-            return ship != null && ship.ShipConfig != null ? ship.ShipConfig.Tier : 2;
+            return ship != null && ship.ShipConfig != null ? (int)ship.ShipConfig.ServiceClass : 0;
         }
 
         // рейтинг на момент спавна; Bind приходит после Init (GameSession),
@@ -733,17 +744,31 @@ namespace SpaceTaxi.Orders
                 0f, pricing.FatOrderMaxChancePct);
         }
 
-        // D2 §1: пул планет для офферов; ignoreGate — редкий «жирный» заказ
-        // в закрытый район. Гейт — жёсткий фильтр списка, а не отбраковка
-        // бросков: закрытые сектора не просачиваются в обычные офферы
-        private List<int> OfferPlanets(int taxiTier, bool ignoreGate)
+        // §1.2: пул всех планет уровня — пикап возможен в любом секторе
+        private List<int> OfferPlanets()
         {
             var pool = new List<int>();
             for (int i = 0; i < level.Bodies.Count; i++)
             {
                 if (level.Bodies[i].Type != BodyType.Planet)
                     continue;
-                if (!ignoreGate && taxiTier < Pricing.GetSectorMinShipTier(level.Bodies[i].Sector))
+                pool.Add(i);
+            }
+            return pool;
+        }
+
+        // §1.2: пул дропоффов по классу корабля — сектор даёт пассажиров
+        // своего класса (класс пассажира = SectorRequiredClass сектора),
+        // кораблю ниже класса сектор не виден. Нетребовательные пассажиры
+        // и жирные заказы идут мимо этого фильтра (общий пул)
+        private List<int> OfferPlanets(int serviceClass)
+        {
+            var pool = new List<int>();
+            for (int i = 0; i < level.Bodies.Count; i++)
+            {
+                if (level.Bodies[i].Type != BodyType.Planet)
+                    continue;
+                if (Pricing.GetSectorRequiredClass(level.Bodies[i].Sector) > serviceClass)
                     continue;
                 pool.Add(i);
             }

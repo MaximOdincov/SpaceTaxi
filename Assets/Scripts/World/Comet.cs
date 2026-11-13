@@ -24,7 +24,7 @@ namespace SpaceTaxi.World
         private void Awake()
         {
             body = gameObject.AddComponent<Rigidbody2D>();
-            body.isKinematic = true;
+            body.bodyType = RigidbodyType2D.Kinematic;
             body.gravityScale = 0f;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         }

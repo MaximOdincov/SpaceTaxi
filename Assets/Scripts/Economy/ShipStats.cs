@@ -40,6 +40,11 @@ namespace SpaceTaxi.Economy
                     ? ship.Retro
                     : physics != null ? physics.Retro : 80f,
             };
+            // §1.4: расход — поле корабля (по классу обслуживания);
+            // 0/нет конфига — глобальный PhysicsConfig.FuelDrainPerSecond (фолбэк)
+            stats.FuelDrain = ship != null && ship.FuelDrainPerSecond > 0f
+                ? ship.FuelDrainPerSecond
+                : stats.FuelDrain;
             if (ship == null || physics == null || upgrades == null)
                 return stats; // без конфига улучшений — сток
 

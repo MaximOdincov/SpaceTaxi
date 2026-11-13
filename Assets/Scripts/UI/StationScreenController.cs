@@ -38,8 +38,9 @@ namespace SpaceTaxi.UI
     // базовые корабли всегда в наличии, показанный вариант покраски
     // (ShipConfig.PaintVariants) ротирует ShopStockService раз в 2 игровых
     // часа. Улучшения (§3.4, C3): строки линий «УР N → УР N+1», прибавка из
-    // процентов UpgradeConfig, цена «Đ» — по-линейные GetPrice(line,
-    // level+1), полоска уровня из 3 сегментов; только на СВОЙ корабль.
+    // процентов UpgradeConfig, цена «Đ» — по классу корабля
+    // (UpgradeConfig.GetPrice, 22_BALANCE_REWORK §1.9), полоска уровня из 3
+    // сегментов; только на СВОЙ корабль.
     // Доступен ТОЛЬКО стоя
     // (State == Landed) на планете с услугами; мир не ставится на паузу (как
     // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
@@ -954,7 +955,7 @@ namespace SpaceTaxi.UI
 
         // блок «Улучшения» — свой метод-строитель (как долг ниже и ангар П3.2).
         // C3: у каждой линии — «УР N → УР N+1», прибавка следующего уровня,
-        // цена «Đ» по-линейная (UpgradeConfig.GetPrice), кнопка КУПИТЬ и
+        // цена «Đ» по классу корабля (UpgradeConfig.GetPrice), кнопка КУПИТЬ и
         // полоска уровня из 3 сегментов
         private void BuildUpgradesBlock(Transform shop)
         {
@@ -1065,8 +1066,8 @@ namespace SpaceTaxi.UI
             return button;
         }
 
-        // уровни/цены — из конфига (по-линейные GetPrice, C3); аренда всегда
-        // сток, ур.3 — без кнопки. UpgradesChanged после покупки перечитывает всё
+        // уровни/цены — из конфига (цена по классу корабля, C3/§1.9); аренда
+        // всегда сток, ур.3 — без кнопки. UpgradesChanged после покупки перечитывает всё
         private void RefreshUpgrades()
         {
             if (upgradeRows == null || session == null || session.Fleet == null)
@@ -1088,8 +1089,8 @@ namespace SpaceTaxi.UI
                 row.Level.text = maxed ? $"УР {level} · МАКС" : $"УР {level} → УР {level + 1}";
                 row.Effect.text = maxed ? "Максимальный уровень" : NextLevelEffect(upgrades, (UpgradeLine)i);
                 SetLevelSegments(row.Segments, level);
-                // цена следующего уровня — GetPrice линии (level + 1), как в TryUpgrade
-                int price = upgrades.GetPrice(i, level + 1);
+                // цена следующего уровня — по классу корабля (§1.9), как в TryUpgrade
+                int price = upgrades.GetPrice((int)fleet.Current.ServiceClass);
                 row.BuyLabel.text = maxed
                     ? "МАКС."
                     : $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(price)}";
