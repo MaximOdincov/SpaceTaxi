@@ -4,8 +4,8 @@ using UnityEngine;
 namespace SpaceTaxi.UI
 {
     // Один слой звёздного фона меню (бриф E.1): рассыпает звёзды по своей
-    // площади, мерцает ими (MenuTwinkle) и смещается от мыши — скорость слоя
-    // задаётся ParallaxFactor/ParallaxAmplitude плюс лёгкий автономный дрейф.
+    // площади, мерцает ими (MenuTwinkle) и дрейфует автономно (E8.3: мышиный
+    // параллакс убран — sway + медленное плавание, глубина — из фаз/амплитуд).
     // Слои строятся кодом контроллером MenuBackdropController; сцена не правится.
     public sealed class MenuStarLayer : MonoBehaviour
     {
@@ -18,8 +18,6 @@ namespace SpaceTaxi.UI
             public float SpeedMin, SpeedMax;    // скорость мерцания
             public float SparkleChance;         // доля звёзд с лучами-бликом
             public float SoftCore;              // доля радиуса с полной альфой (0 — туманность, 0.45 — звезда)
-            public float ParallaxFactor;        // доля сдвига мыши (для отладки/баланса)
-            public float ParallaxAmplitude;     // px сдвига при мыши у края экрана
             public float SwayAmplitude;         // px автономного дрейфа
             public float SwaySpeed;             // рад/с автономного дрейфа
             public float PhaseShift;            // сдвиг фазы мерцания слоя — слои сверкают в противофазе (E4)
@@ -33,8 +31,6 @@ namespace SpaceTaxi.UI
         private Config config;
         private bool built;
 
-        public float ParallaxFactor => config.ParallaxFactor;
-        public float ParallaxAmplitude => config.ParallaxAmplitude;
         public float SwayAmplitude => config.SwayAmplitude;
         public float SwaySpeed => config.SwaySpeed;
         public float DriftAmplitude => config.DriftAmplitude;
@@ -76,8 +72,8 @@ namespace SpaceTaxi.UI
                 MenuTwinkle.Step(stars, Time.unscaledTime);
         }
 
-        // сдвиг слоя от мыши/дрейфа; запас площади слоя (±400px) гарантированно
-        // скрывает края при любом допустимом смещении
+        // автономный сдвиг слоя (sway + drift); запас площади слоя (±400px)
+        // гарантированно скрывает края при любом допустимом смещении
         public void ApplyOffset(Vector2 offset) => ((RectTransform)transform).anchoredPosition = offset;
     }
 }

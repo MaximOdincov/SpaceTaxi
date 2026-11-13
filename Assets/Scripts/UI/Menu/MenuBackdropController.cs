@@ -17,22 +17,23 @@ namespace SpaceTaxi.UI
     //
     //   MenuBackdrop (контроллер, ловит клики по пустому месту)
     //   ├── ClickCatcher      — невидимый Image на весь экран (IPointerClickHandler)
-    //   ├── Nebula            — туманность, параллакс ×0.10
-    //   ├── StarsFar          — дальние звёзды, ×0.14 (тусклые, мерцают медленно)
-    //   ├── StarsMid          — средние, ×0.38
-    //   ├── StarsNear         — ближние яркие, ×0.62 (мерцают быстро)
-    //   └── EggShip           — яйцо-такси (без параллакса: клик = точная цель)
+    //   ├── Nebula            — туманность (медленный дрейф)
+    //   ├── StarsFar          — дальние звёзды (тусклые, мерцают медленно)
+    //   ├── StarsMid          — средние
+    //   ├── StarsNear         — ближние яркие (мерцают быстро)
+    //   └── EggShip           — яйцо-такси (клик = точная цель)
     //
-    // Параллакс от мыши (бриф E.1): слои смещаются ПРОТИВ мыши с разной
-    // амплитудой + автономные дрейф и медленное плавание в противофазе (E4);
+    // Слои живут ТОЛЬКО автономным дрейфом (E8.3: мышиный параллакс убран —
+    // владельца «подташнивает»): sway + медленное плавание в противофазе (E4);
     // запас площади слоя ±400px скрывает края. Клик по экрану — ловушка
     // кликов передаёт точку яйцу (MenuEggShip); кнопки перехватывают свои
     // клики через ClickTarget в StarButtonDecorator (Н6). Название —
     // MenuStarTitle, кнопки — StarButtonDecorator (E2/E3 + Н6: без плашек,
-    // шрифта и рамки — только звёздный текст: белый, под наведением жёлтый).
+    // шрифта и рамки — только звёздный текст; E8.2: под наведением жёлтеют
+    // САМИ звёзды, ореолов-подложек нет).
     // Зелёные заливки прошлой итерации
     // (Frame/Background панели) и оранжевый мокап-квадрат «Image» гасятся:
-    // фон меню — только звёздный параллакс; это чистый визуал без скриптов,
+    // фон меню — только живой звёздный слой; это чистый визуал без скриптов,
     // биндинги не затронуты.
     public sealed class MenuBackdropController : MonoBehaviour, IPointerClickHandler
     {
@@ -112,8 +113,6 @@ namespace SpaceTaxi.UI
         private Canvas canvas;
         private MenuEggShip egg;
         private bool contentBuilt;
-        private Vector2 smoothParallax;
-        private const float ParallaxDamping = 2.5f; // плавность отклика на мышь
 
         // палитры: тёмный космос + яркие акценты борткомпа (мята/такси-жёлтый)
         private static readonly Color[] NebulaPalette =
@@ -163,14 +162,13 @@ namespace SpaceTaxi.UI
             // медленно; ближние — ярче, крупнее, мерцают быстро и искрят.
             // PhaseShift разводит слои по фазе (far 0.75π vs near 1.75π —
             // противофаза), медленное плавание Drift* — у слоёв встречные
-            // направления, глубина читается и без мыши
+            // направления: глубина читается без мыши (E8.3)
             layers.Add(MakeLayer("Nebula", new MenuStarLayer.Config
             {
                 Count = 5, SizeMin = 700f, SizeMax = 1400f,
                 AlphaMin = 0.09f, AlphaMax = 0.16f, TwinkleAmp = 0.25f,
                 SpeedMin = 0.10f, SpeedMax = 0.30f, SparkleChance = 0f,
                 SoftCore = 0f,
-                ParallaxFactor = 0.10f, ParallaxAmplitude = 26f,
                 SwayAmplitude = 10f, SwaySpeed = 0.05f,
                 PhaseShift = 0f,
                 DriftAmplitude = 30f, DriftSpeed = 0.045f, DriftAngleDeg = 15f,
@@ -181,7 +179,6 @@ namespace SpaceTaxi.UI
                 Count = 80, SizeMin = 5f, SizeMax = 13f,
                 AlphaMin = 0.22f, AlphaMax = 0.55f, TwinkleAmp = 0.30f,
                 SpeedMin = 0.5f, SpeedMax = 1.3f, SparkleChance = 0.06f,
-                ParallaxFactor = 0.14f, ParallaxAmplitude = 42f,
                 SwayAmplitude = 8f, SwaySpeed = 0.08f,
                 PhaseShift = Mathf.PI * 0.75f,
                 DriftAmplitude = 36f, DriftSpeed = 0.06f, DriftAngleDeg = 200f,
@@ -192,7 +189,6 @@ namespace SpaceTaxi.UI
                 Count = 36, SizeMin = 10f, SizeMax = 24f,
                 AlphaMin = 0.35f, AlphaMax = 0.85f, TwinkleAmp = 0.34f,
                 SpeedMin = 0.9f, SpeedMax = 2.2f, SparkleChance = 0.30f,
-                ParallaxFactor = 0.38f, ParallaxAmplitude = 84f,
                 SwayAmplitude = 12f, SwaySpeed = 0.10f,
                 PhaseShift = Mathf.PI * 0.25f,
                 DriftAmplitude = 46f, DriftSpeed = 0.08f, DriftAngleDeg = 340f,
@@ -203,7 +199,6 @@ namespace SpaceTaxi.UI
                 Count = 14, SizeMin = 22f, SizeMax = 44f,
                 AlphaMin = 0.70f, AlphaMax = 1f, TwinkleAmp = 0.42f,
                 SpeedMin = 1.4f, SpeedMax = 3.2f, SparkleChance = 0.7f,
-                ParallaxFactor = 0.62f, ParallaxAmplitude = 132f,
                 SwayAmplitude = 14f, SwaySpeed = 0.12f,
                 PhaseShift = Mathf.PI * 1.75f,
                 DriftAmplitude = 58f, DriftSpeed = 0.10f, DriftAngleDeg = 150f,
@@ -218,7 +213,7 @@ namespace SpaceTaxi.UI
             var layerRect = (RectTransform)go.transform;
             layerRect.anchorMin = Vector2.zero;
             layerRect.anchorMax = Vector2.one;
-            layerRect.offsetMin = new Vector2(-400f, -400f); // запас под параллакс/дрейф
+            layerRect.offsetMin = new Vector2(-400f, -400f); // запас под дрейф
             layerRect.offsetMax = new Vector2(400f, 400f);
             MenuStarLayer layer = go.GetComponent<MenuStarLayer>();
             layer.Configure(config);
@@ -298,33 +293,9 @@ namespace SpaceTaxi.UI
                 BuildContent();
             }
 
-            // параллакс от мыши (E.1): цель — нормированная позиция мыши [-1..1],
-            // слои смещаются против мыши; отклик сглажен, плюс автономный дрейф,
-            // чтобы фон жил и без мыши. Unscaled — меню не зависит от timeScale.
-            // Mouse.current.position — origin сверху-слева (y вниз), переводим
-            // в конвенцию Screen (снизу-слева), иначе вертикаль инвертирована
-            Vector2 target = Vector2.zero;
-            var mouse = UnityEngine.InputSystem.Mouse.current;
-            if (mouse != null)
-            {
-                Vector2 mousePosition = mouse.position.ReadValue();
-                float unityY = Screen.height - mousePosition.y;
-                target = new Vector2(mousePosition.x / Screen.width - 0.5f, unityY / Screen.height - 0.5f) * 2f;
-
-                // E7.3: слабый дрейф яйца к курсору при наведении; клик по-
-                // прежнему идёт через OnPointerClick, приоритет клика — внутри
-                // MenuEggShip. Позиция мыши — в конвенции Screen (снизу-слева)
-                if (egg != null && egg.Ready
-                    && RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                        rect, new Vector2(mousePosition.x, unityY), canvas.worldCamera, out Vector2 hoverLocal))
-                    egg.HoverAt(hoverLocal);
-            }
-            else if (egg != null && egg.Ready)
-            {
-                egg.HoverOff(); // мыши нет (геймпад) — hover-дрейф гаснет
-            }
-            smoothParallax = Vector2.Lerp(smoothParallax, target, 1f - Mathf.Exp(-ParallaxDamping * Time.unscaledDeltaTime));
-
+            // E8.3: мышиный параллакс убран (владелец: «подташнивает») — слои
+            // живут только автономным дрейфом: sway + медленное плавание.
+            // Unscaled — меню не зависит от timeScale.
             float time = Time.unscaledTime;
             for (int i = 0; i < layers.Count; i++)
             {
@@ -334,11 +305,10 @@ namespace SpaceTaxi.UI
                     Mathf.Cos(time * layer.SwaySpeed * 0.7f) * layer.SwayAmplitude);
                 // медленное плавание слоя в своём направлении (E4): период ~минута,
                 // у слоёв встречные углы — слои расходятся/сходятся, глубина
-                // читается и без мыши; фазовый сдвиг i*2.4 рад разводит соседние
+                // читается без мыши; фазовый сдвиг i*2.4 рад разводит соседние
                 float drift = Mathf.Sin(time * layer.DriftSpeed + i * 2.4f) * layer.DriftAmplitude;
                 Vector2 driftOffset = new(Mathf.Cos(layer.DriftAngleRad) * drift, Mathf.Sin(layer.DriftAngleRad) * drift);
-                Vector2 parallax = new(-smoothParallax.x * layer.ParallaxAmplitude, -smoothParallax.y * layer.ParallaxAmplitude);
-                layer.ApplyOffset(parallax + sway + driftOffset);
+                layer.ApplyOffset(sway + driftOffset);
             }
         }
 

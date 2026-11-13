@@ -7,18 +7,21 @@ namespace SpaceTaxi.UI
 {
     // Кнопка «из звёзд» (бриф E2/E3, хотфикс Н6): плашек и шрифта нет — прячу
     // сценические Frame/Background с плоской заливкой и TMP-Label; текст
-    // выложен звёздами (MenuStarText по маскам 5x7). Звёздной рамки по
-    // периметру больше НЕТ (Н6: кнопка = только звёздный текст).
+    // выложен звёздами (MenuStarText по маскам 5x7). Звёздной рамки и
+    // гало-полосы по периметру больше НЕТ (E8.2: наведение зажигает САМИ
+    // ЗВЁЗДЫ — цвет и яркость искр; никаких подложек).
     //
-    // Цвет (Н6): все глифы кнопки базово ЧИСТО БЕЛЫЕ; при наведении —
-    // такси-жёлтый, при уходе — обратно белый. Заголовок «SPACE TAXI» не
-    // тронут (MenuStarTitle красит сам). Наведение: масштаб 1 → 1.06,
-    // подсветка — мягкая полоса по периметру (E7.2, MenuGlowSprite),
-    // проявляется плавно.
+    // Цвет (Н6 + E8.2): все глифы кнопки базово ЧИСТО БЕЛЫЕ; при наведении
+    // плавно желтеют (твин ~0.15с внутри MenuStarText.SetGlyphColor) и
+    // разгораются (boost к волне мерцания), при уходе — плавно обратно белый.
+    // Заголовок «SPACE TAXI» не тронут (MenuStarTitle красит сам). Наведение:
+    // масштаб 1 → 1.06. Неактивная кнопка («Продолжить» без сейва) не
+    // желтеет вовсе — её звёзды гасит CanvasGroup от SceneFlowButtons
+    // (DisabledAlpha 0.4 — тусклые белые).
     //
     // Хотфикс Н6 (кликабельность): после гашения Frame/Background/Label под
     // кнопкой не оставалось НИ ОДНОГО raycastTarget (звёзды MenuTwinkle
-    // создаются с raycastTarget=false, гало тоже) — pointer-события вообще
+    // создаются с raycastTarget=false) — pointer-события вообще
     // не доходили до Button: клики падали сквозь кнопку в ClickCatcher
     // (яйцо летело вместо нажатия, hover не включался). Лечение:
     // прозрачный Image на весь прямоугольник кнопки с raycastTarget=true —
@@ -29,27 +32,21 @@ namespace SpaceTaxi.UI
     public sealed class StarButtonDecorator : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         private const float HoverScale = 1.06f;
-        // E7.2: подсветка наведения — мягкая полоса по периметру кнопки
-        // (MenuGlowSprite, Image.type Sliced), не пятно. Итог на кромке =
-        // PeakAlpha текстуры * HaloAlpha; отступ полосы за габарит — HaloSpread
-        private const float HaloAlpha = 0.34f;
-        private const float HaloSpread = 10f;  // px, насколько полоса выходит за края кнопки
-        private const float GlowSpeed = 0.18f; // сек на полное проявление гало
+        private const float GlowSpeed = 0.18f; // сек на разгон/затухание наведения (скейл + boost)
         private const float BoostMax = 0.9f;   // добавка к волне звёзд при наведении
 
         // Н6: глифы кнопок — белый базовый и жёлтый под наведение
-        // (такси-жёлтый проекта, как у гало: 1, 0.831, 0.302)
+        // (такси-жёлтый проекта: 1, 0.831, 0.302)
         private static readonly Color GlyphWhite = Color.white;
         private static readonly Color GlyphYellow = new(1f, 0.831f, 0.302f);
         private static readonly Color[] GlyphPalette = { GlyphWhite };
 
         private RectTransform rect;
         private Button button;
-        private Image halo;
         private MenuStarText starText;
-        private float glow;         // текущая сила подсветки 0..1
+        private float glow;         // текущая сила наведения 0..1 (скейл + boost)
         private bool hovered;
-        private bool glyphsYellow;  // Н6: текущая перекраска глифов
+        private bool glyphsYellow;  // текущая перекраска глифов
 
         public void Build()
         {
@@ -58,7 +55,6 @@ namespace SpaceTaxi.UI
 
             BuildClickTarget();
             HidePlaques();
-            BuildHalo();
             BuildLabel();
         }
 
@@ -93,31 +89,6 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // E7.2: свечение наведения — полоса по периметру кнопки (в индекс 0,
-        // под звёздами текста), а не пятно в центре: спрайт с рамкой BorderPx
-        // + Image.type Sliced держит толщину полосы постоянной у кнопок любой
-        // ширины
-        private void BuildHalo()
-        {
-            var haloGo = new GameObject("StarHalo", typeof(RectTransform), typeof(Image));
-            var haloRect = (RectTransform)haloGo.transform;
-            haloRect.SetParent(rect, false);
-            haloRect.anchorMin = Vector2.zero;
-            haloRect.anchorMax = Vector2.one;
-            haloRect.offsetMin = new Vector2(-HaloSpread, -HaloSpread); // запас под хвост свечения наружу
-            haloRect.offsetMax = new Vector2(HaloSpread, HaloSpread);
-            halo = haloGo.GetComponent<Image>();
-            // PPU спрайта = Reference Pixels Per Unit канваса: uGUI делит
-            // border спрайта на PPU/ReferencePPU, при чужом PPU толщина полосы
-            // уехала бы в разы (в MainMenu ReferencePPU = 1000)
-            Canvas buttonCanvas = haloGo.GetComponentInParent<Canvas>();
-            halo.sprite = MenuGlowSprite.Rim(buttonCanvas != null ? buttonCanvas.referencePixelsPerUnit : 100f);
-            halo.type = Image.Type.Sliced;
-            halo.color = new Color(1f, 0.831f, 0.302f, 0f); // такси-жёлтый, прозрачен до наведения
-            halo.raycastTarget = false;
-            halo.transform.SetSiblingIndex(0);
-        }
-
         // бриф E3: текст кнопки — звёздами по маскам, TMP-Label гасится.
         // Надпись строится по центру КНОПКИ (не Label — у сценических Label
         // разные размеры/поля), высота букв ~54px при кнопке 108px.
@@ -143,17 +114,16 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
-            // погашенная «Продолжить» не подсвечивается
+            // погашенная «Продолжить» не желтеет и не разгорается (её звёзды
+            // гасит CanvasGroup от SceneFlowButtons)
             bool target = hovered && (button == null || button.interactable);
             glow = Mathf.MoveTowards(glow, target ? 1f : 0f, Time.unscaledDeltaTime / GlowSpeed);
 
             rect.localScale = Vector3.one * (1f + (HoverScale - 1f) * glow);
-            Color c = halo.color;
-            c.a = HaloAlpha * glow;
-            halo.color = c;
 
-            // Н6: при наведении все глифы кнопки жёлтые, при уходе — белые;
-            // погашенная «Продолжить» остаётся белой
+            // E8.2: при наведении загораются САМИ ЗВЁЗДЫ кнопки — цвет rgb
+            // (белый→жёлтый, плавный твин внутри MenuStarText) + яркость
+            // искр (boost к волне мерцания). Никаких ореолов-подложек.
             if (starText != null && glyphsYellow != target)
             {
                 glyphsYellow = target;
