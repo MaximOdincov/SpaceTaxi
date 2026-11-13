@@ -49,13 +49,14 @@ namespace SpaceTaxi.UI
     // тень-подставка (Н6.K7) и чернильное кольцо вокруг планеты (M7.3).
     // Курсор системный всегда (Н6.K8). Отдаление
     // клампится — при минимальном зуме видно ≤ 62% диаметра мира (Н6.HF1).
-    // M7.5 (скайрим-дисциплина, конспект R): единый визуальный язык — бумага
-    // (арт владельца) + чернила + один акцент. Тела — чернильные оттиски
-    // реальных игровых спрайтов (форма различает, цвет один); цель заказа —
-    // жжёный янтарь Accent (единственный насыщенный цвет); красный Alarm —
-    // только смерть; метка-waypoint и стоянка слились с чернилами (форму
-    // различают булавка и подпись). Край мира — туманный чернильный крап
-    // (BuildWorldEdge), районы — крупные географические надписи с разрядкой,
+    // M7.5 (скайрим-дисциплина, конспект R) + M8.1/M8.2/M8.7 (вкус владельца):
+    // бумага (арт владельца) + чернила для текста/служебной графики. Тела —
+    // реальные игровые спрайты в РОДНЫХ цветах, без отмывки и теней-копий;
+    // ракета-маркер — родной цвет арта. Цель заказа — жёлтый полупрозрачный
+    // пульс (жёлтый = цель); красный Alarm — только смерть (клякса/взрыв);
+    // метка-waypoint — чернильные булавка+кольцо. Край мира — мягкая туманная
+    // кромка без рамки-обода (BuildWorldEdge), районы — крупные географические
+    // надписи с разрядкой,
     // легенда — компактный ключ с честными значками построенных тел,
     // линейка — тоньше и только на крупных зумах (SyncRuler), подписи —
     // альфа-фейд 0.12с на смене тира (StepLabelFades).
@@ -113,6 +114,11 @@ namespace SpaceTaxi.UI
         private const float TargetRingWidePx = 90f;
         private const float WaypointHaloPx = 44f;
         private const float WaypointPinPx = 20f;
+
+        // M8.7: жёлтый полупрозрачный ореол/кольцо цели (жёлтый = цель заказа,
+        // Н5.28; янтарный Accent отменён владельцем). Тот же тон, что в игре
+        // (OrderService.UpdateTargetGlow)
+        private static readonly Color TargetRingColor = new Color(1f, 0.94f, 0.3f);
 
         // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
         // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
@@ -765,27 +771,25 @@ namespace SpaceTaxi.UI
         }
 
         // граница мира (M7.5): туманная кромка — чернильный крап, нарастающий за
-        // границей («дальше бумаги нет»), тонкое кольцо по границе, буи-звёздочки
-        // и пометки «за кругом — потеря связи» (красный больше не здесь — только смерть)
+        // границей («дальше бумаги нет»), буи-звёздочки и пометки «за кругом —
+        // потеря связи» (красный больше не здесь — только смерть).
+        // M8.2: рамка-обод по краю удалена (вкус владельца), туман — мягкий:
+        // растворение начинается глубже (0.65×R) и тянется шире — без резкой
+        // внутренней границы
         private void BuildWorldEdge()
         {
             float borderPx = mapRadius * scale;
 
-            // крап-туман: растворение начинается ЗАРАНЕЕ (0.8×R — пан-клампы не
+            // крап-туман: растворение начинается ЗАРАНЕЕ (0.65×R — пан-клампы не
             // дают заглянуть дальше ~R×0.99, Н6.HF1) и густеет за кольцом буёв;
             // живёт в edgeFogRoot — не блокирует слоты подписей (см. BuildMap)
-            const float FogInnerFrac = 0.80f;
+            const float FogInnerFrac = 0.65f;
             float fogInnerPx = borderPx * FogInnerFrac;
             RectTransform fog = MakeImage("EdgeFog", edgeFogRoot, PaperMapArt.EdgeFog(),
                 WithAlpha(PaperMapArt.Ink, 0.75f),
                 Vector2.one * (fogInnerPx * 2f / PaperMapArt.EdgeFogBorderFrac), false);
             fog.anchoredPosition = Vector2.zero;
             fog.SetAsFirstSibling();
-
-            // тонкое чернильное кольцо точно по границе
-            RectTransform rim = MakeImage("EdgeRim", edgeFogRoot, PaperMapArt.TargetRing(),
-                WithAlpha(PaperMapArt.Ink, 0.16f), Vector2.one * (borderPx * 2f * 1.04f), false);
-            rim.anchoredPosition = Vector2.zero;
 
             Sprite star = PaperMapArt.BuoyStar();
             for (int i = 0; i < 12; i++)
@@ -834,9 +838,9 @@ namespace SpaceTaxi.UI
                     float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.5f) * scale;
                     Vector2 p = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
                     float size = 9f + (float)rng.NextDouble() * 9f;
-                    // M7.5: камни — вторичные чернила лёгкой отмывкой (фон под телами)
+                    // M8.1: камни — родной цвет арта (отмывка снята по вкусу владельца)
                     RectTransform stone = MakeImage("Rock_" + i, beltsRoot, rock,
-                        WithAlpha(PaperMapArt.InkSoft, 0.55f), Vector2.one * size, false);
+                        Color.white, Vector2.one * size, false);
                     stone.anchoredPosition = p;
                     stone.localRotation = Quaternion.Euler(0f, 0f, (float)rng.NextDouble() * 360f);
                     if (rng.NextDouble() < 0.5)
@@ -870,7 +874,6 @@ namespace SpaceTaxi.UI
             // отношение «px карты / радиус мира» одно для всех тел.
             float d = Mathf.Max(MinIconPx, GameRadiusOf(body) * 2f * scale);
             Sprite art = GameSpriteOf(body);
-            Color tint = BodyIconTint(body); // M7.5: чернильный оттиск вместо игрового тинта
             // вписываем КОНТЕНТ арта (альфа-границы, в мировых юнитах спрайта),
             // как вписывает тело CelestialBody.Init — видимый шар карты = шар игры
             Vector2 spr = art != null ? art.bounds.size : Vector2.one;
@@ -885,14 +888,9 @@ namespace SpaceTaxi.UI
             group.sizeDelta = size;
             group.anchoredPosition = WorldToMap(body.Position);
 
-            // тень со сдвигом — иконка «приклеена» к бумаге
-            RectTransform shadow = MakeImage("Shadow", group, art, WithAlpha(PaperMapArt.Ink, 0.22f), size, false);
-            shadow.anchoredPosition = new Vector2(2.5f, -2.5f);
-            shadow.SetAsFirstSibling();
-
             // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
-            // цвет — как в игре (тинт планеты, заглушки звёзд/дыры)
-            MakeImage("Icon", group, art, tint, size, false);
+            // цвет — родной цвет арта (M8.1: чернильная отмывка снята по вкусу владельца)
+            MakeImage("Icon", group, art, Color.white, size, false);
             bodySizes[body] = d;
             // подпись строится в PlaceAllLabels — блоками «иконка+имя» по приоритету
         }
@@ -920,22 +918,6 @@ namespace SpaceTaxi.UI
                     return renderer.sprite;
             }
             return BodySprite(body);
-        }
-
-        // M7.5: тела — чернильные оттиски, цвет один (вариация светлоты/альфы,
-        // не цвета); форму различает реальный игровой спрайт. Полупрозрачная
-        // «отмывка»: спрайт читается, но живёт в чернильном семействе
-        private static Color BodyIconTint(CelestialBodyData body)
-        {
-            switch (body.Type)
-            {
-                case BodyType.BlackHole:
-                    return WithAlpha(PaperMapArt.Ink, 0.92f);            // прогал в бумаге — самое тёмное
-                case BodyType.Star:
-                    return WithAlpha(PaperMapArt.Ink, 0.55f);            // лучи штрихом, легче планет
-                default:
-                    return WithAlpha(PaperMapArt.Ink, 0.62f);
-            }
         }
 
         private static void CollectRects(RectTransform root, List<Rect> into)
@@ -1452,15 +1434,15 @@ namespace SpaceTaxi.UI
         private void BuildTargetRing()
         {
             // M7.1: константный экранный размер (руту ставит counter-scale в Update);
-            // M7.5: единственный насыщенный цвет карты — янтарный акцент цели
+            // M8.7: единственный насыщенный цвет карты — жёлтый ореол цели
             targetRing = MakeRect("TargetRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             targetRingPulse = MakeImage("Ring", targetRing, PaperMapArt.TargetRing(),
-                PaperMapArt.Accent, Vector2.one * TargetRingPx, false);
+                TargetRingColor, Vector2.one * TargetRingPx, false);
             targetRingWide = MakeImage("RingWide", targetRing, PaperMapArt.TargetRing(),
-                WithAlpha(PaperMapArt.Accent, 0.7f), Vector2.one * TargetRingWidePx, false);
+                WithAlpha(TargetRingColor, 0.7f), Vector2.one * TargetRingWidePx, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
-            targetLabel = MakeLabel("TargetLabel", targetRing, "", 16f, PaperMapArt.Accent);
+            targetLabel = MakeLabel("TargetLabel", targetRing, "", 16f, TargetRingColor);
             ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(280f, 24f);
             ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (TargetRingPx * 0.5f + 18f);
             targetLabel.characterSpacing = 2f;
@@ -1507,9 +1489,9 @@ namespace SpaceTaxi.UI
             float t = Time.unscaledTime;
             targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 4.2f));
             if (targetRingPulseImage != null)
-                targetRingPulseImage.color = WithAlpha(PaperMapArt.Accent, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
+                targetRingPulseImage.color = WithAlpha(TargetRingColor, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
             if (targetRingWideImage != null)
-                targetRingWideImage.color = WithAlpha(PaperMapArt.Accent, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
+                targetRingWideImage.color = WithAlpha(TargetRingColor, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
         }
 
         private void RestoreTargetLabel()
@@ -1569,12 +1551,9 @@ namespace SpaceTaxi.UI
                 size = rocket.rect.height > rocket.rect.width
                     ? new Vector2(48f, RocketMarkerPx)
                     : new Vector2(RocketMarkerPx, 48f);
-                RectTransform shadow = MakeImage("Shadow", playerArrowRoot, rocket, WithAlpha(PaperMapArt.Ink, 0.25f), size, false);
-                shadow.anchoredPosition = new Vector2(2f, -2f);
-                shadow.SetAsFirstSibling();
-                // M7.5: ракета — те же чернила (красный арт читался бы как тревога;
-                // «вы здесь» держат размер, подпись и движение маркера)
-                MakeImage("Rocket", playerArrowRoot, rocket, WithAlpha(PaperMapArt.Ink, 0.9f), size, false);
+                // M8.1: родной цвет арта ракеты — «вы здесь» держат размер,
+                // подпись и движение маркера
+                MakeImage("Rocket", playerArrowRoot, rocket, Color.white, size, false);
             }
             else
             {
@@ -1966,11 +1945,14 @@ namespace SpaceTaxi.UI
                 if (comet == null || cometIcons.ContainsKey(comet))
                     continue;
                 Sprite art = PaperMapArt.MapSprite("map_cometa");
-                if (art == null)
+                // M8.1: арту кометы — родной цвет; процедурный фолбэк (белая
+                // маска) тонируется чернилами, иначе не виден на бумаге
+                bool hasArt = art != null;
+                if (!hasArt)
                     art = PaperMapArt.CometIcon();
-                // M7.5: кометы — те же чернила отмывкой (форму различает хвост)
+                Color cometColor = hasArt ? Color.white : WithAlpha(PaperMapArt.Ink, 0.62f);
                 RectTransform icon = MakeImage("Comet_" + cometIcons.Count, cometsRoot, art,
-                    WithAlpha(PaperMapArt.Ink, 0.62f), Vector2.one * 30f, false);
+                    cometColor, Vector2.one * 30f, false);
                 Vector2 world = comet.transform.position;
                 icon.anchoredPosition = WorldToMap(world);
                 icon.localScale = Vector3.one * inv;
@@ -2230,27 +2212,26 @@ namespace SpaceTaxi.UI
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
             legendRoot.sizeDelta = new Vector2(330f, 170f);
 
-            var ink = WithAlpha(PaperMapArt.Ink, 0.62f);
             int y = 0;
-            // тела: чернила одни (тинты как на карте), форму различает значок
+            // M8.1: значки в родных цветах арта (как на карте), форму различает значок
             LegendRow(0f, ref y, HonestBodySprite(b => !b.IsHub && b.Type == BodyType.Planet, "map_planet"),
-                ink, "планета");
-            LegendRow(0f, ref y, HonestBodySprite(b => b.IsHub, "map_taxi_planet"), ink, "хаб МТО");
+                Color.white, "планета");
+            LegendRow(0f, ref y, HonestBodySprite(b => b.IsHub, "map_taxi_planet"), Color.white, "хаб МТО");
             LegendRow(0f, ref y, HonestBodySprite(b => b.Type == BodyType.Star, "map_sun"),
-                WithAlpha(PaperMapArt.Ink, 0.55f), "звезда");
+                Color.white, "звезда");
             LegendRow(0f, ref y, HonestBodySprite(b => b.Type == BodyType.BlackHole, "map_black_hole"),
-                WithAlpha(PaperMapArt.Ink, 0.92f), "чёрная дыра");
+                Color.white, "чёрная дыра");
             LegendRow(0f, ref y, PaperMapArt.MapSprite("map_asteroid"),
-                WithAlpha(PaperMapArt.InkSoft, 0.55f), "пояс");
+                Color.white, "пояс");
 
-            // маркеры: янтарный акцент — только цель; метка — чернила (отличает булавка)
+            // маркеры: жёлтый — только цель заказа; метка — чернила (отличает булавка)
             y = 0;
             LegendRow(175f, ref y, PaperMapArt.MapSprite("map_cometa"),
-                WithAlpha(PaperMapArt.Ink, 0.62f), "комета");
-            LegendRow(175f, ref y, PaperMapArt.TargetRing(), PaperMapArt.Accent, "цель заказа", 22f);
+                Color.white, "комета");
+            LegendRow(175f, ref y, PaperMapArt.TargetRing(), TargetRingColor, "цель заказа", 22f);
             LegendRow(175f, ref y, PaperMapArt.Pin(), PaperMapArt.Ink, "своя метка", 18f);
             Sprite rocket = PaperMapArt.MapSprite("map_rocket");
-            LegendRow(175f, ref y, rocket, WithAlpha(PaperMapArt.Ink, 0.9f), "вы здесь", 20f);
+            LegendRow(175f, ref y, rocket, Color.white, "вы здесь", 20f);
         }
 
         // честный значок легенды: реальный спрайт построенного тела (как на карте),

@@ -15,7 +15,7 @@ namespace SpaceTaxi.Audio
         private const float LoopPitchMin = 0.9f;
         private const float LoopPitchRange = 0.22f;
         private const float LoopFadeTime = 0.15f;   // нарастание/затухание лупа, без щелчков
-        private const float MusicFadeTime = 1.5f;   // кроссфейд треков
+        private const float MusicFadeTime = 2.5f;   // кроссфейд треков (A8.1: мягче)
         // Н7 A7.1: не-музыкальные группы (Sfx/Ui/Engine) громче музыки на ~35%:
         // события «не пробивались» сквозь станцию. Одна точка — GroupFactor,
         // действует на one-shots и лупы; Music не трогается
@@ -454,20 +454,26 @@ namespace SpaceTaxi.Audio
 
         private IEnumerator RunCrossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
         {
+            // A8.1: equal-power (sqrt-кривые вместо линейных) — в середине
+            // кроссфейда суммарная громкость двух каналов не проваливается,
+            // перелив слышится ровным. Стартовую громкость уходящего канала
+            // фиксируем один раз: множитель sqrt(1-k) честно гасит её к нулю
+            float fadeOutFrom = fadeOut != null ? fadeOut.volume : 0f;
             float t = 0f;
             while (t < MusicFadeTime)
             {
                 t += Time.unscaledDeltaTime;
-                float k = t / MusicFadeTime;
+                float k = Mathf.Clamp01(t / MusicFadeTime);
                 if (fadeIn != null)
                 {
                     // цель пересчитывается каждый кадр: слайдер музыки мог
                     // поехать посреди кроссфейда — иначе застынет старое значение
                     if (fadeIn == musicActive)
                         targetVolume = CurrentMusicVolume();
-                    fadeIn.volume = Mathf.Lerp(0f, targetVolume, k);
+                    fadeIn.volume = targetVolume * Mathf.Sqrt(k);
                 }
-                if (fadeOut != null) fadeOut.volume = Mathf.Lerp(fadeOut.volume, 0f, k);
+                if (fadeOut != null)
+                    fadeOut.volume = fadeOutFrom * Mathf.Sqrt(1f - k);
                 yield return null;
             }
             if (fadeOut != null)

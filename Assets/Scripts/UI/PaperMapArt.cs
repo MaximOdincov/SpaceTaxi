@@ -20,14 +20,17 @@ namespace SpaceTaxi.UI
         public const int StampGridX = 2; // map_stamps: 2×3
         public const int StampGridY = 3;
 
-        // — палитра «бумага + чернила + 1 акцент» (M7.5, скайрим-дисциплина R) —
+        // — палитра «бумага + чернила» (M7.5, скайрим-дисциплина R; ревизия M8.1/M8.7) —
         // Бумага — арт владельца (Art/background.png, тёплая сепия, не трогается) + фолбэки.
-        // Контент листа — ЕДИНОЕ чернильное семейство: тела/подписи/буи/метки различаются
-        // формой и альфой, не цветом. Насыщенный цвет один — янтарный акцент цели заказа;
-        // красный зарезервирован за смертью.
+        // Тела — РЕАЛЬНЫЕ игровые спрайты в родных цветах (отмывка снята владельцем);
+        // чернила — текст и служебная графика листа. Цель заказа — жёлтый
+        // (MapScreenBinder.TargetRingColor); красный зарезервирован за смертью.
         public static readonly Color Ink = new Color(0.243f, 0.184f, 0.137f);     // #3E2F23 — основные чернила
         public static readonly Color InkSoft = new Color(0.420f, 0.329f, 0.235f); // #6B543C — вторичные (периферия, пояса, кромка)
-        public static readonly Color Accent = new Color(0.706f, 0.325f, 0.035f);  // #B45309 — жжёный янтарь: ТОЛЬКО цель заказа
+        // M8.7: янтарный акцент ВЫВЕДЕН из употребления (владелец вернул жёлтый
+        // цели — MapScreenBinder.TargetRingColor); цвет оставлен в палитре как
+        // вторичный, целью заказа больше не назначается
+        public static readonly Color Accent = new Color(0.706f, 0.325f, 0.035f);  // #B45309 — жжёный янтарь
         public static readonly Color Alarm = new Color(0.549f, 0.169f, 0.118f);   // #8C2B1E — красный: ТОЛЬКО смерть
         public static readonly Color Paper = new Color(0.89f, 0.80f, 0.59f);
         public static readonly Color PaperDark = new Color(0.80f, 0.70f, 0.50f);

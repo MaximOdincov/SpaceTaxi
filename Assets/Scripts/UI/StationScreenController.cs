@@ -1462,7 +1462,9 @@ namespace SpaceTaxi.UI
         }
 
         // свотчи расцветки собираются под модель: заводская (индекс 0) +
-        // PaintVariants; старые уничтожаются — число вариантов у моделей разное
+        // PaintVariants; старые уничтожаются — число вариантов у моделей разное.
+        // U8.1: у арендной модели не-стандартные варианты недоступны (S7 Н6:
+        // аренда = заводская покраска) — рисуются серыми, некликабельными
         private void RebuildPaintSwatches(ShipConfig config)
         {
             if (paintSwatchRow == null || config == null)
@@ -1471,16 +1473,19 @@ namespace SpaceTaxi.UI
                 Destroy(paintSwatchRow.transform.GetChild(i).gameObject);
             int count = config.PaintVariantCount + 1;
             paintSwatchIcons = new Image[count];
+            bool locked = config.IsRental;
             // крупный свотч 38px: 9 штук влезают в колонку 434px; больше — мелкий
             float size = count > 9 ? SwatchSizeSmall : SwatchSize;
             for (int i = 0; i < count; i++)
-                paintSwatchIcons[i] = BuildPaintSwatch(config, i, size);
+                paintSwatchIcons[i] = BuildPaintSwatch(config, i, size, locked);
             UpdatePaintSwatches();
         }
 
         // свотч: спрайт варианта (арта нет — затенение по тиру), ColorTint hover,
-        // звук хуком каркаса ПЕРВЫМ, рамка-Outline только у выбранного
-        private Image BuildPaintSwatch(ShipConfig config, int paintIndex, float size)
+        // звук хуком каркаса ПЕРВЫМ, рамка-Outline только у выбранного.
+        // locked (аренда): свотч не-стандартной покраски некликабелен —
+        // паттерн «КУПИТЬ без денег» (S4)
+        private Image BuildPaintSwatch(ShipConfig config, int paintIndex, float size, bool locked)
         {
             var go = new GameObject("Swatch_" + paintIndex, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(paintSwatchRow.transform, false);
@@ -1508,6 +1513,8 @@ namespace SpaceTaxi.UI
             colors.highlightedColor = new Color(0.82f, 1f, 0.9f);
             colors.pressedColor = new Color(0.6f, 1f, 0.78f);
             button.colors = colors;
+            if (locked && paintIndex > 0)
+                button.interactable = false; // аренда: только заводская (S7)
             UiSfx.Hook(button); // каркас: хук первым, слушатели вызывающего после
             int captured = paintIndex;
             button.onClick.AddListener(() => SelectShowcasePaint(captured));
@@ -1515,7 +1522,8 @@ namespace SpaceTaxi.UI
         }
 
         // выбор расцветки свотчем (механика бывшего FlipPaint): большой спрайт
-        // перерисовывается, покупка берёт выбранный индекс
+        // перерисовывается, покупка берёт выбранный индекс. U8.1: у аренды
+        // не-стандартная покраска закрыта (страховка помимо disabled-свотча)
         private void SelectShowcasePaint(int paintIndex)
         {
             ShipConfig config = showcaseShip;
@@ -1523,13 +1531,16 @@ namespace SpaceTaxi.UI
                 return;
             if (paintIndex < 0 || paintIndex > config.PaintVariantCount)
                 return;
+            if (config.IsRental && paintIndex > 0)
+                return; // аренда = заводская покраска (S7 Н6)
             showcasePaintIndex = paintIndex;
             ApplyShowcaseSprite(session.Fleet, config, paintIndex);
             UpdatePaintSwatches();
-            showcasePaint.text = PaintLineText(config, paintIndex);
+            showcasePaint.text = PaintLineText(config, paintIndex, config.IsRental);
         }
 
-        // подсветка выбранного свотча: рамка + полный цвет, невыбранные серее
+        // подсветка выбранного свотча: рамка + полный цвет, невыбранные серее;
+        // закрытые (аренда) — заметно приглушены, у выделения рамки нет
         private void UpdatePaintSwatches()
         {
             ShipConfig config = swatchConfig;
@@ -1540,9 +1551,10 @@ namespace SpaceTaxi.UI
                 bool selected = i == showcasePaintIndex;
                 var image = paintSwatchIcons[i];
                 Color baseColor = image.sprite != null ? Color.white : TierShade(config.Tier);
+                float dim = config.IsRental && i > 0 ? 0.38f : 0.62f; // U8.1: закрытый — глуше
                 image.color = selected
                     ? baseColor
-                    : new Color(baseColor.r * 0.62f, baseColor.g * 0.62f, baseColor.b * 0.62f, baseColor.a);
+                    : new Color(baseColor.r * dim, baseColor.g * dim, baseColor.b * dim, baseColor.a);
                 var outline = image.GetComponent<Outline>();
                 if (outline != null)
                     outline.enabled = selected;
@@ -1568,6 +1580,8 @@ namespace SpaceTaxi.UI
             stockSlot = slot;
             if (modelChanged || slotChanged)
                 showcasePaintIndex = ShopStockService.DisplayPaintIndex(config, slot);
+            if (config.IsRental)
+                showcasePaintIndex = 0; // U8.1: аренда всегда заводская (S7 Н6)
             if (swatchConfig != config)
             {
                 swatchConfig = config;
@@ -1581,7 +1595,7 @@ namespace SpaceTaxi.UI
             showcaseState.text = OwnershipLine(fleet, config);
             UpdateShowcaseStats(config);
             UpdatePaintSwatches();
-            showcasePaint.text = PaintLineText(config, showcasePaintIndex);
+            showcasePaint.text = PaintLineText(config, showcasePaintIndex, config.IsRental);
 
             bool rental = config.IsRental;
             bool current = IsCurrent(fleet, config);
@@ -1628,9 +1642,12 @@ namespace SpaceTaxi.UI
                 : Color.white;
         }
 
-        // строка «Расцветка: …» под именем модели на витрине
-        private static string PaintLineText(ShipConfig config, int paintIndex)
+        // строка «Расцветка: …» под именем модели на витрине; аренда — всегда
+        // заводская (U8.1/S7), варианты ей не продаются
+        private static string PaintLineText(ShipConfig config, int paintIndex, bool rental = false)
         {
+            if (rental)
+                return "Расцветка: заводская · аренда без покраски";
             int variants = config.PaintVariantCount;
             return variants == 0 ? "Расцветка: заводская"
                 : paintIndex == 0
