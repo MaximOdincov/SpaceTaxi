@@ -16,18 +16,23 @@ namespace SpaceTaxi.UI
     // Карта (M) — «нарисованная от руки на старой жёлтой бумаге» (Н5.F + фиксы Н5.21 + Н6.K).
     // Лист ровно вписан в окно карты минус зона бортового компьютера (панель 480 px
     // слева; TAB убирает панель — лист каждый раз перекладывается). Бумага
-    // (Art/background.png) лежит ВНУТРИ зум-контента: пан двигает бумагу, зум
-    // зумит её вместе с телами, запас ×3 от окна — края бумаги не видны.
-    // Тёмный стол (Backdrop) начинается ПРАВЕЕ борткомпа — панель остаётся яркой
-    // при открытой карте (Н6.K1). Декор for_fun и компас-роза убраны (Н6.K2),
-    // легенда — без подложки, чернила прямо на бумаге (Н6.K3).
-    // Н6.HF4 — карта простая и функциональная: НИКАКИХ кликов по телам карты,
-    // записки планет и зум-при-клике снесены. Осталось: пан ЛКМ, зум колесом
+    // (M8.3: бесшовный тайл кропа Art/background.png, Image.Tiled) лежит ВНУТРИ
+    // зум-контента и СЧИТАЕТСЯ ОТ МИРА: размер = 2×граница мира×поля, тайл = 512
+    // мировых юнитов — плотность зерна постоянна в юнитах мира, зум крутит бумагу
+    // вместе с телами честно (прежде зерно было привязано к листу и «приближало»
+    // вместе с ним). Тёмный стол (Backdrop) начинается ПРАВЕЕ борткомпа — панель
+    // остаётся яркой при открытой карте (Н6.K1). Декор for_fun и компас-роза
+    // убраны (Н6.K2), легенда — без подложки, чернила прямо на бумаге (Н6.K3).
+    // Н6.HF4 сносил клики по телам; M8.8 вернул МИНИМАЛЬНЫЙ клик-выбор (без
+    // записок/зум-при-клике/чипа): клик по телу (отличение от пана — порог
+    // сдвига 6 px) ставит/снимает СВОЮ метку — зелёная булавка + зелёный
+    // пульсирующий ореол на карте (зелёный = метка игрока), червон на радаре
+    // и скобка в мире живут от Waypoint API. Правый клик / Esc (при открытой
+    // карте) метку снимают. Осталось: пан ЛКМ, зум колесом
     // и кнопками (кламп minViewZoom..MaxViewZoom), следование за ракетой,
-    // маркеры заказов (жёлтая цель + зелёная метка). Waypoint-контракт
-    // (Waypoint/WaypointChanged/Set/Clear/ToggleWaypoint) сохранён для
-    // WaypointIndicator/MinimapBinder — способ задания метки появится позже
-    // в борткомпе.
+    // маркеры заказов (жёлтая цель). Waypoint-контракт
+    // (Waypoint/WaypointChanged/Set/Clear/ToggleWaypoint) — для
+    // WaypointIndicator/MinimapBinder.
     // Подписи — блок «иконка+имя» (картографическая модель 8 слотов, Н6.HF4):
     // подпись живёт ПРИ своей иконке на фиксированном близком расстоянии,
     // порядок размещения хаб → тела по радиусу → пояса; занятые слоты
@@ -48,13 +53,15 @@ namespace SpaceTaxi.UI
     // подписка не ленивая — ловит смерть и при закрытой карте), стоянка —
     // тень-подставка (Н6.K7) и чернильное кольцо вокруг планеты (M7.3).
     // Курсор системный всегда (Н6.K8). Отдаление
-    // клампится — при минимальном зуме видно ≤ 62% диаметра мира (Н6.HF1).
+    // клампится — при минимальном зуме виден ВЕСЬ мир (≤ 100% диаметра, M8.3:
+    // прежде было ≤ 62% и мир не влезал целиком; поля бумаги дают FitMargin).
     // M7.5 (скайрим-дисциплина, конспект R) + M8.1/M8.2/M8.7 (вкус владельца):
     // бумага (арт владельца) + чернила для текста/служебной графики. Тела —
     // реальные игровые спрайты в РОДНЫХ цветах, без отмывки и теней-копий;
     // ракета-маркер — родной цвет арта. Цель заказа — жёлтый полупрозрачный
     // пульс (жёлтый = цель); красный Alarm — только смерть (клякса/взрыв);
-    // метка-waypoint — чернильные булавка+кольцо. Край мира — мягкая туманная
+    // метка-waypoint — зелёные булавка+кольцо (M8.8, зелёный = метка игрока).
+    // Край мира — мягкая туманная
     // кромка без рамки-обода (BuildWorldEdge), районы — крупные географические
     // надписи с разрядкой,
     // легенда — компактный ключ с честными значками построенных тел,
@@ -67,17 +74,17 @@ namespace SpaceTaxi.UI
     // Вид: колесо — зум к курсору ×1.2 (весь мир ↔ одна планета), ЛКМ-драг —
     // пан (Н6.K5: WASD-пан убран, W больше не двигает карту — игра под картой
     // ловит тягу честно).
-    public class MapScreenBinder : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public class MapScreenBinder : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
+        IPointerDownHandler, IPointerClickHandler
     {
         [SerializeField] private TMP_FontAsset mapFont; // Excalifont-Regular SDF — назначен в сцене
 
         // — вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору —
-        // Н6.HF1: прежний MinViewZoom = 1 означал «из базового вида не отдаляемся»,
-        // но мир стал компактным (×0.58, край тела ~3936 юн от старта) и целиком
-        // влезал даже на максимальном отъезде. Минимальный зум больше не константа:
-        // он считается в BuildMap от реального окна (поле minViewZoom) так, чтобы
-        // при полном отдалении по каждой оси было видно ≤ 62% диаметра мира
-        private const float MinZoomWorldFraction = 0.62f; // доля диаметра мира в окне при минимальном зуме
+        // Н6.HF1 → M8.3: минимальный зум считается в BuildMap от реального окна
+        // (поле minViewZoom) так, чтобы при полном отдалении по каждой оси было
+        // видно ≤ 100% диаметра мира — «полный отъезд = весь мир + поля бумаги»
+        // (прежде 0.62 поднимало порог зума ×1.77 и мир не влезал целиком)
+        private const float MinZoomWorldFraction = 1.0f; // доля диаметра мира в окне при минимальном зуме
         private const float MaxViewZoom = 14f;     // от максимального отъезда до одной планеты крупно
         private const float InitialViewZoom = 9f;  // карта открывается приближенной к игроку
         private const float ZoomDuration = 0.22f;
@@ -99,7 +106,10 @@ namespace SpaceTaxi.UI
         private const float ContentMargin = 26f;        // окно вида внутри листа (маска клипует всё внутри)
         private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
-        private const float PaperOversize = 3f;         // запас бумаги за краями окна (×3 от окна)
+        // M8.3: бумага — тайл ОТ МИРА (не от окна): зерно привязано к мировым юнитам
+        private const float PaperWorldMargin = 1.6f;    // радиус бумаги = радиус мира × (поля за туманом)
+        private const float WorldUnitsPerTile = 512f;   // мировых юнитов на один тайл бумаги
+        private const int PaperTilePx = 512;            // размер кропа-тайла в пикселях текстуры
         // M7.2: относительная нормировка (RefIconPx/maxBodyRadius) убрана — иконка
         // = честный игровой диаметр 2 × Radius_game × scale; минимум — различимая
         // точка (4 px контента ≈ 9 px экрана на минимальном зуме; при 6 px
@@ -112,13 +122,25 @@ namespace SpaceTaxi.UI
         // заданы в экранных px и не растут при приближении
         private const float TargetRingPx = 64f;
         private const float TargetRingWidePx = 90f;
-        private const float WaypointHaloPx = 44f;
+        // M8.8: своя метка — зелёный аналог жёлтой цели заказа (кольца того же
+        // калибра) + булавка
+        private const float WaypointHaloPx = 64f;
+        private const float WaypointWidePx = 90f;
         private const float WaypointPinPx = 20f;
+
+        // M8.8: клик-выбор — различение клика от пана (минимальная версия из
+        // истории Н5.18-Н6.8) + минимальный радиус попадания в тело
+        private const float ClickDragGuard = 6f;   // сдвиг больше этого — пан, а не клик
+        private const float PickMinScreenPx = 14f; // мелкие тела кликаются в радиусе 14 экранных px
 
         // M8.7: жёлтый полупрозрачный ореол/кольцо цели (жёлтый = цель заказа,
         // Н5.28; янтарный Accent отменён владельцем). Тот же тон, что в игре
         // (OrderService.UpdateTargetGlow)
         private static readonly Color TargetRingColor = new Color(1f, 0.94f, 0.3f);
+
+        // M8.8: своя метка — зелёный (зелёный = метка игрока), единый цвет с
+        // червоном радара (MinimapBinder.WaypointColor) и скобкой в мире
+        private static readonly Color WaypointMarkColor = WaypointIndicator.WaypointGreen;
 
         // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
         // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
@@ -126,9 +148,8 @@ namespace SpaceTaxi.UI
         private const float CometHeadDeg = 226f;
 
         // — waypoint для WaypointIndicator/MinimapBinder (Н-8): свойство + событие.
-        // Н6.HF4: UI-точка входа на карте (чип «пометить») снесена вместе с
-        // выбором тел; API сохранён — способ задания метки появится позже
-        // в борткомпе
+        // M8.8: способ задания — клик по телу на карте (минимальный клик-выбор,
+        // повторный клик/правый клик/Esc снимают)
         public CelestialBodyData Waypoint { get; private set; }
         public event Action WaypointChanged;
 
@@ -156,12 +177,15 @@ namespace SpaceTaxi.UI
                 SetWaypoint(body);
         }
 
-        // Esc из контроллера: интерактивных панелей на карте больше нет
-        // (выбор тел снесён, Н6.HF4) — Esc всегда закрывает карту целиком.
-        // Метод сохранён как контракт с MapScreenController
+        // Esc из контроллера: M8.8 — при открытой карте Esc сначала снимает
+        // СВОЮ метку (карта остаётся открытой), без метки — Esc закрывает карту
+        // целиком (контракт с MapScreenController: true — Esc съеден)
         public bool TryHandleEscape()
         {
-            return false;
+            if (Waypoint == null)
+                return false;
+            ClearWaypoint();
+            return true;
         }
 
         private LevelAsset level;
@@ -212,8 +236,10 @@ namespace SpaceTaxi.UI
         private TMP_Text targetLabel;
         private RectTransform waypointRoot;      // зелёный ореол метки + булавка
         private RectTransform waypointHalo;
+        private RectTransform waypointWide;      // второе, широкое кольцо (как у цели)
         private RectTransform waypointPin;
         private Image waypointHaloImage;         // кэш: пульс обновляется каждый кадр
+        private Image waypointWideImage;
         private Image waypointPinImage;
         private int targetIndex = -1;
         private CelestialBodyData lastTargetBody; // чья подпись спрятана под «ЦЕЛЬ: …»
@@ -265,6 +291,7 @@ namespace SpaceTaxi.UI
 
         private Vector2 worldCenter; // центр карты = origin мира (граница HullSystem — от него)
         private float mapRadius;
+        private float bodyEdgeRadius; // фактический край тел/кометной зоны — от него туман (M8.3)
         private float scale = 1f;
 
         private float zoom = 1f;
@@ -277,8 +304,11 @@ namespace SpaceTaxi.UI
         private Vector2 offTo;
         private bool zoomAnim;
 
-        // пан: ЛКМ-драг по листу и столу (клики по телам снесены — Н6.HF4)
+        // пан: ЛКМ-драг по листу и столу; клик (сдвиг ≤ ClickDragGuard) —
+        // клик-выбор метки (M8.8)
         private bool dragging;
+        private bool suppressClick; // нажатие переросло в пан — кликом не считать
+        private float dragMoved;
         private Vector2 dragSheetPos;
 
         // режим «следить за ракетой» (Н6.K6)
@@ -450,6 +480,8 @@ namespace SpaceTaxi.UI
             // карта закрылась — вид сбрасываем, следующий вход с чистого экрана;
             // кляксы гибелей и отложенный burst живут «до закрытия карты» (M7.4)
             dragging = false;
+            suppressClick = false;
+            dragMoved = 0f;
             relayoutPending = false;
             if (content != null)
                 ApplyZoom(1f, Vector2.zero);
@@ -492,11 +524,15 @@ namespace SpaceTaxi.UI
 
             paperRect = MakeRect("Paper", content, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
             Image paperImage = paperRect.gameObject.AddComponent<Image>();
-            Sprite paperArt = PaperMapArt.SheetArt();
-            paperImage.sprite = paperArt;
-            paperImage.color = paperArt != null ? Color.white : PaperMapArt.Paper;
+            // M8.3: бесшовный тайл бумаги (кроп background.png) — Image.Tiled,
+            // тайл = 512 мировых юнитов (пересчёт в BuildMap, когда известен scale).
+            // Тайла нет — ровный цвет Paper прежним спрайтом/заливкой
+            Sprite paperTile = PaperMapArt.PaperTile();
+            paperImage.type = paperTile != null ? Image.Type.Tiled : Image.Type.Simple;
+            paperImage.sprite = paperTile != null ? paperTile : PaperMapArt.SheetArt();
+            paperImage.color = paperImage.sprite != null ? Color.white : PaperMapArt.Paper;
             paperImage.raycastTarget = false;
-            paperRect.sizeDelta = sheetRect.rect.size * PaperOversize; // панится/зумится вместе с контентом
+            paperRect.sizeDelta = Vector2.one * 1000f; // временно; BuildMap ставит размер от мира
 
             BuildTitle();
             BuildZoomButtons();
@@ -511,8 +547,7 @@ namespace SpaceTaxi.UI
                 return;
             sheetRect.offsetMin = new Vector2(ReservedLeftInset() + OnboardGap, SheetMargin);
             sheetRect.offsetMax = new Vector2(-SheetMargin, -SheetMargin);
-            if (paperRect != null) // запас бумаги от текущего окна
-                paperRect.sizeDelta = sheetRect.rect.size * PaperOversize;
+            // бумага с M8.3 не зависит от окна: её размер считает BuildMap от мира
             // Н6.K1: стол — от края панели (минус кольцо-поле листа) и правее;
             // полоса борткомпа остаётся вне затемнения
             if (backdropRect != null)
@@ -538,32 +573,11 @@ namespace SpaceTaxi.UI
 
         private void BuildMap()
         {
-            LayoutSheet(); // размеры окна уже известны — лист и бумага актуальны
-
-            // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin)
-            mapRadius = level.WorldRadius;
-            float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
-            foreach (CelestialBodyData body in level.Bodies)
-            {
-                float edge = body.Position.magnitude + body.Radius;
-                if (edge > mapRadius)
-                    mapRadius = edge + 100f;
-                extX = Mathf.Max(extX, Mathf.Abs(body.Position.x) + body.Radius);
-                extY = Mathf.Max(extY, Mathf.Abs(body.Position.y) + body.Radius);
-            }
-            if (level.CometAreaRadius > 0f) // зона комет — тоже часть содержимого
-            {
-                extX = Mathf.Max(extX, Mathf.Abs(level.CometAreaCenter.x) + level.CometAreaRadius);
-                extY = Mathf.Max(extY, Mathf.Abs(level.CometAreaCenter.y) + level.CometAreaRadius);
-            }
-            if (extX <= 1f)
-                extX = mapRadius;
-            if (extY <= 1f)
-                extY = mapRadius;
-            worldCenter = Vector2.zero;
+            LayoutSheet(); // размеры окна уже известны — лист актуален
 
             // M7.2: реальные тела уровня — радиус (уже с PlanetSizeMul) и игровой
-            // спрайт; имя тела = имя GameObject (WorldBuilder)
+            // спрайт; имя тела = имя GameObject (WorldBuilder). Заполняется ДО
+            // bbox: честный fit считает игровые радиусы (M8.3)
             gameBodies.Clear();
             GravityField gravity = FindAnyObjectByType<GravityField>();
             if (gravity != null)
@@ -571,14 +585,56 @@ namespace SpaceTaxi.UI
                     if (gameBody != null && !string.IsNullOrEmpty(gameBody.DisplayName))
                         gameBodies[gameBody.DisplayName] = gameBody;
 
+            // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin)
+            mapRadius = level.WorldRadius;
+            float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
+            bodyEdgeRadius = 0f;        // фактический край тел — от него туман (M8.3)
+            foreach (CelestialBodyData body in level.Bodies)
+            {
+                float gameRadius = GameRadiusOf(body);
+                float edge = body.Position.magnitude + gameRadius;
+                if (edge > mapRadius)
+                    mapRadius = edge + 100f;
+                bodyEdgeRadius = Mathf.Max(bodyEdgeRadius, edge);
+                extX = Mathf.Max(extX, Mathf.Abs(body.Position.x) + gameRadius);
+                extY = Mathf.Max(extY, Mathf.Abs(body.Position.y) + gameRadius);
+            }
+            if (level.CometAreaRadius > 0f) // зона комет — тоже часть содержимого
+            {
+                extX = Mathf.Max(extX, Mathf.Abs(level.CometAreaCenter.x) + level.CometAreaRadius);
+                extY = Mathf.Max(extY, Mathf.Abs(level.CometAreaCenter.y) + level.CometAreaRadius);
+                bodyEdgeRadius = Mathf.Max(bodyEdgeRadius, level.CometAreaCenter.magnitude + level.CometAreaRadius);
+            }
+            if (extX <= 1f)
+                extX = mapRadius;
+            if (extY <= 1f)
+                extY = mapRadius;
+            worldCenter = Vector2.zero;
+
             // «весь мир на листе»: bbox тел уровня + поля 10% вписывается целиком
             float w = content.rect.width, h = content.rect.height;
             scale = Mathf.Min(w / (2f * extX * FitMargin), h / (2f * extY * FitMargin));
             scale = Mathf.Max(scale, 0.012f);
 
-            // Н6.HF1: порог отдаления — при минимальном зуме по каждой оси видно
-            // ≤ MinZoomWorldFraction диаметра мира (нормируем на bbox тел; т.к.
-            // scale вписывает bbox с полем FitMargin, порог никогда не ниже ≈1.77)
+            // M8.3: бумага — от МИРА: диаметр мира × поля; тайл = WorldUnitsPerTile
+            // мировых юнитов → tilePx = PaperTilePx / (PPU/refPPU × multiplier),
+            // отсюда multiplier = PaperTilePx×refPPU / (PPU-спрайта×юнитов×scale)
+            if (paperRect != null)
+            {
+                paperRect.sizeDelta = Vector2.one * (2f * mapRadius * scale * PaperWorldMargin);
+                Image paperImage = paperRect.GetComponent<Image>();
+                if (paperImage != null && paperImage.type == Image.Type.Tiled)
+                {
+                    Canvas canvas = paperImage.canvas;
+                    float refPpu = canvas != null ? canvas.referencePixelsPerUnit : 100f;
+                    paperImage.pixelsPerUnitMultiplier =
+                        PaperTilePx * refPpu / (100f * WorldUnitsPerTile * scale);
+                }
+            }
+
+            // Н6.HF1 → M8.3: порог отдаления — при минимальном зуме по каждой оси
+            // видно ≤ MinZoomWorldFraction (1.0) диаметра мира: полный отъезд
+            // показывает весь мир, поля бумаги дают FitMargin
             float minByWidth = w / (scale * 2f * extX * MinZoomWorldFraction);
             float minByHeight = h / (scale * 2f * extY * MinZoomWorldFraction);
             minViewZoom = Mathf.Min(MaxViewZoom, Mathf.Max(minByWidth, minByHeight));
@@ -780,11 +836,13 @@ namespace SpaceTaxi.UI
         {
             float borderPx = mapRadius * scale;
 
-            // крап-туман: растворение начинается ЗАРАНЕЕ (0.65×R — пан-клампы не
-            // дают заглянуть дальше ~R×0.99, Н6.HF1) и густеет за кольцом буёв;
-            // живёт в edgeFogRoot — не блокирует слоты подписей (см. BuildMap)
-            const float FogInnerFrac = 0.65f;
-            float fogInnerPx = borderPx * FogInnerFrac;
+            // крап-туман: растворение начинается от ФАКТИЧЕСКОГО края тел
+            // (bodyEdgeRadius, M8.3 — прежде 0.65×mapRadius, что при плотной
+            // компоновке с WorldRadius 4600 накрыло бы Дальний район) и густеет
+            // за кольцом буёв; живёт в edgeFogRoot — не блокирует слоты
+            // подписей (см. BuildMap). Максимум с прежним поведением: у старого
+            // мира 0.65×6000 ≈ 3936 — край тел, вид не меняется
+            float fogInnerPx = Mathf.Max(bodyEdgeRadius, mapRadius * 0.65f) * scale;
             RectTransform fog = MakeImage("EdgeFog", edgeFogRoot, PaperMapArt.EdgeFog(),
                 WithAlpha(PaperMapArt.Ink, 0.75f),
                 Vector2.one * (fogInnerPx * 2f / PaperMapArt.EdgeFogBorderFrac), false);
@@ -1393,15 +1451,19 @@ namespace SpaceTaxi.UI
         private void BuildWaypoint()
         {
             // M7.1: константный экранный размер — рут несёт counter-scale 1/zoom,
-            // дети заданы в экранных px и больше не растут от IconSizeOf×zoom
+            // дети заданы в экранных px и больше не растут от IconSizeOf×zoom.
+            // M8.8: своя метка ЗЕЛЁНАЯ (зелёный = метка игрока) — ореол-кольца
+            // того же калибра, что у жёлтой цели заказа, булавка над кольцом
             waypointRoot = MakeRect("WaypointRoot", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            // M7.5: метка слита с чернилами — форму различает булавка
+            waypointWide = MakeImage("Wide", waypointRoot, PaperMapArt.TargetRing(),
+                WithAlpha(WaypointMarkColor, 0.5f), Vector2.one * WaypointWidePx, false);
             waypointHalo = MakeImage("Halo", waypointRoot, PaperMapArt.TargetRing(),
-                PaperMapArt.Ink, Vector2.one * WaypointHaloPx, false);
+                WaypointMarkColor, Vector2.one * WaypointHaloPx, false);
             waypointPin = MakeImage("Pin", waypointRoot, PaperMapArt.Pin(),
-                PaperMapArt.Ink, Vector2.one * WaypointPinPx, false);
+                WaypointMarkColor, Vector2.one * WaypointPinPx, false);
             waypointPin.anchoredPosition = Vector2.up * (WaypointHaloPx * 0.5f + 16f);
             waypointHaloImage = waypointHalo.GetComponent<Image>(); // кэш для кадра
+            waypointWideImage = waypointWide.GetComponent<Image>();
             waypointPinImage = waypointPin.GetComponent<Image>();
             waypointRoot.gameObject.SetActive(false);
         }
@@ -1423,12 +1485,14 @@ namespace SpaceTaxi.UI
             waypointRoot.anchoredPosition = WorldToMap(Waypoint.Position);
             waypointRoot.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранный px постоянны
 
+            // пульс как у жёлтой цели (в противофазе широкое кольцо)
             float t = Time.unscaledTime;
-            float pulse = 0.5f + 0.3f * Mathf.Sin(t * 2.8f);
             if (waypointHaloImage != null)
-                waypointHaloImage.color = WithAlpha(PaperMapArt.Ink, pulse);
+                waypointHaloImage.color = WithAlpha(WaypointMarkColor, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
+            if (waypointWideImage != null)
+                waypointWideImage.color = WithAlpha(WaypointMarkColor, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
             if (waypointPinImage != null)
-                waypointPinImage.color = WithAlpha(PaperMapArt.Ink, 0.65f + 0.35f * Mathf.Sin(t * 2.8f + 1f));
+                waypointPinImage.color = WithAlpha(WaypointMarkColor, 0.75f + 0.25f * Mathf.Sin(t * 2.8f + 1f));
         }
 
         private void BuildTargetRing()
@@ -1577,7 +1641,14 @@ namespace SpaceTaxi.UI
             if (shipT == null || playerMarker == null || sheetRect == null)
                 return;
 
-            if (ship != null && ship.State == ShipState.Flying && ship.Body != null
+            if (ship != null && ship.State == ShipState.Landed)
+            {
+                // M8.5: поза посадки — нос маркера по ориентации КОРПУСА
+                // (SpriteNoseAngle, как на радаре Н7 G7.2), а не по последнему
+                // вектору полёта: прежде ракета на карте «падала» носом вниз
+                playerHeading = HullHeadingDeg();
+            }
+            else if (ship != null && ship.State == ShipState.Flying && ship.Body != null
                 && ship.Body.linearVelocity.sqrMagnitude > 25f)
             {
                 Vector2 v = ship.Body.linearVelocity;
@@ -1675,6 +1746,20 @@ namespace SpaceTaxi.UI
                 ship = FindAnyObjectByType<Ship>();
             BindHullDeath();
             return ship != null ? ship.transform : null;
+        }
+
+        // ориентация корпуса в мировых градусах (M8.5: поза посадки маркера) —
+        // та же конвенция, что в MinimapBinder.HullHeadingDeg: поворот тела +
+        // нос спрайта ShipController
+        private float HullHeadingDeg()
+        {
+            if (ship == null)
+                ship = FindAnyObjectByType<Ship>();
+            if (ship == null || ship.Body == null)
+                return playerHeading;
+            ShipController controller = ship.GetComponent<ShipController>();
+            float nose = controller != null ? controller.SpriteNoseAngle : 0f;
+            return ship.Body.rotation + nose;
         }
 
         // взрыв на карте (Н6.K7 + M7.4): подписка на смерть корабля — НЕ ленивая:
@@ -2118,9 +2203,64 @@ namespace SpaceTaxi.UI
             if (!dragging || !TryScreenToSheet(eventData.position, out Vector2 pos))
                 return;
             Vector2 delta = pos - dragSheetPos;
+            dragMoved += delta.magnitude;
+            if (dragMoved > ClickDragGuard)
+                suppressClick = true; // перетащили — это пан, не клик-выбор (M8.8)
             dragSheetPos = pos;
             // резиновый вынос за край; на отпускании лист плавно вернётся в границы мира
             ApplyZoom(zoom, ClampZoomOffset(zoomOffset + delta, zoom, RubberMargin));
+        }
+
+        // M8.8: клик-выбор. Нажатие сбрасывает «перетащили» — клик снова жив;
+        // клик по телу ставит/снимает метку (ToggleWaypoint), правый — снимает
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            suppressClick = false;
+            dragMoved = 0f;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (suppressClick || !built)
+                return;
+            if (eventData.button == PointerEventData.InputButton.Right)
+            {
+                ClearWaypoint();
+                return;
+            }
+            if (eventData.button == PointerEventData.InputButton.Left
+                && !PressOnChrome(eventData)
+                && TryScreenToSheet(eventData.position, out _)
+                && PickBodyAt(eventData.position, out CelestialBodyData body))
+                ToggleWaypoint(body);
+        }
+
+        // тело под курсором (минимальный вариант из истории Н5.18-Н6.8, без
+        // записок/чипа/зум-при-клике): ближайшее тело, у которого точка мира
+        // внутри честного радиуса (мелкие — в радиусе PickMinScreenPx экрана).
+        // Пояса не кликабельны: метка ставится на точку, у пояса она бессмысленна
+        private bool PickBodyAt(Vector2 screenPos, out CelestialBodyData picked)
+        {
+            picked = null;
+            if (!TryScreenToSheet(screenPos, out Vector2 sheetPos))
+                return false;
+            Vector2 contentPos = (sheetPos - zoomOffset) / Mathf.Max(zoom, 0.001f);
+            Vector2 world = contentPos / Mathf.Max(scale, 0.0001f) + worldCenter;
+            float pickMinWorld = PickMinScreenPx / Mathf.Max(zoom * scale, 0.0001f);
+            float best = float.MaxValue;
+            foreach (CelestialBodyData body in level.Bodies)
+            {
+                if (body.Type == BodyType.AsteroidBelt)
+                    continue;
+                float hitR = Mathf.Max(GameRadiusOf(body), pickMinWorld);
+                float d = Vector2.Distance(world, body.Position);
+                if (d <= hitR && d < best)
+                {
+                    best = d;
+                    picked = body;
+                }
+            }
+            return picked != null;
         }
 
         public void OnEndDrag(PointerEventData eventData)
@@ -2224,12 +2364,12 @@ namespace SpaceTaxi.UI
             LegendRow(0f, ref y, PaperMapArt.MapSprite("map_asteroid"),
                 Color.white, "пояс");
 
-            // маркеры: жёлтый — только цель заказа; метка — чернила (отличает булавка)
+            // маркеры: жёлтый — только цель заказа; зелёный — своя метка (M8.8)
             y = 0;
             LegendRow(175f, ref y, PaperMapArt.MapSprite("map_cometa"),
                 Color.white, "комета");
             LegendRow(175f, ref y, PaperMapArt.TargetRing(), TargetRingColor, "цель заказа", 22f);
-            LegendRow(175f, ref y, PaperMapArt.Pin(), PaperMapArt.Ink, "своя метка", 18f);
+            LegendRow(175f, ref y, PaperMapArt.Pin(), WaypointMarkColor, "своя метка", 18f);
             Sprite rocket = PaperMapArt.MapSprite("map_rocket");
             LegendRow(175f, ref y, rocket, Color.white, "вы здесь", 20f);
         }
@@ -2453,8 +2593,10 @@ namespace SpaceTaxi.UI
             targetLabel = null;
             waypointRoot = null;
             waypointHalo = null;
+            waypointWide = null;
             waypointPin = null;
             waypointHaloImage = null;
+            waypointWideImage = null;
             waypointPinImage = null;
             targetIndex = -1;
             lastTargetBody = null;
@@ -2463,6 +2605,8 @@ namespace SpaceTaxi.UI
             followMode = false;
             bursts.Clear();
             dragging = false;
+            suppressClick = false;
+            dragMoved = 0f;
             zoomAnim = false;
             zoom = 1f;
             zoomOffset = Vector2.zero;

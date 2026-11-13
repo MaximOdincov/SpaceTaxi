@@ -56,6 +56,25 @@ namespace SpaceTaxi.UI
             return LoadArt("background");
         }
 
+        // M8.3: бесшовный тайл бумаги для Image.Tiled — кроп 512×512 из
+        // Art/background.png (генерируется из чистой центральной зоны листа с
+        // перекрёстным затуханием краёв; ассет Assets/Resources/Art/map/paper_tile.png).
+        // Тайлится Image'ом карты с pixelsPerUnitMultiplier = 1/scale — один тайл
+        // всегда 512 мировых юнитов, зерно не «приближается» вместе с листом.
+        // PPU спрайта 100 = канонический referencePixelsPerUnit канваса
+        public static Sprite PaperTile()
+        {
+            string key = "paper_tile";
+            if (cache.TryGetValue(key, out Sprite s) && s != null)
+                return s;
+            Texture2D tex = Resources.Load<Texture2D>("Art/map/paper_tile");
+            if (tex == null)
+                return null;
+            s = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            cache[key] = s;
+            return s;
+        }
+
         // Иконки тел владельца из Assets/Resources/Art/map: map_planet, map_sun,
         // map_black_hole, map_gas_station, map_repair, map_taxi_planet,
         // map_asteroid, map_rocket, map_cometa, map_for_fun_1/2.

@@ -22,6 +22,16 @@ namespace SpaceTaxi.UI
         private const float EdgePad = 88f;     // отступ стрелки от края, единиц канваса
         private const float OverlapGap = 110f; // минимальный зазор между стрелками
 
+        // M8.9: габарит скобки метки НАД телом (геометрия PlaceMarker):
+        // зазор Radius+10 + луч 21 + подпись центр +11 и полвысоты 22 = +64,
+        // низ скобки = Radius+10. У верхнего края кадра скобка резалась, а
+        // стрелка-компас пряталась (диск тела касался кадра) — маркер просто
+        // исчезал. Теперь маркер гасится, когда не влезает целиком, и
+        // направление показывает честная стрелка (ComputeEdge с той же
+        // надбавкой) — «отключение за границей»
+        private const float MarkerTopPad = 64f;
+        private const float MarkerBottomPad = 10f;
+
         // своя метка (waypoint с карты) — зелёная (G-15): единый цвет с ромбом на
         // радаре; на бумажной карте тот же смысл — тёмно-карандашный GreenPencil
         public static readonly Color WaypointGreen = new Color(0.235f, 1f, 0.557f);
@@ -169,8 +179,32 @@ namespace SpaceTaxi.UI
                 PlaceMarker();
             }
 
-            if (markerRoot != null && !markerRoot.gameObject.activeSelf)
-                markerRoot.gameObject.SetActive(true);
+            if (markerRoot != null)
+            {
+                // M8.9: маркер в мире показываем только если он влезает в кадр
+                // ЦЕЛИКОМ (скобка+подпись над телом), иначе — гасим, направление
+                // держит стрелка-компас (см. ComputeEdge)
+                bool fits = MarkerFitsFrame();
+                if (markerRoot.gameObject.activeSelf != fits)
+                    markerRoot.gameObject.SetActive(fits);
+            }
+        }
+
+        // влезает ли скобка метки в кадр камеры целиком (см. MarkerTopPad)
+        private bool MarkerFitsFrame()
+        {
+            if (markerBody == null)
+                return true;
+            Camera cam = Camera.main;
+            if (cam == null)
+                return true;
+            Vector2 delta = markerBody.transform.position - cam.transform.position;
+            float halfH = cam.orthographicSize;
+            float halfW = halfH * cam.aspect;
+            float r = markerBody.Radius;
+            return Mathf.Abs(delta.x) <= halfW
+                && delta.y + r + MarkerBottomPad >= -halfH
+                && delta.y + r + MarkerTopPad <= halfH;
         }
 
         private void HideMarker()
@@ -273,11 +307,11 @@ namespace SpaceTaxi.UI
 
             (Vector2? pos, float radius) wp = WaypointRef();
             (Vector2? pos, float radius) tp = TargetRef();
-            bool showWaypoint = ComputeEdge(wp.pos, wp.radius, cam, out Vector2 posW, out float angleW);
+            bool showWaypoint = ComputeEdge(wp.pos, wp.radius, cam, true, out Vector2 posW, out float angleW);
             string distW = showWaypoint
                 ? CachedDistance(ref lastDistWValue, ref lastDistWText, Vector2.Distance(ShipPos(), wp.pos.Value))
                 : null;
-            bool showTarget = ComputeEdge(tp.pos, tp.radius, cam, out Vector2 posT, out float angleT);
+            bool showTarget = ComputeEdge(tp.pos, tp.radius, cam, false, out Vector2 posT, out float angleT);
             string distT = showTarget
                 ? CachedDistance(ref lastDistTValue, ref lastDistTText, Vector2.Distance(ShipPos(), tp.pos.Value))
                 : null;
@@ -319,8 +353,12 @@ namespace SpaceTaxi.UI
             return body != null ? ((Vector2)body.transform.position, body.Radius) : (data.Position, data.Radius);
         }
 
-        // кламп направления к прямоугольнику экрана с отступом; false — цель видна
-        private bool ComputeEdge(Vector2? worldPoint, float radius, Camera cam, out Vector2 canvasPos, out float angle)
+        // кламп направления к прямоугольнику экрана с отступом; false — цель видна.
+        // bracketAbove: у маркера есть скобка с подписью НАД телом (метка) —
+        // стрелка появляется и когда тело видно, но скобка резанётся краем
+        // (M8.9), цель стрелки — верхняя точка маркера
+        private bool ComputeEdge(Vector2? worldPoint, float radius, Camera cam, bool bracketAbove,
+            out Vector2 canvasPos, out float angle)
         {
             canvasPos = Vector2.zero;
             angle = 0f;
@@ -340,13 +378,21 @@ namespace SpaceTaxi.UI
             }
             float halfH = cam.orthographicSize;
             float halfW = halfH * cam.aspect;
-            // тело краем уже в кадре — стрелка не нужна
+            // тело краем уже в кадре — стрелка не нужна (M8.9: кроме случая,
+            // когда скобка с подписью резанётся краем кадра)
             float cx = Mathf.Clamp(delta.x, -halfW, halfW);
             float cy = Mathf.Clamp(delta.y, -halfH, halfH);
             float ex = delta.x - cx;
             float ey = delta.y - cy;
-            if (ex * ex + ey * ey <= radius * radius)
+            bool bodyInFrame = ex * ex + ey * ey <= radius * radius;
+            bool bracketFits = !bracketAbove
+                || (Mathf.Abs(delta.x) <= halfW
+                    && delta.y + radius + MarkerBottomPad >= -halfH
+                    && delta.y + radius + MarkerTopPad <= halfH);
+            if (bodyInFrame && bracketFits)
                 return false;
+            if (bodyInFrame) // видно тело, но скобка резанётся — стрелка на её верх
+                delta.y += radius + MarkerTopPad;
 
             // мир → единицы канваса: высота экрана = 2*orthographicSize юнитов мира
             float scale = arrowCanvas.scaleFactor;

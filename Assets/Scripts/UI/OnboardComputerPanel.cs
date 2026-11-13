@@ -14,6 +14,11 @@ namespace SpaceTaxi.UI
 
         private bool shown;
         private Coroutine anim;
+        private MapScreenController mapController; // карта открыта — Tab закрывает её (M8.6)
+        // M8.6: wasPressedThisFrame у Tab может быть true у нескольких
+        // компонентов в одном кадре — статический флаг потребления гарантирует,
+        // что одно нажатие обрабатывается ровно один раз
+        private static int tabConsumedFrame = -1;
 
         private void Awake()
         {
@@ -25,8 +30,24 @@ namespace SpaceTaxi.UI
 
         private void Update()
         {
-            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
-                Toggle();
+            // M8.6: единый потребитель Tab. При ОТКРЫТОЙ карте Tab закрывает
+            // карту (панель прячется вместе с ней — MapScreenController.Close),
+            // и борткомп тем же нажатием не открывается; при открытой панели —
+            // закрывает её (как прежде); оба закрыты — прежнее поведение
+            // (Tab открывает панель). Esc-контракт карты не задет (Esc читает
+            // только MapScreenController)
+            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame
+                && tabConsumedFrame != Time.frameCount)
+            {
+                tabConsumedFrame = Time.frameCount;
+                if (mapController == null)
+                    mapController = FindAnyObjectByType<MapScreenController>();
+                if (mapController != null && mapController.IsOpened)
+                    mapController.Close(); // панель прячется вместе с картой
+                else
+                    Toggle();
+            }
+
             // страховка от рассинхрона флага и позиции: корутина слайда может
             // умереть на полпути (перезагрузка домена в плее, замерзший кадр
             // без фокуса) — тогда флаг «открыто» и позиция «за экраном» живут

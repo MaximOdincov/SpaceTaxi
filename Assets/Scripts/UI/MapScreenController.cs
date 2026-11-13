@@ -56,6 +56,13 @@ namespace SpaceTaxi.UI
             SetOpened(true);
         }
 
+        // M8.6: программное закрытие (Tab из борткомпа) — панель прячется
+        // вместе с картой (SetOpened → onboard.Show(false))
+        public void Close()
+        {
+            SetOpened(false);
+        }
+
         private void SetOpened(bool value, bool force = false)
         {
             if (!force && value == opened) return;
