@@ -205,8 +205,14 @@ namespace SpaceTaxi.Tools
             {
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HasFuel"),
                     new GUIContent("Заправка (топливо за кредиты)"));
+                if (element.FindPropertyRelative("HasFuel").boolValue)
+                    EditorGUILayout.PropertyField(element.FindPropertyRelative("FuelTier"),
+                        new GUIContent("Тир топливной сети (0 = базовая)"));
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("HasRepair"),
                     new GUIContent("Мастерская (ремонт за кредиты)"));
+                if (element.FindPropertyRelative("HasRepair").boolValue)
+                    EditorGUILayout.PropertyField(element.FindPropertyRelative("RepairTier"),
+                        new GUIContent("Тир сети ремонта (0 = чинит полностью)"));
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("IsHub"),
                     new GUIContent("Хаб МТО (магазин + улучшения)"));
                 EditorGUILayout.PropertyField(element.FindPropertyRelative("VisualSizeMul"),
@@ -264,8 +270,20 @@ namespace SpaceTaxi.Tools
                 indexProp.intValue = indices[picked];
             }
             EditorGUILayout.PropertyField(so.FindProperty("SpawnAngleDeg"));
+            // точка/курс свободного спавна читает CometSystem (SpawnGuardPoint)
+            if ((SpawnMode)modeProp.intValue == SpawnMode.Free)
+            {
+                EditorGUILayout.PropertyField(so.FindProperty("SpawnPoint"));
+                EditorGUILayout.PropertyField(so.FindProperty("SpawnHeading"));
+            }
             EditorGUILayout.PropertyField(so.FindProperty("WorldRadius"),
                 new GUIContent("Граница системы"));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Кометы", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(so.FindProperty("CometAreaCenter"));
+            EditorGUILayout.PropertyField(so.FindProperty("CometAreaRadius"),
+                new GUIContent("Радиус зоны (0 = хорды по всему миру)"));
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();
@@ -538,7 +556,7 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init) + 7
+        // как в игре: радиус облика по GameRadiusOf (CelestialBody.Init) + 7
         public static Vector2 SpawnPointOf(LevelAsset lvl)
         {
             if (lvl.StartPlanetIndex < 0 || lvl.StartPlanetIndex >= lvl.Bodies.Count)
@@ -546,7 +564,21 @@ namespace SpaceTaxi.Tools
             var start = lvl.Bodies[lvl.StartPlanetIndex];
             float rad = lvl.SpawnAngleDeg * Mathf.Deg2Rad;
             return start.Position
-                + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
+                + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (GameRadiusOf(start) + 7f);
+        }
+
+        // игровой радиус облика тела — та же формула, что CelestialBody.Init:
+        // планета — data.Radius × VisualSizeMul (0 = авто по имени, WorldSprites.PlanetSizeMul),
+        // звёзды и дыры — сырой Radius (их зоны жара/горизонт в данных точные).
+        // Общая точка правды превью для окна и LevelEditorSceneView.
+        public static float GameRadiusOf(CelestialBodyData body)
+        {
+            if (body.Type != BodyType.Planet)
+                return body.Radius;
+            float mul = body.VisualSizeMul > 0f
+                ? body.VisualSizeMul
+                : Core.WorldSprites.PlanetSizeMul(body.DisplayName);
+            return body.Radius * mul;
         }
     }
 }

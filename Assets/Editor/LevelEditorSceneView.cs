@@ -62,6 +62,7 @@ namespace SpaceTaxi.Tools
             DrawSpawn(level);
             DrawCameraFrame(level);
             DrawWorldRadius(level);
+            DrawCometArea(level);
             if (window.ShowTrajectory)
                 DrawSpawnTrajectory(level);
 
@@ -78,6 +79,17 @@ namespace SpaceTaxi.Tools
             Handles.color = new Color(1f, 0.4f, 0.3f, 0.5f);
             Handles.Label(new Vector3(0f, level.WorldRadius + 40f, 0f),
                 "граница системы · " + level.WorldRadius.ToString("0"));
+        }
+
+        // зона комет (CometSystem.Init): маршруты комет не покидают окружность
+        private static void DrawCometArea(LevelAsset level)
+        {
+            if (level.CometAreaRadius <= 0f)
+                return;
+            DottedCircle(level.CometAreaCenter, level.CometAreaRadius, new Color(0.6f, 0.9f, 1f, 0.35f), 6f);
+            Handles.color = new Color(0.6f, 0.9f, 1f, 0.5f);
+            Handles.Label(new Vector3(level.CometAreaCenter.x, level.CometAreaCenter.y + level.CometAreaRadius + 40f, 0f),
+                "зона комет · r=" + level.CometAreaRadius.ToString("0"));
         }
 
         // зонд: Ctrl — стрелка суммарного притяжения под курсором
@@ -137,12 +149,17 @@ namespace SpaceTaxi.Tools
             bool star = body.Type == BodyType.Star;
             bool hole = body.Type == BodyType.BlackHole;
 
+            // игровой радиус облика (CelestialBody.Init): планета — Radius ×
+            // VisualSizeMul/PlanetSizeMul, звёзды/дыры — сырой Radius. Превью
+            // мельче фактической планеты = «по превью влетишь, а в игре промах»
+            float gameRadius = LevelEditorWindow.GameRadiusOf(body);
+
             // превью: спрайт и цвет из данных уровня
             var visuals = body.Visuals;
             if (visuals != null && visuals.Sprite != null && Event.current.type == EventType.Repaint)
             {
                 Vector2 guiCenter = HandleUtility.WorldToGUIPoint(center);
-                Vector2 guiEdge = HandleUtility.WorldToGUIPoint(center + Vector3.right * body.Radius);
+                Vector2 guiEdge = HandleUtility.WorldToGUIPoint(center + Vector3.right * gameRadius);
                 float guiRadius = Vector2.Distance(guiCenter, guiEdge);
                 Color tint = visuals.UseColor ? visuals.Color : Color.white;
                 Rect rect = new Rect(guiCenter.x - guiRadius, guiCenter.y - guiRadius, guiRadius * 2f, guiRadius * 2f);
@@ -159,12 +176,12 @@ namespace SpaceTaxi.Tools
             // заливка + контур + имя
             Handles.color = hole ? HoleFill : star ? StarFill : PlanetFill;
             if (visuals == null || visuals.Sprite == null)
-                Handles.DrawSolidDisc(center, Vector3.forward, body.Radius);
+                Handles.DrawSolidDisc(center, Vector3.forward, gameRadius);
             Handles.color = selected ? Color.white
                 : hole ? new Color(0.7f, 0.5f, 1f)
                 : star ? new Color(1f, 0.8f, 0.3f) : new Color(0.6f, 0.8f, 1f);
-            Handles.DrawWireDisc(center, Vector3.forward, body.Radius);
-            Handles.Label(center + Vector3.up * (body.Radius + 12f), body.DisplayName + " · " + body.Sector);
+            Handles.DrawWireDisc(center, Vector3.forward, gameRadius);
+            Handles.Label(center + Vector3.up * (gameRadius + 12f), body.DisplayName + " · " + body.Sector);
             if (body.Type == BodyType.Planet && (body.HasFuel || body.HasRepair))
             {
                 // подпись услуг: хаб / заправка / мастерская / их комбинация
@@ -172,11 +189,12 @@ namespace SpaceTaxi.Tools
                     : body.HasFuel && body.HasRepair ? "станция"
                     : body.HasFuel ? "заправка" : "мастерская";
                 Handles.color = new Color(1f, 0.84f, 0.3f);
-                Handles.Label(center + Vector3.up * (body.Radius + 34f), services,
+                Handles.Label(center + Vector3.up * (gameRadius + 34f), services,
                     new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = new Color(1f, 0.84f, 0.3f) } });
             }
 
-            // кольца: override из данных или формула
+            // кольца: override из данных или формула от ИГРОВОГО радиуса —
+            // в игре кольца считают от Radius построенного тела
             var config = FindConfig();
             float landingOffset = config != null ? config.LandingRingOffset : 90f;
             float captureK = config != null ? config.CaptureRingK : 3.3f;
@@ -185,17 +203,17 @@ namespace SpaceTaxi.Tools
             // посадочное кольцо — зелёный пунктир (только планеты)
             if (body.Type == BodyType.Planet)
             {
-                float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : body.Radius + landingOffset;
+                float landing = body.LandingRingRadius > 0f ? body.LandingRingRadius : gameRadius + landingOffset;
                 DottedCircle(center, landing, LandingRing, 4f);
             }
 
             // кольцо качели — мельче
-            float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : body.Radius * captureK + captureBase;
+            float capture = body.CaptureRingRadius > 0f ? body.CaptureRingRadius : gameRadius * captureK + captureBase;
             DottedCircle(center, capture, CaptureRing, 2f);
 
             // зона сжатия дыры — r × 6
             if (hole)
-                DottedCircle(center, body.Radius * BlackHole.EffectRadiusMultiplier, HoleEffectColor, 2f);
+                DottedCircle(center, gameRadius * BlackHole.EffectRadiusMultiplier, HoleEffectColor, 2f);
 
             // жаровая зона — пунктир + слабая заливка
             if (star && body.HeatRadius > 0f)
@@ -230,18 +248,28 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // спавн: маркер + стрелка курса
+        // спавн: маркер + стрелка курса (Landed — на планете, Free — точка уровня)
         private static void DrawSpawn(LevelAsset level)
         {
-            if (level.StartPlanetIndex < 0 || level.StartPlanetIndex >= level.Bodies.Count)
-                return;
-            var start = level.Bodies[level.StartPlanetIndex];
-            float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
-            Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-            // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init)
-            Vector2 pos = start.Position
-                + dir * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
+            Vector2 pos;
+            float heading;
+            if (level.SpawnMode == SpawnMode.Free)
+            {
+                // свободную точку читает CometSystem.SpawnGuardPoint (задания комет)
+                pos = level.SpawnPoint;
+                heading = level.SpawnHeading;
+            }
+            else
+            {
+                if (level.StartPlanetIndex < 0 || level.StartPlanetIndex >= level.Bodies.Count)
+                    return;
+                var start = level.Bodies[level.StartPlanetIndex];
+                heading = level.SpawnAngleDeg;
+                // как в игре: радиус облика по GameRadiusOf (CelestialBody.Init)
+                pos = start.Position + AngleDir(heading) * (LevelEditorWindow.GameRadiusOf(start) + 7f);
+            }
 
+            Vector2 dir = AngleDir(heading);
             Handles.color = SpawnColor;
             Vector3 p = pos;
             Vector3 side = new Vector3(-dir.y, dir.x) * 8f;
@@ -251,7 +279,13 @@ namespace SpaceTaxi.Tools
             Handles.DrawLine(p, a);
             Handles.DrawLine(a, a - (Vector3)dir * 12f - side * 0.7f);
             Handles.DrawLine(a, a - (Vector3)dir * 12f + side * 0.7f);
-            Handles.Label(a + (Vector3)dir * 10f, "спавн " + level.SpawnAngleDeg.ToString("0") + "°");
+            Handles.Label(a + (Vector3)dir * 10f, "спавн " + heading.ToString("0") + "°");
+        }
+
+        private static Vector2 AngleDir(float degrees)
+        {
+            float rad = degrees * Mathf.Deg2Rad;
+            return new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
         }
 
         // рамка «что видит игрок» вокруг спавна
@@ -359,7 +393,9 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        // та же формула гравитации, что в игре (пояс не источник гравитации — как в рантайме)
+        // та же формула гравитации, что в игре (пояс не источник гравитации — как в рантайме):
+        // параметр — от игрового радиуса облика, у дыры слабый след FieldGravityScale
+        // (PhysicsConfig.GravParamOf; её настоящее притяжение — воронка BlackHole)
         private static Vector2 GravityAt(LevelAsset level, Vector2 pos, float k, float clamp)
         {
             Vector2 accel = Vector2.zero;
@@ -372,7 +408,8 @@ namespace SpaceTaxi.Tools
                 if (d2 < 0.0001f)
                     continue;
                 float d = Mathf.Sqrt(d2);
-                float a = Mathf.Min(k * body.Radius * body.MassMultiplier / d2, clamp);
+                float fieldScale = body.Type == BodyType.BlackHole ? BlackHole.FieldGravityScale : 1f;
+                float a = Mathf.Min(k * LevelEditorWindow.GameRadiusOf(body) * body.MassMultiplier * fieldScale / d2, clamp);
                 accel += delta / d * a;
             }
             return accel;
@@ -402,11 +439,9 @@ namespace SpaceTaxi.Tools
             if (level.StartPlanetIndex < 0 || level.StartPlanetIndex >= level.Bodies.Count)
                 return;
             var start = level.Bodies[level.StartPlanetIndex];
-            float rad = level.SpawnAngleDeg * Mathf.Deg2Rad;
-            Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-            // как в игре: радиус облика с множителем PlanetSizeMul (CelestialBody.Init)
-            Vector2 pos = start.Position
-                + dir * (start.Radius * Core.WorldSprites.PlanetSizeMul(start.DisplayName) + 7f);
+            Vector2 dir = AngleDir(level.SpawnAngleDeg);
+            // как в игре: радиус облика по GameRadiusOf (CelestialBody.Init)
+            Vector2 pos = start.Position + dir * (LevelEditorWindow.GameRadiusOf(start) + 7f);
             Vector2 vel = dir * takeoffV;
 
             const float h = 1f / 60f;
@@ -422,7 +457,7 @@ namespace SpaceTaxi.Tools
                 {
                     if (body.Type == BodyType.AsteroidBelt)
                         continue; // пояс — не сплошной диск, прогноз через него свободен
-                    if (Vector2.Distance(body.Position, pos) < body.Radius + 7f)
+                    if (Vector2.Distance(body.Position, pos) < LevelEditorWindow.GameRadiusOf(body) + 7f)
                         return; // врезались — конец прогноза
                 }
 
