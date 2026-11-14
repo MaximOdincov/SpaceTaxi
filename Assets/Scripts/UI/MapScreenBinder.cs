@@ -940,7 +940,10 @@ namespace SpaceTaxi.UI
                     float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
                     float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.5f) * scale;
                     Vector2 p = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
-                    float size = 9f + (float)rng.NextDouble() * 9f;
+                    // ХОТФИКС владельца: камни пояса с настоящим разбросом габаритов —
+                    // степенное распределение (мало крупных, много мелких); прежде
+                    // 9-18px читались «одного размера»
+                    float size = 6f + Mathf.Pow((float)rng.NextDouble(), 2.2f) * 22f;
                     // M8.1: камни — родной цвет арта (отмывка снята по вкусу владельца)
                     RectTransform stone = MakeImage("Rock_" + i, beltsRoot, rock,
                         Color.white, Vector2.one * size, false);

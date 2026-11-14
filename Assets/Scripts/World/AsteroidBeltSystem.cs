@@ -11,11 +11,12 @@ namespace SpaceTaxi.World
     // В GravityField не регистрируется (без гравитации), урон — на принимающей стороне.
     public class AsteroidBeltSystem : MonoBehaviour
     {
-        // числа §3.8 — не менять
+        // числа §3.8 — не менять (кроме радиусной вилки: расширена владельцем
+        // 2026-11-14 «масштаб должен сохраняться», было 4-10)
         private const int MinAsteroids = 24;
         private const int MaxAsteroids = 40;
-        private const float MinAsteroidRadius = 4f;
-        private const float MaxAsteroidRadius = 10f;
+        private const float MinAsteroidRadius = 3f;
+        private const float MaxAsteroidRadius = 13f;
 
         private const float ToastZoneMargin = 20f;  // предупреждение на подлёте к поясу
         private const float ToastResetMargin = 50f; // флаг сбрасывается дальше зоны (повторный вход = новый тост)

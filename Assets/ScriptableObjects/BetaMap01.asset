@@ -42,7 +42,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 869, y: 233}
     Radius: 20
-    VisualSizeMul: 3.4
+    VisualSizeMul: 3.55
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -65,7 +65,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 233, y: 869}
     Radius: 18
-    VisualSizeMul: 3.8889
+    VisualSizeMul: 4.3889
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -88,7 +88,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -636, y: 636}
     Radius: 22
-    VisualSizeMul: 3.4545
+    VisualSizeMul: 4.0455
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -111,7 +111,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -869, y: -233}
     Radius: 24
-    VisualSizeMul: 2.9167
+    VisualSizeMul: 3.2917
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -134,7 +134,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -233, y: -869}
     Radius: 16
-    VisualSizeMul: 4.25
+    VisualSizeMul: 4.625
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -157,7 +157,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 636, y: -636}
     Radius: 20
-    VisualSizeMul: 3.4
+    VisualSizeMul: 3.55
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -203,7 +203,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 2050, y: 0}
     Radius: 28
-    VisualSizeMul: 2.7143
+    VisualSizeMul: 3.1071
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -226,7 +226,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 1025, y: 1775}
     Radius: 32
-    VisualSizeMul: 2.8125
+    VisualSizeMul: 3.59375
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -249,7 +249,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1025, y: 1775}
     Radius: 24
-    VisualSizeMul: 3
+    VisualSizeMul: 3.9167
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -272,7 +272,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -2050, y: 0}
     Radius: 30
-    VisualSizeMul: 2.6
+    VisualSizeMul: 3.6667
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -295,7 +295,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1025, y: -1775}
     Radius: 22
-    VisualSizeMul: 3.1818
+    VisualSizeMul: 3.4091
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -318,7 +318,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 1025, y: -1775}
     Radius: 26
-    VisualSizeMul: 2.8462
+    VisualSizeMul: 3.1923
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -364,7 +364,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 1905, y: 1100}
     Radius: 16
-    VisualSizeMul: 4.25
+    VisualSizeMul: 4.625
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -387,7 +387,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 0, y: 2200}
     Radius: 26
-    VisualSizeMul: 2.8462
+    VisualSizeMul: 3.1923
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -410,7 +410,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1905, y: 1100}
     Radius: 30
-    VisualSizeMul: 2.8667
+    VisualSizeMul: 3.6667
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -433,7 +433,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1905, y: -1100}
     Radius: 24
-    VisualSizeMul: 3.25
+    VisualSizeMul: 3.9167
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -456,7 +456,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 0, y: -2200}
     Radius: 34
-    VisualSizeMul: 2.4706
+    VisualSizeMul: 2.8824
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -479,7 +479,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 1905, y: -1100}
     Radius: 26
-    VisualSizeMul: 2.6154
+    VisualSizeMul: 2.5385
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -525,7 +525,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 2670, y: 1940}
     Radius: 18
-    VisualSizeMul: 3.8889
+    VisualSizeMul: 4.3889
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -548,7 +548,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1020, y: 3138}
     Radius: 32
-    VisualSizeMul: 2.75
+    VisualSizeMul: 3.59375
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -571,7 +571,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -3300, y: 0}
     Radius: 38
-    VisualSizeMul: 2
+    VisualSizeMul: 2.1579
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -594,7 +594,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: -1020, y: -3138}
     Radius: 28
-    VisualSizeMul: 2.9286
+    VisualSizeMul: 3.75
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
@@ -617,7 +617,7 @@ MonoBehaviour:
     Type: 0
     Position: {x: 2670, y: -1940}
     Radius: 24
-    VisualSizeMul: 3.1667
+    VisualSizeMul: 3.9167
     MassMultiplier: 1
     HeatRadius: 0
     Visuals:
