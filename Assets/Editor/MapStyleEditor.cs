@@ -10,6 +10,14 @@ namespace SpaceTaxi.Tools
     // кликом по карте (режим размещения) и живут в ассете стиля. Расположение
     // планет НЕ редактируется — оно в LevelAsset (Level Editor), зафиксировано.
     // Открытие: Space Taxi → Map Style Editor.
+    //
+    // ХОТФИКС владельца («нереально лагает, скролл откидывает»): RebuildAll больше
+    // НЕ зовётся из OnGUI (пересоздание объектов сцены посреди GUI-layout сбрасывало
+    // скролл, а драг ползунка перестраивал карту на каждый кадр). Применение —
+    // отложенный флаг, обрабатываемый в EditorApplication.update не чаще 3 раз/с;
+    // дифф кэшируется (пересчёт только по правке), эталон дефолтов — один
+    // статический инстанс; референсы биндера — по таймеру; всё содержимое окна
+    // обёрнуто в Scroll.
     public sealed class MapStyleEditor : EditorWindow
     {
         private MapStyleConfig style;
@@ -17,15 +25,52 @@ namespace SpaceTaxi.Tools
         private bool autoApply = true;
         private readonly List<bool> folds = new List<bool>();
 
+        private Vector2 mainScroll;
+        private Vector2 diffScroll;
+
+        // применение правок — вне GUI-прохода
+        private bool pendingApply;
+        private double pendingSince;
+        private const double ApplyDebounceSeconds = 0.30; // драг ползунка → ≤ ~3 пересборок/с
+
+        // кэш: эталон дефолтов, дифф, референсы
+        private static MapStyleConfig defaults;
+        private readonly List<string> diffCache = new List<string>();
+        private bool diffValid;
+        private double nextResolveTime;
+
         [MenuItem("Space Taxi/Map Style Editor")]
         private static void Open()
         {
-            GetWindow<MapStyleEditor>("Map Style").minSize = new Vector2(420f, 520f);
+            GetWindow<MapStyleEditor>("Map Style").minSize = new Vector2(430f, 540f);
         }
 
         private void OnEnable()
         {
+            EditorApplication.update += OnUpdate;
             ResolveRefs();
+            InvalidateDiff();
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.update -= OnUpdate;
+        }
+
+        // вне GUI-прохода: отложенное применение правок + переодический ре-резолв
+        private void OnUpdate()
+        {
+            if (pendingApply && EditorApplication.timeSinceStartup - pendingSince >= ApplyDebounceSeconds)
+            {
+                pendingApply = false;
+                ApplyToMap();
+            }
+            if (EditorApplication.timeSinceStartup > nextResolveTime)
+            {
+                nextResolveTime = EditorApplication.timeSinceStartup + 2.0;
+                ResolveRefs();
+                Repaint();
+            }
         }
 
         private void ResolveRefs()
@@ -36,6 +81,7 @@ namespace SpaceTaxi.Tools
                 string[] guids = AssetDatabase.FindAssets("t:MapStyleConfig");
                 if (guids.Length > 0)
                     style = AssetDatabase.LoadAssetAtPath<MapStyleConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                InvalidateDiff();
             }
             if (style == null && binder != null)
             {
@@ -45,103 +91,52 @@ namespace SpaceTaxi.Tools
             }
         }
 
-        private void OnGUI()
+        private static MapStyleConfig Defaults
         {
-            ResolveRefs();
-            DrawHeader();
-            if (style == null)
+            get
             {
-                EditorGUILayout.HelpBox("Стиль не найден — создай ассет кнопкой выше. " +
-                    "Он ляжет в Assets/Resources/MapStyle_Default.asset и подхватится картой автоматически.", MessageType.Warning);
-                return;
+                if (defaults == null)
+                    defaults = CreateInstance<MapStyleConfig>();
+                return defaults;
             }
-            DrawDiffSection();
-
-            var so = new SerializedObject(style);
-            EditorGUI.BeginChangeCheck();
-            DrawStyle(so);
-            bool changed = EditorGUI.EndChangeCheck();
-            if (changed)
-            {
-                so.ApplyModifiedProperties();
-                if (autoApply)
-                    ApplyToMap();
-            }
-
-            EditorGUILayout.Space(6f);
-            DrawAnnotations(so);
-            if (EditorGUI.EndChangeCheck())
-            {
-                so.ApplyModifiedProperties();
-                if (autoApply)
-                    ApplyToMap();
-            }
-
-            EditorGUILayout.Space(8f);
-            DrawPlacementBar();
-            EditorGUILayout.HelpBox(
-                "Как пользоваться:\n" +
-                "• Ручки выше меняются кнопкой «Перерисовать карту» (или авто-применением) — карта должна быть открыта (M в пле).\n" +
-                "• «Клик: …» включает режим размещения — левый клик по бумаге ставит аннотацию в точку мира, правый отменяет. Текст/цвет/размер правятся в списке выше.\n" +
-                "• Окно видимости minZoom/maxZoom: 0 = без границы. Контур — в юнитах мира (растёт с зумом), надпись может быть экранного размера (галочка).\n" +
-                "• Аннотации сохраняются в ассет стиля и переживают выход из плея.\n" +
-                "• Расположение планет здесь не меняется — только Level Editor.", MessageType.Info);
         }
 
-        private void DrawHeader()
+        private void InvalidateDiff()
         {
-            EditorGUILayout.LabelField("Стиль карты (MapStyleConfig)", EditorStyles.boldLabel);
-            // статус превью: правки видны сразу только при открытой карте
-            string status = binder == null
-                ? "GameScene не открыта — открой сцену и пле, затем карту (M)"
-                : binder.IsBuilt
-                    ? "КАРТА ОТКРЫТА — правки видны на ней сразу"
-                    : "Карта закрыта — правки применятся при следующем открытии (M в пле)";
-            EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
-            EditorGUILayout.BeginHorizontal();
-            style = (MapStyleConfig)EditorGUILayout.ObjectField("Ассет", style, typeof(MapStyleConfig), false);
-            if (GUILayout.Button("Создать", GUILayout.Width(70f)))
-                CreateAsset();
-            if (GUILayout.Button("В карту сцены", GUILayout.Width(100f)))
-                AssignToBinder();
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-            autoApply = EditorGUILayout.ToggleLeft("Авто-применение", autoApply);
-            if (GUILayout.Button("Перерисовать карту", GUILayout.Width(140f)))
-                ApplyToMap();
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space(4f);
+            diffValid = false;
         }
 
         // «что я наменял»: сравнение с заводскими дефолтами (аннотации не сравниваются —
-        // это контент владельца, не стиль)
+        // это контент владельца, не стиль). Кэшируется — пересчёт только по правке.
         private void DrawDiffSection()
         {
-            var defs = CreateInstance<MapStyleConfig>();
-            var changes = new List<string>();
-            foreach (var f in typeof(MapStyleConfig).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            if (!diffValid)
             {
-                if (f.Name == "annotations")
-                    continue;
-                object cur = f.GetValue(style);
-                object def = f.GetValue(defs);
-                bool same = cur == null ? def == null : cur.Equals(def);
-                if (!same)
-                    changes.Add($"{Label(f.Name)}: {Fmt(def)} → {Fmt(cur)}");
+                diffCache.Clear();
+                MapStyleConfig defs = Defaults;
+                foreach (var f in typeof(MapStyleConfig).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    if (f.Name == "annotations")
+                        continue;
+                    object cur = f.GetValue(style);
+                    object def = f.GetValue(defs);
+                    bool same = cur == null ? def == null : cur.Equals(def);
+                    if (!same)
+                        diffCache.Add($"{Label(f.Name)}: {Fmt(def)} → {Fmt(cur)}");
+                }
+                diffValid = true;
             }
-            DestroyImmediate(defs);
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField($"Что изменено против заводского стиля: {changes.Count}", EditorStyles.boldLabel);
-            if (changes.Count == 0)
+            EditorGUILayout.LabelField($"Что изменено против заводского стиля: {diffCache.Count}", EditorStyles.boldLabel);
+            if (diffCache.Count == 0)
             {
                 EditorGUILayout.LabelField("пока ничего — все ручки на дефолтах.", EditorStyles.miniLabel);
             }
             else
             {
-                _diffScroll = EditorGUILayout.BeginScrollView(_diffScroll, GUILayout.MaxHeight(84f));
-                foreach (string c in changes)
+                diffScroll = EditorGUILayout.BeginScrollView(diffScroll, GUILayout.MaxHeight(84f));
+                foreach (string c in diffCache)
                     EditorGUILayout.LabelField("• " + c, EditorStyles.miniLabel);
                 EditorGUILayout.EndScrollView();
                 if (GUILayout.Button("Сбросить ручки на заводские (аннотации останутся)"))
@@ -156,9 +151,8 @@ namespace SpaceTaxi.Tools
         // m_Script не копируются)
         private void ResetStyleKnobs()
         {
-            var defs = CreateInstance<MapStyleConfig>();
             var so = new SerializedObject(style);
-            var dso = new SerializedObject(defs);
+            var dso = new SerializedObject(Defaults);
             var it = dso.GetIterator();
             while (it.NextVisible(true))
             {
@@ -167,13 +161,11 @@ namespace SpaceTaxi.Tools
                 so.CopyFromSerializedProperty(it); // копирует в свойство с тем же именем
             }
             so.ApplyModifiedProperties();
-            DestroyImmediate(defs);
             AssetDatabase.SaveAssetIfDirty(style);
-            ApplyToMap();
+            InvalidateDiff();
+            RequestApply(immediate: true);
             Repaint();
         }
-
-        private static Vector2 _diffScroll;
 
         private static string Label(string field)
         {
@@ -224,6 +216,76 @@ namespace SpaceTaxi.Tools
             if (value is float f)
                 return f.ToString("0.##");
             return value.ToString();
+        }
+
+        private void OnGUI()
+        {
+            mainScroll = EditorGUILayout.BeginScrollView(mainScroll);
+
+            DrawHeader();
+            if (style == null)
+            {
+                EditorGUILayout.HelpBox("Стиль не найден — создай ассет кнопкой выше. " +
+                    "Он ляжет в Assets/Resources/MapStyle_Default.asset и подхватится картой автоматически.", MessageType.Warning);
+                EditorGUILayout.EndScrollView();
+                return;
+            }
+            DrawDiffSection();
+
+            var so = new SerializedObject(style);
+            EditorGUI.BeginChangeCheck();
+            DrawStyle(so);
+            bool styleChanged = EditorGUI.EndChangeCheck();
+
+            EditorGUILayout.Space(6f);
+            EditorGUI.BeginChangeCheck();
+            DrawAnnotations(so);
+            bool annotationsChanged = EditorGUI.EndChangeCheck();
+
+            if (styleChanged || annotationsChanged)
+            {
+                so.ApplyModifiedProperties();
+                InvalidateDiff();
+                RequestApply(immediate: false); // драг ползунка → применение с дебаунсом, вне GUI
+            }
+
+            EditorGUILayout.Space(8f);
+            DrawPlacementBar();
+            EditorGUILayout.HelpBox(
+                "Как пользоваться:\n" +
+                "• Открой пле и карту (M) — правки применяются на живую карту с задержкой ~0.3с (чтобы не лагало на драге).\n" +
+                "• «Клик: …» включает режим размещения — левый клик по бумаге ставит аннотацию в точку мира, правый отменяет. Текст/цвет/размер правятся в списке выше.\n" +
+                "• Окно видимости minZoom/maxZoom: 0 = без границы. Контур — в юнитах мира (растёт с зумом), надпись может быть экранного размера (галочка).\n" +
+                "• Аннотации сохраняются в ассет стиля и переживают выход из плея.\n" +
+                "• Расположение планет здесь не меняется — только Level Editor.", MessageType.Info);
+
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawHeader()
+        {
+            EditorGUILayout.LabelField("Стиль карты (MapStyleConfig)", EditorStyles.boldLabel);
+            // статус превью: правки видны сразу только при открытой карте
+            string status = binder == null
+                ? "GameScene не открыта — открой сцену и пле, затем карту (M)"
+                : binder.IsBuilt
+                    ? "КАРТА ОТКРЫТА — правки видны на ней сразу"
+                    : "Карта закрыта — правки применятся при следующем открытии (M в пле)";
+            EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
+            EditorGUILayout.BeginHorizontal();
+            style = (MapStyleConfig)EditorGUILayout.ObjectField("Ассет", style, typeof(MapStyleConfig), false);
+            if (GUILayout.Button("Создать", GUILayout.Width(70f)))
+                CreateAsset();
+            if (GUILayout.Button("В карту сцены", GUILayout.Width(100f)))
+                AssignToBinder();
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            autoApply = EditorGUILayout.ToggleLeft("Авто-применение", autoApply);
+            if (GUILayout.Button("Перерисовать карту", GUILayout.Width(140f)))
+                RequestApply(immediate: true);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(4f);
         }
 
         private void DrawStyle(SerializedObject so)
@@ -312,6 +374,9 @@ namespace SpaceTaxi.Tools
                 {
                     list.DeleteArrayElementAtIndex(i);
                     folds.RemoveAt(i);
+                    so.ApplyModifiedProperties();
+                    InvalidateDiff();
+                    RequestApply(immediate: true);
                     GUIUtility.ExitGUI();
                 }
                 if (GUILayout.Button("К центру вида", GUILayout.Width(110f)))
@@ -343,7 +408,8 @@ namespace SpaceTaxi.Tools
             el.FindPropertyRelative("worldPosition").vector2Value = Vector2.zero;
             folds.Add(true);
             so.ApplyModifiedProperties();
-            ApplyToMap();
+            InvalidateDiff();
+            RequestApply(immediate: true);
         }
 
         private void DrawPlacementBar()
@@ -370,6 +436,24 @@ namespace SpaceTaxi.Tools
             MapScreenBinder.AnnotationPlacementMode = true;
             MapScreenBinder.PlacementKind = kind;
             Repaint();
+        }
+
+        // применение правок ВСЕГДА отложено в EditorApplication.update (не в OnGUI!):
+        // пересоздание объектов сцены посреди GUI-layout сбрасывало скролл окна,
+        // а драг ползунка перестраивал карту на каждый кадр
+        private void RequestApply(bool immediate)
+        {
+            if (immediate)
+            {
+                pendingApply = false;
+                ApplyToMap();
+                return;
+            }
+            if (!pendingApply)
+            {
+                pendingApply = true;
+                pendingSince = EditorApplication.timeSinceStartup;
+            }
         }
 
         private void ApplyToMap()
@@ -405,7 +489,7 @@ namespace SpaceTaxi.Tools
             so.FindProperty("style").objectReferenceValue = style;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(binder);
-            ApplyToMap();
+            RequestApply(immediate: true);
         }
 
         private static string KindName(AnnotationKind kind)

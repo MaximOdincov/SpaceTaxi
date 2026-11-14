@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d78d6e2dff9b53428e0fedc7cd3bc8f, type: 3}
   m_Name: MapStyle_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapStyleConfig
-  fontOverride: {fileID: 0}
+  fontOverride: {fileID: 11400000, guid: c84a4d74a0caeec47b9a6352452a67bb, type: 2}
   labelFontSize: 18
   labelColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
   districtFontSize: 38
