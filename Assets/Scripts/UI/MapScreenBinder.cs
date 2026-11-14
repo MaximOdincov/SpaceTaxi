@@ -758,7 +758,16 @@ namespace SpaceTaxi.UI
 
             foreach (var pair in groups)
             {
+                if (pair.Key == Sector.Hub)
+                    continue; // у хаба есть собственная подпись тела — район «ХАБ» дублировал её
+
+                // кольцевой тест — только по ПЛАНЕТАМ сектора: звёзды периферии
+                // входят в сектора (Утренняя/S1 … Горн/S4), их радиус 3950 раздувал
+                // разброс и уводил подписку в bbox-ветку «верх bbox» — все районы
+                // собирались наверху листа (две — за пределами экрана)
+                float rMin = float.MaxValue, rMax = 0f;
                 float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                var planetsOnly = new List<CelestialBodyData>();
                 foreach (CelestialBodyData body in pair.Value)
                 {
                     Vector2 p = body.Position;
@@ -766,21 +775,68 @@ namespace SpaceTaxi.UI
                     maxX = Mathf.Max(maxX, p.x);
                     minY = Mathf.Min(minY, p.y);
                     maxY = Mathf.Max(maxY, p.y);
+                    if (body.Type != BodyType.Planet)
+                        continue;
+                    float r = p.magnitude;
+                    rMin = Mathf.Min(rMin, r);
+                    rMax = Mathf.Max(rMax, r);
+                    planetsOnly.Add(body);
                 }
 
                 // крупная географическая надпись района (M7.5): разрядка + низкая
-                // альфа — «география», а не UI-элемент; пустые зоны листа получают
-                // смысл. Шахматный сдвиг по паритету сектора: концентрические
-                // районы не пересекаются текстами
-                float xShift = ((int)pair.Key % 2 == 0 ? -1f : 1f) * (maxX - minX) * 0.20f;
+                // альфа — «география», а не UI-элемент.
+                // ХОТФИКС владельца: после круглого редизайна M8.4 сектор = КОНЦЕНТРИЧЕСКОЕ
+                // КОЛЬЦО планет — подпись НА кольце (средний радиус планет) под своим
+                // углом (вразлёт по компасу, середина дуги между планетами); позиция
+                // живёт в мировых координатах и обновляется по зуму в SyncSectorFade
+                // (sectorRoot — незум-слой). Географический сектор (разброс радиусов
+                // планет велик) — прежняя логика bbox
                 TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), Style.districtFontSize,
                     WithAlpha(Style.districtColor, 0.35f));
                 RectTransform labelRect = (RectTransform)label.transform;
                 labelRect.sizeDelta = new Vector2(560f, 56f);
-                labelRect.anchoredPosition = WorldToMap(new Vector2((minX + maxX) * 0.5f + xShift, maxY)) + Vector2.up * 34f;
+
+                bool isRing = planetsOnly.Count > 0 && rMax - rMin < 260f;
+                if (isRing)
+                {
+                    // подпись НА кольце — контент-пространство (пан/зум везут её сами)
+                    Vector2 world = new Vector2(Mathf.Cos(SectorLabelAngle((int)pair.Key) * Mathf.Deg2Rad),
+                        Mathf.Sin(SectorLabelAngle((int)pair.Key) * Mathf.Deg2Rad)) * rMean(planetsOnly);
+                    labelRect.anchoredPosition = WorldToMap(world);
+                }
+                else
+                {
+                    float xShift = ((int)pair.Key % 2 == 0 ? -1f : 1f) * (maxX - minX) * 0.20f;
+                    labelRect.anchoredPosition = WorldToMap(new Vector2((minX + maxX) * 0.5f + xShift, maxY)) + Vector2.up * 34f;
+                }
                 labelRect.localRotation = Quaternion.Euler(0f, 0f, (Hash01((int)pair.Key * 7 + 3) - 0.5f) * 3f);
                 label.characterSpacing = 16f;
+                sectorTexts.Add(label); // кегль — константный экранный (контр-скейл в SyncSectorFade)
             }
+        }
+
+        private readonly List<TMP_Text> sectorTexts = new List<TMP_Text>();
+
+        // углы районных подписей на кольцах — вразлёт по компасу (лево/право-верх/низ),
+        // каждый угол — середина дуги между планетами своего кольца
+        private static float SectorLabelAngle(int sector)
+        {
+            switch ((Sector)sector)
+            {
+                case Sector.Near: return 165f;  // лево, чуть выше горизонта
+                case Sector.Mid1: return 75f;   // верх-право
+                case Sector.Mid2: return 255f;  // низ-лево
+                case Sector.Far: return 345f;   // право, чуть ниже горизонта
+                default: return 75f + 90f * (sector % 4); // неизвестный сектор — по кругу
+            }
+        }
+
+        private static float rMean(List<CelestialBodyData> bodies)
+        {
+            float sum = 0f;
+            foreach (CelestialBodyData body in bodies)
+                sum += body.Position.magnitude;
+            return sum / Mathf.Max(1, bodies.Count);
         }
 
         // рамка «от руки»: отрезки с дрожью руки по периметру + кляксы-углы
@@ -1059,17 +1115,14 @@ namespace SpaceTaxi.UI
         private const float LabelSlotGap = 3f;      // зазор края подписи от края иконки, px контента
         private const float LeaderThickness = 1.6f; // толщина чернильной выноски
 
-        // — decluttering по зуму (Н6.HF4.1): тиры видимости подписей —
-        // тир 0 (всегда): хаб, звёзды, чёрная дыра, пояса; тир 1: планеты с
-        // Radius ≥ LabelTier1MinRadius; тир 2: остальные. Пороги — по
-        // contentScale = zoom / MaxViewZoom (нормированный масштаб контента на
-        // экране: 1.0 — максимальное приближение, полный отъезд ≈ 0.16).
-        // При пересечении порога подписи переразмещаются: скрытые подписи
-        // НЕ блокируют слоты видимым (размещение дёшево, правила те же,
-        // результат детерминирован для каждого состояния тира)
-        private const float LabelTier1MinRadius = 22f;      // планеты мельче — тир 2
-        private const float LabelTier1ZoomFraction = 0.20f; // тир 1 виден при contentScale ≥
-        private const float LabelTier2ZoomFraction = 0.32f; // тир 2 виден при contentScale ≥
+        // — decluttering по зуму (Н6.HF4.1) — с ХОТФИКСА владельца («не у всех планет
+        // есть надписи») тиры видимости для тел ВЫКЛЮЧЕНЫ (LabelTierOf всегда 0):
+        // подпись у каждого тела на любом зуме. Пороги contentScale остались
+        // триггерами ПЕРЕРАЗМЕЩЕНИЯ подписей при пересечении (дрейф разложенных) —
+        // contentScale = zoom / MaxViewZoom (1.0 — максимальное приближение,
+        // полный отъезд ≈ 0.16); скрытые подписи не блокируют слоты видимым
+        private const float LabelTier1ZoomFraction = 0.20f; // порог переразмещения
+        private const float LabelTier2ZoomFraction = 0.32f; // порог переразмещения
         private const float LabelFadeSeconds = 0.12f;       // альфа-фейд подписей на смене тира (M7.5)
 
         // M7.5: подписи тел — константного ЭКРАННОГО размера (скайрим-урок, как
@@ -1344,14 +1397,14 @@ namespace SpaceTaxi.UI
                 : IconSizeOf(body) * 0.5f;
         }
 
-        // тир видимости подписи: 0 — хаб/звёзды/чёрная дыра/пояса (всегда),
-        // 1 — планеты покрупнее, 2 — мелкие (decluttering по зуму)
+        // ХОТФИКС владельца («не у всех планет есть надписи»): decluttering тиров
+        // для тел выключен — подпись теперь у КАЖДОГО тела на любом зуме (кегль
+        // константный экранный, солвер разводит с выносками; на полном отъезде
+        // прежде планеты молчали до приближения). Механика переразмещения при
+        // зуме (дрейф разложенных подписей) осталась
         private static int LabelTierOf(CelestialBodyData body)
         {
-            if (body.IsHub || body.Type == BodyType.Star || body.Type == BodyType.BlackHole
-                || body.Type == BodyType.AsteroidBelt)
-                return 0;
-            return body.Radius >= LabelTier1MinRadius ? 1 : 2;
+            return 0;
         }
 
         // нормированный масштаб контента на экране → максимальный видимый тир:
@@ -2719,6 +2772,13 @@ namespace SpaceTaxi.UI
                 if (sectorRoot.gameObject.activeSelf != active)
                     sectorRoot.gameObject.SetActive(active);
             }
+
+            // районы в контент-пространстве: кегль — константный экранный
+            // (контентный = Style.districtFontSize / zoom), как у подписей тел
+            float districtSize = Style.districtFontSize / Mathf.Max(zoom, 0.001f);
+            foreach (TMP_Text text in sectorTexts)
+                if (text != null && !Mathf.Approximately(text.fontSize, districtSize))
+                    text.fontSize = districtSize;
         }
 
         // кнопки зума: +/− к центру листа, «сброс» — максимальный отъезд
@@ -2796,6 +2856,7 @@ namespace SpaceTaxi.UI
             content = null;
             sectorRoot = null;
             sectorFade = null;
+            sectorTexts.Clear();
             edgeFogRoot = null;
             edgeRoot = null;
             beltsRoot = null;
