@@ -931,7 +931,10 @@ namespace SpaceTaxi.UI
             // пролетаешь мимо»). Относительная нормировка maxBodyRadius убрана:
             // отношение «px карты / радиус мира» одно для всех тел.
             float d = Mathf.Max(MinIconPx, GameRadiusOf(body) * 2f * scale);
-            Sprite art = GameSpriteOf(body);
+            // ХОТФИКС владельца (день после Н8): на карте — КАРТОГРАФИЧЕСКИЕ спрайты
+            // Art/map (услуги читаются с иконки), не игровые арты планет; честный
+            // размер (d) остаётся прежним — меняется только текстура
+            Sprite art = MapSpriteOf(body);
             // вписываем КОНТЕНТ арта (альфа-границы, в мировых юнитах спрайта),
             // как вписывает тело CelestialBody.Init — видимый шар карты = шар игры
             Vector2 spr = art != null ? art.bounds.size : Vector2.one;
@@ -965,17 +968,23 @@ namespace SpaceTaxi.UI
             return body.Radius * mul;
         }
 
-        // спрайт — как тело выглядит В ИГРЕ (K10-подход: у хаба уже так);
-        // тела нет или спрайта нет — картографическая генерация (map_planet/…)
-        private Sprite GameSpriteOf(CelestialBodyData body)
+        // спрайт иконки тела на карте — КАРТОГРАФИЧЕСКИЙ (Art/map: map_planet/
+        // map_taxi_planet/map_gas_station/map_repair/map_sun/map_black_hole;
+        // услуги читаются с иконки). Хотфикс владельца после Н8: прежде здесь был
+        // игровой спрайт планеты. Картографии нет (арт удалён/не найден) —
+        // прежний источник, игровой спрайт построенного тела
+        private Sprite MapSpriteOf(CelestialBodyData body)
         {
+            Sprite map = BodySprite(body);
+            if (map != null)
+                return map;
             if (gameBodies.TryGetValue(body.DisplayName, out CelestialBody gameBody) && gameBody != null)
             {
                 SpriteRenderer renderer = gameBody.GetComponent<SpriteRenderer>();
                 if (renderer != null && renderer.sprite != null)
                     return renderer.sprite;
             }
-            return BodySprite(body);
+            return null;
         }
 
         private static void CollectRects(RectTransform root, List<Rect> into)
@@ -1020,7 +1029,9 @@ namespace SpaceTaxi.UI
         // на приближении имена разрастаются (16px × zoom9 = 144px — «куча мала»).
         // Солвер не тронут: работает с тем же кеглем через GetPreferredValues;
         // при дрейфе зума подписи переразмещаются (SyncLabelVisibility)
-        private const float LabelScreenFontSize = 15f;
+        // ХОТФИКС владельца (день после Н8): 15px мелковато — искать планету по
+        // названию тяжело; 18px на любом зуме (константный экранный кегль M7.5)
+        private const float LabelScreenFontSize = 18f;
         private const float LabelRezoomGrow = 1.20f;  // зум вырос на 20% — переразместить (кегль вырос)
         private const float LabelRezoomShrink = 0.55f; // зум упал сильнее — переразместить (кегль отстал)
 
@@ -1485,12 +1496,18 @@ namespace SpaceTaxi.UI
             waypointRoot.anchoredPosition = WorldToMap(Waypoint.Position);
             waypointRoot.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранный px постоянны
 
-            // пульс как у жёлтой цели (в противофазе широкое кольцо)
+            // ХОТФИКС владельца: кольца метки должны «зафиксироваться» — прежде
+            // альфы пульсовали В ПРОТИВОФАЗЕ (гасло 64px разгоралось, когда
+            // широкое 90px гасло, и наоборот) — зелёное пятно дышало видимым
+            // размером 64↔90px. Теперь оба кольца пульсируют альфой В ФАЗЕ
+            // (широкое всегда тусклее в постоянной пропорции) — пятно не меняет
+            // видимый диаметр; экранный размер колец постоянен (counter-scale)
             float t = Time.unscaledTime;
+            float pulse = 0.72f + 0.22f * Mathf.Sin(t * 3.4f);
             if (waypointHaloImage != null)
-                waypointHaloImage.color = WithAlpha(WaypointMarkColor, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
+                waypointHaloImage.color = WithAlpha(WaypointMarkColor, pulse);
             if (waypointWideImage != null)
-                waypointWideImage.color = WithAlpha(WaypointMarkColor, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
+                waypointWideImage.color = WithAlpha(WaypointMarkColor, pulse * 0.55f);
             if (waypointPinImage != null)
                 waypointPinImage.color = WithAlpha(WaypointMarkColor, 0.75f + 0.25f * Mathf.Sin(t * 2.8f + 1f));
         }
@@ -2353,16 +2370,14 @@ namespace SpaceTaxi.UI
             legendRoot.sizeDelta = new Vector2(330f, 170f);
 
             int y = 0;
-            // M8.1: значки в родных цветах арта (как на карте), форму различает значок
-            LegendRow(0f, ref y, HonestBodySprite(b => !b.IsHub && b.Type == BodyType.Planet, "map_planet"),
-                Color.white, "планета");
-            LegendRow(0f, ref y, HonestBodySprite(b => b.IsHub, "map_taxi_planet"), Color.white, "хаб МТО");
-            LegendRow(0f, ref y, HonestBodySprite(b => b.Type == BodyType.Star, "map_sun"),
-                Color.white, "звезда");
-            LegendRow(0f, ref y, HonestBodySprite(b => b.Type == BodyType.BlackHole, "map_black_hole"),
-                Color.white, "чёрная дыра");
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_asteroid"),
-                Color.white, "пояс");
+            // ХОТФИКС владельца: значки легенды = те же картографические арты, что
+            // рисуют тела на карте (MapSpriteOf), — легенда больше не показывает
+            // игровые спрайты планет
+            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_planet"), Color.white, "планета");
+            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_taxi_planet"), Color.white, "хаб МТО");
+            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_sun"), Color.white, "звезда");
+            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_black_hole"), Color.white, "чёрная дыра");
+            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_asteroid"), Color.white, "пояс");
 
             // маркеры: жёлтый — только цель заказа; зелёный — своя метка (M8.8)
             y = 0;
@@ -2372,21 +2387,6 @@ namespace SpaceTaxi.UI
             LegendRow(175f, ref y, PaperMapArt.Pin(), WaypointMarkColor, "своя метка", 18f);
             Sprite rocket = PaperMapArt.MapSprite("map_rocket");
             LegendRow(175f, ref y, rocket, Color.white, "вы здесь", 20f);
-        }
-
-        // честный значок легенды: реальный спрайт построенного тела (как на карте),
-        // тела ещё нет или спрайта нет — типовой картографический арт
-        private Sprite HonestBodySprite(Func<CelestialBodyData, bool> match, string fallbackName)
-        {
-            foreach (CelestialBodyData body in level.Bodies)
-                if (match(body) && gameBodies.TryGetValue(body.DisplayName, out CelestialBody gameBody)
-                    && gameBody != null)
-                {
-                    SpriteRenderer renderer = gameBody.GetComponent<SpriteRenderer>();
-                    if (renderer != null && renderer.sprite != null)
-                        return renderer.sprite;
-                }
-            return PaperMapArt.MapSprite(fallbackName);
         }
 
         private void LegendRow(float x, ref int row, Sprite icon, Color color, string text, float iconSize = 18f)
