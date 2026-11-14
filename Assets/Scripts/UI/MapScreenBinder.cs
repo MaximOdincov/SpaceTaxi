@@ -229,6 +229,9 @@ namespace SpaceTaxi.UI
         private RectTransform mapRect;
         private TMP_FontAsset font;
         private bool built;
+
+        // карта построена и сейчас на экране (Map Style Editor: статус «правки видны сразу»)
+        public bool IsBuilt => built;
         private float builtWidth;
         private Camera canvasCam; // null для Screen Space Overlay — так и нужно утилитам
 

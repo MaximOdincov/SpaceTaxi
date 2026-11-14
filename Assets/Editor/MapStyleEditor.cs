@@ -55,6 +55,7 @@ namespace SpaceTaxi.Tools
                     "Он ляжет в Assets/Resources/MapStyle_Default.asset и подхватится картой автоматически.", MessageType.Warning);
                 return;
             }
+            DrawDiffSection();
 
             var so = new SerializedObject(style);
             EditorGUI.BeginChangeCheck();
@@ -90,6 +91,13 @@ namespace SpaceTaxi.Tools
         private void DrawHeader()
         {
             EditorGUILayout.LabelField("Стиль карты (MapStyleConfig)", EditorStyles.boldLabel);
+            // статус превью: правки видны сразу только при открытой карте
+            string status = binder == null
+                ? "GameScene не открыта — открой сцену и пле, затем карту (M)"
+                : binder.IsBuilt
+                    ? "КАРТА ОТКРЫТА — правки видны на ней сразу"
+                    : "Карта закрыта — правки применятся при следующем открытии (M в пле)";
+            EditorGUILayout.LabelField(status, EditorStyles.miniLabel);
             EditorGUILayout.BeginHorizontal();
             style = (MapStyleConfig)EditorGUILayout.ObjectField("Ассет", style, typeof(MapStyleConfig), false);
             if (GUILayout.Button("Создать", GUILayout.Width(70f)))
@@ -104,6 +112,118 @@ namespace SpaceTaxi.Tools
                 ApplyToMap();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4f);
+        }
+
+        // «что я наменял»: сравнение с заводскими дефолтами (аннотации не сравниваются —
+        // это контент владельца, не стиль)
+        private void DrawDiffSection()
+        {
+            var defs = CreateInstance<MapStyleConfig>();
+            var changes = new List<string>();
+            foreach (var f in typeof(MapStyleConfig).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (f.Name == "annotations")
+                    continue;
+                object cur = f.GetValue(style);
+                object def = f.GetValue(defs);
+                bool same = cur == null ? def == null : cur.Equals(def);
+                if (!same)
+                    changes.Add($"{Label(f.Name)}: {Fmt(def)} → {Fmt(cur)}");
+            }
+            DestroyImmediate(defs);
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField($"Что изменено против заводского стиля: {changes.Count}", EditorStyles.boldLabel);
+            if (changes.Count == 0)
+            {
+                EditorGUILayout.LabelField("пока ничего — все ручки на дефолтах.", EditorStyles.miniLabel);
+            }
+            else
+            {
+                _diffScroll = EditorGUILayout.BeginScrollView(_diffScroll, GUILayout.MaxHeight(84f));
+                foreach (string c in changes)
+                    EditorGUILayout.LabelField("• " + c, EditorStyles.miniLabel);
+                EditorGUILayout.EndScrollView();
+                if (GUILayout.Button("Сбросить ручки на заводские (аннотации останутся)"))
+                    ResetStyleKnobs();
+            }
+            EditorGUILayout.LabelField($"Своих надписей и контуров: {style.annotations.Count} шт.", EditorStyles.miniLabel);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4f);
+        }
+
+        // сброс визуальных ручек к дефолтам через SerializedObject (аннотации и
+        // m_Script не копируются)
+        private void ResetStyleKnobs()
+        {
+            var defs = CreateInstance<MapStyleConfig>();
+            var so = new SerializedObject(style);
+            var dso = new SerializedObject(defs);
+            var it = dso.GetIterator();
+            while (it.NextVisible(true))
+            {
+                if (it.name == "m_Script" || it.name == "annotations")
+                    continue;
+                so.CopyFromSerializedProperty(it); // копирует в свойство с тем же именем
+            }
+            so.ApplyModifiedProperties();
+            DestroyImmediate(defs);
+            AssetDatabase.SaveAssetIfDirty(style);
+            ApplyToMap();
+            Repaint();
+        }
+
+        private static Vector2 _diffScroll;
+
+        private static string Label(string field)
+        {
+            switch (field)
+            {
+                case "fontOverride": return "Шрифт";
+                case "labelFontSize": return "Кегль подписей тел";
+                case "labelColor": return "Цвет подписей тел";
+                case "districtFontSize": return "Кегль районов";
+                case "districtColor": return "Цвет районов";
+                case "districtFadeOutFraction": return "Районы гаснут при";
+                case "targetRingPx": return "Кольцо цели, px";
+                case "targetRingWidePx": return "Широкое кольцо цели, px";
+                case "targetColor": return "Цель — цвет";
+                case "waypointHaloPx": return "Кольцо метки, px";
+                case "waypointWidePx": return "Широкое кольцо метки, px";
+                case "waypointPinPx": return "Булавка, px";
+                case "waypointColor": return "Метка — цвет";
+                case "legendVisible": return "Легенда видна";
+                case "legendSize": return "Размер легенды";
+                case "titleVisible": return "Заголовок виден";
+                case "titleText": return "Заголовок — окончание";
+                case "fogInnerFrac": return "Туман: начало";
+                case "paperWorldMargin": return "Поля бумаги";
+                case "worldUnitsPerTile": return "Плотность зерна";
+                case "maxViewZoom": return "Потолок зума";
+                case "initialViewZoom": return "Начальный зум";
+                case "rulerMinZoomFraction": return "Линейка при";
+                case "zoomButtonScale": return "Кнопки зума ×";
+                default: return field;
+            }
+        }
+
+        private static string Fmt(object value)
+        {
+            if (value == null)
+                return "сцена";
+            if (value is Color c)
+                return "#" + ColorUtility.ToHtmlStringRGB(c) + (c.a < 0.999f ? $" a={c.a:0.00}" : "");
+            if (value is Vector2 v)
+                return $"({v.x:0.#}; {v.y:0.#})";
+            if (value is bool b)
+                return b ? "вкл" : "выкл";
+            if (value is string s)
+                return "«" + s + "»";
+            if (value is Object u)
+                return u.name;
+            if (value is float f)
+                return f.ToString("0.##");
+            return value.ToString();
         }
 
         private void DrawStyle(SerializedObject so)
