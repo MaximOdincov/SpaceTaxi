@@ -78,6 +78,39 @@ namespace SpaceTaxi.UI
         IPointerDownHandler, IPointerClickHandler
     {
         [SerializeField] private TMP_FontAsset mapFont; // Excalifont-Regular SDF — назначен в сцене
+        [SerializeField] private MapStyleConfig style;  // стиль карты (ручки владельца); null → Resources
+
+        // — свои надписи/контуры (Map Style Editor): режим клика по карте —
+        public static bool AnnotationPlacementMode;     // левый клик ставит аннотацию, правый отменяет
+        public static AnnotationKind PlacementKind = AnnotationKind.Label;
+
+        // стиль карты: назначенный в сцене → Resources/MapStyle_Default → временные
+        // дефолты (значения = константы Н8.13 — карта не меняется). Кэшируется;
+        // правится окном Space Taxi → Map Style Editor
+        public MapStyleConfig Style
+        {
+            get
+            {
+                if (style == null)
+                    style = Resources.Load<MapStyleConfig>("MapStyle_Default");
+                if (style == null)
+                {
+                    style = ScriptableObject.CreateInstance<MapStyleConfig>();
+                    style.name = "MapStyle_RuntimeDefaults";
+                }
+                return style;
+            }
+        }
+
+        private RectTransform annotationsRoot;
+        private readonly List<AnnotationNode> annotationNodes = new List<AnnotationNode>();
+
+        // аннотация на карте: рект для окна видимости + режим кегля
+        private struct AnnotationNode
+        {
+            public RectTransform rect;
+            public bool screenFixed;
+        }
 
         // — вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору —
         // Н6.HF1 → M8.3: минимальный зум считается в BuildMap от реального окна
@@ -85,8 +118,10 @@ namespace SpaceTaxi.UI
         // видно ≤ 100% диаметра мира — «полный отъезд = весь мир + поля бумаги»
         // (прежде 0.62 поднимало порог зума ×1.77 и мир не влезал целиком)
         private const float MinZoomWorldFraction = 1.0f; // доля диаметра мира в окне при минимальном зуме
-        private const float MaxViewZoom = 14f;     // от максимального отъезда до одной планеты крупно
-        private const float InitialViewZoom = 9f;  // карта открывается приближенной к игроку
+        // — визуальные ручки теперь в MapStyleConfig (Map Style Editor); свойства
+        // читают стиль — точки вызова сохранены, дефолты = прежние константы —
+        private float MaxViewZoom => Style.maxViewZoom;     // от максимального отъезда до одной планеты крупно
+        private float InitialViewZoom => Style.initialViewZoom; // карта открывается приближенной к игроку
         private const float ZoomDuration = 0.22f;
         private const float WheelStep = 1.2f;
         private const float ButtonZoomStep = 1.35f;
@@ -107,8 +142,8 @@ namespace SpaceTaxi.UI
         private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
         // M8.3: бумага — тайл ОТ МИРА (не от окна): зерно привязано к мировым юнитам
-        private const float PaperWorldMargin = 1.6f;    // радиус бумаги = радиус мира × (поля за туманом)
-        private const float WorldUnitsPerTile = 512f;   // мировых юнитов на один тайл бумаги
+        private float PaperWorldMargin => Style.paperWorldMargin;  // радиус бумаги = радиус мира × (поля за туманом)
+        private float WorldUnitsPerTile => Style.worldUnitsPerTile; // мировых юнитов на один тайл бумаги
         private const int PaperTilePx = 512;            // размер кропа-тайла в пикселях текстуры
         // M7.2: относительная нормировка (RefIconPx/maxBodyRadius) убрана — иконка
         // = честный игровой диаметр 2 × Radius_game × scale; минимум — различимая
@@ -120,13 +155,13 @@ namespace SpaceTaxi.UI
         // M7.1: маркеры цели/метки — константный ЭКРАННЫЙ размер (скайрим-урок):
         // рут в зум-контенте несёт counter-scale 1/zoom (как кометы), дети
         // заданы в экранных px и не растут при приближении
-        private const float TargetRingPx = 64f;
-        private const float TargetRingWidePx = 90f;
+        private float TargetRingPx => Style.targetRingPx;
+        private float TargetRingWidePx => Style.targetRingWidePx;
         // M8.8: своя метка — зелёный аналог жёлтой цели заказа (кольца того же
         // калибра) + булавка
-        private const float WaypointHaloPx = 64f;
-        private const float WaypointWidePx = 90f;
-        private const float WaypointPinPx = 20f;
+        private float WaypointHaloPx => Style.waypointHaloPx;
+        private float WaypointWidePx => Style.waypointWidePx;
+        private float WaypointPinPx => Style.waypointPinPx;
 
         // M8.8: клик-выбор — различение клика от пана (минимальная версия из
         // истории Н5.18-Н6.8) + минимальный радиус попадания в тело
@@ -136,11 +171,11 @@ namespace SpaceTaxi.UI
         // M8.7: жёлтый полупрозрачный ореол/кольцо цели (жёлтый = цель заказа,
         // Н5.28; янтарный Accent отменён владельцем). Тот же тон, что в игре
         // (OrderService.UpdateTargetGlow)
-        private static readonly Color TargetRingColor = new Color(1f, 0.94f, 0.3f);
+        private Color TargetRingColor => Style.targetColor;
 
         // M8.8: своя метка — зелёный (зелёный = метка игрока), единый цвет с
         // червоном радара (MinimapBinder.WaypointColor) и скобкой в мире
-        private static readonly Color WaypointMarkColor = WaypointIndicator.WaypointGreen;
+        private Color WaypointMarkColor => Style.waypointColor;
 
         // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
         // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
@@ -374,6 +409,8 @@ namespace SpaceTaxi.UI
         // Н5.21-3: на карте только Excalifont — все тексты идут через MakeLabel.
         private TMP_FontAsset ResolveFont()
         {
+            if (Style.fontOverride != null)
+                return Style.fontOverride; // Map Style Editor: шрифт карты из стиля
             if (mapFont != null)
                 return mapFont;
             TMP_FontAsset res = Resources.Load<TMP_FontAsset>("Excalifont-Regular SDF");
@@ -446,6 +483,7 @@ namespace SpaceTaxi.UI
             UpdateTargetRing();
             UpdateWaypointVisual();
             UpdateComets();
+            UpdateAnnotations();
             UpdateMapEffects();
         }
 
@@ -671,6 +709,7 @@ namespace SpaceTaxi.UI
             BuildCometZone();
             BuildWorldEdge();
             BuildLegend(); // M7.5: компактный ключ с честными значками — до PlaceAllLabels (блокирует слоты)
+            BuildAnnotations(); // свои надписи/контуры владельца (Map Style Editor) — поверх подписей
             foreach (CelestialBodyData body in level.Bodies)
                 if (body.Type == BodyType.AsteroidBelt)
                     CreateBelt(body);
@@ -691,9 +730,12 @@ namespace SpaceTaxi.UI
             BuildRuler(); // линейка зависит от scale — известен только здесь
             if (titleRoot != null)
             {
+                bool titleOn = Style.titleVisible && !string.IsNullOrEmpty(Style.titleText);
+                if (titleRoot.gameObject.activeSelf != titleOn)
+                    titleRoot.gameObject.SetActive(titleOn);
                 TMP_Text title = titleRoot.GetComponentInChildren<TMP_Text>();
                 if (title != null)
-                    title.text = "система " + level.LevelName + " · маршрутный лист";
+                    title.text = "система " + level.LevelName + " · " + Style.titleText;
             }
         }
 
@@ -728,8 +770,8 @@ namespace SpaceTaxi.UI
                 // смысл. Шахматный сдвиг по паритету сектора: концентрические
                 // районы не пересекаются текстами
                 float xShift = ((int)pair.Key % 2 == 0 ? -1f : 1f) * (maxX - minX) * 0.20f;
-                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), 38f,
-                    WithAlpha(PaperMapArt.Ink, 0.35f));
+                TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), Style.districtFontSize,
+                    WithAlpha(Style.districtColor, 0.35f));
                 RectTransform labelRect = (RectTransform)label.transform;
                 labelRect.sizeDelta = new Vector2(560f, 56f);
                 labelRect.anchoredPosition = WorldToMap(new Vector2((minX + maxX) * 0.5f + xShift, maxY)) + Vector2.up * 34f;
@@ -842,7 +884,7 @@ namespace SpaceTaxi.UI
             // за кольцом буёв; живёт в edgeFogRoot — не блокирует слоты
             // подписей (см. BuildMap). Максимум с прежним поведением: у старого
             // мира 0.65×6000 ≈ 3936 — край тел, вид не меняется
-            float fogInnerPx = Mathf.Max(bodyEdgeRadius, mapRadius * 0.65f) * scale;
+            float fogInnerPx = Mathf.Max(bodyEdgeRadius, mapRadius * Style.fogInnerFrac) * scale;
             RectTransform fog = MakeImage("EdgeFog", edgeFogRoot, PaperMapArt.EdgeFog(),
                 WithAlpha(PaperMapArt.Ink, 0.75f),
                 Vector2.one * (fogInnerPx * 2f / PaperMapArt.EdgeFogBorderFrac), false);
@@ -1031,15 +1073,15 @@ namespace SpaceTaxi.UI
         // при дрейфе зума подписи переразмещаются (SyncLabelVisibility)
         // ХОТФИКС владельца (день после Н8): 15px мелковато — искать планету по
         // названию тяжело; 18px на любом зуме (константный экранный кегль M7.5)
-        private const float LabelScreenFontSize = 18f;
+        private float LabelScreenFontSize => Style.labelFontSize;
         private const float LabelRezoomGrow = 1.20f;  // зум вырос на 20% — переразместить (кегль вырос)
         private const float LabelRezoomShrink = 0.55f; // зум упал сильнее — переразместить (кегль отстал)
 
         // M7.5: линейка — тонкая, чернила, только на крупных зумах
-        private const float RulerMinZoomFraction = 0.30f;   // видна при contentScale ≥ (зум ≥ ~4.2)
+        private float RulerMinZoomFraction => Style.rulerMinZoomFraction; // видна при contentScale ≥
 
         // M7.5: районы — «география» листа, видна издалека; на приближении гаснут
-        private const float SectorFadeOutFraction = 0.60f;  // исчезли при contentScale ≥
+        private float SectorFadeOutFraction => Style.districtFadeOutFraction; // исчезли при contentScale ≥
 
         // размещает подписи всех тел и поясов — вызывается один раз в BuildMap
         // ПОСЛЕ построения всех иконок: их rects известны сразу
@@ -1573,6 +1615,177 @@ namespace SpaceTaxi.UI
                 targetRingPulseImage.color = WithAlpha(TargetRingColor, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
             if (targetRingWideImage != null)
                 targetRingWideImage.color = WithAlpha(TargetRingColor, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
+        }
+
+        // ————— свои надписи и контуры (Map Style Editor) —————
+
+        // слой аннотаций поверх подписей: клики не ест (raycastTarget=false),
+        // пан/зум работают сквозь него как по листу
+        private void BuildAnnotations()
+        {
+            if (annotationsRoot != null)
+                Destroy(annotationsRoot.gameObject);
+            annotationNodes.Clear();
+            annotationsRoot = MakeRect("Annotations", content, new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            annotationsRoot.SetAsLastSibling();
+            var list = Style.annotations;
+            for (int i = 0; i < list.Count; i++)
+                annotationNodes.Add(BuildAnnotation(list[i], i));
+            UpdateAnnotations();
+        }
+
+        private AnnotationNode BuildAnnotation(MapAnnotation ann, int index)
+        {
+            string name = "Ann_" + index;
+            Vector2 pos = WorldToMap(ann.worldPosition);
+            var node = new AnnotationNode();
+            switch (ann.kind)
+            {
+                case AnnotationKind.Label:
+                {
+                    TMP_Text label = MakeLabel(name, annotationsRoot, ann.text, ann.fontSize, ann.color);
+                    if (ann.screenFixedSize) // экранный кегль: контентный = кегль/zoom
+                        label.fontSize = ann.fontSize / Mathf.Max(zoom, 0.001f);
+                    RectTransform rect = (RectTransform)label.transform;
+                    rect.anchoredPosition = pos;
+                    node.rect = rect;
+                    node.screenFixed = ann.screenFixedSize;
+                    break;
+                }
+                case AnnotationKind.Ring:
+                {
+                    // рисованный карандашный круг — тот же спрайт, что у колец меток;
+                    // живёт в масштабе мира (географический контур района)
+                    RectTransform ring = MakeImage(name, annotationsRoot, PaperMapArt.TargetRing(), ann.color,
+                        Vector2.one * (Mathf.Max(1f, ann.radius) * 2f * scale), false);
+                    ring.anchoredPosition = pos;
+                    node.rect = ring;
+                    break;
+                }
+                case AnnotationKind.Circle:
+                {
+                    RectTransform fill = MakeImage(name, annotationsRoot, StubSprites.SoftDot(64f, 0f), ann.color,
+                        Vector2.one * (Mathf.Max(1f, ann.radius) * 2f * scale), false);
+                    fill.anchoredPosition = pos;
+                    node.rect = fill;
+                    break;
+                }
+                case AnnotationKind.Rect:
+                {
+                    // рамка из чернильных линий (толщина в экранных px); группа —
+                    // точка мира, линии в её локальных координатах
+                    RectTransform group = MakeRect(name, annotationsRoot, new Vector2(0.5f, 0.5f),
+                        new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+                    group.anchoredPosition = pos;
+                    float halfW = Mathf.Max(1f, ann.radius) * scale;
+                    float halfH = Mathf.Max(1f, ann.height) * scale;
+                    Color c = ann.color;
+                    MakeSegment(group, new Vector2(-halfW, halfH), new Vector2(halfW, halfH), c, ann.thicknessPx);
+                    MakeSegment(group, new Vector2(-halfW, -halfH), new Vector2(halfW, -halfH), c, ann.thicknessPx);
+                    MakeSegment(group, new Vector2(-halfW, -halfH), new Vector2(-halfW, halfH), c, ann.thicknessPx);
+                    MakeSegment(group, new Vector2(halfW, -halfH), new Vector2(halfW, halfH), c, ann.thicknessPx);
+                    node.rect = group;
+                    break;
+                }
+            }
+            return node;
+        }
+
+        // окно видимости по зуму + экранный кегль fixed-надписей — каждый кадр
+        private void UpdateAnnotations()
+        {
+            if (annotationsRoot == null)
+                return;
+            var list = Style.annotations;
+            if (list.Count != annotationNodes.Count)
+            {
+                BuildAnnotations(); // правка из окна (добавили/удалили) — слой рассинхронился
+                return;
+            }
+            for (int i = 0; i < list.Count; i++)
+            {
+                MapAnnotation ann = list[i];
+                RectTransform rect = annotationNodes[i].rect;
+                if (rect == null)
+                    continue;
+                bool visible = (ann.minZoom <= 0f || zoom >= ann.minZoom - 0.001f)
+                    && (ann.maxZoom <= 0f || zoom <= ann.maxZoom + 0.001f);
+                if (rect.gameObject.activeSelf != visible)
+                    rect.gameObject.SetActive(visible);
+                if (annotationNodes[i].screenFixed && visible)
+                {
+                    TMP_Text label = rect.GetComponent<TMP_Text>();
+                    if (label != null)
+                    {
+                        float target = ann.fontSize / Mathf.Max(zoom, 0.001f);
+                        if (!Mathf.Approximately(label.fontSize, target))
+                            label.fontSize = target;
+                    }
+                }
+            }
+        }
+
+        // поставить аннотацию в точку мира (клик из Map Style Editor / API):
+        // дописывает в стиль, перерисовывает слой; ассет сохраняется — аннотации
+        // переживают выход из плея
+        public MapAnnotation AddAnnotationAtWorld(Vector2 world, AnnotationKind kind, string text = null)
+        {
+            var ann = new MapAnnotation { kind = kind, worldPosition = world, text = !string.IsNullOrEmpty(text) ? text : DefaultAnnotationText(kind) };
+            if (kind == AnnotationKind.Rect)
+            {
+                ann.radius = 320f;
+                ann.height = 220f;
+            }
+            Style.annotations.Add(ann);
+            PersistStyle();
+            if (built)
+                BuildAnnotations();
+            return ann;
+        }
+
+        // удалить последнюю аннотацию (кнопка окна)
+        public bool RemoveLastAnnotation()
+        {
+            var list = Style.annotations;
+            if (list.Count == 0)
+                return false;
+            list.RemoveAt(list.Count - 1);
+            PersistStyle();
+            if (built)
+                BuildAnnotations();
+            return true;
+        }
+
+        // применить стиль, правленный в Map Style Editor: пересборка листа
+        // (не построена — применится при следующем открытии карты)
+        public void RefreshMapStyle()
+        {
+            if (built)
+                RebuildAll();
+        }
+
+        private static string DefaultAnnotationText(AnnotationKind kind)
+        {
+            switch (kind)
+            {
+                case AnnotationKind.Ring: return "контур";
+                case AnnotationKind.Circle: return "зона";
+                case AnnotationKind.Rect: return "рамка";
+                default: return "метка";
+            }
+        }
+
+        // правки стиля из плея пишутся в ассет — аннотации/ручки переживают выход
+        private void PersistStyle()
+        {
+#if UNITY_EDITOR
+            if (style != null && UnityEditor.AssetDatabase.Contains(style))
+            {
+                UnityEditor.EditorUtility.SetDirty(style);
+                UnityEditor.AssetDatabase.SaveAssetIfDirty(style);
+            }
+#endif
         }
 
         private void RestoreTargetLabel()
@@ -2242,14 +2455,30 @@ namespace SpaceTaxi.UI
                 return;
             if (eventData.button == PointerEventData.InputButton.Right)
             {
+                if (AnnotationPlacementMode)
+                {
+                    AnnotationPlacementMode = false; // правый клик отменяет режим размещения
+                    return;
+                }
                 ClearWaypoint();
                 return;
             }
             if (eventData.button == PointerEventData.InputButton.Left
                 && !PressOnChrome(eventData)
-                && TryScreenToSheet(eventData.position, out _)
-                && PickBodyAt(eventData.position, out CelestialBodyData body))
-                ToggleWaypoint(body);
+                && TryScreenToSheet(eventData.position, out Vector2 sheetPos))
+            {
+                // режим из Map Style Editor: клик по листу ставит аннотацию в точку мира
+                if (AnnotationPlacementMode)
+                {
+                    Vector2 contentPos = (sheetPos - zoomOffset) / Mathf.Max(zoom, 0.001f);
+                    Vector2 world = contentPos / Mathf.Max(scale, 0.0001f) + worldCenter;
+                    AddAnnotationAtWorld(world, PlacementKind);
+                    AnnotationPlacementMode = false;
+                    return;
+                }
+                if (PickBodyAt(eventData.position, out CelestialBodyData body))
+                    ToggleWaypoint(body);
+            }
         }
 
         // тело под курсором (минимальный вариант из истории Н5.18-Н6.8, без
@@ -2367,7 +2596,8 @@ namespace SpaceTaxi.UI
             legendRoot = MakeRect("Legend", sheetRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
-            legendRoot.sizeDelta = new Vector2(330f, 170f);
+            legendRoot.sizeDelta = Style.legendSize;
+            legendRoot.gameObject.SetActive(Style.legendVisible); // выключена — слоты подписей освобождаются
 
             int y = 0;
             // ХОТФИКС владельца: значки легенды = те же картографические арты, что
@@ -2494,6 +2724,7 @@ namespace SpaceTaxi.UI
             zoomRoot.pivot = new Vector2(0.5f, 0f);
             zoomRoot.anchoredPosition = new Vector2(0f, 16f);
             zoomRoot.sizeDelta = new Vector2(480f, 64f);
+            zoomRoot.localScale = Vector3.one * Style.zoomButtonScale; // ручка размера кнопок зума
 
             MakePaperButton("BtnZoomIn", zoomRoot, new Vector2(52f, 48f), new Vector2(-168f, 8f), "+", 26f,
                 () => ZoomStep(ButtonZoomStep), 701);
@@ -2591,6 +2822,8 @@ namespace SpaceTaxi.UI
             targetRingPulseImage = null;
             targetRingWideImage = null;
             targetLabel = null;
+            annotationsRoot = null;
+            annotationNodes.Clear();
             waypointRoot = null;
             waypointHalo = null;
             waypointWide = null;

@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d78d6e2dff9b53428e0fedc7cd3bc8f, type: 3}
+  m_Name: MapStyle_Default
+  m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapStyleConfig
+  fontOverride: {fileID: 0}
+  labelFontSize: 18
+  labelColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
+  districtFontSize: 38
+  districtColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
+  districtFadeOutFraction: 0.6
+  targetRingPx: 64
+  targetRingWidePx: 90
+  targetColor: {r: 1, g: 0.94, b: 0.3, a: 1}
+  waypointHaloPx: 64
+  waypointWidePx: 90
+  waypointPinPx: 20
+  waypointColor: {r: 0.235, g: 1, b: 0.557, a: 1}
+  legendVisible: 1
+  legendSize: {x: 330, y: 170}
+  titleVisible: 1
+  titleText: "\u043C\u0430\u0440\u0448\u0440\u0443\u0442\u043D\u044B\u0439 \u043B\u0438\u0441\u0442"
+  fogInnerFrac: 0.65
+  paperWorldMargin: 1.6
+  worldUnitsPerTile: 512
+  maxViewZoom: 14
+  initialViewZoom: 9
+  rulerMinZoomFraction: 0.3
+  zoomButtonScale: 1
+  annotations:
+  - text: "\u0437\u043E\u043D\u0430 \u041A\u0443\u0437\u043D\u0438"
+    kind: 1
+    worldPosition: {x: 700, y: 1212}
+    fontSize: 20
+    color: {r: 0.243, g: 0.184, b: 0.137, a: 1}
+    screenFixedSize: 0
+    radius: 300
+    height: 220
+    thicknessPx: 2
+    minZoom: 0
+    maxZoom: 0
+  - text: "\u0421\u0412\u041E\u042F \u041D\u0410\u0414\u041F\u0418\u0421\u042C"
+    kind: 0
+    worldPosition: {x: 700, y: 1380}
+    fontSize: 20
+    color: {r: 0.243, g: 0.184, b: 0.137, a: 1}
+    screenFixedSize: 0
+    radius: 300
+    height: 220
+    thicknessPx: 2
+    minZoom: 0
+    maxZoom: 0
