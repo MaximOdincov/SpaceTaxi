@@ -36,26 +36,4 @@ MonoBehaviour:
   initialViewZoom: 9
   rulerMinZoomFraction: 0.3
   zoomButtonScale: 1
-  annotations:
-  - text: "\u0437\u043E\u043D\u0430 \u041A\u0443\u0437\u043D\u0438"
-    kind: 1
-    worldPosition: {x: 700, y: 1212}
-    fontSize: 20
-    color: {r: 0.243, g: 0.184, b: 0.137, a: 1}
-    screenFixedSize: 0
-    radius: 300
-    height: 220
-    thicknessPx: 2
-    minZoom: 0
-    maxZoom: 0
-  - text: "\u0421\u0412\u041E\u042F \u041D\u0410\u0414\u041F\u0418\u0421\u042C"
-    kind: 0
-    worldPosition: {x: 700, y: 1380}
-    fontSize: 20
-    color: {r: 0.243, g: 0.184, b: 0.137, a: 1}
-    screenFixedSize: 0
-    radius: 300
-    height: 220
-    thicknessPx: 2
-    minZoom: 0
-    maxZoom: 0
+  annotations: []
