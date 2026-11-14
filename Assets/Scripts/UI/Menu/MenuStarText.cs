@@ -33,16 +33,19 @@ namespace SpaceTaxi.UI
         // Откат — одна константа GlyphStyle. Сетка и маски 5x7 от стиля не
         // зависят; искры-блики (18%) и мерцание общие для всех стилей.
         private const StarGlyphStyle GlyphStyle = StarGlyphStyle.Spark;
-        // Spark (E8.1): толщина/длина луча и мягкость кромки — доли полуразмера
-        // точки; ядро — радиус горячего центра и мягкость его края
-        private const float SparkArmWidth = 0.12f;
-        private const float SparkArmLength = 0.95f;
-        private const float SparkArmEdge = 0.05f;
-        private const float SparkCore = 0.30f;
-        private const float SparkCoreSoftness = 0.14f;
-        private const float SparkArmBrightness = 0.9f;
-        private const float SparkSizeMin = 1.30f;   // множители клетки: искра крупнее клетки —
-        private const float SparkSizeMax = 1.85f;   // вылет лучами; прозрачные углы не дают «блока»
+        // Spark (E8.1 + хотфикс владельца №2 «всё ещё квадратики»): фактические
+        // размеры (замер): клетка 15.6 канвас-px, канвас-скейл 0.578. Лучи 0.12×
+        // умирали до ~1 экранного px (квадратные ядра); 2.8-3.6× клетки — слияние
+        // в блоки. Середина: искра ~1.6-2.0× клетки (≈15 экранных px, лёгкое
+        // перекрытие — «созвездие»), лучи 0.30 ≈ 2.5 экранных px — ВИДНЫ
+        private const float SparkArmWidth = 0.38f;
+        private const float SparkArmLength = 1.0f;
+        private const float SparkArmEdge = 0.07f;
+        private const float SparkCore = 0.20f;
+        private const float SparkCoreSoftness = 0.10f;
+        private const float SparkArmBrightness = 1f;
+        private const float SparkSizeMin = 1.25f;   // множители клетки: точки различимы,
+        private const float SparkSizeMax = 1.55f;   // лучи ~2px экрана живы, блоков нет
         private const float DiamondFatness = 0.60f; // (откат Diamond) полнота лучей: меньше — тоньше/острее, 1 — простой ромб
         private const float DiamondCore = 0.30f;    // радиус горячего ядра (доля полуширины) — плотность букв
         private const float DiamondSizeMin = 1.15f; // множители клетки для Diamond — чуть крупнее кружков

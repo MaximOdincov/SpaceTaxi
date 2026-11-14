@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: MapStyle_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapStyleConfig
   fontOverride: {fileID: 11400000, guid: c84a4d74a0caeec47b9a6352452a67bb, type: 2}
-  labelFontSize: 18
-  labelColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
+  labelFontSize: 33.1
+  labelColor: {r: 1, g: 0.042452812, b: 0.22197784, a: 1}
   districtFontSize: 38
   districtColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
   districtFadeOutFraction: 0.6
@@ -26,14 +26,14 @@ MonoBehaviour:
   waypointPinPx: 20
   waypointColor: {r: 0.235, g: 1, b: 0.557, a: 1}
   legendVisible: 1
-  legendSize: {x: 330, y: 170}
+  legendSize: {x: 489, y: 288.3}
   titleVisible: 1
   titleText: "\u043C\u0430\u0440\u0448\u0440\u0443\u0442\u043D\u044B\u0439 \u043B\u0438\u0441\u0442"
-  fogInnerFrac: 0.65
+  fogInnerFrac: 0.692
   paperWorldMargin: 1.6
   worldUnitsPerTile: 512
   maxViewZoom: 14
   initialViewZoom: 9
   rulerMinZoomFraction: 0.3
-  zoomButtonScale: 1
+  zoomButtonScale: 1.25
   annotations: []

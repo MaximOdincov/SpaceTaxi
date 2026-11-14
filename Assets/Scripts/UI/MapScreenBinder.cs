@@ -961,6 +961,25 @@ namespace SpaceTaxi.UI
                 buoy.localRotation = Quaternion.Euler(0f, 0f, i * 17f);
             }
 
+            // ХОТФИКС владельца: граница связи ОБВЕДЕНА и ЗАШТРИХОВАНА — «места, где
+            // нет связи», читаются сразу (прежде — только крап тумана и текст).
+            // Рисованная окружность по радиусу буёв + чернильная штриховка снаружи
+            RectTransform boundary = MakeImage("SignalBoundary", edgeRoot, PaperMapArt.TargetRing(),
+                WithAlpha(PaperMapArt.Ink, 0.55f), Vector2.one * (borderPx * 2f), false);
+            boundary.anchoredPosition = Vector2.zero;
+            var hatch = new System.Random(20261114);
+            int strokes = 64;
+            for (int i = 0; i < strokes; i++)
+            {
+                float ang = i * Mathf.PI * 2f / strokes + (float)hatch.NextDouble() * 0.05f;
+                float r1 = borderPx + 6f + (float)hatch.NextDouble() * 6f;
+                float len = 10f + (float)hatch.NextDouble() * 12f;
+                Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                Vector2 a = dir * r1;
+                Vector2 b = dir * (r1 + len) + new Vector2(-dir.y, dir.x) * ((float)hatch.NextDouble() * 6f - 3f);
+                MakeSegment(edgeRoot, a, b, WithAlpha(PaperMapArt.Ink, 0.42f), 1.5f);
+            }
+
             var warnColor = WithAlpha(PaperMapArt.InkSoft, 0.75f);
             for (int i = 0; i < 2; i++)
             {
@@ -996,10 +1015,10 @@ namespace SpaceTaxi.UI
                     float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
                     float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.5f) * scale;
                     Vector2 p = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
-                    // ХОТФИКС владельца: камни пояса с настоящим разбросом габаритов —
-                    // степенное распределение (мало крупных, много мелких); прежде
-                    // 9-18px читались «одного размера»
-                    float size = 6f + Mathf.Pow((float)rng.NextDouble(), 2.2f) * 22f;
+                    // ХОТФИКС владельца №2: камни пояса МЕЛЬЧЕ — «в реальности раз в
+                    // 10 меньше» (прежде 6-28px); теперь 2-8px степенным распределением —
+                    // текстура полосы, не галька
+                    float size = 2f + Mathf.Pow((float)rng.NextDouble(), 2.2f) * 6f;
                     // M8.1: камни — родной цвет арта (отмывка снята по вкусу владельца)
                     RectTransform stone = MakeImage("Rock_" + i, beltsRoot, rock,
                         Color.white, Vector2.one * size, false);
@@ -1052,6 +1071,16 @@ namespace SpaceTaxi.UI
                 new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             group.sizeDelta = size;
             group.anchoredPosition = WorldToMap(body.Position);
+
+            // ХОТФИКС владельца: чёрная дыра на карте — «в жизни огромная»: рисуем
+            // ЗОНУ ЗАХВАТА (EffectRadius = R×6, мягкий фиолетовый диск как в игре)
+            // позади честного ядра — ядро маленькое, опасность огромная
+            if (body.Type == BodyType.BlackHole)
+            {
+                float effectPx = GameRadiusOf(body) * BlackHole.EffectRadiusMultiplier * 2f * scale;
+                MakeImage("HoleZone", group, StubSprites.Zone(effectPx),
+                    new Color(0.45f, 0.25f, 0.7f, 0.22f), Vector2.one * effectPx, false);
+            }
 
             // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
             // цвет — родной цвет арта (M8.1: чернильная отмывка снята по вкусу владельца)
@@ -1182,10 +1211,15 @@ namespace SpaceTaxi.UI
                 Vector2 labelHalf = labelSize * 0.5f;
 
                 int slot = -1;
+                // ХОТФИКС владельца («чупа-чупсы — палочки странные»): близкий слот
+                // разрешает перекрыть ЧУЖУЮ иконку (мелькающая под чернилами мелочь) —
+                // жёсткие блокеры только чужие подписи и хром; ярлык сидит при своей
+                // планете, палочка-выноска не нужна. Иконки учитывает лишь дальний
+                // проход (все близкие заняты подписями/хромом)
                 for (int i = 0; i < 8 && slot < 0; i++) // низ → верх → право → лево → диагонали
                 {
                     Rect candidate = CenteredRect(center + SlotOffset(i, iconHalf, LabelSlotGap, labelHalf), labelSize);
-                    if (PlacementCollisions(candidate, body, iconRects, placed, chrome) == 0)
+                    if (PlacementCollisions(candidate, body, null, placed, chrome) == 0)
                         slot = i;
                 }
 
@@ -1507,9 +1541,12 @@ namespace SpaceTaxi.UI
             foreach (Rect rect in placedLabels)
                 if (candidate.Overlaps(rect))
                     count++;
-            foreach (var pair in iconRects)
-                if (pair.Key != self && candidate.Overlaps(pair.Value))
-                    count++;
+            // iconRects == null — близкий проход: чужие иконки не блокируют
+            // (ХОТФИКС «чупа-чупсы»); дальний проход считает их как прежде
+            if (iconRects != null)
+                foreach (var pair in iconRects)
+                    if (pair.Key != self && candidate.Overlaps(pair.Value))
+                        count++;
             foreach (Rect rect in chrome)
                 if (candidate.Overlaps(rect))
                     count++;
@@ -1667,6 +1704,14 @@ namespace SpaceTaxi.UI
             }
             targetRing.anchoredPosition = WorldToMap(body.Position);
             targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // M7.1: экранные px постоянны
+            // ХОТФИКС владельца: ореол цели ОБНИМАЕТ планету на любом зуме (прежде
+            // кольцо было постоянным экранного размера — на отъезде «больше» планеты,
+            // при приближении терялось внутри диска). Диаметры = экранный диаметр
+            // иконки цели × 1.25 / ×1.75 — тот же принцип, что у жёлтого ореола в игре
+            float planetPx = IconSizeOf(body) * zoom;
+            targetRingPulse.sizeDelta = Vector2.one * (planetPx * 1.25f);
+            targetRingWide.sizeDelta = Vector2.one * (planetPx * 1.75f);
+            ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (planetPx * 1.25f * 0.5f + 18f);
             // пульс: кольца дышат размером и альфой
             float t = Time.unscaledTime;
             targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 4.2f));
@@ -2656,6 +2701,7 @@ namespace SpaceTaxi.UI
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
             legendRoot.sizeDelta = Style.legendSize;
+            legendRoot.localScale = Vector3.one * 1.3f; // ХОТФИКС владельца: легенда крупнее
             legendRoot.gameObject.SetActive(Style.legendVisible); // выключена — слоты подписей освобождаются
 
             int y = 0;

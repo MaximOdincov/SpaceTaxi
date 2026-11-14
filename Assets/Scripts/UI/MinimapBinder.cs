@@ -47,6 +47,7 @@ namespace SpaceTaxi.UI
         private const float NearScaleMul = 1.25f; // тела в ближней зоне рисуются крупнее (G-15)
         private const float FarScaleMul = 0.85f;  // …и мельче на краю охвата
         private const float RimInset = 8f;        // отступ маркеров от обода при клампе
+        private const float WaypointRimInset = 15f; // червон: запас под полудиагональ+пульс (хотфикс «обрезается»)
         private const float CometTailPx = 11f;    // длина хвоста кометы на радаре, px
         // Н6 M3: ар for_mini смотрит носом в правый верх — PNG-анализ: главная
         // ось силуэта +45° (Unity, от +X). Поворот иконки = курс − этот офсет.
@@ -634,7 +635,10 @@ namespace SpaceTaxi.UI
             Vector2 pos = live != null ? (Vector2)live.transform.position : waypoint.Position;
 
             waypointMark.gameObject.SetActive(true);
-            Vector2 p = ClampToRim(WorldToRadar(pos) + Vector2.up * 10f, out bool clamped); // над точкой тела
+            // ХОТФИКС владельца («червон обрезается»): кламп с запасом под полудиагональ
+            // ромба (12px → кончик 8.5px) + пульс — прежде RimInset 8 срезал кончики
+            // маской радара при клампе к ободу
+            Vector2 p = ClampToRim(WorldToRadar(pos) + Vector2.up * 10f, out bool clamped, WaypointRimInset);
             waypointMark.anchoredPosition = p;
             if (waypointOnRim != clamped)
             {
@@ -736,9 +740,9 @@ namespace SpaceTaxi.UI
 
         // важные цели за охватом клампятся к ободу: точка на краю прибора,
         // сама рисуется приглушённой (см. OffEdgeAlpha у вызывающих)
-        private Vector2 ClampToRim(Vector2 radarPos, out bool clamped)
+        private Vector2 ClampToRim(Vector2 radarPos, out bool clamped, float inset = RimInset)
         {
-            float edge = radarRadiusPx - RimInset;
+            float edge = radarRadiusPx - inset;
             if (radarPos.magnitude <= edge)
             {
                 clamped = false;
