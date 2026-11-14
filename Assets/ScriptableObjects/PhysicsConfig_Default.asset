@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: PhysicsConfig_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.Physics.PhysicsConfig
   Retro: 62
+  BrakeHoverFraction: 0.2
   MinSpeed: 10
   StrafeMaxTurnRate: 60
   LandSpeed: 75
@@ -30,5 +31,15 @@ MonoBehaviour:
   GravityBoost: 1.15
   BlackHolePullEdge: 45
   BlackHolePullHorizon: 300
+  BlackHoleEscapeThrustFraction: 1.15
   BlackHoleRadialHoldEdge: 160
   BlackHoleRadialHoldHorizon: 380
+  BlackHoleSwirlEdge: 45
+  BlackHoleSwirlHorizon: 130
+  BlackHoleOrbitSpeedFactor: 0.95
+  BlackHoleOrbitClampRate: 240
+  BlackHoleSinkSpeedMax: 12
+  BlackHoleSinkClampRate: 900
+  BlackHoleShrinkSeconds: 210
+  BlackHoleMinScale: 0.25
+  BlackHoleDeathProximity: 45

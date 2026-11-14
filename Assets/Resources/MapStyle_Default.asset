@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: MapStyle_Default
   m_EditorClassIdentifier: SpaceTaxi.Gameplay::SpaceTaxi.UI.MapStyleConfig
   fontOverride: {fileID: 11400000, guid: c84a4d74a0caeec47b9a6352452a67bb, type: 2}
-  labelFontSize: 33.1
+  labelFontSize: 21
   labelColor: {r: 1, g: 0.042452812, b: 0.22197784, a: 1}
-  districtFontSize: 38
+  districtFontSize: 46
   districtColor: {r: 0.243, g: 0.184, b: 0.137, a: 1}
   districtFadeOutFraction: 0.6
   targetRingPx: 64
@@ -35,5 +35,5 @@ MonoBehaviour:
   maxViewZoom: 14
   initialViewZoom: 9
   rulerMinZoomFraction: 0.3
-  zoomButtonScale: 1.25
+  zoomButtonScale: 1.5
   annotations: []

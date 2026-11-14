@@ -3,17 +3,18 @@ using UnityEngine;
 
 namespace SpaceTaxi.World
 {
-    // Обломки-призраки (Н7 G7.1): после гибели корабля в захвате чёрной дыры
-    // его спрайт остаётся кружить вокруг дыры и медленно сжиматься — прилетев
-    // новым кораблём, игрок видит останки прошлой гибели. Кинематика без
-    // физики и коллайдеров (призрак): орбита с растущей угловой скоростью,
-    // спираль к горизонту, исчезновение на минимальном размере или при уходе
-    // под горизонт. Живут только в текущей сессии (сейв-персист — отдельное
-    // решение владельца), максимум два: старейший гаснет при спавне нового.
-    // Спавнит BlackHole в момент гибели (HullSystem.Died).
+    // Обломки-призраки (Н7 G7.1 + v4 Н8.27): спрайт брошенного/погибшего корабля
+    // остаётся кружить вокруг дыры — прилетев новым кораблём, игрок видит останки.
+    // Два режима: СПИРАЛЬ (гибель в захвате — обломок стягивается к горизонту,
+    // Н7) и ОРБИТА (отключение корабля v4 — брошенный борт держит свою орбиту
+    // до конца окна поглощения, медленно сжимаясь, потом гаснет; решение
+    // владельца «корабль остаётся на орбите, мы видим его с другого корабля»).
+    // Кинематика без физики и коллайдеров (призрак). Живут только в текущей
+    // сессии (сейв-персист — отдельное решение владельца), максимум три:
+    // старейший гаснет при спавне нового. Спавнит BlackHole.
     public class WreckSystem : MonoBehaviour
     {
-        private const int MaxWrecks = 2;
+        private const int MaxWrecks = 3;
         // доля стартового масштаба, на которой обломок исчезает
         private const float MinScaleFraction = 0.12f;
         private const float ShrinkSeconds = 34f;          // медленнее сжатия живого корабля
@@ -37,6 +38,8 @@ namespace SpaceTaxi.World
             internal float spinDegPerSec; // качание вокруг своей оси
             internal float fadeLeft;
             internal bool fading;
+            internal bool orbital;        // v4: стабильная орбита (отключение), не спираль
+            internal float lifetimeLeft;  // orbital: остаток окна поглощения
         }
 
         private readonly List<Wreck> wrecks = new List<Wreck>();
@@ -53,6 +56,23 @@ namespace SpaceTaxi.World
 
         public void Spawn(BlackHole hole, Vector2 position, Sprite sprite, float scale,
             float angularSpeedRadPerSec, float spinDegPerSec)
+        {
+            SpawnInternal(hole, position, sprite, scale, angularSpeedRadPerSec, spinDegPerSec,
+                orbital: false, lifetimeSeconds: 0f);
+        }
+
+        // v4: брошенный (отключённый) корабль — СТАБИЛЬНАЯ ОРБИТА на remaining
+        // секунд окна поглощения: радиус не Decay-ится, корабль медленно сжимается
+        // (дыра всё же тянет) и в конце окна гаснет
+        public void SpawnOrbital(BlackHole hole, Vector2 position, Sprite sprite, float scale,
+            float angularSpeedRadPerSec, float spinDegPerSec, float lifetimeSeconds)
+        {
+            SpawnInternal(hole, position, sprite, scale, angularSpeedRadPerSec, spinDegPerSec,
+                orbital: true, lifetimeSeconds: Mathf.Max(4f, lifetimeSeconds));
+        }
+
+        private void SpawnInternal(BlackHole hole, Vector2 position, Sprite sprite, float scale,
+            float angularSpeedRadPerSec, float spinDegPerSec, bool orbital, float lifetimeSeconds)
         {
             if (hole == null || sprite == null || scale <= 0f)
                 return;
@@ -91,8 +111,12 @@ namespace SpaceTaxi.World
                 angularSpeed = Mathf.Clamp(angularSpeedRadPerSec, -SpinMaxRadPerSec, SpinMaxRadPerSec),
                 scale = scale,
                 minScale = scale * MinScaleFraction,
-                shrinkPerSecond = scale * (1f - MinScaleFraction) / ShrinkSeconds,
+                shrinkPerSecond = orbital
+                    ? scale * (1f - MinScaleFraction) / Mathf.Max(lifetimeSeconds, 1f)
+                    : scale * (1f - MinScaleFraction) / ShrinkSeconds,
                 spinDegPerSec = spinDegPerSec,
+                orbital = orbital,
+                lifetimeLeft = lifetimeSeconds,
             };
             go.transform.position = position;
             go.transform.localScale = Vector3.one * scale;
@@ -120,20 +144,38 @@ namespace SpaceTaxi.World
                     else
                     {
                         wreck.center = wreck.hole.transform.position;
-                        float direction = wreck.angularSpeed >= 0f ? 1f : -1f;
-                        wreck.angularSpeed = direction * Mathf.MoveTowards(
-                            Mathf.Abs(wreck.angularSpeed), SpinMaxRadPerSec, SpinAccelRadPerSec2 * dt);
-                        wreck.angle += wreck.angularSpeed * dt;
-                        wreck.radius = Mathf.MoveTowards(wreck.radius, 0f, RadiusDecayPerSecond * dt);
-                        wreck.scale = Mathf.MoveTowards(wreck.scale, wreck.minScale, wreck.shrinkPerSecond * dt);
-                        wreck.transform.position = wreck.center
-                            + new Vector2(Mathf.Cos(wreck.angle), Mathf.Sin(wreck.angle)) * wreck.radius;
-                        wreck.transform.localScale = Vector3.one * wreck.scale;
-                        wreck.transform.Rotate(0f, 0f, wreck.spinDegPerSec * dt);
+                        if (wreck.orbital)
+                        {
+                            // стабильная орбита: радиус держится, лёгкий дрейф угла,
+                            // окно поглощения тикает — в конце окно гаснет
+                            wreck.angle += wreck.angularSpeed * dt;
+                            wreck.lifetimeLeft -= dt;
+                            wreck.scale = Mathf.MoveTowards(
+                                wreck.scale, wreck.minScale, wreck.shrinkPerSecond * dt);
+                            wreck.transform.position = wreck.center
+                                + new Vector2(Mathf.Cos(wreck.angle), Mathf.Sin(wreck.angle)) * wreck.radius;
+                            wreck.transform.localScale = Vector3.one * wreck.scale;
+                            wreck.transform.Rotate(0f, 0f, wreck.spinDegPerSec * dt);
+                            if (wreck.lifetimeLeft <= 0f)
+                                StartFade(wreck);
+                        }
+                        else
+                        {
+                            float direction = wreck.angularSpeed >= 0f ? 1f : -1f;
+                            wreck.angularSpeed = direction * Mathf.MoveTowards(
+                                Mathf.Abs(wreck.angularSpeed), SpinMaxRadPerSec, SpinAccelRadPerSec2 * dt);
+                            wreck.angle += wreck.angularSpeed * dt;
+                            wreck.radius = Mathf.MoveTowards(wreck.radius, 0f, RadiusDecayPerSecond * dt);
+                            wreck.scale = Mathf.MoveTowards(wreck.scale, wreck.minScale, wreck.shrinkPerSecond * dt);
+                            wreck.transform.position = wreck.center
+                                + new Vector2(Mathf.Cos(wreck.angle), Mathf.Sin(wreck.angle)) * wreck.radius;
+                            wreck.transform.localScale = Vector3.one * wreck.scale;
+                            wreck.transform.Rotate(0f, 0f, wreck.spinDegPerSec * dt);
 
-                        // полный уход под горизонт или минимальный размер — гаснем
-                        if (wreck.radius <= wreck.hole.Horizon || wreck.scale <= wreck.minScale + 0.001f)
-                            StartFade(wreck);
+                            // полный уход под горизонт или минимальный размер — гаснем
+                            if (wreck.radius <= wreck.hole.Horizon || wreck.scale <= wreck.minScale + 0.001f)
+                                StartFade(wreck);
+                        }
                     }
                 }
                 else

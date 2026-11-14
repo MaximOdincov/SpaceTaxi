@@ -59,6 +59,8 @@ namespace SpaceTaxi.UI
             if (hole == null)
                 hole = FindAnyObjectByType<BlackHole>();
 
+            // v4: оверлей показан всё время ЗАХВАТА (медленное поглощение) —
+            // выход один: отключить корабль кнопкой или X
             bool show = hole != null && hole.SwallowActive && !AnyPanelOpen();
             if (show && screen == null)
                 screen = BuildScreen();
@@ -67,9 +69,9 @@ namespace SpaceTaxi.UI
             if (!show)
                 return;
 
-            // обратный отсчёт до автоотключения — то же игровое время, что и лимит
-            float left = Mathf.Max(0f, BlackHole.SwallowTimeoutSeconds - hole.SwallowElapsed);
-            countdown.text = $"автоотключение через {Mathf.CeilToInt(left)} с";
+            // обратный отсчёт до полного поглощения — то же игровое время, что и сжатие
+            float left = hole.SwallowLeftSeconds;
+            countdown.text = $"полное поглощение через {Mathf.CeilToInt(left)} с";
 
             var kb = Keyboard.current;
             if (kb != null && kb.xKey.wasPressedThisFrame)
@@ -124,8 +126,9 @@ namespace SpaceTaxi.UI
             var fitter = panel.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            Label(panel, "КОРАБЛЬ ЗАТЯНУЛО", 34f, OnboardComputerFactory.DangerColor);
-            Label(panel, "Управление отключено — борт не отвечает. Отключите корабль, чтобы вернуться.",
+            Label(panel, "ЧЁРНАЯ ДЫРА ЗАТЯГИВАЕТ", 34f, OnboardComputerFactory.DangerColor);
+            Label(panel, "Корабль сжимается — вырваться можно только пока глубина мала. " +
+                "Не рискуешь — отключи корабль: он останется кружить на орбите.",
                 19f, OnboardComputerFactory.LabelColor);
 
             var button = OnboardComputerFactory.Button(panel.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ",

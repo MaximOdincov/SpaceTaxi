@@ -1079,7 +1079,7 @@ namespace SpaceTaxi.UI
             {
                 float effectPx = GameRadiusOf(body) * BlackHole.EffectRadiusMultiplier * 2f * scale;
                 MakeImage("HoleZone", group, StubSprites.Zone(effectPx),
-                    new Color(0.45f, 0.25f, 0.7f, 0.22f), Vector2.one * effectPx, false);
+                    new Color(0.45f, 0.25f, 0.7f, 0.45f), Vector2.one * effectPx, false);
             }
 
             // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
@@ -1634,12 +1634,16 @@ namespace SpaceTaxi.UI
             waypointRoot.anchoredPosition = WorldToMap(Waypoint.Position);
             waypointRoot.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранный px постоянны
 
-            // ХОТФИКС владельца: кольца метки должны «зафиксироваться» — прежде
-            // альфы пульсовали В ПРОТИВОФАЗЕ (гасло 64px разгоралось, когда
-            // широкое 90px гасло, и наоборот) — зелёное пятно дышало видимым
-            // размером 64↔90px. Теперь оба кольца пульсируют альфой В ФАЗЕ
-            // (широкое всегда тусклее в постоянной пропорции) — пятно не меняет
-            // видимый диаметр; экранный размер колец постоянен (counter-scale)
+            // ХОТФИКС владельца v2: ореол метки ОБНИМАЕТ планету на любом зуме —
+            // кольца = экранный диаметр иконки ×1.25/×1.75 (как у жёлтой цели;
+            // прежде кольца были постоянного экранного размера и «менялись»
+            // относительно планеты: на отъезде больше неё, вблизи терялись внутри).
+            // Пульс остался, в фазе (Н8.23); булавка — над кольцом
+            float planetPx = IconSizeOf(Waypoint) * zoom;
+            waypointHalo.sizeDelta = Vector2.one * (planetPx * 1.25f);
+            waypointWide.sizeDelta = Vector2.one * (planetPx * 1.75f);
+            waypointPin.anchoredPosition = Vector2.up * (planetPx * 1.25f * 0.5f + 16f);
+
             float t = Time.unscaledTime;
             float pulse = 0.72f + 0.22f * Mathf.Sin(t * 3.4f);
             if (waypointHaloImage != null)
@@ -2701,7 +2705,7 @@ namespace SpaceTaxi.UI
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
             legendRoot.sizeDelta = Style.legendSize;
-            legendRoot.localScale = Vector3.one * 1.3f; // ХОТФИКС владельца: легенда крупнее
+            legendRoot.localScale = Vector3.one * 1.7f; // ХОТФИКС владельца v2: легенда ЕЩЁ крупнее
             legendRoot.gameObject.SetActive(Style.legendVisible); // выключена — слоты подписей освобождаются
 
             int y = 0;

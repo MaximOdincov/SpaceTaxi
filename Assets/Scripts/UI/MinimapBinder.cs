@@ -643,7 +643,7 @@ namespace SpaceTaxi.UI
             if (waypointOnRim != clamped)
             {
                 waypointOnRim = clamped;
-                waypointMark.sizeDelta = Vector2.one * (clamped ? 9f : 12f);
+                waypointMark.sizeDelta = Vector2.one * (clamped ? 8f : 10f); // хотфикс: иконка меньше
             }
             float a = 0.72f + 0.18f * Mathf.Sin(Time.unscaledTime * 2.4f); // лёгкий пульс, как у метки в мире (Н-8/G-15)
             waypointImage.color = WithAlpha(WaypointColor, a * (clamped ? OffEdgeAlpha : 1f));
