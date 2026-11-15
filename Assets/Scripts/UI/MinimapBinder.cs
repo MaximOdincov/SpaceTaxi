@@ -457,11 +457,14 @@ namespace SpaceTaxi.UI
                 default:
                 {
                     float d = Mathf.Clamp(trueD, 8f, 44f);
-                    Halo(root, d * 1.25f, PlanetColor, 0.1f);
-                    // v5.2 (владелец: «убери обводку на миникарте у центральной
-                    // планеты МТО»): у хаба внешнее зелёное кольцо не рисуется
+                    // v5.2 (владелец: «зелёное кольцо вокруг хаба на радаре всё
+                    // ещё есть»): у хаба НИЧЕГО вокруг точки — ни Halo (жёсткий
+                    // край Circle читался кольцом), ни внешнего RingMark
                     if (!body.IsHub)
+                    {
+                        Halo(root, d * 1.25f, PlanetColor, 0.1f);
                         RingMark(root, d, WithAlpha(PlanetColor, 0.9f));
+                    }
                     BuildStationDot(root, body, d);
                     break;
                 }
