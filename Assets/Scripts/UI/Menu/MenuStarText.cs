@@ -5,28 +5,28 @@ namespace SpaceTaxi.UI
 {
     // Звёздный текст (бриф E3): строка выкладывается по пиксельным маскам 5x7
     // (MenuStarFont) — на каждую включённую ячейку одна мерцающая звезда,
-    // лёгкое дрожание позиции и примесь бликов-искр дают «россыпь», а малая
-    // амплитуда мерцания — читаемость. E8.1: точка глифа — честная 4-лучевая
-    // искра как звёзды параллакса (GlyphStyle=Spark, размер крупнее клетки —
-    // вылет за счёт прозрачных диагоналей не собирается в блок). E8.2:
-    // перекраска глифов (hover кнопок) — плавный лерп rgb к цели ~0.15с,
-    // индивидуальная альфа каждой звезды сохраняется; мерцание идёт поверх
-    // hover-цвета. Контейнер-ребёнок целевого RectTransform: hover-скейл
-    // кнопки и гасящий CanvasGroup применяются к звёздам автоматически.
-    // Текстовые компоненты под звёздами гасит вызывающий код — шрифта в
-    // звёздных надписях нет.
+    // малая амплитуда мерцания даёт «россыпь» и читаемость. E8.1: точка
+    // глифа — честная 4-лучевая искра как звёзды параллакса (GlyphStyle=Spark,
+    // размер крупнее клетки — вылет за счёт прозрачных диагоналей не
+    // собирается в блок). 2026-11-15 (владелец «чтобы звёзды НИКОГДА не
+    // заменялись кружочками»): подмена части точек мягким бликом StarSparkle
+    // УБРАНА — все точки текста рисуются одним и тем же спрайтом искры (на
+    // экранных ~8-10px лучи StarSparkle умирают в мип-бленде и точка читается
+    // «кружлишком»). E8.2: перекраска глифов (hover кнопок) — плавный лерп
+    // rgb к цели ~0.15с, индивидуальная альфа каждой звезды сохраняется;
+    // мерцание идёт поверх hover-цвета. Контейнер-ребёнок целевого
+    // RectTransform: hover-скейл кнопки и гасящий CanvasGroup применяются к
+    // звёздам автоматически. Текстовые компоненты под звёздами гасит
+    // вызывающий код — шрифта в звёздных надписях нет.
     public sealed class MenuStarText : MonoBehaviour
     {
         private const int GlyphColumns = 5;
         private const int GlyphRows = 7;
         private const float LetterGap = 1f;    // клетки между буквами
         private const float SpaceAdvance = 3f; // ширина пробела, клеток
-        private const float Jitter = 0.18f;    // дрожание звезды, доли клетки
-        private const float SparkleChance = 0.18f;  // доля ярких бликов-акцентов
-                                                    // (StarSparkle из StubSprites —
-                                                    // всегда рисовался корректно;
-                                                    // «квадратность» была у глифовой
-                                                    // текстуры без SetPixels32)
+        private const float Jitter = 0.08f;    // дрожание звезды, доли клетки
+                                               // (2026-11-15: 0.18 → 0.08 — «маска
+                                               // поточнее»: буквы сидят строже)
         private const float MinCell = 1.5f;    // px, ниже текст перестаёт читаться
 
         // --- E7.1/E8.1, ручки владельца: форма/плотность точек-звёзд глифов ---
@@ -35,7 +35,7 @@ namespace SpaceTaxi.UI
         // прозрачные диагонали); Diamond — ромб с вогнутыми сторонами (Н7 —
         // отвергнуто: читалось «квадратами»); Circle — мягкая точка.
         // Откат — одна константа GlyphStyle. Сетка и маски 5x7 от стиля не
-        // зависят; искры-блики (18%) и мерцание общие для всех стилей.
+        // зависят; мерцание общее для всех стилей (бликов-подмен нет).
         private static readonly StarGlyphStyle GlyphStyle = StarGlyphStyle.Spark;
         // Spark (E8.1 + Н8.25 + правка 2026-11-15 «буквы из квадратиков»):
         // Н8.25 сделал лучи толстыми (0.38 — половина толщины плюса от
@@ -52,11 +52,12 @@ namespace SpaceTaxi.UI
         private const float SparkArmWidth = 0.07f;
         private const float SparkArmLength = 1.0f;
         private const float SparkArmEdge = 0.03f;
-        private const float SparkCore = 0.30f;
-        private const float SparkCoreSoftness = 0.12f;
-        private const float SparkArmBrightness = 0.65f;
-        private const float SparkSizeMin = 1.25f;   // множители клетки: зазор между
-        private const float SparkSizeMax = 1.45f;   // точками при шаге 2 клетки ~4px
+        private const float SparkCore = 0.36f;      // 2026-11-15 «буквы потолще»:
+        private const float SparkCoreSoftness = 0.14f; // крупнее точка и ядро —
+        private const float SparkArmBrightness = 0.65f; // штрихи толще (ореолы
+        private const float SparkSizeMin = 1.45f;   // соседей смыкаются в сплошную
+        private const float SparkSizeMax = 1.65f;   // светящуюся линию, ядра-бусины
+                                                    // различимы)
         // Прореживание «созвездия» (ручка владельца): звезда ставится на
         // клетки маски с (row+column) % CellParityStep == 0 (диагонали штрихов
         // сохраняются — у соседа по диагонали сумма меняется на шаг). Шаг 2 —
@@ -89,16 +90,19 @@ namespace SpaceTaxi.UI
 
         // Выложить text по центру площади target. Клетка подбирается под
         // прямоугольник (maxWidth/maxHeight — доли площади) либо задаётся
-        // явно через cellOverride. Возвращает итоговый размер клетки (px).
+        // явно через cellOverride. containerOffset — сдвиг контейнера от центра
+        // target (заголовок крупнее ректа растёт вправо от его левого края,
+        // не уезжая за экран). Возвращает итоговый размер клетки (px).
         public float Build(RectTransform target, string text, Color[] palette,
-            float maxWidthFactor = 0.92f, float maxHeightFactor = 0.86f, float cellOverride = 0f)
+            float maxWidthFactor = 0.92f, float maxHeightFactor = 0.86f, float cellOverride = 0f,
+            Vector2 containerOffset = default)
         {
             var go = new GameObject("StarGlyphs", typeof(RectTransform));
             go.transform.SetParent(target, false);
             RectTransform container = (RectTransform)go.transform;
             container.anchorMin = new Vector2(0.5f, 0.5f);
             container.anchorMax = new Vector2(0.5f, 0.5f);
-            container.anchoredPosition = Vector2.zero;
+            container.anchoredPosition = containerOffset;
             container.pivot = new Vector2(0.5f, 0.5f);
 
             float columns = MeasureColumns(text);
@@ -161,12 +165,11 @@ namespace SpaceTaxi.UI
                         Vector2 position = new(
                             cursor + (column + 0.5f) * cell + Random.Range(-Jitter, Jitter) * cell,
                             Height * 0.5f - (row + 0.5f) * cell + Random.Range(-Jitter, Jitter) * cell);
-                        bool sparkle = Random.value < SparkleChance;
                         Color color = palette[Random.Range(0, palette.Length)];
                         color.a *= Random.Range(0.75f, 1f);
                         MenuTwinkle.CreateStar(container, position, cell * Random.Range(sizeMin, sizeMax),
                             color, 0.22f * Random.Range(0.7f, 1.3f), Random.Range(0.8f, 2.2f),
-                            Random.Range(0f, Mathf.PI * 2f), sparkle, stars, baseSprite: glyphDot);
+                            Random.Range(0f, Mathf.PI * 2f), sparkle: false, stars, baseSprite: glyphDot);
                     }
                 }
                 cursor += (GlyphColumns + LetterGap) * cell;

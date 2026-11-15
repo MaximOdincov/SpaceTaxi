@@ -12,6 +12,13 @@ namespace SpaceTaxi.UI
     {
         private const string Title = "SPACE TAXI";
 
+        // 2026-11-15 (владелец «заголовок побольше»): клетка 13 → 16 канвас-px —
+        // буквы ~112 канвас-px (~65 экранных) высотой, ширина ~912 канвас-px.
+        // Ручка размера заголовка — только эта константа
+        private const float TitleCell = 16f;
+        // Колонки "SPACE TAXI": 9 букв × (5+1) + пробел (3+1) − хвостовой зазор = 57
+        private const float TitleColumns = 57f;
+
         private static readonly Color[] Palette =
         {
             new(0.659f, 1f, 0.796f),   // мятный (цвет логотипа в сцене)
@@ -22,18 +29,21 @@ namespace SpaceTaxi.UI
 
         private MenuStarText starText;
 
-        // Заголовок строится в прямоугольнике TMP-логотипа (589x144): клетка
-        // ~10.5px, буквы 7 клеток ≈ 73px высотой — как прежний шрифт 96pt
+        // Заголовок строится в прямоугольнике TMP-логотипа (589x144). Клетка
+        // задаётся явно (TitleCell) — ширина 57 колонок упирала клетку в ~10
+        // (точка мельче ~13 экранных px не читается звездой). Контейнер
+        // центрируется на ректе логотипа; когда надпись шире ректа, сдвигаем
+        // её вправо на половину переполнения — левый край встаёт на левый край
+        // шапки панели, заголовок растёт ВПРАВО и не уезжает за экран
         public void Build(RectTransform logo)
         {
             if (logo.TryGetComponent(out TMP_Text text))
                 text.enabled = false; // под звёздами шрифт не нужен
 
             starText = gameObject.AddComponent<MenuStarText>();
-            // 2026-11-15: клетка задана явно (13 канвас-px ≈ 7.5 экранных) —
-            // ширина 58 колонок упирала клетку в 10 (точка < 13 экранных px
-            // читается квадратиком, не звездой); буквы ~91 канвас-px высотой
-            starText.Build(logo, Title, Palette, maxWidthFactor: 0.98f, maxHeightFactor: 0.6f, cellOverride: 13f);
+            var offset = new Vector2((TitleColumns * TitleCell - logo.rect.width) / 2f, 0f);
+            starText.Build(logo, Title, Palette, maxWidthFactor: 0.98f, maxHeightFactor: 0.6f,
+                cellOverride: TitleCell, containerOffset: offset);
         }
     }
 }

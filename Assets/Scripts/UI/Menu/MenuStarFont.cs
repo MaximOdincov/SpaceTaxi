@@ -28,7 +28,10 @@ namespace SpaceTaxi.UI
         private const string Hcyr = "X...X|X...X|X...X|XXXXX|X...X|X...X|X...X"; // Н
         private const string Ocyr = ".XXX.|X...X|X...X|X...X|X...X|X...X|.XXX."; // О
         private const string Pcyr = "XXXXX|X...X|X...X|X...X|X...X|X...X|X...X"; // П
-        private const string Ycyr = "X...X|X...X|X...X|XXXXX|X...X|X...X|XXXXX"; // Ы
+        // Ы: правая вертикаль во всю высоту + нижняя перекладина (2026-11-15
+        // «маска поточнее»: раньше была лишняя перекладина посередине — читалось
+        // как Н с двумя перекладинами)
+        private const string Ycyr = "X...X|X...X|X...X|X...X|X...X|X...X|XXXXX"; // Ы
         private const string SoftSign = "X....|X....|X....|XXXX.|X...X|X...X|XXXX."; // Ь
         private const string Yacyr = ".XXXX|X...X|X...X|.XXXX|..X.X|.X..X|X...X"; // Я
         private const string Zhcyr = "X.X.X|X.X.X|X.X.X|XXXXX|X.X.X|X.X.X|X.X.X"; // Ж
