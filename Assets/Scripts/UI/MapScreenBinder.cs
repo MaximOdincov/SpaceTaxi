@@ -271,7 +271,6 @@ namespace SpaceTaxi.UI
         private RectTransform targetRingWide;    // и второе — видно издалека
         private Image targetRingPulseImage;      // кэш: пульс обновляется каждый кадр
         private Image targetRingWideImage;
-        private TMP_Text targetLabel;
         private RectTransform waypointRoot;      // зелёный ореол метки + булавка
         private RectTransform waypointHalo;
         private RectTransform waypointWide;      // второе, широкое кольцо (как у цели)
@@ -1659,10 +1658,9 @@ namespace SpaceTaxi.UI
                 WithAlpha(TargetRingColor, 0.7f), Vector2.one * TargetRingWidePx, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
-            targetLabel = MakeLabel("TargetLabel", targetRing, "", 16f, TargetRingColor);
-            ((RectTransform)targetLabel.transform).sizeDelta = new Vector2(280f, 24f);
-            ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (TargetRingPx * 0.5f + 18f);
-            targetLabel.characterSpacing = 2f;
+            // v5.1 (владелец: «не подписывай планету цели»): подпись «ЦЕЛЬ: ИМЯ»
+            // убрана — кольцо-ореол само маркирует цель; собственное имя планеты
+            // прячется на время кольца (см. UpdateTargetRing/RestoreTargetLabel)
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
         }
@@ -1698,7 +1696,6 @@ namespace SpaceTaxi.UI
                     if (labelLeaders.TryGetValue(body, out RectTransform leader) && leader != null)
                         leader.gameObject.SetActive(false); // выноска прячется вместе с подписью
                 }
-                targetLabel.text = "ЦЕЛЬ: " + body.DisplayName.ToUpper();
             }
             targetRing.anchoredPosition = WorldToMap(body.Position);
             targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // M7.1: экранные px постоянны
@@ -1709,7 +1706,6 @@ namespace SpaceTaxi.UI
             float planetPx = IconSizeOf(body) * zoom;
             targetRingPulse.sizeDelta = Vector2.one * (planetPx * 1.25f);
             targetRingWide.sizeDelta = Vector2.one * (planetPx * 1.75f);
-            ((RectTransform)targetLabel.transform).anchoredPosition = Vector2.up * (planetPx * 1.25f * 0.5f + 18f);
             // пульс: кольца дышат размером и альфой
             float t = Time.unscaledTime;
             targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 4.2f));
@@ -2932,7 +2928,6 @@ namespace SpaceTaxi.UI
             targetRingWide = null;
             targetRingPulseImage = null;
             targetRingWideImage = null;
-            targetLabel = null;
             annotationsRoot = null;
             annotationNodes.Clear();
             waypointRoot = null;

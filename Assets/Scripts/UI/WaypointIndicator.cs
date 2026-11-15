@@ -81,6 +81,14 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private PauseScreenController pause;
 
+        // v5.1 (владелец: «делай ореол вокруг планеты цели — пульсирующий, под
+        // планетой; у нас вообще нет ореола ни жёлтого, ни зелёного»): мировой
+        // пульсирующий жёлтый ореол ПОД спрайтом планеты цели — виден, когда
+        // планета в кадре (стрелка у края гаснет — они дополняют друг друга)
+        private GameObject targetHalo;
+        private SpriteRenderer targetHaloRenderer;
+        private bool targetInFrame;
+
         private void Update()
         {
             if (!Bind())
@@ -94,6 +102,7 @@ namespace SpaceTaxi.UI
                 return;
             UpdateMarkerPose();
             UpdateArrows();
+            UpdateTargetHalo();
         }
 
         private void OnDestroy()
@@ -298,6 +307,7 @@ namespace SpaceTaxi.UI
             bool canvasOn = cam != null && !IsAnyPanelOpen();
             if (!canvasOn)
             {
+                targetInFrame = false;
                 if (arrowCanvas != null && arrowCanvas.enabled)
                     arrowCanvas.enabled = false; // панель погасила — не считаем вхолостую
                 return;
@@ -312,6 +322,7 @@ namespace SpaceTaxi.UI
                 ? CachedDistance(ref lastDistWValue, ref lastDistWText, Vector2.Distance(ShipPos(), wp.pos.Value))
                 : null;
             bool showTarget = ComputeEdge(tp.pos, tp.radius, cam, false, out Vector2 posT, out float angleT);
+            targetInFrame = canvasOn && tp.pos.HasValue && !showTarget;
             string distT = showTarget
                 ? CachedDistance(ref lastDistTValue, ref lastDistTText, Vector2.Distance(ShipPos(), tp.pos.Value))
                 : null;
@@ -536,6 +547,43 @@ namespace SpaceTaxi.UI
             distRect.sizeDelta = new Vector2(150f, 26f);
             distRect.anchoredPosition = new Vector2(0f, -32f);
             return root;
+        }
+
+        // пульсирующий ореол под планетой цели: сортировка -1 (за спрайтом
+        // планеты 0/1, над звёздами -10), диаметр обнимает планету ×1.3,
+        // пульс размером и альфой — как кольцо цели на карте
+        private void UpdateTargetHalo()
+        {
+            CelestialBody body = null;
+            var lvl = session != null ? session.Level : null;
+            if (targetInFrame && lvl != null && targetIndex >= 0 && targetIndex < lvl.Bodies.Count)
+                body = ResolveBody(lvl.Bodies[targetIndex].DisplayName);
+
+            if (body == null)
+            {
+                if (targetHalo != null && targetHalo.activeSelf)
+                    targetHalo.SetActive(false);
+                return;
+            }
+
+            if (targetHalo == null)
+            {
+                targetHalo = new GameObject("TargetHalo", typeof(SpriteRenderer));
+                targetHaloRenderer = targetHalo.GetComponent<SpriteRenderer>();
+                targetHaloRenderer.sprite = StubSprites.Ring(256f);
+                targetHaloRenderer.sortingOrder = -1;
+            }
+            if (!targetHalo.activeSelf)
+                targetHalo.SetActive(true);
+            targetHalo.transform.position = body.transform.position;
+            // StubSprites.Ring запекает диаметр в PPU (спрайт 256 = 256 юнитов при
+            // Ring(256)) — итоговый размер = 256 × localScale; обнимаем планету
+            // (диаметр ×1.3) с пульсом размером и альфой
+            float baseD = body.Radius * 2.6f;
+            float t = Time.unscaledTime;
+            targetHalo.transform.localScale = Vector3.one * (baseD / 256f * (1f + 0.08f * Mathf.Sin(t * 4.2f)));
+            Color c = TargetYellow;
+            targetHaloRenderer.color = new Color(c.r, c.g, c.b, 0.55f + 0.3f * Mathf.Sin(t * 3.4f));
         }
 
         private bool IsAnyPanelOpen()
