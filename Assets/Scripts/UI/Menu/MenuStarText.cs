@@ -52,11 +52,12 @@ namespace SpaceTaxi.UI
         private const float SparkArmWidth = 0.07f;
         private const float SparkArmLength = 1.0f;
         private const float SparkArmEdge = 0.03f;
-        private const float SparkCore = 0.36f;      // 2026-11-15 «буквы потолще»:
-        private const float SparkCoreSoftness = 0.14f; // крупнее точка и ядро —
-        private const float SparkArmBrightness = 0.65f; // штрихи толще (ореолы
-        private const float SparkSizeMin = 1.45f;   // соседей смыкаются в сплошную
-        private const float SparkSizeMax = 1.65f;   // светящуюся линию, ядра-бусины
+        private const float SparkCore = 0.40f;      // 2026-11-15 «буквы потолще»
+        private const float SparkCoreSoftness = 0.14f; // (раунд 3: ещё чуть толще —
+        private const float SparkArmBrightness = 0.65f; // точка 1.6-1.8 клетки,
+        private const float SparkSizeMin = 1.6f;    // ядро 0.40: ореолы соседей
+        private const float SparkSizeMax = 1.8f;    // смыкаются в сплошную
+                                                    // светящуюся линию, ядра-бусины
                                                     // различимы)
         // Прореживание «созвездия» (ручка владельца): звезда ставится на
         // клетки маски с (row+column) % CellParityStep == 0 (диагонали штрихов

@@ -35,6 +35,15 @@ namespace SpaceTaxi.UI
         private const float GlowSpeed = 0.18f; // сек на разгон/затухание наведения (скейл + boost)
         private const float BoostMax = 0.9f;   // добавка к волне звёзд при наведении
 
+        // 2026-11-15 (владелец: «Продолжить и Новая игра чуть меньше других»):
+        // клетка у каждой кнопки подбиралась по ДЛИНЕ надписи — ПРОДОЛЖИТЬ 10.3,
+        // НОВАЯ ИГРА 11.0, НАСТРОЙКИ 11.4, ВЫХОД 14.2 (вертикальный предел) —
+        // заметный разброс. ЕДИНАЯ клетка 11.4 для всех кнопок: самая длинная
+        // надпись ПРОДОЛЖИТЬ (59 колонок = 673 канвас-px) чуть шире невидимой
+        // кнопки 638 — панель не обрезает (заливки скрыты), кликабельна вся
+        // площадь кнопки. Ручка размера букв кнопок — только эта константа
+        private const float UniformCell = 11.4f;
+
         // Н6: глифы кнопок — белый базовый и жёлтый под наведение
         // (такси-жёлтый проекта: 1, 0.831, 0.302)
         private static readonly Color GlyphWhite = Color.white;
@@ -105,10 +114,11 @@ namespace SpaceTaxi.UI
                 text = gameObject.name; // страховка: имя кнопки
 
             starText = gameObject.AddComponent<MenuStarText>();
-            // 2026-11-15: клетка упиралась в ширину (0.86) — надпись теряла ~10%
-            // клетки; «буквы потолще» — текст на ~95% ширины кнопки (плашек нет,
-            // кнопка невидима). Высота 0.92 — как раньше
-            starText.Build(rect, text.Trim(), GlyphPalette, maxWidthFactor: 0.95f, maxHeightFactor: 0.92f);
+            // Клетка едина для всех кнопок (UniformCell) — надписи разной длины
+            // набираются ОДНИМ кеглем; ширина/высота ректа при override не
+            // участвуют (кнопка невидима, панель не обрезает)
+            starText.Build(rect, text.Trim(), GlyphPalette, maxWidthFactor: 0.95f, maxHeightFactor: 0.92f,
+                cellOverride: UniformCell);
         }
 
         public void OnPointerEnter(PointerEventData eventData) => hovered = true;
