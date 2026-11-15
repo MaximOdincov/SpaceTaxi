@@ -81,13 +81,20 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private PauseScreenController pause;
 
-        // v5.1 (владелец: «делай ореол вокруг планеты цели — пульсирующий, под
-        // планетой; у нас вообще нет ореола ни жёлтого, ни зелёного»): мировой
-        // пульсирующий жёлтый ореол ПОД спрайтом планеты цели — виден, когда
-        // планета в кадре (стрелка у края гаснет — они дополняют друг друга)
+        // v5.2 (владелец: «ореол не линией, а кругом, сзади планеты чуть больше
+        // неё; и не только у заказов — у целей, выбранных на карте, там он
+        // зелёный»): мировой пульсирующий ореол — МЯГКИЙ ДИСК (SoftDot, а не
+        // тонкое кольцо) ПОД спрайтом планеты, чуть больше планеты; два
+        // инстанса — жёлтый у цели заказа, зелёный у тела, выбранного на карте
+        // (MapScreenBinder.Waypoint). Видны, когда планета в кадре (стрелка у
+        // края гаснет — они дополняют друг друга)
         private GameObject targetHalo;
         private SpriteRenderer targetHaloRenderer;
+        private GameObject waypointHalo;
+        private SpriteRenderer waypointHaloRenderer;
         private bool targetInFrame;
+        private bool waypointInFrame;
+        private GravityField haloGravity; // ленивый бинд для ореола цели (см. UpdateTargetHalo)
 
         private void Update()
         {
@@ -103,6 +110,7 @@ namespace SpaceTaxi.UI
             UpdateMarkerPose();
             UpdateArrows();
             UpdateTargetHalo();
+            UpdateWaypointHalo();
         }
 
         private void OnDestroy()
@@ -308,6 +316,7 @@ namespace SpaceTaxi.UI
             if (!canvasOn)
             {
                 targetInFrame = false;
+                waypointInFrame = false;
                 if (arrowCanvas != null && arrowCanvas.enabled)
                     arrowCanvas.enabled = false; // панель погасила — не считаем вхолостую
                 return;
@@ -318,6 +327,7 @@ namespace SpaceTaxi.UI
             (Vector2? pos, float radius) wp = WaypointRef();
             (Vector2? pos, float radius) tp = TargetRef();
             bool showWaypoint = ComputeEdge(wp.pos, wp.radius, cam, true, out Vector2 posW, out float angleW);
+            waypointInFrame = canvasOn && wp.pos.HasValue && !showWaypoint;
             string distW = showWaypoint
                 ? CachedDistance(ref lastDistWValue, ref lastDistWText, Vector2.Distance(ShipPos(), wp.pos.Value))
                 : null;
@@ -470,11 +480,18 @@ namespace SpaceTaxi.UI
         {
             if (chevronSprite != null)
                 return chevronSprite;
-            // v5.1 (владелец: «чеврон цели обрезан — он должен быть из
-            // Resources/Art/icons»): первичный источник — Шеврон.png (контурный
-            // шеврон с ПОЛНЫМИ закруглёнными концами); прежний svrn_0 — цельные
-            // шевроны с плоско срезанными концами арта (читались «обрезанными»)
-            // — фолбэк, если Шеврон нечитаем
+            // v5.1 (владелец: «svrn полностью заполненный, а обычный шеврон
+            // полый — сейчас используется полый»): правильная иконка — svrn_0
+            // (ЦЕЛЬНЫЙ заполненный шеврон); Шеврон.png (ПОЛЫЙ контурный) —
+            // фолбэк, если svrn нечитаем
+            var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
+            if (frames != null && frames.Length > 0)
+            {
+                foreach (var frame in frames)
+                    if (frame != null && frame.name == "svrn_0")
+                        return frame;
+                return frames[0];
+            }
             var texture = Resources.Load<Texture2D>("Art/icons/Шеврон");
             if (texture == null)
                 return null;
@@ -495,16 +512,8 @@ namespace SpaceTaxi.UI
             }
             catch (UnityException)
             {
-                // Шеврон нечитаем (импортер без isReadable) — прежний svrn_0
-                var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
-                if (frames != null && frames.Length > 0)
-                {
-                    foreach (var frame in frames)
-                        if (frame != null && frame.name == "svrn_0")
-                            return frame;
-                    return frames[0];
-                }
-                return null; // процедурный фолбэк StubSprites.TargetChevron
+                // Шеврон нечитаем (импортер без isReadable) — процедурный фолбэк
+                return null; // StubSprites.TargetChevron
             }
             return chevronSprite;
         }
@@ -549,41 +558,64 @@ namespace SpaceTaxi.UI
             return root;
         }
 
-        // пульсирующий ореол под планетой цели: сортировка -1 (за спрайтом
-        // планеты 0/1, над звёздами -10), диаметр обнимает планету ×1.3,
-        // пульс размером и альфой — как кольцо цели на карте
+        // пульсирующий ореол под планетой: сортировка -1 (за спрайтом планеты
+        // 0/1, над звёздами -10), МЯГКИЙ ДИСК чуть больше планеты (диаметр
+        // ×1.28, у SoftDot мягкая кромка — видимое свечение-обод вокруг диска
+        // планеты), пульс размером и альфой
+        private void UpdateHalo(ref GameObject haloGo, ref SpriteRenderer haloRenderer,
+            CelestialBody body, Color color, bool visible, string name)
+        {
+            if (!visible || body == null)
+            {
+                if (haloGo != null && haloGo.activeSelf)
+                    haloGo.SetActive(false);
+                return;
+            }
+
+            if (haloGo == null)
+            {
+                haloGo = new GameObject(name, typeof(SpriteRenderer));
+                haloRenderer = haloGo.GetComponent<SpriteRenderer>();
+                haloRenderer.sprite = StubSprites.SoftDot(256f, 0.82f); // мягкая кромка ореола
+                haloRenderer.sortingOrder = -1;
+            }
+            if (!haloGo.activeSelf)
+                haloGo.SetActive(true);
+            haloGo.transform.position = body.transform.position;
+            // StubSprites.SoftDot запекает диаметр в PPU (256 = 256 юнитов при
+            // SoftDot(256,...)) — итоговый размер = 256 × localScale
+            float baseD = body.Radius * 2.56f;
+            float t = Time.unscaledTime;
+            haloGo.transform.localScale = Vector3.one * (baseD / 256f * (1f + 0.08f * Mathf.Sin(t * 4.2f)));
+            haloRenderer.color = new Color(color.r, color.g, color.b, 0.55f + 0.3f * Mathf.Sin(t * 3.4f));
+        }
+
         private void UpdateTargetHalo()
         {
             CelestialBody body = null;
             var lvl = session != null ? session.Level : null;
+            // ResolveBody зависит от gravity (инициализируется только меткой) —
+            // ореолу цели нужен СВОЙ ленивый поиск по GravityField
             if (targetInFrame && lvl != null && targetIndex >= 0 && targetIndex < lvl.Bodies.Count)
-                body = ResolveBody(lvl.Bodies[targetIndex].DisplayName);
-
-            if (body == null)
             {
-                if (targetHalo != null && targetHalo.activeSelf)
-                    targetHalo.SetActive(false);
-                return;
+                if (haloGravity == null)
+                    haloGravity = FindAnyObjectByType<GravityField>();
+                if (haloGravity != null && haloGravity.Bodies != null)
+                    foreach (CelestialBody b in haloGravity.Bodies)
+                        if (b.DisplayName == lvl.Bodies[targetIndex].DisplayName)
+                        {
+                            body = b;
+                            break;
+                        }
             }
+            UpdateHalo(ref targetHalo, ref targetHaloRenderer, body, TargetYellow, targetInFrame, "TargetHalo");
+        }
 
-            if (targetHalo == null)
-            {
-                targetHalo = new GameObject("TargetHalo", typeof(SpriteRenderer));
-                targetHaloRenderer = targetHalo.GetComponent<SpriteRenderer>();
-                targetHaloRenderer.sprite = StubSprites.Ring(256f);
-                targetHaloRenderer.sortingOrder = -1;
-            }
-            if (!targetHalo.activeSelf)
-                targetHalo.SetActive(true);
-            targetHalo.transform.position = body.transform.position;
-            // StubSprites.Ring запекает диаметр в PPU (спрайт 256 = 256 юнитов при
-            // Ring(256)) — итоговый размер = 256 × localScale; обнимаем планету
-            // (диаметр ×1.3) с пульсом размером и альфой
-            float baseD = body.Radius * 2.6f;
-            float t = Time.unscaledTime;
-            targetHalo.transform.localScale = Vector3.one * (baseD / 256f * (1f + 0.08f * Mathf.Sin(t * 4.2f)));
-            Color c = TargetYellow;
-            targetHaloRenderer.color = new Color(c.r, c.g, c.b, 0.55f + 0.3f * Mathf.Sin(t * 3.4f));
+        // зелёный ореол — у тела, ВЫБРАННОГО на карте (своя метка, G-15)
+        private void UpdateWaypointHalo()
+        {
+            UpdateHalo(ref waypointHalo, ref waypointHaloRenderer, markerBody,
+                WaypointGreen, waypointInFrame, "WaypointHalo");
         }
 
         private bool IsAnyPanelOpen()
