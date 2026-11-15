@@ -2020,14 +2020,17 @@ namespace SpaceTaxi.UI
         // M7.3: фиксация при посадке — чернильное кольцо «вы припаркованы здесь»
         // вокруг планеты стоянки (в content-координатах: «территория», скейлится
         // зумом честно, как иконка). Пересоздаётся на смену LandedOn; стоялка
-        // читается поллом — событие взлёта не существует
+        // читается поллом — событие взлёта не существует.
+        // v5.2 (владелец: «убери обводку на карте у центральной планеты МТО»):
+        // на хабе кольцо не рисуется — ракета-маркер и так стоит на планете
         private void UpdateLandedRing()
         {
             if (content == null)
                 return;
             CelestialBody parkedOn = ship != null && ship.State == ShipState.Landed
-                ? ship.LandedOn
-                : null;
+                && ship.LandedOn != null && !ship.LandedOn.IsHub
+                    ? ship.LandedOn
+                    : null;
             if (parkedOn == null)
             {
                 if (landedRing != null && landedRing.gameObject.activeSelf)
