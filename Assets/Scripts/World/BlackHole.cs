@@ -76,6 +76,8 @@ namespace SpaceTaxi.World
         // корабль в зоне влияния (до захвата) — для мягкого предупреждения в баннере
         public bool InEffectZone => ship != null && ship.State == ShipState.Flying
             && Vector2.Distance(ship.transform.position, transform.position) <= EffectRadius;
+        // борт заглушен оператором (X) — баннер без подсказки X, реле X молчит
+        public bool PoweredDown => ship != null && ship.PoweredDown;
         // сколько РЕАЛЬНЫХ секунд осталось до потери связи (для баннера и обломка):
         // время захвата копится с множителем глубины, остаток — от окна
         public float SwallowLeftSeconds => Mathf.Max(0f, config.BlackHoleShrinkSeconds - captureElapsed);
@@ -107,6 +109,28 @@ namespace SpaceTaxi.World
                 return;
 
             float d = Vector2.Distance(ship.transform.position, transform.position);
+
+            // v5.1: заглушенный борт — дыра держит при ЛЮБОЙ дистанции: окно
+            // идёт, сжатие продолжается, гул не смолкает, restore не применяется
+            if (ship.PoweredDown && ship.State == ShipState.Flying)
+            {
+                Sound.StartLoop(SoundId.BlackHoleHum);
+                float span = Mathf.Max(EffectRadius - Horizon, 0.001f);
+                float dClamped = Mathf.Clamp(d, Horizon + 0.01f, EffectRadius - 0.01f);
+                float depth = Mathf.Clamp01((EffectRadius - dClamped) / span);
+                Sound.SetLoopIntensity(SoundId.BlackHoleHum, Mathf.Lerp(0.3f, 1f, depth));
+
+                float rate = Mathf.Lerp(ShrinkRateNearEdge, ShrinkRateNearHorizon, depth);
+                captureElapsed += Mathf.Min(Time.deltaTime, 0.1f) * rate;
+                float seconds = Mathf.Max(config.BlackHoleShrinkSeconds, 0.1f);
+                float x = Mathf.Clamp01(captureElapsed / seconds);
+                shrink = 1f - Mathf.Pow(1f - x, ShrinkEasePower);
+                ship.transform.localScale = ShipScale();
+
+                if (x >= 1f && !swallowStarted)
+                    FullSwallow(); // «пропадает связь» — спавн на стартовой планете
+                return;
+            }
 
             if (d <= EffectRadius && ship.State == ShipState.Flying)
             {
@@ -164,15 +188,21 @@ namespace SpaceTaxi.World
             Vector2 center = transform.position;
             Vector2 offset = ship.Body.position - center;
             float d = offset.magnitude;
-            if (d >= EffectRadius || d < 0.01f)
+            bool powered = ship.PoweredDown;
+            // заглушенный борт дыра держит при ЛЮБОЙ дистанции — дрейфом наружу
+            // не уйти, окно дотикает где бы корабль ни был
+            if (!powered && (d >= EffectRadius || d < 0.01f))
+                return;
+            if (d < 0.01f)
                 return;
 
             float span = Mathf.Max(EffectRadius - Horizon, 0.001f);
-            float depth = Mathf.Clamp01((EffectRadius - d) / span);
+            float dForDepth = powered ? Mathf.Clamp(d, Horizon + 0.01f, EffectRadius - 0.01f) : d;
+            float depth = Mathf.Clamp01((EffectRadius - dForDepth) / span);
             Vector2 inward = -(Vector2)(offset / d);
             Vector2 velocity = ship.Body.linearVelocity + inward * (PullAt(depth) * Time.fixedDeltaTime);
 
-            bool captured = d <= (wasCaptured ? CaptureRadius * CaptureExitFraction : CaptureRadius);
+            bool captured = powered || d <= (wasCaptured ? CaptureRadius * CaptureExitFraction : CaptureRadius);
             if (captured && !wasCaptured)
             {
                 wasCaptured = true;
@@ -219,7 +249,8 @@ namespace SpaceTaxi.World
                 // корабль жмёт наружу — воронка пересиливает. Застрявшему вязко
                 // стягивается орбитальная скорость (потолок ниже центробежного
                 // баланса и проседает со сжатием) — спираль внутрь неизбежна
-                if (ship.Eff.Thrust <= TotalPull(d, depth) * config.BlackHoleEscapeThrustFraction)
+                float thrust = powered ? 0f : ship.Eff.Thrust;
+                if (thrust <= TotalPull(d, depth) * config.BlackHoleEscapeThrustFraction)
                 {
                     float orbitCap = config.BlackHoleOrbitSpeedFactor * (1f - 0.4f * shrink)
                         * Mathf.Sqrt(TotalPull(d, depth) * d);
@@ -254,8 +285,11 @@ namespace SpaceTaxi.World
         }
 
         // конец окна поглощения (владелец: «пропадает связь и корабль
-        // отключается, и ты спавнишься на новом»): корабль списан без взрыва —
-        // стандартная потеря борта (HullSystem.Abandon: списание, пересадка)
+        // отключается, и ты спавнишься на новом»): борт списан без взрыва —
+        // стандартная потеря (HullSystem.Abandon: списание, пересадка на
+        // аренду; RespawnAfter возвращает оператора на стартовую планету).
+        // Обломок-клон у дыры НЕ спавнится — гибель корабля оператор видел
+        // вживую (сжатие и спираль шли при нём)
         private void FullSwallow()
         {
             if (swallowStarted || hull == null || ship == null || ship.State != ShipState.Flying)
@@ -265,15 +299,20 @@ namespace SpaceTaxi.World
             hull.Abandon(SignalLostReason);
         }
 
-        // оператор отключил корабль сам (X в захвате): спавн на новом сразу —
-        // а старый борт остаётся кружить до конца окна (см. OnShipLostInCapture)
+        // оператор отключил корабль сам (X в захвате): борт ГЛОХНЕТ — тяги
+        // больше нет, воронка дотягивает его до конца окна. СПАВНА НОВОГО
+        // КОРАБЛЯ ЗДЕСЬ НЕТ И КЛОНА У ДЫРЫ ТОЖЕ (владелец: «он должен
+        // появиться на стартовой планете и ждать меня там, а не появляться
+        // тут после отключения») — новый борт оператор получает в конце окна
+        // (FullSwallow: «пропадает связь» → стандартный респавн)
         public void RequestAbandon()
         {
-            if (ship == null || hull == null || ship.State != ShipState.Flying)
+            if (ship == null || ship.State != ShipState.Flying)
                 return;
             if (!wasCaptured)
                 return; // вне захвата дыры отключать нечего
-            hull.Abandon(AbandonedReason);
+            ship.PoweredDown = true;
+            Debug.Log("[BlackHole] борт заглушен оператором — воронка дотягивает до потери связи");
         }
 
         // масштаб сжатия: 1 → BlackHoleMinScale (порог гибели по размеру)
@@ -308,48 +347,15 @@ namespace SpaceTaxi.World
             return hull != null;
         }
 
-        // потеря борта в захвате (отключение оверлеем/полное поглощение):
-        // сброс сжатия; при ОТКЛЮЧЕНИИ борт остаётся КРУЖИТЬ НА ОРБИТЕ дыры
-        // до конца своего окна поглощения — его видно с другого корабля.
-        // Полное поглощение — корабль исчез внутри, без обломка
+        // потеря борта в захвате (конец окна): сброс сжатия. Обломок-клон у дыры
+        // НЕ спавнится (владелец: «после отключения появляется его клон» —
+        // гибель корабля оператор видел вживую, новый борт ждёт на стартовой)
         private void OnShipLostInCapture()
         {
-            bool capturedNow = wasCaptured;
-            bool swallowNow = swallowStarted;
             shrink = 0f;
             wasCaptured = false;
             swallowStarted = false;
-            if (!capturedNow || swallowNow || ship == null)
-                return; // потеря вне захвата или полное поглощение — без обломка
-
-            Sprite sprite = CaptureShipSprite();
-            if (sprite == null)
-                return;
-
-            // масштаб с учётом сжатия дырой — обломок в размере брошенного корабля
-            float scale;
-            ShipModelVisual visual = ship.GetComponent<ShipModelVisual>();
-            if (visual != null && visual.VisualRoot != null)
-                scale = Mathf.Max(Mathf.Abs(visual.VisualRoot.lossyScale.x), 0.05f);
-            else
-                scale = Mathf.Max(Mathf.Abs(ship.transform.localScale.x), 0.05f);
-
-            float angular = 0.8f; // рад/с, против часовой по умолчанию
-            float spin = 20f;
-            if (ship.Body != null)
-            {
-                Vector2 offset = ship.transform.position - transform.position;
-                float dist = Mathf.Max(offset.magnitude, 0.01f);
-                Vector2 u = offset / dist;
-                float tangent = Vector2.Dot(ship.Body.linearVelocity, new Vector2(-u.y, u.x));
-                float fromVelocity = Mathf.Clamp(tangent / dist, -1.5f, 1.5f);
-                if (Mathf.Abs(fromVelocity) > 0.05f)
-                    angular = fromVelocity;
-            }
-
-            float lifetime = SwallowLeftSeconds + 4f; // орбита до конца окна поглощения
-            WreckSystem.Ensure().SpawnOrbital(this, ship.transform.position, sprite, scale,
-                angular, spin, lifetime);
+            captureElapsed = 0f;
         }
 
         // гибель корпуса: сброс сжатия и — если это гибель в захвате дыры —

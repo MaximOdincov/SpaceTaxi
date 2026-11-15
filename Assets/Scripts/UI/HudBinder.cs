@@ -484,7 +484,9 @@ namespace SpaceTaxi.UI
             if (ship.Fuel <= 0f)
                 message = "⚠ ТОПЛИВО КОНЧИЛОСЬ — ДРЕЙФ";
             else if (hole != null && hole.SwallowActive)
-                message = $"⚠ ЧЁРНАЯ ДЫРА — ЗАТЯГИВАЕТ · СВЯЗЬ ЧЕРЕЗ {Mathf.CeilToInt(hole.SwallowLeftSeconds)} с · X — ОТКЛЮЧИТЬ БОРТ";
+                message = hole.PoweredDown
+                    ? $"⚠ ЧЁРНАЯ ДЫРА — ЗАТЯГИВАЕТ · СВЯЗЬ ЧЕРЕЗ {Mathf.CeilToInt(hole.SwallowLeftSeconds)} с"
+                    : $"⚠ ЧЁРНАЯ ДЫРА — ЗАТЯГИВАЕТ · СВЯЗЬ ЧЕРЕЗ {Mathf.CeilToInt(hole.SwallowLeftSeconds)} с · X — ОТКЛЮЧИТЬ БОРТ";
             else if (IsInHeat())
                 message = "⚠ ЖАРОВАЯ ЗОНА — КОРПУС ГОРИТ";
             else if (hole != null && hole.InEffectZone)

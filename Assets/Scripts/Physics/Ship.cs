@@ -19,6 +19,11 @@ namespace SpaceTaxi.Physics
         public ShipState State = ShipState.Flying;
         public float Hp = 100f;
 
+        // v5.1: борт заглушен оператором в захвате чёрной дыры (BlackHole.
+        // RequestAbandon) — двигатели молчат (ShipController), воронка дотягивает
+        // до конца окна; сбрасывается при респавне
+        public bool PoweredDown { get; set; }
+
         public PhysicsConfig Config { get; private set; }
         public ShipConfig ShipConfig { get; private set; }
         public Rigidbody2D Body { get; private set; }

@@ -47,8 +47,8 @@ namespace SpaceTaxi.UI
         {
             if (hole == null)
                 hole = FindAnyObjectByType<BlackHole>();
-            if (hole == null || !hole.SwallowActive || AnyPanelOpen())
-                return;
+            if (hole == null || !hole.SwallowActive || hole.PoweredDown || AnyPanelOpen())
+                return; // заглушенный борт X больше не глушит — окно дотикает само
 
             var kb = Keyboard.current;
             if (kb != null && kb.xKey.wasPressedThisFrame)

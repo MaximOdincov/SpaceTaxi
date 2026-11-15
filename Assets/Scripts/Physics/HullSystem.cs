@@ -193,6 +193,7 @@ namespace SpaceTaxi.Physics
             ship.Body.linearVelocity = Vector2.zero;
             ship.Hp = ship.Eff.HpMax;
             ship.Fuel = ship.Eff.FuelMax;
+            ship.PoweredDown = false; // новый борт — не заглушенный
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
             RestoreVisuals(); // корпус возвращается при респавне (после гибели прятался)
             ship.LandedOn = respawnPlanet;

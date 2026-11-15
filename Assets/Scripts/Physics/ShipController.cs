@@ -170,6 +170,14 @@ namespace SpaceTaxi.Physics
                 brakeOn = false;
                 strafe = 0f;
             }
+            // v5.1: борт заглушен в чёрной дыре (владелец: «отключить корабль») —
+            // двигатели молчат, воронка дотягивает до конца окна
+            if (ship.PoweredDown)
+            {
+                thrustOn = false;
+                brakeOn = false;
+                strafe = 0f;
+            }
             ThrustOn = thrustOn;
             BrakeOn = brakeOn;
             StrafeLevel = strafe;
