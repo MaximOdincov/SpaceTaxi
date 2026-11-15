@@ -29,7 +29,7 @@ namespace SpaceTaxi.Physics
         // Н6 хотфикс: у артов есть прозрачный отступ снизу — в позе Landed корабль
         // «парит» над поверхностью. Топим ТОЛЬКО визуал (в мировых юнитах): капсула,
         // поза физики и предиктивная посадка (G1) не тронуты; на взлёте — обратно.
-        private const float LandedSinkWorld = 2.5f;
+        private const float LandedSinkWorld = 5f; // (владелец: «стоит на воздухе чуть выше планет» — 2.5 → 5, посадка ниже)
 
         private Ship ship;
         private Vector3 baseVisualLocalPos; // центрирование контента из Apply

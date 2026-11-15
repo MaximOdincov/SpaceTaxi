@@ -9,7 +9,7 @@ namespace SpaceTaxi.Physics
         // меньше и вообще чуть отдали»
         private const float FlightViewHeight = 320f;  // медленный полёт — ближе
         private const float FastViewHeight = 680f;    // отъезд на максималке
-        private const float LandingViewHeight = 230f; // посадка/ретро
+        private const float LandingViewHeight = 300f; // посадка/ретро (владелец: «слишком сильно приближение при посадке» — 230 → 300, зум мягче)
         private const float LookaheadSeconds = 0.45f; // взгляд вперёд
         private const float LookaheadMax = 130f;      // предел смещения
         private const float ShakeDecay = 1.6f;        // спад trauma в секунду
