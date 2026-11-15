@@ -126,6 +126,11 @@ namespace SpaceTaxi.UI
                     pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(a * 255f));
                 }
             }
+            // 2026-11-15, КОРЕНЬ «квадратиков»: SetPixels32 не вызывался — на GPU
+            // уходила неинициализированная память (сплошной квадрат ~0.8 альфы),
+            // и вся геометрия ромба/искры с Н7 никогда не попадала в рендер.
+            // В StubSprites.SetPixels32 есть — потому фоновые звёзды живые
+            tex.SetPixels32(pixels);
             tex.Apply(true, false);
             return tex;
         }
@@ -145,8 +150,12 @@ namespace SpaceTaxi.UI
             string key = $"{armWidth:F3}|{armLength:F3}|{armEdge:F3}|{core:F3}|{coreSoftness:F3}|{armBrightness:F3}";
             if (!glyphSparks.TryGetValue(key, out Sprite sprite) || sprite == null)
             {
-                var tex = CreateGlyphSparkTexture(64, armWidth, armLength, armEdge, core, coreSoftness, armBrightness);
-                sprite = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
+                // 32px = нативное разрешение точки (точка на экране ~16-31px):
+                // крупная текстура (64/128px) после мип-фильтрации на экранном
+                // размере размывает тонкие лучи в «вату» (замер 2026-11-15) —
+                // печатаем геометрию прямо в экранных пикселях, mip 0-1
+                var tex = CreateGlyphSparkTexture(32, armWidth, armLength, armEdge, core, coreSoftness, armBrightness);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, 32f, 32f), new Vector2(0.5f, 0.5f), 32f);
                 glyphSparks[key] = sprite;
             }
             return sprite;
@@ -155,7 +164,12 @@ namespace SpaceTaxi.UI
         private static Texture2D CreateGlyphSparkTexture(int size, float armWidth, float armLength,
             float armEdge, float core, float coreSoftness, float armBrightness)
         {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
+            // БЕЗ мипов (2026-11-15): текстура 32px рисуется на экране ~11-16px —
+            // попадает в бленд mip0/mip1, и тонкие лучи (1-2 текселя) разбавляются
+            // блендом до нуля — точка вырождается в квадратное пятно. Билинейный
+            // сэмпл без мипов держит лучи острыми; мерцание меняет только альфу,
+            // поэтому шиммера нет
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
             var pixels = new Color32[size * size];
             float reach = Mathf.Clamp(armLength, 0.05f, 1f);      // длина луча, доля полуразмера
             float halfWidth = Mathf.Max(0.01f, armWidth);         // толщина луча
@@ -173,19 +187,25 @@ namespace SpaceTaxi.UI
                     float dist = Mathf.Sqrt(x * x + y * y);
                     float center = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((core - dist) / coreSoftness));
 
-                    // лучи: вертикаль + горизонталь, сужение к концам (как у
-                    // искр параллакса), мягкая боковая кромка; диагонали
-                    // прозрачны — квадрат не читается
+                    // лучи: вертикаль + горизонталь, ЛИНЕЙНОЕ сужение к концам;
+                    // диагонали прозрачны — квадрат не читается. (2026-11-15:
+                    // квадратичное сужение t² убивало луч на 40% длины — при
+                    // точке ~12px видимый центр оставался квадратным пятном;
+                    // линейная нить во весь спрайт читается лучом на любом
+                    // размере, как у «живых» звёзд фона)
                     float alongH = Mathf.Clamp01((reach - ax) / reach); // 1 в центре → 0 на кончике
-                    float armH = alongH * alongH * Mathf.Clamp01((halfWidth - ay) / soft);
+                    float armH = alongH * Mathf.Clamp01((halfWidth - ay) / soft);
                     float alongV = Mathf.Clamp01((reach - ay) / reach);
-                    float armV = alongV * alongV * Mathf.Clamp01((halfWidth - ax) / soft);
+                    float armV = alongV * Mathf.Clamp01((halfWidth - ax) / soft);
                     float arm = Mathf.Max(armH, armV) * armBrightness;
 
                     float a = Mathf.Max(center, arm);
                     pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
                 }
             }
+            // см. комментарий в CreateDiamondTexture: без SetPixels32 рендерился
+            // неинициализированный квадрат — лучи/ядро не существовали на GPU
+            tex.SetPixels32(pixels);
             tex.Apply(true, false);
             return tex;
         }

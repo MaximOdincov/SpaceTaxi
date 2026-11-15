@@ -30,7 +30,10 @@ namespace SpaceTaxi.UI
                 text.enabled = false; // под звёздами шрифт не нужен
 
             starText = gameObject.AddComponent<MenuStarText>();
-            starText.Build(logo, Title, Palette, maxWidthFactor: 0.98f, maxHeightFactor: 0.6f);
+            // 2026-11-15: клетка задана явно (13 канвас-px ≈ 7.5 экранных) —
+            // ширина 58 колонок упирала клетку в 10 (точка < 13 экранных px
+            // читается квадратиком, не звездой); буквы ~91 канвас-px высотой
+            starText.Build(logo, Title, Palette, maxWidthFactor: 0.98f, maxHeightFactor: 0.6f, cellOverride: 13f);
         }
     }
 }

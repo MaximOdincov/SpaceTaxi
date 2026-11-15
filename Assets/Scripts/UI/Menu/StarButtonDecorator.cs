@@ -105,7 +105,10 @@ namespace SpaceTaxi.UI
                 text = gameObject.name; // страховка: имя кнопки
 
             starText = gameObject.AddComponent<MenuStarText>();
-            starText.Build(rect, text.Trim(), GlyphPalette, maxWidthFactor: 0.86f, maxHeightFactor: 0.62f);
+            // 2026-11-15: клетка 10 канвас-px (5.8 экранных) рендерит точку-«звезду»
+            // квадратиком — форма живёт только от ~13 экранных px. Буквы почти на
+            // всю высоту кнопки: клетка ~14 канвас-px, точка ~13-16 экранных px
+            starText.Build(rect, text.Trim(), GlyphPalette, maxWidthFactor: 0.86f, maxHeightFactor: 0.92f);
         }
 
         public void OnPointerEnter(PointerEventData eventData) => hovered = true;

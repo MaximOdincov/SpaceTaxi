@@ -22,7 +22,11 @@ namespace SpaceTaxi.UI
         private const float LetterGap = 1f;    // клетки между буквами
         private const float SpaceAdvance = 3f; // ширина пробела, клеток
         private const float Jitter = 0.18f;    // дрожание звезды, доли клетки
-        private const float SparkleChance = 0.18f;
+        private const float SparkleChance = 0.18f;  // доля ярких бликов-акцентов
+                                                    // (StarSparkle из StubSprites —
+                                                    // всегда рисовался корректно;
+                                                    // «квадратность» была у глифовой
+                                                    // текстуры без SetPixels32)
         private const float MinCell = 1.5f;    // px, ниже текст перестаёт читаться
 
         // --- E7.1/E8.1, ручки владельца: форма/плотность точек-звёзд глифов ---
@@ -32,20 +36,36 @@ namespace SpaceTaxi.UI
         // отвергнуто: читалось «квадратами»); Circle — мягкая точка.
         // Откат — одна константа GlyphStyle. Сетка и маски 5x7 от стиля не
         // зависят; искры-блики (18%) и мерцание общие для всех стилей.
-        private const StarGlyphStyle GlyphStyle = StarGlyphStyle.Spark;
-        // Spark (E8.1 + хотфикс владельца №2 «всё ещё квадратики»): фактические
-        // размеры (замер): клетка 15.6 канвас-px, канвас-скейл 0.578. Лучи 0.12×
-        // умирали до ~1 экранного px (квадратные ядра); 2.8-3.6× клетки — слияние
-        // в блоки. Середина: искра ~1.6-2.0× клетки (≈15 экранных px, лёгкое
-        // перекрытие — «созвездие»), лучи 0.30 ≈ 2.5 экранных px — ВИДНЫ
-        private const float SparkArmWidth = 0.38f;
+        private static readonly StarGlyphStyle GlyphStyle = StarGlyphStyle.Spark;
+        // Spark (E8.1 + Н8.25 + правка 2026-11-15 «буквы из квадратиков»):
+        // Н8.25 сделал лучи толстыми (0.38 — половина толщины плюса от
+        // полразмера точки) ради видимости ~2px на экране — но яркая область
+        // точки стала «толстым плюсом», который после мип-фильтрации читается
+        // КВАДРАТОМ: владелец снова видит «квадратики», а не звёзды. Лечение —
+        // форма как у параллаксовых искр (StubSprites.StarSparkle), которые
+        // владельцу нравятся: компактное горячее круглое ядро + ТОНКИЕ длинные
+        // лучи (0.10 ≈ 1-1.5 экранных px, но луч жив как светлая нить — так же
+        // выживают лучи фоновых искр), диагонали прозрачны. Клетка ~9 экранных
+        // px, точка ~1.85-2.25× клетки (16-20 экранного px) — ядро ~6px,
+        // звёзды в штрихе различимы поодиночке («бусины на нити»), блоков нет:
+        // в Н8.25 сливались именно ТОЛСТЫЕ плюсы, у компактных ядер зазор есть.
+        private const float SparkArmWidth = 0.07f;
         private const float SparkArmLength = 1.0f;
-        private const float SparkArmEdge = 0.07f;
-        private const float SparkCore = 0.20f;
-        private const float SparkCoreSoftness = 0.10f;
-        private const float SparkArmBrightness = 1f;
-        private const float SparkSizeMin = 1.25f;   // множители клетки: точки различимы,
-        private const float SparkSizeMax = 1.55f;   // лучи ~2px экрана живы, блоков нет
+        private const float SparkArmEdge = 0.03f;
+        private const float SparkCore = 0.30f;
+        private const float SparkCoreSoftness = 0.12f;
+        private const float SparkArmBrightness = 0.65f;
+        private const float SparkSizeMin = 1.25f;   // множители клетки: зазор между
+        private const float SparkSizeMax = 1.45f;   // точками при шаге 2 клетки ~4px
+        // Прореживание «созвездия» (ручка владельца): звезда ставится на
+        // клетки маски с (row+column) % CellParityStep == 0 (диагонали штрихов
+        // сохраняются — у соседа по диагонали сумма меняется на шаг). Шаг 2 —
+        // звезда через клетку: пробовал 2026-11-15 после починки текстуры —
+        // звёзды крупнее и отдельнее, но буквы рассыпаются (штрих из точек
+        // через 2 клетки при клетке ~10 канвас-px не читается). Оставлен шаг 1
+        // (без прореживания): буквы читаются, звёздность дают мерцание и
+        // хвосты лучей. Откат к «созвездию» — поставить 2.
+        private const int CellParityStep = 1;
         private const float DiamondFatness = 0.60f; // (откат Diamond) полнота лучей: меньше — тоньше/острее, 1 — простой ромб
         private const float DiamondCore = 0.30f;    // радиус горячего ядра (доля полуширины) — плотность букв
         private const float DiamondSizeMin = 1.15f; // множители клетки для Diamond — чуть крупнее кружков
@@ -136,6 +156,8 @@ namespace SpaceTaxi.UI
                     {
                         if (rows[row][column] != 'X')
                             continue;
+                        if ((row + column) % CellParityStep != 0)
+                            continue; // прореживание «созвездия» — см. константу
                         Vector2 position = new(
                             cursor + (column + 0.5f) * cell + Random.Range(-Jitter, Jitter) * cell,
                             Height * 0.5f - (row + 0.5f) * cell + Random.Range(-Jitter, Jitter) * cell);
