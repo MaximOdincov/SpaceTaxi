@@ -4,18 +4,19 @@ using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.World
 {
-    // Чёрная дыра v4 (Н8.27, переработка владельца): дыра НЕ УБИВАЕТ — она
-    // МЕДЛЕННО ЗАТЯГИВАЕТ. Захват (кольцо) запускает спагетти-сжатие на
-    // BlackHoleShrinkSeconds (~3.5 реальных минуты): корабль становится всё
-    // меньше, пока не исчезнет полностью. Вырваться можно только на малой
-    // глубине (тяга против воронки — Барин/стоковые); глубже — удержание
-    // намертво. Единственный способ спастись до полного поглощения —
-    // ОТКЛЮЧИТЬ КОРАБЛЬ (оверлей Н-10: кнопка или X) — тогда борт остаётся
-    // КРУЖИТЬ НА ОРБИТЕ дыры до конца своего окна поглощения, и его видно
-    // с другого корабля (WreckSystem, орбитальный режим). Полное поглощение
-    // (shrink=1) — стандартная потеря корабля (HullSystem.Abandon: списание,
-    // пересадка) — без взрыва. Прежние пороги гибели (размер/приближение)
-    // убраны; физика воронки v3 (Н7/Н8.0) не тронута.
+    // Чёрная дыра v5 (2026-11-15, переработка владельца): дыра В РАЗЫ БОЛЬШЕ
+    // (радиус тела в ассете уровня ×3) И СИЛЬНЕЕ (воронка/закрутка — ручки
+    // PhysicsConfig). Захват (кольцо) запускает окно поглощения
+    // BlackHoleShrinkSeconds (~45 РЕАЛЬНЫХ секунд): корабль КРУТИТ и сжимает —
+    // быстро в начале, потом всё слабее (ease-out по времени захвата), спираль
+    // к центру тоже затухает по мере сжатия. В конце окна «ПРОПАДАЕТ СВЯЗЬ» —
+    // корабль отключается сам, оператор спавнится на новом. Или оператор
+    // отключает корабль сам в любой момент (X) — спавн на новом сразу. В ОБОИХ
+    // случаях старый борт остаётся КРУЖИТЬ НА ОРБИТЕ дыры ДО КОНЦА ОКНА и его
+    // видно с нового корабля (WreckSystem, орбитальный режим). Предупреждения —
+    // в HUD-баннере (как жар), НЕ на весь экран; X ловит оверлей-реле.
+    // Респавн — стандартный (на стартовой планете). Физика воронки v3 (Н7/Н8.0)
+    // не тронута, кроме вязкости падения (затухает по мере сжатия).
     public class BlackHole : CelestialBody
     {
         // дыра всегда ×8: если в данных множитель меньше — форсим (решение координатора)
@@ -37,16 +38,20 @@ namespace SpaceTaxi.World
         private const float ShrinkRateNearEdge = 0.9f;
         private const float ShrinkRateNearHorizon = 1.15f;
 
-        // совместимость: прежний константный таймаут Н-10 — полное окно поглощения
-        // теперь BlackHoleShrinkSeconds (конфиг)
-        public const float SwallowTimeoutSeconds = 210f;
+        // ease-out сжатия (2026-11-15, владелец: «в начале уменьшается заметно,
+        // а потом всё слабее, слабее»): прогресс = 1-(1-x)^Power, x — доля окна.
+        // Степень 2: к половине окна корабль сжат на 75%, дальше ползёт
+        private const float ShrinkEasePower = 2f;
 
         private const float RestoreDuration = 1f; // выход из зоны — восстановление быстрее
         // гистерезис выхода из захвата: на границе кольца удержание и звук
         // «затянуло» не должны хлопать туда-обратно
         private const float CaptureExitFraction = 1.06f;
 
-        public const string AbandonReason = "ПОГЛОЩЁН ЧЁРНОЙ ДЫРОЙ";
+        // причины потери борта (тост «КОРАБЛЬ ПОТЕРЯН — …»): в конце окна
+        // «пропадает связь», вручную — оператор отключил сам
+        public const string SignalLostReason = "ПОТЕРЯНА СВЯЗЬ С БОРТОМ";
+        public const string AbandonedReason = "БОРТ ОТКЛЮЧЁН ОПЕРАТОРОМ";
 
         public static readonly Color CoreColor = new Color(0.06f, 0.05f, 0.1f);
         public static readonly Color ZoneColor = new Color(0.45f, 0.25f, 0.7f, 0.1f);
@@ -59,18 +64,24 @@ namespace SpaceTaxi.World
         // зоны эффекта — воронка действует только в ней
         public float CaptureRadius => Mathf.Min(CaptureRing, EffectRadius);
 
-        // оверлей Н-10 → v4: корабль в захвате дыры (медленное поглощение идёт)
+        // оверлей Н-10 → v5: корабль в захвате дыры (окно поглощения идёт);
+        // предупреждение — в HUD-баннере (HudBinder), реле X — оверлей-контроллер
         public bool SwallowActive => Captured;
         public bool Captured => wasCaptured && ship != null && ship.State == ShipState.Flying;
-        // сколько секунд осталось до полного поглощения (для оверлея)
-        public float SwallowLeftSeconds => Mathf.Max(0f, config.BlackHoleShrinkSeconds * (1f - shrink));
+        // корабль в зоне влияния (до захвата) — для мягкого предупреждения в баннере
+        public bool InEffectZone => ship != null && ship.State == ShipState.Flying
+            && Vector2.Distance(ship.transform.position, transform.position) <= EffectRadius;
+        // сколько РЕАЛЬНЫХ секунд осталось до потери связи (для баннера и обломка):
+        // время захвата копится с множителем глубины, остаток — от окна
+        public float SwallowLeftSeconds => Mathf.Max(0f, config.BlackHoleShrinkSeconds - captureElapsed);
 
         private Ship ship;
         private HullSystem hull;
         private Vector3 shipScale = Vector3.one;
-        private float shrink;       // 0 — нормальный корабль, 1 — поглощён полностью
-        private bool swallowStarted; // полное поглощение — один раз
-        private bool wasCaptured;   // одноразовые эффекты на входе в кольцо
+        private float shrink;          // 0 — нормальный корабль, 1 — поглощён полностью
+        private float captureElapsed;  // время в захвате (с множителем глубины), с
+        private bool swallowStarted;   // полное поглощение — один раз
+        private bool wasCaptured;      // одноразовые эффекты на входе в кольцо
 
         public override void Init(CelestialBodyData data, Physics.PhysicsConfig physicsConfig, bool fuelOutage = false)
         {
@@ -103,16 +114,23 @@ namespace SpaceTaxi.World
 
                 // сжатие-спагетти: прогрессирует только в захвате (внутри
                 // кольца), у горизонта — быстрее; между кольцом и краем держится.
-                // v4: смерть по размеру убрана — полное сжатие = ПОЛНОЕ ПОГЛОЩЕНИЕ
+                // v5: ход сжатия — ease-out (владелец: «в начале уменьшается
+                // заметно, а потом всё слабее, слабее»): время захвата копится
+                // с множителем глубины, сжатие = 1-(1-x)^Power — в конце окна
+                // корабль всё же исчезает (ПОТЕРЯНА СВЯЗЬ)
                 if (d <= CaptureRadius)
                 {
                     float rate = Mathf.Lerp(ShrinkRateNearEdge, ShrinkRateNearHorizon, depth);
+                    // кламп кадра: спайки dt (загрузка сцены, лаги) не съедают окно
+                    // поглощения за миг — окно честно отмеряется игровым временем
+                    captureElapsed += Mathf.Min(Time.deltaTime, 0.1f) * rate;
                     float seconds = Mathf.Max(config.BlackHoleShrinkSeconds, 0.1f);
-                    shrink = Mathf.MoveTowards(shrink, 1f, Time.deltaTime / seconds * rate);
+                    float x = Mathf.Clamp01(captureElapsed / seconds);
+                    shrink = 1f - Mathf.Pow(1f - x, ShrinkEasePower);
                     ship.transform.localScale = ShipScale();
 
-                    if (shrink >= 1f && !swallowStarted)
-                        FullSwallow(); // поглощён полностью — корабль списан
+                    if (x >= 1f && !swallowStarted)
+                        FullSwallow(); // конец окна — потеря связи, борт списан
                 }
             }
             else
@@ -124,6 +142,8 @@ namespace SpaceTaxi.World
                     shrink = Mathf.MoveTowards(shrink, 0f, Time.deltaTime / RestoreDuration);
                     ship.transform.localScale = ShipScale();
                 }
+                if (d > EffectRadius)
+                    captureElapsed = 0f; // вышел из зоны — окно захвата заново
             }
         }
 
@@ -175,9 +195,14 @@ namespace SpaceTaxi.World
                 tangential += orbitDir * (swirl * Time.fixedDeltaTime);
 
                 // вязкость: скорость падения ограничена — спираль тянется, а не
-                // обрывается (и быстрый таран горизонта превращается в медленный)
-                if (radial < -config.BlackHoleSinkSpeedMax)
-                    radial = Mathf.MoveTowards(radial, -config.BlackHoleSinkSpeedMax,
+                // обрывается (и быстрый таран горизонта превращается в медленный).
+                // v5: предел падения затухает по мере сжатия — расстояние до
+                // центра сокращается заметно в начале окна, потом всё слабее
+                // (владелец), корабль встаёт на стягивающуюся орбиту, пока
+                // сжатие не доведёт до конца окна
+                float sinkCap = config.BlackHoleSinkSpeedMax * (1f - shrink);
+                if (radial < -sinkCap)
+                    radial = Mathf.MoveTowards(radial, -sinkCap,
                         config.BlackHoleSinkClampRate * Time.fixedDeltaTime);
 
                 // застрявший (тяги не хватает на вырывание): вылет гасится,
@@ -224,7 +249,8 @@ namespace SpaceTaxi.World
             return Mathf.Lerp(config.BlackHoleRadialHoldEdge, config.BlackHoleRadialHoldHorizon, depth);
         }
 
-        // полное поглощение (shrink=1): корабль исчезает без взрыва —
+        // конец окна поглощения (владелец: «пропадает связь и корабль
+        // отключается, и ты спавнишься на новом»): корабль списан без взрыва —
         // стандартная потеря борта (HullSystem.Abandon: списание, пересадка)
         private void FullSwallow()
         {
@@ -232,18 +258,18 @@ namespace SpaceTaxi.World
                 return;
             swallowStarted = true;
             Sound.StopLoop(SoundId.BlackHoleHum);
-            hull.Abandon(AbandonReason);
+            hull.Abandon(SignalLostReason);
         }
 
-        // оператор отключил корабль (оверлей Н-10 / X): доступно в ЗАХВАТЕ —
-        // единственный способ спастись до полного поглощения
+        // оператор отключил корабль сам (X в захвате): спавн на новом сразу —
+        // а старый борт остаётся кружить до конца окна (см. OnShipLostInCapture)
         public void RequestAbandon()
         {
             if (ship == null || hull == null || ship.State != ShipState.Flying)
                 return;
             if (!wasCaptured)
                 return; // вне захвата дыры отключать нечего
-            hull.Abandon(AbandonReason);
+            hull.Abandon(AbandonedReason);
         }
 
         // масштаб сжатия: 1 → BlackHoleMinScale (порог гибели по размеру)

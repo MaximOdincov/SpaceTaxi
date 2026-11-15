@@ -662,7 +662,7 @@ MonoBehaviour:
   - DisplayName: "\u0427\u0451\u0440\u043D\u0430\u044F \u0434\u044B\u0440\u0430"
     Type: 10
     Position: {x: 1190, y: -3662}
-    Radius: 55
+    Radius: 165
     VisualSizeMul: 0
     MassMultiplier: 8
     HeatRadius: 0

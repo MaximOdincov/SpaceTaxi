@@ -42,9 +42,9 @@ namespace SpaceTaxi.Physics
 
         [Header("Чёрная дыра (Н7 G7.1; §1.6 — градиент риска)")]
         [Tooltip("Воронка: притяжение на краю зоны эффекта, ед/с²")]
-        public float BlackHolePullEdge = 45f;
+        public float BlackHolePullEdge = 70f;
         [Tooltip("Воронка: притяжение у горизонта, ед/с² — глубже кольца вырваться не может никто")]
-        public float BlackHolePullHorizon = 300f;
+        public float BlackHolePullHorizon = 420f;
         [Tooltip("Порог вырывания: корабль не считается застрявшим, если его тяга выше притяжения × это значение. Стоковый Барин (140) > притяжение на кольце (~119) × 1.15 — вырывается; Игла (135) — уже нет")]
         public float BlackHoleEscapeThrustFraction = 1.15f;
         [Tooltip("Удержание «застрял»: скорость гашения радиального ВЫЛЕТА на кольце захвата, ед/с² (должно быть больше тяги корабля)")]
@@ -52,19 +52,19 @@ namespace SpaceTaxi.Physics
         [Tooltip("Удержание у горизонта, ед/с²")]
         public float BlackHoleRadialHoldHorizon = 380f;
         [Tooltip("Закрутка орбиты на кольце захвата, ед/с² — скорость вращения по орбите растёт")]
-        public float BlackHoleSwirlEdge = 45f;
+        public float BlackHoleSwirlEdge = 80f;
         [Tooltip("Закрутка у горизонта, ед/с²")]
-        public float BlackHoleSwirlHorizon = 130f;
+        public float BlackHoleSwirlHorizon = 220f;
         [Tooltip("Потолок орбитальной скорости застрявшего корабля = фактор × √(притяжение × дистанция). Ниже центробежного баланса — корабль вязко спирали внутрь; вырывание через разгон орбиты остаётся у кораблей с достаточной тягой")]
         public float BlackHoleOrbitSpeedFactor = 0.95f;
         [Tooltip("Скорость стягивания орбитальной скорости к потолку, ед/с")]
         public float BlackHoleOrbitClampRate = 240f;
         [Tooltip("Предел скорости падения в захвате, ед/с — спираль тянется, а не обрывается")]
-        public float BlackHoleSinkSpeedMax = 12f;
+        public float BlackHoleSinkSpeedMax = 16f;
         [Tooltip("Как быстро скорость падения приводится к пределу, ед/с² — должно успевать гасить таран на максимальной скорости до порога приближения")]
         public float BlackHoleSinkClampRate = 900f;
-        [Tooltip("Полное время поглощения (v4, хотфикс владельца): сжатие корабля от 1 до полного исчезновения, с — 3.5 реальных минуты; у горизонта слегка ускоряется. Дыра не убивает — полностью поглощённый корабль списывается")]
-        public float BlackHoleShrinkSeconds = 210f;
+        [Tooltip("Окно поглощения (v5, владелец: ~45 реальных секунд): корабль крутит и сжимает — быстро в начале, потом всё слабее (ease-out); в конце окна «пропадает связь», борт отключается сам, оператор спавнится на новом")]
+        public float BlackHoleShrinkSeconds = 45f;
         [Tooltip("Конечный масштаб сжатия: корабль исчезает, когда сжатие доходит до этой доли (полное поглощение)")]
         public float BlackHoleMinScale = 0.25f;
         [Tooltip("НЕ ИСПОЛЬЗУЕТСЯ с v4 (дыра не убивает по приближению) — оставлено для схемы ассета")]

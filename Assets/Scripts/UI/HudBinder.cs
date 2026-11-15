@@ -26,6 +26,7 @@ namespace SpaceTaxi.UI
         private Ship ship;
         private GravityField gravity;
         private ShipController controller;
+        private BlackHole hole;      // предупреждения дыры — ленивый бинд, как в самом BlackHole
         private bool bound;
         private Color speedBaseColor;
 
@@ -469,15 +470,25 @@ namespace SpaceTaxi.UI
                 fuelSegments[i].color = i < lit ? SegmentOn : SegmentOff;
         }
 
-        // один баннер, приоритет: пустой бак > жар > мало топлива.
-        // Тревога: крупный пульсирующий текст + сирены по бокам + звук
+        // один баннер, приоритет: пустой бак > захват дыры > жар > зона дыры > мало топлива.
+        // Тревога: крупный пульсирующий текст + сирены по бокам + звук.
+        // v5 (2026-11-15, владелец: «предупреждения как с жаром, но не на весь
+        // экран как сейчас»): предупреждения чёрной дыры — здесь, фуллскрин-
+        // оверлей убран; в тексте захвата — отсчёт до потери связи и подсказка X
         private void UpdateWarning()
         {
+            if (hole == null)
+                hole = FindAnyObjectByType<BlackHole>();
+
             string message = null;
             if (ship.Fuel <= 0f)
                 message = "⚠ ТОПЛИВО КОНЧИЛОСЬ — ДРЕЙФ";
+            else if (hole != null && hole.SwallowActive)
+                message = $"⚠ ЧЁРНАЯ ДЫРА — ЗАТЯГИВАЕТ · СВЯЗЬ ЧЕРЕЗ {Mathf.CeilToInt(hole.SwallowLeftSeconds)} с · X — ОТКЛЮЧИТЬ БОРТ";
             else if (IsInHeat())
                 message = "⚠ ЖАРОВАЯ ЗОНА — КОРПУС ГОРИТ";
+            else if (hole != null && hole.InEffectZone)
+                message = "⚠ ЧЁРНАЯ ДЫРА — ЗОНА ВЛИЯНИЯ";
             else if (ship.FuelFraction < 0.1f)
                 message = "⚠ ТОПЛИВО КОНЧАЕТСЯ";
 

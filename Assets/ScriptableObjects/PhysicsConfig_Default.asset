@@ -29,17 +29,17 @@ MonoBehaviour:
   HeadingMaxTurnSpeed: 260
   MinControlSpeed: 1
   GravityBoost: 1.15
-  BlackHolePullEdge: 45
-  BlackHolePullHorizon: 300
+  BlackHolePullEdge: 70
+  BlackHolePullHorizon: 420
   BlackHoleEscapeThrustFraction: 1.15
   BlackHoleRadialHoldEdge: 160
   BlackHoleRadialHoldHorizon: 380
-  BlackHoleSwirlEdge: 45
-  BlackHoleSwirlHorizon: 130
+  BlackHoleSwirlEdge: 80
+  BlackHoleSwirlHorizon: 220
   BlackHoleOrbitSpeedFactor: 0.95
   BlackHoleOrbitClampRate: 240
-  BlackHoleSinkSpeedMax: 12
+  BlackHoleSinkSpeedMax: 16
   BlackHoleSinkClampRate: 900
-  BlackHoleShrinkSeconds: 210
+  BlackHoleShrinkSeconds: 45
   BlackHoleMinScale: 0.25
   BlackHoleDeathProximity: 45
