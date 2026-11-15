@@ -480,10 +480,17 @@ namespace SpaceTaxi.UI
         {
             if (chevronSprite != null)
                 return chevronSprite;
-            // v5.1 (владелец: «svrn полностью заполненный, а обычный шеврон
-            // полый — сейчас используется полый»): правильная иконка — svrn_0
-            // (ЦЕЛЬНЫЙ заполненный шеврон); Шеврон.png (ПОЛЫЙ контурный) —
-            // фолбэк, если svrn нечитаем
+            // v5.2 (владелец: «почему она обрезанная какая-то» — в svrn.png
+            // концы диагоналей срезаны краем холста арта): первичный источник —
+            // svrn_full.png (заполненный шеврон с ПОЛНЫМИ концами, восстановлен
+            // заливкой тел из контурного Шеврон.png); фолбэки: svrn_0 (обрезанный
+            // оригинал), Шеврон.png (полый контур), StubSprites
+            var full = Resources.Load<Sprite>("Art/icons/svrn_full");
+            if (full != null)
+            {
+                chevronSprite = full;
+                return chevronSprite;
+            }
             var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
             if (frames != null && frames.Length > 0)
             {

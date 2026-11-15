@@ -458,7 +458,10 @@ namespace SpaceTaxi.UI
                 {
                     float d = Mathf.Clamp(trueD, 8f, 44f);
                     Halo(root, d * 1.25f, PlanetColor, 0.1f);
-                    RingMark(root, d, WithAlpha(PlanetColor, 0.9f));
+                    // v5.2 (владелец: «убери обводку на миникарте у центральной
+                    // планеты МТО»): у хаба внешнее зелёное кольцо не рисуется
+                    if (!body.IsHub)
+                        RingMark(root, d, WithAlpha(PlanetColor, 0.9f));
                     BuildStationDot(root, body, d);
                     break;
                 }
@@ -474,9 +477,8 @@ namespace SpaceTaxi.UI
         {
             if (body.IsHub)
             {
-                Color c = FuelTierColor(body.FuelTier);
-                RingMark(root, Mathf.Max(ringD - 6f, 6f), WithAlpha(c, 0.5f));
-                Dot(root, 5f, c);
+                // v5.2: без обводок — только точка-статус (топливный тир)
+                Dot(root, 5f, FuelTierColor(body.FuelTier));
             }
             else if (body.HasFuel)
             {
