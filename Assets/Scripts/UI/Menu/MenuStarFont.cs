@@ -32,12 +32,11 @@ namespace SpaceTaxi.UI
         private const string Hcyr = "X...X|X...X|X...X|XXXXX|X...X|X...X|X...X"; // Н
         private const string Ocyr = ".XXX.|X...X|X...X|X...X|X...X|X...X|.XXX."; // О
         private const string Pcyr = "XXXXX|X...X|X...X|X...X|X...X|X...X|X...X"; // П
-        // Ы = ь + ı: чашечка «ь» с пустотой-«окружностью» В ЦЕНТРЕ буквы —
-        // край чашечки (col 3) на рядах 4-5, соединительная точка (col 2, ряд 6)
-        // замыкает низ на основание, разрыв (col 4) отделяет от правой палки.
-        // (2026-11-15, владелец: «одну точку выше подними, чтоб окружность
-        // была в центре» — нижняя точка края поднялась с ряда 6 на ряд 4)
-        private const string Ycyr = "X...X|X...X|X...X|X.X.X|X.X.X|XX..X|XXXXX"; // Ы
+        // Ы = ь + ı — маска ВЛАДЕЛЬЦА (2026-11-15, «смотри как надо»): чашечка
+        // «ь» замкнута в кольцо — верхняя перемычка (ряд 4: cols 1-3), правый
+        // край (col 3, ряды 5-6), низ — базовая линия; пустота (col 2, ряды 5-6)
+        // в центре, разрыв (col 4) отделяет от правой палки
+        private const string Ycyr = "X...X|X...X|X...X|XXX.X|X.X.X|X.X.X|XXXXX"; // Ы
         private const string SoftSign = "X....|X....|X....|XXXX.|X...X|X...X|XXXX."; // Ь
         private const string Yacyr = ".XXXX|X...X|X...X|.XXXX|..X.X|.X..X|X...X"; // Я
         private const string Zhcyr = "X.X.X|X.X.X|X.X.X|XXXXX|X.X.X|X.X.X|X.X.X"; // Ж
