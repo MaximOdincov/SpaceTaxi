@@ -480,15 +480,14 @@ namespace SpaceTaxi.UI
         {
             if (chevronSprite != null)
                 return chevronSprite;
-            // v5.2 (владелец: «почему она обрезанная какая-то» — в svrn.png
-            // концы диагоналей срезаны краем холста арта): первичный источник —
-            // svrn_full.png (заполненный шеврон с ПОЛНЫМИ концами, восстановлен
-            // заливкой тел из контурного Шеврон.png); фолбэки: svrn_0 (обрезанный
-            // оригинал), Шеврон.png (полый контур), StubSprites
-            var full = Resources.Load<Sprite>("Art/icons/svrn_full");
-            if (full != null)
+            // v5.2 (владелец перевёл импорт svrn.png Multiple → Single — нарезка
+            // кадров резала концы шеврона): первичный источник — обычный svrn
+            // (единый спрайт целиком); фолбэки: LoadAll (старый Multiple),
+            // Шеврон.png (полый контур), StubSprites
+            var svrn = Resources.Load<Sprite>("Art/icons/svrn");
+            if (svrn != null)
             {
-                chevronSprite = full;
+                chevronSprite = svrn;
                 return chevronSprite;
             }
             var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
