@@ -20,7 +20,11 @@ namespace SpaceTaxi.UI
         private const string T = "XXXXX|..X..|..X..|..X..|..X..|..X..|..X..";
         private const string X = "X...X|X...X|.X.X.|..X..|.X.X.|X...X|X...X";
         private const string Gcyr = "XXXXX|X....|X....|X....|X....|X....|X....";     // Г
-        private const string Dcyr = ".XXXX|.X..X|.X..X|.X..X|.X..X|XXXXX|X...X"; // Д
+        // Д: симметричный «шалашик» (2026-11-15: прежний корпус по cols 1-4 при
+        // ногах 0/4 давал асимметрию — левая нога выходила вбок, правая шла
+        // вертикально под стеной; теперь корпус cols 1-3, обе ноги выходят
+        // наружу на 1 клетку)
+        private const string Dcyr = ".XXX.|.X.X.|.X.X.|.X.X.|.X.X.|XXXXX|X...X"; // Д
         private const string Icyr = "X...X|X...X|X..XX|X.X.X|XX..X|X...X|X...X"; // И
         private const string Jcyr = ".X.X.|X...X|X..XX|X.X.X|XX..X|X...X|X...X"; // Й
         private const string Kcyr = "X...X|X..X.|X.X..|XX...|X.X..|X..X.|X...X"; // К
@@ -28,10 +32,11 @@ namespace SpaceTaxi.UI
         private const string Hcyr = "X...X|X...X|X...X|XXXXX|X...X|X...X|X...X"; // Н
         private const string Ocyr = ".XXX.|X...X|X...X|X...X|X...X|X...X|.XXX."; // О
         private const string Pcyr = "XXXXX|X...X|X...X|X...X|X...X|X...X|X...X"; // П
-        // Ы: обе вертикали во всю высоту + ДВУХРЯДНАЯ нижняя перекладина
-        // (2026-11-15: однорядная перекладина из мерцающих точек терялась —
-        // «ВЫХОД» читалось «ВИХОД»; двойной бар читается однозначно)
-        private const string Ycyr = "X...X|X...X|X...X|X...X|X...X|XXXXX|XXXXX"; // Ы
+        // Ы: обе вертикали во всю высоту + ОДНОРЯДНАЯ нижняя перекладина
+        // (2026-11-15: двухрядная при толстых точках слилась с закруглением
+        // левой ножки в сплошной низ — «поплыла»; однорядная читается, т.к.
+        // точки с тех пор стали заметно толще — как перекладины В)
+        private const string Ycyr = "X...X|X...X|X...X|X...X|X...X|X...X|XXXXX"; // Ы
         private const string SoftSign = "X....|X....|X....|XXXX.|X...X|X...X|XXXX."; // Ь
         private const string Yacyr = ".XXXX|X...X|X...X|.XXXX|..X.X|.X..X|X...X"; // Я
         private const string Zhcyr = "X.X.X|X.X.X|X.X.X|XXXXX|X.X.X|X.X.X|X.X.X"; // Ж
