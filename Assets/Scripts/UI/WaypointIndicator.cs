@@ -459,20 +459,11 @@ namespace SpaceTaxi.UI
         {
             if (chevronSprite != null)
                 return chevronSprite;
-            var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
-            if (frames != null && frames.Length > 0)
-            {
-                foreach (var frame in frames)
-                {
-                    if (frame != null && frame.name == "svrn_0")
-                    {
-                        chevronSprite = frame;
-                        return chevronSprite;
-                    }
-                }
-                chevronSprite = frames[0];
-                return chevronSprite;
-            }
+            // v5.1 (владелец: «чеврон цели обрезан — он должен быть из
+            // Resources/Art/icons»): первичный источник — Шеврон.png (контурный
+            // шеврон с ПОЛНЫМИ закруглёнными концами); прежний svrn_0 — цельные
+            // шевроны с плоско срезанными концами арта (читались «обрезанными»)
+            // — фолбэк, если Шеврон нечитаем
             var texture = Resources.Load<Texture2D>("Art/icons/Шеврон");
             if (texture == null)
                 return null;
@@ -493,8 +484,16 @@ namespace SpaceTaxi.UI
             }
             catch (UnityException)
             {
-                // текстура не читаема (импортер без isReadable) — процедурный фолбэк
-                return null;
+                // Шеврон нечитаем (импортер без isReadable) — прежний svrn_0
+                var frames = Resources.LoadAll<Sprite>("Art/icons/svrn");
+                if (frames != null && frames.Length > 0)
+                {
+                    foreach (var frame in frames)
+                        if (frame != null && frame.name == "svrn_0")
+                            return frame;
+                    return frames[0];
+                }
+                return null; // процедурный фолбэк StubSprites.TargetChevron
             }
             return chevronSprite;
         }
@@ -516,8 +515,9 @@ namespace SpaceTaxi.UI
             tip.sizeDelta = new Vector2(56f, 56f);
             tip.anchoredPosition = new Vector2(0f, 12f);
             Image tipImage = tipGo.GetComponent<Image>();
-            Sprite chevron = ChevronSprite(); // иконка Шеврон.png (Н4.2.3)
+            Sprite chevron = ChevronSprite(); // иконка Шеврон.png из Art/icons (v5.1)
             tipImage.sprite = chevron != null ? chevron : StubSprites.TargetChevron();
+            tipImage.preserveAspect = true; // спрайт не сплющивается в квадрат tip'а
             tipImage.color = color;
             tipImage.raycastTarget = false;
 
