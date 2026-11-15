@@ -38,8 +38,9 @@ namespace SpaceTaxi.World
             internal float spinDegPerSec; // качание вокруг своей оси
             internal float fadeLeft;
             internal bool fading;
-            internal bool orbital;        // v4: стабильная орбита (отключение), не спираль
+            internal bool orbital;        // v4: орбита дыры (отключение); v5.1 — со спиралью внутрь
             internal float lifetimeLeft;  // orbital: остаток окна поглощения
+            internal float radiusDecayPerSecond; // v5.1: скорость угасания орбиты, юнитов/с
         }
 
         private readonly List<Wreck> wrecks = new List<Wreck>();
@@ -61,9 +62,10 @@ namespace SpaceTaxi.World
                 orbital: false, lifetimeSeconds: 0f);
         }
 
-        // v4: брошенный (отключённый) корабль — СТАБИЛЬНАЯ ОРБИТА на remaining
-        // секунд окна поглощения: радиус не Decay-ится, корабль медленно сжимается
-        // (дыра всё же тянет) и в конце окна гаснет
+        // v5.1 (2026-11-15, владелец: «после отключения появляется его КЛОН»):
+        // брошенный корабль — НЕ статичная копия, а погибающий борт: орбита
+        // УГАСАЕТ к центру дыры за время окна (спираль, как у живого корабля
+        // в воронке), сжатие продолжается, в конце — поглощение (гаснет)
         public void SpawnOrbital(BlackHole hole, Vector2 position, Sprite sprite, float scale,
             float angularSpeedRadPerSec, float spinDegPerSec, float lifetimeSeconds)
         {
@@ -110,6 +112,9 @@ namespace SpaceTaxi.World
                 angle = Mathf.Atan2(offset.y, offset.x),
                 angularSpeed = Mathf.Clamp(angularSpeedRadPerSec, -SpinMaxRadPerSec, SpinMaxRadPerSec),
                 scale = scale,
+                radiusDecayPerSecond = orbital
+                    ? Mathf.Max(offset.magnitude, hole.Horizon) / Mathf.Max(lifetimeSeconds, 1f)
+                    : RadiusDecayPerSecond,
                 minScale = scale * MinScaleFraction,
                 shrinkPerSecond = orbital
                     ? scale * (1f - MinScaleFraction) / Mathf.Max(lifetimeSeconds, 1f)
@@ -146,10 +151,13 @@ namespace SpaceTaxi.World
                         wreck.center = wreck.hole.transform.position;
                         if (wreck.orbital)
                         {
-                            // стабильная орбита: радиус держится, лёгкий дрейф угла,
-                            // окно поглощения тикает — в конце окно гаснет
+                            // v5.1: орбита угасает — спираль внутрь дыры за время
+                            // окна (радиус = начальный × остаток жизни), не статичный
+                            // «клон» на месте; в конце — поглощение (гаснет)
                             wreck.angle += wreck.angularSpeed * dt;
                             wreck.lifetimeLeft -= dt;
+                            wreck.radius = Mathf.MoveTowards(wreck.radius, 0f,
+                                wreck.radiusDecayPerSecond * dt);
                             wreck.scale = Mathf.MoveTowards(
                                 wreck.scale, wreck.minScale, wreck.shrinkPerSecond * dt);
                             wreck.transform.position = wreck.center

@@ -15,8 +15,13 @@ namespace SpaceTaxi.World
     // случаях старый борт остаётся КРУЖИТЬ НА ОРБИТЕ дыры ДО КОНЦА ОКНА и его
     // видно с нового корабля (WreckSystem, орбитальный режим). Предупреждения —
     // в HUD-баннере (как жар), НЕ на весь экран; X ловит оверлей-реле.
-    // Респавн — стандартный (на стартовой планете). Физика воронки v3 (Н7/Н8.0)
-    // не тронута, кроме вязкости падения (затухает по мере сжатия).
+    // Респавн — стандартный (на стартовой планете). Воронка v5.1: двигатели
+    // в захвате РАБОТАЮТ (разворот/тормоз/тяга — без гасилки скорости) —
+    // исход решает чистое сравнение силы тяги и воронки: слабые обречены
+    // сразу, сильные (Барин) — пока глубина мала; у застрявших орбитальная
+    // скорость вязко стягивается (потолок проседает со сжатием), предел
+    // падения растёт — траектория угасает внутрь. Обломок отключённого
+    // борта тоже спиралит внутрь (WreckSystem), а не висит клоном.
     public class BlackHole : CelestialBody
     {
         // дыра всегда ×8: если в данных множитель меньше — форсим (решение координатора)
@@ -173,7 +178,7 @@ namespace SpaceTaxi.World
                 wasCaptured = true;
                 Sound.Play(SoundId.BlackHoleSwallow); // слот «провала»: момент захвата
                 CameraFollow.AddShake(0.45f);
-                Debug.Log("[BlackHole] корабль захвачен — радиальный вылет заблокирован");
+                Debug.Log("[BlackHole] корабль захвачен — воронка сильнее тяги");
             }
             else if (!captured && wasCaptured)
             {
@@ -194,26 +199,30 @@ namespace SpaceTaxi.World
                 float swirl = Mathf.Lerp(config.BlackHoleSwirlEdge, config.BlackHoleSwirlHorizon, depth);
                 tangential += orbitDir * (swirl * Time.fixedDeltaTime);
 
-                // вязкость: скорость падения ограничена — спираль тянется, а не
-                // обрывается (и быстрый таран горизонта превращается в медленный).
-                // v5: предел падения затухает по мере сжатия — расстояние до
-                // центра сокращается заметно в начале окна, потом всё слабее
-                // (владелец), корабль встаёт на стягивающуюся орбиту, пока
-                // сжатие не доведёт до конца окна
-                float sinkCap = config.BlackHoleSinkSpeedMax * (1f - shrink);
+                // вязкость падения (v5.1, владелец: «не только размер — должна
+                // уменьшаться траектория и затягивать больше внутрь, а то
+                // супер маленький корабль волочится по огромной орбите»):
+                // предел падения РАСТЁТ по мере сжатия — крошечный корабль
+                // уже не волочится по большому кругу, а падает внутрь всё
+                // быстрее; быстрый таран горизонта по-прежнему превращается
+                // в медленную спираль
+                float sinkCap = config.BlackHoleSinkSpeedMax * (0.4f + 1.6f * shrink);
                 if (radial < -sinkCap)
                     radial = Mathf.MoveTowards(radial, -sinkCap,
                         config.BlackHoleSinkClampRate * Time.fixedDeltaTime);
 
-                // застрявший (тяги не хватает на вырывание): вылет гасится,
-                // орбитальная скорость стягивается к потолку ниже центробежного
-                // баланса — медленная спираль внутрь неизбежна
+                // «застрял» (v5.1, владелец: «двигатели должны работать даже в
+                // зоне влияния... у слабых шансов нет на разных этапах, у сильных
+                // и Барина сначала есть, потом пропадает; разворот, тормоз и тд
+                // работают — просто дыру уже не остановить»): тяга против
+                // воронки — ЧИСТОЕ силовое сравнение, никакой гасилки скорости:
+                // корабль жмёт наружу — воронка пересиливает. Застрявшему вязко
+                // стягивается орбитальная скорость (потолок ниже центробежного
+                // баланса и проседает со сжатием) — спираль внутрь неизбежна
                 if (ship.Eff.Thrust <= TotalPull(d, depth) * config.BlackHoleEscapeThrustFraction)
                 {
-                    if (radial > 0f)
-                        radial = Mathf.MoveTowards(radial, 0f, HoldAt(depth) * Time.fixedDeltaTime);
-
-                    float orbitCap = config.BlackHoleOrbitSpeedFactor * Mathf.Sqrt(TotalPull(d, depth) * d);
+                    float orbitCap = config.BlackHoleOrbitSpeedFactor * (1f - 0.4f * shrink)
+                        * Mathf.Sqrt(TotalPull(d, depth) * d);
                     float tangentMag = tangential.magnitude;
                     if (tangentMag > 0.001f)
                         tangential = tangential.normalized * Mathf.MoveTowards(
@@ -242,11 +251,6 @@ namespace SpaceTaxi.World
         {
             float field = Mathf.Min(config.GravParamOf(this) / Mathf.Max(d * d, 1f), config.GravityAccelClamp);
             return PullAt(depth) + field;
-        }
-
-        private float HoldAt(float depth)
-        {
-            return Mathf.Lerp(config.BlackHoleRadialHoldEdge, config.BlackHoleRadialHoldHorizon, depth);
         }
 
         // конец окна поглощения (владелец: «пропадает связь и корабль

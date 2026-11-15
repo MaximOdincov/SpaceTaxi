@@ -1054,6 +1054,10 @@ namespace SpaceTaxi.UI
             // пролетаешь мимо»). Относительная нормировка maxBodyRadius убрана:
             // отношение «px карты / радиус мира» одно для всех тел.
             float d = Mathf.Max(MinIconPx, GameRadiusOf(body) * 2f * scale);
+            // v5.1 (владелец: «на карте просто увеличь иконку черной дыры, а не
+            // рисуй ореол»): иконка дыры ×2 — фиолетовая зона-ореол убрана
+            if (body.Type == BodyType.BlackHole)
+                d *= 2f;
             // ХОТФИКС владельца (день после Н8): на карте — КАРТОГРАФИЧЕСКИЕ спрайты
             // Art/map (услуги читаются с иконки), не игровые арты планет; честный
             // размер (d) остаётся прежним — меняется только текстура
@@ -1071,16 +1075,6 @@ namespace SpaceTaxi.UI
                 new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             group.sizeDelta = size;
             group.anchoredPosition = WorldToMap(body.Position);
-
-            // ХОТФИКС владельца: чёрная дыра на карте — «в жизни огромная»: рисуем
-            // ЗОНУ ЗАХВАТА (EffectRadius = R×6, мягкий фиолетовый диск как в игре)
-            // позади честного ядра — ядро маленькое, опасность огромная
-            if (body.Type == BodyType.BlackHole)
-            {
-                float effectPx = GameRadiusOf(body) * BlackHole.EffectRadiusMultiplier * 2f * scale;
-                MakeImage("HoleZone", group, StubSprites.Zone(effectPx),
-                    new Color(0.45f, 0.25f, 0.7f, 0.45f), Vector2.one * effectPx, false);
-            }
 
             // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
             // цвет — родной цвет арта (M8.1: чернильная отмывка снята по вкусу владельца)
