@@ -194,7 +194,6 @@ namespace SpaceTaxi.Core
                 save.TaskSpeedLimit = offer.Task.SpeedLimit;
                 save.TaskDistanceThreshold = offer.Task.DistanceThreshold;
                 save.TaskTargetBodyIndex = offer.Task.TargetBodyIndex;
-                save.TaskWaitSeconds = offer.Task.WaitSeconds;
                 save.TaskSucceeded = offer.Task.Succeeded;
                 save.TaskFailed = offer.Task.Failed;
                 // только остаток — при загрузке таймер продолжится с него
@@ -482,7 +481,6 @@ namespace SpaceTaxi.Core
                 SpeedLimit = save.TaskSpeedLimit,
                 DistanceThreshold = save.TaskDistanceThreshold,
                 TargetBodyIndex = save.TaskTargetBodyIndex,
-                WaitSeconds = save.TaskWaitSeconds,
                 Succeeded = save.TaskSucceeded,
                 Failed = save.TaskFailed,
             };
