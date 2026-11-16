@@ -27,13 +27,13 @@ MonoBehaviour:
   waypointColor: {r: 0.235, g: 1, b: 0.557, a: 1}
   legendVisible: 1
   legendSize: {x: 489, y: 288.3}
-  titleVisible: 1
+  titleVisible: 0
   titleText: "\u043C\u0430\u0440\u0448\u0440\u0443\u0442\u043D\u044B\u0439 \u043B\u0438\u0441\u0442"
   fogInnerFrac: 0.692
   paperWorldMargin: 1.6
   worldUnitsPerTile: 512
   maxViewZoom: 14
-  initialViewZoom: 9
+  initialViewZoom: 11
   rulerMinZoomFraction: 0.3
-  zoomButtonScale: 1.5
+  zoomButtonScale: 1.2
   annotations: []

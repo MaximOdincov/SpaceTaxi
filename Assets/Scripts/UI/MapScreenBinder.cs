@@ -679,8 +679,7 @@ namespace SpaceTaxi.UI
             float minByHeight = h / (scale * 2f * extY * MinZoomWorldFraction);
             minViewZoom = Mathf.Min(MaxViewZoom, Mathf.Max(minByWidth, minByHeight));
 
-            // рамка листа «от руки» — когда размер известен
-            MakeSketchFrame(sheetRect, WithAlpha(PaperMapArt.Ink, 0.75f), 2.6f, 1042);
+            // рамка листа снята (владелец Н9.2: «убери бежевую рамку по краю»)
 
             // слои снизу вверх: районы → край мира → пояса → подписи → тела →
             // кометы → метка/цель (игрок — на листе, выше всех). Нарисованные
@@ -960,12 +959,19 @@ namespace SpaceTaxi.UI
                 buoy.localRotation = Quaternion.Euler(0f, 0f, i * 17f);
             }
 
-            // ХОТФИКС владельца: граница связи ОБВЕДЕНА и ЗАШТРИХОВАНА — «места, где
-            // нет связи», читаются сразу (прежде — только крап тумана и текст).
-            // Рисованная окружность по радиусу буёв + чернильная штриховка снаружи
-            RectTransform boundary = MakeImage("SignalBoundary", edgeRoot, PaperMapArt.TargetRing(),
-                WithAlpha(PaperMapArt.Ink, 0.55f), Vector2.one * (borderPx * 2f), false);
-            boundary.anchoredPosition = Vector2.zero;
+            // Граница связи — окружность из дуговых сегментов (владелец Н9.2:
+            // «полноценный круг без углов» — TargetRing 256px, растянутый до
+            // тысяч px, читался многоугольником) с тем же трёхлепестковым воблом
+            const int boundarySegments = 180;
+            Vector2 prev = new Vector2(borderPx, 0f);
+            for (int i = 1; i <= boundarySegments; i++)
+            {
+                float ang = i * Mathf.PI * 2f / boundarySegments;
+                float wob = 1f + 0.012f * Mathf.Sin(ang * 3f + 1.3f);
+                Vector2 p = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * (borderPx * wob);
+                MakeSegment(edgeRoot, prev, p, WithAlpha(PaperMapArt.Ink, 0.55f), 2f);
+                prev = p;
+            }
             var hatch = new System.Random(20261114);
             int strokes = 64;
             for (int i = 0; i < strokes; i++)
@@ -1956,9 +1962,6 @@ namespace SpaceTaxi.UI
                 MakeImage("Rocket", playerArrowRoot, chev, PaperMapArt.Ink, Vector2.one * 40f, false);
             }
 
-            TMP_Text youLabel = MakeLabel("YouLabel", playerMarker, "ВЫ", 18f, PaperMapArt.Ink);
-            ((RectTransform)youLabel.transform).sizeDelta = new Vector2(60f, 26f);
-            ((RectTransform)youLabel.transform).anchoredPosition = new Vector2(0f, -47f);
         }
 
         // ракета видна всегда: размер не зависит от зума (маркер вне зум-контента),
@@ -2692,41 +2695,40 @@ namespace SpaceTaxi.UI
         // без подложки и рамки (Н6.K3). Значки — те же источники, что рисуют карту:
         // реальные спрайты построенных тел (M7.2), иначе типовой картографический арт;
         // строки «заправка/мастерская» сняты — услуги видны с реального арта планет
+        // арт map_rocket нарисован с наклоном носа +55° (0=вправо) — в легенде
+        // выпрямляем до вертикали
+        private const float LegendRocketDeg = 35f;
+
         private void BuildLegend()
         {
             legendRoot = MakeRect("Legend", sheetRect, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
             legendRoot.sizeDelta = Style.legendSize;
-            legendRoot.localScale = Vector3.one * 1.7f; // ХОТФИКС владельца v2: легенда ЕЩЁ крупнее
+            legendRoot.localScale = Vector3.one * 1.4f; // владелец Н9.2: чуть меньше
             legendRoot.gameObject.SetActive(Style.legendVisible); // выключена — слоты подписей освобождаются
 
             int y = 0;
-            // ХОТФИКС владельца: значки легенды = те же картографические арты, что
-            // рисуют тела на карте (MapSpriteOf), — легенда больше не показывает
-            // игровые спрайты планет
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_planet"), Color.white, "планета");
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_taxi_planet"), Color.white, "хаб МТО");
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_sun"), Color.white, "звезда");
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_black_hole"), Color.white, "чёрная дыра");
-            LegendRow(0f, ref y, PaperMapArt.MapSprite("map_asteroid"), Color.white, "пояс");
-
-            // маркеры: жёлтый — только цель заказа; зелёный — своя метка (M8.8)
-            y = 0;
-            LegendRow(175f, ref y, PaperMapArt.MapSprite("map_cometa"),
-                Color.white, "комета");
-            LegendRow(175f, ref y, PaperMapArt.TargetRing(), TargetRingColor, "цель заказа", 22f);
-            LegendRow(175f, ref y, PaperMapArt.Pin(), WaypointMarkColor, "своя метка", 18f);
-            Sprite rocket = PaperMapArt.MapSprite("map_rocket");
-            LegendRow(175f, ref y, rocket, Color.white, "вы здесь", 20f);
+            // один столбец (владелец Н9.2), значки — те же картографические арты,
+            // что рисуют тела на карте; «своя метка» снята, «вы здесь» -> «корабль»
+            LegendRow(ref y, PaperMapArt.MapSprite("map_planet"), Color.white, "планета");
+            LegendRow(ref y, PaperMapArt.MapSprite("map_taxi_planet"), Color.white, "хаб МТО");
+            LegendRow(ref y, PaperMapArt.MapSprite("map_sun"), Color.white, "звезда");
+            LegendRow(ref y, PaperMapArt.MapSprite("map_black_hole"), Color.white, "чёрная дыра");
+            LegendRow(ref y, PaperMapArt.MapSprite("map_asteroid"), Color.white, "астероид");
+            LegendRow(ref y, PaperMapArt.MapSprite("map_cometa"), Color.white, "комета");
+            LegendRow(ref y, PaperMapArt.TargetRing(), TargetRingColor, "цель заказа", 22f);
+            LegendRow(ref y, PaperMapArt.MapSprite("map_rocket"), Color.white, "корабль", 20f, LegendRocketDeg);
         }
 
-        private void LegendRow(float x, ref int row, Sprite icon, Color color, string text, float iconSize = 18f)
+        private void LegendRow(ref int row, Sprite icon, Color color, string text,
+            float iconSize = 18f, float iconRotationDeg = 0f)
         {
-            float y = 138f - row * 30f;
+            float y = 252f - row * 30f;
             RectTransform iconRect = MakeRect("I", legendRoot, new Vector2(0f, 0f), new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
             iconRect.sizeDelta = Vector2.one * 24f;
-            iconRect.anchoredPosition = new Vector2(x + 12f, y);
+            iconRect.anchoredPosition = new Vector2(12f, y);
+            iconRect.localRotation = Quaternion.Euler(0f, 0f, iconRotationDeg);
             MakeImage("G", iconRect, icon, color, Vector2.one * iconSize, false);
             if (icon == null)
                 MakeImage("F", iconRect, StubSprites.Circle(64f), WithAlpha(PaperMapArt.Ink, 0.7f), Vector2.one * 14f, false);
@@ -2737,7 +2739,7 @@ namespace SpaceTaxi.UI
             ((RectTransform)rowLabel.transform).anchorMin = new Vector2(0f, 0f);
             ((RectTransform)rowLabel.transform).anchorMax = new Vector2(0f, 0f);
             ((RectTransform)rowLabel.transform).pivot = new Vector2(0f, 0.5f);
-            ((RectTransform)rowLabel.transform).anchoredPosition = new Vector2(x + 30f, y);
+            ((RectTransform)rowLabel.transform).anchoredPosition = new Vector2(30f, y);
             row++;
         }
 
