@@ -264,6 +264,10 @@ namespace SpaceTaxi.UI
             orders.TaskFailed += offer => Show("Жалоба пассажира"
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
 
+            // v5.2: тост-момент — отклик в момент свершения/срыва задания
+            orders.TaskMomentSuccess += text => Show(text, false, ToastTone.Success);
+            orders.TaskMomentFail += text => Show(text, true, ToastTone.Danger);
+
             // Н7 Q7.3: тост принятия заказа; «паникёр» предупреждает сразу (Н7 Q7.1)
             orders.OrderAccepted += offer => Show("Заказ принят: " + offer.Passenger.DisplayName
                 + (offer.HurrySeconds > 0f

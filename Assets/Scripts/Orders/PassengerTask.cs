@@ -42,6 +42,7 @@ namespace SpaceTaxi.Orders
         // внутреннее отслеживание исхода; итог подводится при доставке
         public bool Succeeded;
         public bool Failed;
+        public bool MomentFired; // тост-момент (успех/провал) уже показан — один на заказ
 
         // Time.time в момент Accept; < 0 — таймер ещё не запущен
         private float deadlineStartedAt = -1f;
@@ -139,7 +140,7 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoCollision,
-                        Text = "Ни одного столкновения, пожалуйста.",
+                        Text = "Ни одного столкновения с повреждением корпуса, пожалуйста.", // enforced: только удары с уроном
                     };
                 case PassengerTaskKind.SpeedLimit:
                     return new PassengerTask
@@ -172,14 +173,14 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.RingVisit,
-                        Text = $"Облетим кольцо планеты {level.Bodies[planet].DisplayName}?",
+                        Text = $"Зайдём в орбитальное кольцо планеты {level.Bodies[planet].DisplayName} — подлетим вплотную.", // enforced: вход в capture-кольцо
                         TargetBodyIndex = planet,
                     };
                 case PassengerTaskKind.StarBackside:
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.StarBackside,
-                        Text = $"С теневой стороны звезды {level.Bodies[star].DisplayName} — говорят, вид необыкновенный.",
+                        Text = $"Облетим звезду {level.Bodies[star].DisplayName} с внешней стороны системы — говорят, вид необыкновенный.", // enforced: точка дальше звезды от центра мира
                         TargetBodyIndex = star,
                     };
                 case PassengerTaskKind.HoleFlyby:
@@ -193,7 +194,7 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.WaitOnPlanet,
-                        Text = $"Посидим перед стартом на {level.Bodies[planet].DisplayName} минут десять. Тишина — тоже путешествие.",
+                        Text = $"Посидим перед стартом на {level.Bodies[planet].DisplayName} секунд десять. Тишина — тоже путешествие.", // enforced: WaitSeconds = 10
                         TargetBodyIndex = planet,
                         WaitSeconds = WaitOnPlanetSeconds,
                     };
@@ -213,6 +214,35 @@ namespace SpaceTaxi.Orders
         public static float HurrySecondsFor(float routeDistance)
         {
             return routeDistance / DeadlineSpeedUnit + HurrySlack;
+        }
+
+        // v5.2 (владелец: «нет какого-то отклика, когда задание выполняется»):
+        // тексты тостов-моментов — в одном месте, редактируются здесь.
+        // Успех — момент свершения (точки интереса, ожидание); провал — момент
+        // срыва условия (до этого было тихо, итог всплывал только при доставке)
+        public static string SuccessMomentText(PassengerTask task)
+        {
+            switch (task.Kind)
+            {
+                case PassengerTaskKind.CometFlyby: return "Комета показана — пассажир в восторге";
+                case PassengerTaskKind.HoleFlyby: return "Мимо бездны пролетели — пассажир доволен";
+                case PassengerTaskKind.RingVisit: return "Орбитальное кольцо планеты пройдено";
+                case PassengerTaskKind.StarBackside: return "Внешняя сторона звезды — вид необыкновенный";
+                case PassengerTaskKind.WaitOnPlanet: return "Пассажир нагулялся — можно взлетать";
+                default: return "Задание выполнено";
+            }
+        }
+
+        public static string FailMomentText(PassengerTask task)
+        {
+            switch (task.Kind)
+            {
+                case PassengerTaskKind.Deadline: return "Дедлайн вышел — пассажир опаздывает";
+                case PassengerTaskKind.NoCollision: return "Столкновение с повреждением — задание провалено";
+                case PassengerTaskKind.NoRefuel: return "Станция использована — задание провалено";
+                case PassengerTaskKind.SpeedLimit: return "Превышение скорости — задание провалено";
+                default: return "Задание провалено";
+            }
         }
 
         // случайное тело типа (исключения — концы маршрута); нет — -1

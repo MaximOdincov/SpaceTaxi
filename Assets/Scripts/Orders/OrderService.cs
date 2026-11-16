@@ -58,15 +58,15 @@ namespace SpaceTaxi.Orders
     {
         [Header("Поток карточек")]
         [Tooltip("Сколько секунд живёт карточка входящего")]
-        public float offerLifetime = 60f;
-        [Tooltip("Новая карточка: минимум через")]
-        public float spawnMin = 15f;
-        [Tooltip("Новая карточка: максимум через")]
-        public float spawnMax = 30f;
+        public float offerLifetime = 120f;
+        [Tooltip("Новая карточка: минимум через (v5.2: 15→10)")]
+        public float spawnMin = 10f;
+        [Tooltip("Новая карточка: максимум через (v5.2: 30→18)")]
+        public float spawnMax = 18f;
         [Tooltip("Максимум карточек одновременно (лишние старейшие вытесняются)")]
         public int maxOffers = 4;
         [Tooltip("Сколько карточек сразу на старте")]
-        public int initialOffers = 2;
+        public int initialOffers = 4;
 
         [Header("Ценообразование")]
         [Tooltip("Пусто — фолбэк с дефолтными числами (PricingConfig.Default)")]
@@ -141,6 +141,11 @@ namespace SpaceTaxi.Orders
         public event Action<OrderOffer> OrderCancelled;
         public event Action<OrderOffer> TaskSucceeded; // задание выполнено (П5.3)
         public event Action<OrderOffer> TaskFailed;    // задание провалено — жалоба
+        // v5.2 (владелец: «нет какого-то отклика, когда задание выполняется»):
+        // тост-момент — свершение точки интереса/ожидания и срыв условия
+        // в момент события (итог и так тостится при доставке)
+        public event Action<string> TaskMomentSuccess;
+        public event Action<string> TaskMomentFail;
         public event Action<OrderOffer> OrderAccepted; // принят игроком (тост Н7 Q7.3); RestoreActive не зовёт
         public event Action<string> OrderWarning;      // промежуточное предупреждение задания (Н7 Q7.4) — тост Danger
 
@@ -370,7 +375,10 @@ namespace SpaceTaxi.Orders
             if (Active.State == OrderState.Active || Active.State == OrderState.Aboard)
                 CollisionsOfActive++;
             if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.NoCollision))
+            {
                 Active.Task.Failed = true;
+                TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(Active.Task));
+            }
             // хрупкая посылка (Н7 Q7.4): CrashImpact приходит только на удар
             // с уроном (скорость выше посадочной) — это и есть «сильный удар»
             if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.FragileCargo))
@@ -397,7 +405,10 @@ namespace SpaceTaxi.Orders
         {
             if (Active != null && Active.State == OrderState.Aboard
                 && TaskIs(PassengerTaskKind.NoRefuel))
+            {
                 Active.Task.Failed = true;
+                TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(Active.Task));
+            }
         }
 
         // покадровый трекинг задания активного заказа (П5.3)
@@ -414,13 +425,19 @@ namespace SpaceTaxi.Orders
             // время вышло до доставки — задание провалено, заказ может доставиться
             if (task.Kind == PassengerTaskKind.Deadline && !task.Failed
                 && task.DeadlineRemaining(Time.time) <= 0f)
+            {
                 task.Failed = true;
+                TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(task));
+            }
 
             // превышение скорости ловим в одном кадре — только с пассажиром на борту
             if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.SpeedLimit
                 && !task.Failed && ship != null && ship.Body != null
                 && ship.Body.linearVelocity.magnitude > task.SpeedLimit)
+            {
                 task.Failed = true;
+                TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(task));
+            }
 
             // нервный пассажир (Н7 Q7.4): превышения копят замечания (эпизод = одно
             // замечание), предел — жалоба при доставке; заказ не срывается
@@ -545,6 +562,13 @@ namespace SpaceTaxi.Orders
                         task.Succeeded = true;
                     break;
                 }
+            }
+
+            // v5.2: момент свершения — тост сразу, а не только при доставке
+            if (task.Succeeded && !task.MomentFired)
+            {
+                task.MomentFired = true;
+                TaskMomentSuccess?.Invoke(PassengerTasks.SuccessMomentText(task));
             }
         }
 
