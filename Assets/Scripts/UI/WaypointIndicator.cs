@@ -96,6 +96,15 @@ namespace SpaceTaxi.UI
         private bool waypointInFrame;
         private GravityField haloGravity; // ленивый бинд для ореола цели (см. UpdateTargetHalo)
 
+        // Н9.11 (владелец: «шеврон не должен заходить на UI — останавливается до него»):
+        // прямоугольники HUD-элементов у краёв экрана; стрелка упирается в их границу
+        private RectTransform hudMinimap;
+        private RectTransform hudSpeed;
+        private RectTransform hudFuelTrack;
+        private RectTransform hudFuelIcon;
+        private RectTransform hudHull;
+        private RectTransform hudPanel;
+
         private void Update()
         {
             if (!Bind())
@@ -351,6 +360,10 @@ namespace SpaceTaxi.UI
                 }
             }
 
+            // Н9.11: стрелка скользит по краю, но не заходит на HUD-элементы
+            posW = ClampOutsideHud(posW);
+            posT = ClampOutsideHud(posT);
+
             ApplyArrow(waypointArrow, waypointArrowTip, waypointArrowDist, showWaypoint, posW, angleW, distW);
             ApplyArrow(targetArrow, targetArrowTip, targetArrowDist, showTarget, posT, angleT, distT);
         }
@@ -429,6 +442,82 @@ namespace SpaceTaxi.UI
             canvasPos = d * t;
             angle = Mathf.Atan2(canvasPos.y, canvasPos.x) * Mathf.Rad2Deg;
             return true;
+        }
+
+        // ленивый сбор прямоугольников HUD-элементов (биндеры живут с сценой)
+        private void EnsureHudRects()
+        {
+            if (hudMinimap == null)
+            {
+                var mm = FindAnyObjectByType<MinimapBinder>(FindObjectsInactive.Include);
+                hudMinimap = mm != null ? mm.GetComponent<RectTransform>() : null;
+            }
+            if (hudSpeed == null)
+            {
+                var hud = FindAnyObjectByType<HudBinder>(FindObjectsInactive.Include);
+                if (hud != null)
+                {
+                    hudSpeed = hud.transform.Find("SpeedValue") as RectTransform;
+                    hudFuelTrack = hud.transform.Find("FuelTrack") as RectTransform;
+                    hudFuelIcon = hud.transform.Find("FuelIcon") as RectTransform;
+                    hudHull = hud.transform.Find("HullValue") as RectTransform;
+                }
+            }
+            if (hudPanel == null)
+            {
+                var panel = FindAnyObjectByType<OnboardComputerPanel>(FindObjectsInactive.Include);
+                hudPanel = panel != null ? panel.GetComponent<RectTransform>() : null;
+            }
+        }
+
+        // экранная зона HUD-элемента в пикселях (overlay — position уже в px;
+        // camera-space — проекция через камеру канваса)
+        private static Rect HudRectPx(RectTransform rect)
+        {
+            Vector3[] corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            var canvas = rect.GetComponentInParent<Canvas>();
+            var cam = canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera
+                ? canvas.worldCamera
+                : null;
+            Vector2 min = cam != null ? (Vector2)cam.WorldToScreenPoint(corners[0]) : (Vector2)corners[0];
+            Vector2 max = cam != null ? (Vector2)cam.WorldToScreenPoint(corners[2]) : (Vector2)corners[2];
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        // стрелка прижата к краю экрана: если её точка попадает в расширенную
+        // зону HUD-элемента — сдвигаем вдоль края до границы зоны («останавливается
+        // до элемента»). canvasPos — единицы канваса от центра экрана
+        private Vector2 ClampOutsideHud(Vector2 canvasPos)
+        {
+            EnsureHudRects();
+            float sf = arrowCanvas != null ? arrowCanvas.scaleFactor : 1f;
+            Vector2 px = canvasPos * sf; // точка стрелки относительно центра, px
+            float pad = 30f; // отступ от элемента
+            Vector2 halfScreen = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            float halfW = Screen.width * 0.5f;
+            float halfH = Screen.height * 0.5f;
+
+            foreach (RectTransform rect in new[] { hudMinimap, hudSpeed, hudFuelTrack, hudFuelIcon, hudHull, hudPanel })
+            {
+                if (rect == null)
+                    continue;
+                Rect r = HudRectPx(rect);
+                Rect rel = new Rect(r.x - halfScreen.x, r.y - halfScreen.y, r.width, r.height); // от центра
+                Rect zone = new Rect(rel.x - pad, rel.y - pad, rel.width + pad * 2f, rel.height + pad * 2f);
+                if (px.x <= zone.x || px.x >= zone.xMax || px.y <= zone.y || px.y >= zone.yMax)
+                    continue; // вне зоны
+
+                // ближайший край экрана определяет ось скольжения
+                float dTop = halfH - px.y, dBottom = px.y + halfH;
+                float dLeft = px.x + halfW, dRight = halfW - px.x;
+                float minEdge = Mathf.Min(Mathf.Min(dTop, dBottom), Mathf.Min(dLeft, dRight));
+                if (minEdge == dTop || minEdge == dBottom) // верх/низ — скользим по X
+                    px.x = px.x - zone.x < zone.xMax - px.x ? zone.x - 2f : zone.xMax + 2f;
+                else // лево/право — скользим по Y
+                    px.y = px.y - zone.y < zone.yMax - px.y ? zone.y - 2f : zone.yMax + 2f;
+            }
+            return px / sf;
         }
 
         private void ApplyArrow(RectTransform root, RectTransform tip, TMP_Text distLabel,

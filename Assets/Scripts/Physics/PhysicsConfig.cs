@@ -63,6 +63,8 @@ namespace SpaceTaxi.Physics
         public float BlackHoleShrinkSeconds = 45f;
         [Tooltip("Конечный масштаб сжатия: корабль исчезает, когда сжатие доходит до этой доли (полное поглощение)")]
         public float BlackHoleMinScale = 0.25f;
+        [Tooltip("Сколько секунд обломок потерянного борта остаётся у дыры (Н9.11, владелец: «корабль должен оставаться в дыре — в этом прикол»): медленно спиралит внутрь и исчезает; раньше = окно 45с, возврат новым кораблём не успевал")]
+        public float BlackHoleWreckSeconds = 120f;
         [Tooltip("НЕ ИСПОЛЬЗУЕТСЯ с v4 (дыра не убивает по приближению) — оставлено для схемы ассета")]
         public float BlackHoleDeathProximity = 45f;
 

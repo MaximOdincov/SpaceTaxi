@@ -17,10 +17,6 @@ namespace SpaceTaxi.UI
     public class BlackHoleOverlayController : MonoBehaviour
     {
         private BlackHole hole;
-        private MapScreenController map;
-        private OnboardComputerPanel onboard;
-        private StationScreenController station;
-        private PauseScreenController pause;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -47,25 +43,15 @@ namespace SpaceTaxi.UI
         {
             if (hole == null)
                 hole = FindAnyObjectByType<BlackHole>();
-            if (hole == null || !hole.SwallowActive || hole.PoweredDown || AnyPanelOpen())
-                return; // заглушенный борт X больше не глушит — окно дотикает само
+            // Н9.11 (владелец: «нажимаю X — ничего не происходит; надо отключать»):
+            // гейт открытых панелей снят — панели клавишу X не едят, а борт под
+            // открытой картой глушить честно. Заглушенный борт X не глушит
+            if (hole == null || !hole.SwallowActive || hole.PoweredDown)
+                return;
 
             var kb = Keyboard.current;
             if (kb != null && kb.xKey.wasPressedThisFrame)
                 hole.RequestAbandon();
-        }
-
-        // при открытых панелях X не ловим — сами они клавишу X не едят
-        private bool AnyPanelOpen()
-        {
-            if (map == null) map = FindAnyObjectByType<MapScreenController>();
-            if (onboard == null) onboard = FindAnyObjectByType<OnboardComputerPanel>();
-            if (station == null) station = FindAnyObjectByType<StationScreenController>();
-            if (pause == null) pause = FindAnyObjectByType<PauseScreenController>();
-            return (map != null && map.IsOpened)
-                || (onboard != null && onboard.IsShown)
-                || (station != null && station.IsOpened)
-                || (pause != null && pause.IsPaused);
         }
     }
 }

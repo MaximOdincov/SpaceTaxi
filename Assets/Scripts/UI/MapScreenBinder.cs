@@ -137,8 +137,10 @@ namespace SpaceTaxi.UI
         private const float RocketMarkerPx = 64f;  // маркер ракеты (Н6.K6: 48 → +33%)
 
         // — лист и бортовой компьютер (Н5.21) —
-        private const float SheetMargin = 12f;          // поля листа от краёв доступной области
-        private const float ContentMargin = 26f;        // окно вида внутри листа (маска клипует всё внутри)
+        // Н9.11 (владелец: «рамка осталась хоть без цвета — убери»): поля листа
+        // давали тёмную полосу вокруг бумаги — бумага теперь от края до края
+        private const float SheetMargin = 0f;           // поля листа от краёв доступной области
+        private const float ContentMargin = 0f;         // окно вида внутри листа (маска клипует всё внутри)
         private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
         // M8.3: бумага — тайл ОТ МИРА (не от окна): зерно привязано к мировым юнитам

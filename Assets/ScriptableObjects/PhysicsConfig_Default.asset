@@ -32,8 +32,6 @@ MonoBehaviour:
   BlackHolePullEdge: 70
   BlackHolePullHorizon: 420
   BlackHoleEscapeThrustFraction: 1.15
-  BlackHoleRadialHoldEdge: 160
-  BlackHoleRadialHoldHorizon: 380
   BlackHoleSwirlEdge: 80
   BlackHoleSwirlHorizon: 220
   BlackHoleOrbitSpeedFactor: 0.95
@@ -42,4 +40,5 @@ MonoBehaviour:
   BlackHoleSinkClampRate: 900
   BlackHoleShrinkSeconds: 45
   BlackHoleMinScale: 0.25
+  BlackHoleWreckSeconds: 120
   BlackHoleDeathProximity: 45

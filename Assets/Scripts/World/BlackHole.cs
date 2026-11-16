@@ -296,14 +296,14 @@ namespace SpaceTaxi.World
                 return;
             swallowStarted = true;
             Sound.StopLoop(SoundId.BlackHoleHum);
-            // Н9.6 (владелец: «быстро вернулся — старый борт должен быть там,
-            // она как-бы медленно затягивает; в конце окна он полностью
-            // пропадает в дыре»): обломок-призрак продолжает спираль от точки
-            // потери — радиус и масштаб угасают за lifetime (SpawnOrbital),
-            // lifetime = то же окно (45с). v5.2 снимал обломок совсем
+            // Н9.6/Н9.11 (владелец: «быстро вернулся — старый борт должен быть
+            // там, она как-бы медленно затягивает»): обломок-призрак продолжает
+            // спираль от точки потери — радиус и масштаб угасают за lifetime
+            // (SpawnOrbital); lifetime = BlackHoleWreckSeconds (120с — возврат
+            // успевает увидеть), потом фейд и удаление. v5.2 снимал обломок совсем
             if (CaptureWreckPose(out Sprite sprite, out float scale, out float angular, out float spin))
                 WreckSystem.Ensure().SpawnOrbital(this, ship.transform.position, sprite, scale,
-                    angular, spin, config.BlackHoleShrinkSeconds);
+                    angular, spin, config.BlackHoleWreckSeconds);
             hull.Abandon(SignalLostReason);
         }
 
