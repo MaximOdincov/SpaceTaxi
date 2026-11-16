@@ -582,7 +582,7 @@ namespace SpaceTaxi.UI
             {
                 haloGo = new GameObject(name, typeof(SpriteRenderer));
                 haloRenderer = haloGo.GetComponent<SpriteRenderer>();
-                haloRenderer.sprite = StubSprites.SoftDot(256f, 0.82f); // мягкая кромка ореола
+                haloRenderer.sprite = StubSprites.SoftDot(256f, 0.82f, 1024); // гладкий край: плотность текстуры 1024
                 haloRenderer.sortingOrder = -1;
             }
             if (!haloGo.activeSelf)

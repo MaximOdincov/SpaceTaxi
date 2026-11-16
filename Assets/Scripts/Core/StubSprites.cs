@@ -47,13 +47,14 @@ namespace SpaceTaxi.Core
 
         // мягкая точка без тёмной окантовки: пыль, далёкие светила. core — доля
         // радиуса с полной альфой (0 = полностью мягкая, 0.7 = горячее ядро)
-        public static Sprite SoftDot(float diameter, float core = 0f)
+        public static Sprite SoftDot(float diameter, float core = 0f, int textureSize = 64)
         {
-            int key = Mathf.Max(2, Mathf.RoundToInt(diameter)) * 100 + Mathf.RoundToInt(core * 10f);
+            int key = Mathf.RoundToInt(diameter) * 100000 + Mathf.RoundToInt(core * 10f) * 1000 + Mathf.Clamp(textureSize, 16, 2048);
             if (!softDots.TryGetValue(key, out Sprite sprite) || sprite == null)
             {
-                var tex = CreateSoftDotTexture(64, core);
-                sprite = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f / diameter);
+                int size = Mathf.Clamp(textureSize, 16, 2048);
+                var tex = CreateSoftDotTexture(size, core);
+                sprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), (float)size / diameter);
                 softDots[key] = sprite;
             }
             return sprite;
