@@ -544,6 +544,12 @@ namespace SpaceTaxi.Audio
                     ApplyLoopParams(voice);
         }
 
+        // группы, затухающие при взрыве: строится один раз — DuckRoutine
+        // перебирает его дважды за такт вместо Enum.GetValues в цикле
+        private static readonly AudioGroup[] duckGroups = System.Array
+            .FindAll((AudioGroup[])System.Enum.GetValues(typeof(AudioGroup)),
+                g => g != AudioGroup.Music && g != AudioGroup.Ui);
+
         private void DuckAll()
         {
             if (duckRoutine != null) StopCoroutine(duckRoutine);
@@ -552,18 +558,16 @@ namespace SpaceTaxi.Audio
 
         private IEnumerator DuckRoutine()
         {
-            foreach (AudioGroup g in System.Enum.GetValues(typeof(AudioGroup)))
-                if (g != AudioGroup.Music && g != AudioGroup.Ui)
-                    groupDuck[g] = DuckFactor;
+            foreach (AudioGroup g in duckGroups)
+                groupDuck[g] = DuckFactor;
             RefreshLoops();
             float t = 0f;
             while (t < DuckTime)
             {
                 t += Time.unscaledDeltaTime;
                 float recover = Mathf.Clamp01(t / DuckTime);
-                foreach (AudioGroup g in System.Enum.GetValues(typeof(AudioGroup)))
-                    if (g != AudioGroup.Music && g != AudioGroup.Ui)
-                        groupDuck[g] = Mathf.Lerp(DuckFactor, 1f, recover);
+                foreach (AudioGroup g in duckGroups)
+                    groupDuck[g] = Mathf.Lerp(DuckFactor, 1f, recover);
                 RefreshLoops();
                 yield return null;
             }

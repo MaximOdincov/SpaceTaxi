@@ -26,6 +26,7 @@ namespace SpaceTaxi.UI
         private Ship ship;
         private GravityField gravity;
         private ShipController controller;
+        private HullSystem hullSystem; // для симметричной отписки в OnDestroy
         private BlackHole hole;      // предупреждения дыры — ленивый бинд, как в самом BlackHole
         private bool bound;
         private Color speedBaseColor;
@@ -53,12 +54,28 @@ namespace SpaceTaxi.UI
             if (dimGroup == null)
                 dimGroup = gameObject.AddComponent<CanvasGroup>();
 
-            speedValue = transform.Find("SpeedValue").GetComponent<TMP_Text>();
-            hullValue = transform.Find("HullValue").GetComponent<TMP_Text>();
+            speedValue = transform.Find("SpeedValue")?.GetComponent<TMP_Text>();
+            hullValue = transform.Find("HullValue")?.GetComponent<TMP_Text>();
+            warningBanner = transform.Find("WarningBanner")?.gameObject;
+            warningText = warningBanner != null ? warningBanner.transform.Find("Text")?.GetComponent<TMP_Text>() : null;
+            // переименование узла сцены — явная ошибка вместо NRE в кадре
+            if (speedValue == null || hullValue == null || warningText == null)
+            {
+                Debug.LogError("[HudBinder] в HUD нет SpeedValue/HullValue/WarningBanner/Text — биндер отключён");
+                enabled = false;
+                return;
+            }
             for (int i = 0; i < fuelSegments.Length; i++)
-                fuelSegments[i] = transform.Find($"FuelTrack/FuelSeg_{i + 1:00}").GetComponent<Image>();
-            warningBanner = transform.Find("WarningBanner").gameObject;
-            warningText = warningBanner.transform.Find("Text").GetComponent<TMP_Text>();
+            {
+                var seg = transform.Find($"FuelTrack/FuelSeg_{i + 1:00}");
+                fuelSegments[i] = seg != null ? seg.GetComponent<Image>() : null;
+                if (fuelSegments[i] == null)
+                {
+                    Debug.LogError($"[HudBinder] нет FuelSeg_{i + 1:00} — биндер отключён");
+                    enabled = false;
+                    return;
+                }
+            }
             warningText.fontSize = 36f; // тревога должна пугать издалека
             warningText.enableAutoSizing = true; // текст не вылезает из подложки
             warningText.fontSizeMin = 20f;
@@ -352,6 +369,16 @@ namespace SpaceTaxi.UI
             return img;
         }
 
+        // Н9.7 (конвенция OnboardBinder:102): издатели переживают подписчика
+        // при смене сцены — отписка симметрична подписке в Update
+        private void OnDestroy()
+        {
+            if (ship != null)
+                ship.FuelChanged -= UpdateFuel;
+            if (hullSystem != null)
+                hullSystem.HpChanged -= UpdateHull;
+        }
+
         private void Update()
         {
             if (!bound)
@@ -361,10 +388,10 @@ namespace SpaceTaxi.UI
                 if (ship != null && ship.Config != null)
                 {
                     controller = ship.GetComponent<ShipController>();
-                    var hull = ship.GetComponent<HullSystem>();
-                    if (hull != null)
+                    hullSystem = ship.GetComponent<HullSystem>();
+                    if (hullSystem != null)
                     {
-                        hull.HpChanged += UpdateHull;
+                        hullSystem.HpChanged += UpdateHull;
                         UpdateHull();
                     }
                     ship.FuelChanged += UpdateFuel;

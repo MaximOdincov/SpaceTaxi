@@ -310,7 +310,9 @@ namespace SpaceTaxi.Physics
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f)); // вариация по силе удара
             CameraFollow.AddShake(Mathf.Clamp01(damage / 45f) * 0.7f); // от «бумкнул» до «въехал»
+#if UNITY_EDITOR
             Debug.Log($"[Landing] удар о «{planet.DisplayName}»: v={v:0}, урон={damage:0.0}");
+#endif
 
             if (ship.Hp > 0f)
                 Land(planet, collision);
@@ -332,7 +334,9 @@ namespace SpaceTaxi.Physics
             Hull.ApplyDamage(damage);
             Sound.Play(SoundId.Collision, Mathf.Clamp01(damage / 30f));
             CameraFollow.AddShake(Mathf.Clamp01(damage / 30f) * 0.7f);
+#if UNITY_EDITOR
             Debug.Log($"[Landing] удар об астероид: v={v:0}, урон={damage:0.0}");
+#endif
         }
     }
 }

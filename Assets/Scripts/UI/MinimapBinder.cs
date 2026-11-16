@@ -229,6 +229,18 @@ namespace SpaceTaxi.UI
             cometsBound = true;
         }
 
+        // Н9.7 (конвенция MapScreenBinder.OnDestroy): CometSystem ставится
+        // WorldBuilder'ом и живёт сессию — отписка симметрична BindComets
+        private void OnDestroy()
+        {
+            if (cometsBound && cometSystem != null)
+            {
+                cometSystem.CometIncoming -= OnCometIncoming;
+                cometSystem.CometSpawned -= OnCometSpawned;
+                cometsBound = false;
+            }
+        }
+
         // шрифт прибора: JetBrains из HUD (как цифры скорости), иначе цепочка карты
         private TMP_FontAsset ResolveFont()
         {

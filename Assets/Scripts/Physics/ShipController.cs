@@ -204,19 +204,23 @@ namespace SpaceTaxi.Physics
             else if (!lowFuelLogged)
             {
                 lowFuelLogged = true;
+#if UNITY_EDITOR
                 Debug.Log("[Fuel] меньше 10% — ТОПЛИВО КОНЧАЕТСЯ");
+#endif
             }
             if (ship.Fuel <= 0f && !emptyFuelLogged)
             {
                 emptyFuelLogged = true;
+#if UNITY_EDITOR
                 Debug.Log("[Fuel] бак пуст — двигатели не работают");
+#endif
             }
 
             // Все ускорения — к вектору скорости
             if (v > config.MinControlSpeed)
             {
                 headingDir = velocity / v; // курс живёт, пока корабль движется
-                Vector2 dir = velocity / v;
+                Vector2 dir = headingDir; // то же деление — без повторного
                 if (thrustOn && v < shipConfig.MaxV)
                     velocity += dir * (ship.Eff.Thrust * engMul * dt);
                 if (brakeOn)
