@@ -78,9 +78,10 @@ namespace SpaceTaxi.Core
         }
 
         // тело звезды: яркое ядро с плавной экспоненциальной короной — без лучей,
-        // ступеней и тёмной обводки круга-заглушки. Хвост у края канвы держится
-        // выше альфа-порога SpriteArt.ContentSize, поэтому контент = вся канва,
-        // масштаб тела в CelestialBody.Init остаётся 1 и зоны-дети не растут
+        // ступеней и тёмной обводки круга-заглушки. У края канвы корона доходит
+        // ДО НУЛЯ (StarFadeStart): раньше хвост 0.05 читался квадратной кромкой
+        // канвы на тёмном фоне (владелец Н9.3: «звезда квадратная»); контент-бокс
+        // ~0.96 канвы — CelestialBody.Init компенсирует масштабом ~×1.04
         public static Sprite StarBody(float diameter)
         {
             int key = Mathf.Max(2, Mathf.RoundToInt(diameter));
@@ -276,13 +277,14 @@ namespace SpaceTaxi.Core
         // спад к StarTailAlpha на краю канвы; хвост специально выше альфа-порога
         // SpriteArt (8/255), чтобы альфа-контент оставался равным всей канве
         private const float StarCoreEnd = 0.55f;
-        private const float StarTailAlpha = 0.05f;
+        private const float StarTailAlpha = 0.05f; // альфа экспоненты у нулевой точки фейда
+        private const float StarFadeStart = 0.94f; // с какой доли радиуса корона гаснет в ноль
 
         public static Texture2D CreateStarTexture(int size)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear };
             var pixels = new Color32[size * size];
-            float k = Mathf.Log(1f / StarTailAlpha) / (1f - StarCoreEnd);
+            float k = Mathf.Log(1f / StarTailAlpha) / (StarFadeStart - StarCoreEnd);
             for (int iy = 0; iy < size; iy++)
             {
                 for (int ix = 0; ix < size; ix++)
@@ -291,6 +293,8 @@ namespace SpaceTaxi.Core
                     float y = (iy + 0.5f) / size * 2f - 1f;
                     float dist = Mathf.Sqrt(x * x + y * y);
                     float alpha = dist <= StarCoreEnd ? 1f : Mathf.Exp(-k * (dist - StarCoreEnd));
+                    if (dist > StarFadeStart)
+                        alpha *= Mathf.Clamp01((1f - dist) / (1f - StarFadeStart));
                     pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(alpha * 255f));
                 }
             }
