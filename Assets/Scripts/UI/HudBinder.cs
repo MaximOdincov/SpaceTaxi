@@ -67,13 +67,14 @@ namespace SpaceTaxi.UI
             if (bannerRect != null)
             {
                 bannerRect.sizeDelta = new Vector2(bannerRect.sizeDelta.x * 1.3f, bannerRect.sizeDelta.y * 1.25f);
-                // №19: тревога убрана из центра UI — баннер переезжает на низ экрана
-                // (сверху стопка тостов и подсказка цели); текст, пульс, сирены
-                // и звук сирены остаются как были
-                bannerRect.anchorMin = new Vector2(0.5f, 0f);
-                bannerRect.anchorMax = new Vector2(0.5f, 0f);
-                bannerRect.pivot = new Vector2(0.5f, 0f);
-                bannerRect.anchoredPosition = new Vector2(0f, 16f);
+                // Н9.5: владелец вернул тревогу наверх («уведомления снизу —
+                // наверх, например о чёрной дыре»); №19 гнал её вниз из-за
+                // стопки тостов — теперь тост на экране один, баннер снова
+                // над ним. Текст, пульс, сирены и звук остаются как были
+                bannerRect.anchorMin = new Vector2(0.5f, 1f);
+                bannerRect.anchorMax = new Vector2(0.5f, 1f);
+                bannerRect.pivot = new Vector2(0.5f, 1f);
+                bannerRect.anchoredPosition = new Vector2(0f, -16f);
             }
             speedBaseColor = speedValue.color;
 

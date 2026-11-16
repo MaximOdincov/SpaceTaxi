@@ -19,14 +19,15 @@ namespace SpaceTaxi.UI
         Success
     }
 
-    // Тосты событий заказов и корабля: вертикальный стек до 3 с шагом,
-    // очередь со стаггером и дедупом, аварийные (emphasized) поверх очереди
+    // Тосты событий заказов и корабля: ОДИН на экране (владелец Н9.5:
+    // «максимум одно, не накладываются»), очередь со стаггером и дедупом,
+    // аварийные (emphasized) идут первыми
     public class ToastNotifier : MonoBehaviour
     {
         [Tooltip("Сколько секунд висит обычный тост")]
         public float duration = 3.5f;
 
-        private const int MaxVisible = 3;        // слотов в стеке; старейший вытесняется
+        private const int MaxVisible = 1;        // один тост на экране; очередь ждёт
         private const float EmphasizedDuration = 5f;
         private const float Stagger = 0.15f;     // пауза между показами тостов одного кадра
         private const float DedupWindow = 10f;   // одинаковый текст — не чаще раза в 10 с
@@ -258,13 +259,10 @@ namespace SpaceTaxi.UI
                     : "СРЫВ ЗАКАЗА: " + offer.FailReason + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)),
                 true, ToastTone.Danger);
 
-            // итог задания пассажира (П5.3): благодарность или жалоба
-            orders.TaskSucceeded += offer => Show("Задание выполнено"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), false, ToastTone.Success);
-            orders.TaskFailed += offer => Show("Жалоба пассажира"
-                + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)), true, ToastTone.Danger);
-
-            // v5.2: тост-момент — отклик в момент свершения/срыва задания
+            // v5.2: тост-момент — отклик в момент свершения/срыва задания.
+            // Н9.5: финальные тосты TaskSucceeded/TaskFailed сняты — они
+            // дублировались: момент в полёте + «ЗАКАЗ ВЫПОЛНЕН» и выплата на
+            // доставке давали три плашки разом (владелец: «слишком много»)
             orders.TaskMomentSuccess += text => Show(text, false, ToastTone.Success);
             orders.TaskMomentFail += text => Show(text, true, ToastTone.Danger);
 
