@@ -296,6 +296,14 @@ namespace SpaceTaxi.World
                 return;
             swallowStarted = true;
             Sound.StopLoop(SoundId.BlackHoleHum);
+            // Н9.6 (владелец: «быстро вернулся — старый борт должен быть там,
+            // она как-бы медленно затягивает; в конце окна он полностью
+            // пропадает в дыре»): обломок-призрак продолжает спираль от точки
+            // потери — радиус и масштаб угасают за lifetime (SpawnOrbital),
+            // lifetime = то же окно (45с). v5.2 снимал обломок совсем
+            if (CaptureWreckPose(out Sprite sprite, out float scale, out float angular, out float spin))
+                WreckSystem.Ensure().SpawnOrbital(this, ship.transform.position, sprite, scale,
+                    angular, spin, config.BlackHoleShrinkSeconds);
             hull.Abandon(SignalLostReason);
         }
 
@@ -369,21 +377,29 @@ namespace SpaceTaxi.World
             if (Vector2.Distance(ship.transform.position, transform.position) > CaptureRadius)
                 return; // гибель вне захвата (звезда/столкновение) — без обломка у дыры
 
-            Sprite sprite = CaptureShipSprite();
-            if (sprite == null)
-                return;
+            if (CaptureWreckPose(out Sprite sprite, out float scale, out float angular, out float spin))
+                WreckSystem.Ensure().Spawn(this, ship.transform.position, sprite, scale, angular, spin);
+        }
 
-            // масштаб визуала модели (с учётом сжатия дырой) — обломок начинается
-            // ровно в том размере, каким корабль погиб
-            float scale;
+        // поза и спрайт корабля для обломка: масштаб визуала модели (с учётом
+        // сжатия дырой — обломок рождается ровно в размере гибели), закрутка
+        // из орбитальной скорости. Вызывать ДО Abandon/HideVisuals — спрайт
+        // ещё жив (позже использующий код не обязан знать про порядок методов)
+        private bool CaptureWreckPose(out Sprite sprite, out float scale, out float angular, out float spin)
+        {
+            sprite = CaptureShipSprite();
+            scale = 0f;
+            angular = 0.8f; // рад/с, против часовой по умолчанию
+            spin = 25f;     // качание вокруг своей оси, град/с
+            if (sprite == null)
+                return false;
+
             ShipModelVisual visual = ship.GetComponent<ShipModelVisual>();
             if (visual != null && visual.VisualRoot != null)
                 scale = Mathf.Max(Mathf.Abs(visual.VisualRoot.lossyScale.x), 0.05f);
             else
                 scale = Mathf.Max(Mathf.Abs(ship.transform.localScale.x), 0.05f);
 
-            float angular = 0.8f; // рад/с, против часовой по умолчанию
-            float spin = 25f;     // качание вокруг своей оси, град/с
             if (ship.Body != null)
             {
                 Vector2 offset = ship.transform.position - transform.position;
@@ -397,8 +413,7 @@ namespace SpaceTaxi.World
                 if (Mathf.Abs(bodySpin) > 15f)
                     spin = bodySpin;
             }
-
-            WreckSystem.Ensure().Spawn(this, ship.transform.position, sprite, scale, angular, spin);
+            return true;
         }
 
         // спрайт корабля: визуал модели (арт А1/А2) или корневой рендерер.
