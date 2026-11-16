@@ -141,8 +141,14 @@ namespace SpaceTaxi.Core
             Rating.AddDelivery();
             // выплата: тосты уходят синхронно внутри Paid, экран открываем после них.
             // Чаевые (Н-14): случайная доля 10–25%, брошенная при спавне карточки;
-            // перк «Меридианы» домножается в выплате
-            Payout.Pay(Orders.Pricing, offer.Price, Fleet.Current.IsRental,
+            // перк «Меридианы» домножается в выплате.
+            // v5.3 (владелец: «мимо бездны стоит очень хорошо»): бонус задания —
+            // сложение с ценой (строка «Перевозка» на экране завершения)
+            int taskBonus = offer.Task != null && offer.Task.Succeeded
+                && offer.Task.Kind == PassengerTaskKind.HoleFlyby
+                    ? PassengerTasks.HoleFlybyBonus
+                    : 0;
+            Payout.Pay(Orders.Pricing, offer.Price + taskBonus, Fleet.Current.IsRental,
                 Orders.CollisionsOfActive, offer.TipsFraction, IsMeridian);
             // автосейв §3.9 (П10.1): сразу после выплаты — счётчики/рейтинг/долг
             // уже консистентны, экран завершения данных не меняет

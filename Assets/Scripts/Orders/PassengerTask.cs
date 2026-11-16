@@ -9,15 +9,13 @@ namespace SpaceTaxi.Orders
         None = 0,     // задания нет
         Deadline,     // доставить за отведённое время
         NoRefuel,     // без заправки на станциях в пути
-        NoCollision,  // без столкновений
+        NoCollision,  // без столкновений с повреждением
         SpeedLimit,   // не быстрее лимита весь полёт
-        FragileCargo, // хрупкая посылка: сильные удары ломают груз (Н7 Q7.4)
-        NervousSpeed, // нервный пассажир: превышения копят замечания (Н7 Q7.4)
-        CometFlyby,   // пролететь близко к комете (П8.1)
+        NoHeat,       // не входить в зоны жара звёзд (v5.3)
+        BeltAvoid,    // не влетать в астероидные пояса (v5.3)
         RingVisit,    // зайти в capture-кольцо планеты
-        StarBackside, // побывать за звездой относительно центра мира
+        StarNearby,   // пролететь рядом со звездой (v5.3, бывш. StarBackside)
         HoleFlyby,    // пролететь близко к чёрной дыре
-        WaitOnPlanet, // суммарно постоять на планете
     }
 
     // Задание пассажира (П5.3): одно на заказ, тип выбирается случайно (Н-14).
@@ -30,14 +28,10 @@ namespace SpaceTaxi.Orders
         public float SpeedLimit;        // лимит скорости, юн/с (Kind == SpeedLimit)
         public float DistanceThreshold; // дистанция подлёта (CometFlyby/HoleFlyby)
         public int TargetBodyIndex;     // цель — индекс в LevelAsset.Bodies (RingVisit/StarBackside/WaitOnPlanet)
-        public float WaitSeconds;       // сколько сидеть (WaitOnPlanet)
-        public float WaitAccumulated;   // накоплено ожидания, копится с прерываниями (внутреннее)
-
-        // накопительные условия (Н7 Q7.4); в сейв не пишутся — до загрузки
-        // счёт начинается заново, флаг Failed при этом сохраняется
-        public int CargoHits;           // сильных ударов по борту с грузом (FragileCargo)
-        public int SpeedStrikes;        // замечаний за превышение (NervousSpeed)
-        public bool SpeedExceeded;      // эпизод превышения открыт — замечание уже засчитано
+        // накопительные условия-избегания (v5.3): эпизоды с гистерезисом; в сейв
+        // не пишутся — до загрузки счёт начинается заново, Failed сохраняется
+        public int Strikes;             // замечаний (NoHeat/BeltAvoid)
+        public bool EpisodeOpen;        // эпизод открыт — замечание уже засчитано
 
         // внутреннее отслеживание исхода; итог подводится при доставке
         public bool Succeeded;
@@ -70,25 +64,28 @@ namespace SpaceTaxi.Orders
         private const float DeadlineSpeedUnit = 150f; // юн/с — знаменатель формулы T
         private const float DeadlineSlack = 45f;      // с — прибавка к чистому времени
         private const float QuietSpeedLimit = 250f;   // юн/с — лимит скорости
-        private const float CometFlybyDistance = 400f;  // юн — подлететь к комете (§3.6)
         private const float HoleFlybyDistance = 800f;   // юн — подлететь к дыре (§3.6)
-        private const float WaitOnPlanetSeconds = 10f;  // с — сидеть на планете (§3.6)
+        private const float StarNearbyDistance = 400f;  // юн — пролететь рядом со звездой (v5.3)
 
-        // Н7 Q7.4: накопительные задания; публичные — OnboardBinder показывает счёт
-        public const int CargoHitLimit = 3;    // сильных ударов — посылка разбита
-        public const int SpeedStrikeLimit = 3; // превышений — жалоба пассажира
+        // избегания-условия (v5.3): эпизоды с гестерезисом; публичные — OnboardBinder показывает счёт
+        public const int NoHeatStrikeLimit = 2;  // входов в жар звёзд — жалоба пассажира
+        public const int BeltStrikeLimit = 2;    // пролетов сквозь пояс — жалоба пассажира
+
+        // «мимо бездны стоит очень хорошо» (владелец): бонус к выплате при успехе
+        public const int HoleFlybyBonus = 150;
 
         // Н7 Q7.1: шанс «паникёра» при генерации профиля (таймер-срыв на заказ)
         public const float HurryChance = 0.2f;
         private const float HurrySlack = 75f;   // с — прибавка к чистому времени срыва
 
         // Равномерный случайный тип из доступных (Н-14); шанс задания вообще — 50%,
-        // иначе null (UI трактует как «задания нет»). Точкам интереса (П8.1) нужен
-        // уровень: цель ищется по типу тела; объекта нет — тип выпадает из выбора,
-        // ядро условий (Deadline/NoRefuel/NoCollision/SpeedLimit/FragileCargo/
-        // NervousSpeed) доступно всегда
+        // иначе null (UI трактует как «задания нет»). Точки интереса (П8.1) нужны
+        // уровень/пояса: цель ищется по типу тела; объекта нет — тип выпадает из
+        // выбора. Пул v5.3 (владелец): хрупкий груз влился в «без столкновений»
+        // (вкус «у меня хрупкий груз»), нервный/комета/ожидание убраны; новые —
+        // жар звёзд и пояса
         public static PassengerTask CreateRandom(float routeDistance,
-            int pickupIndex, int dropoffIndex, LevelAsset level, bool cometsAvailable)
+            int pickupIndex, int dropoffIndex, LevelAsset level)
         {
             if (UnityEngine.Random.value >= TaskChance)
                 return null;
@@ -96,25 +93,21 @@ namespace SpaceTaxi.Orders
             int planet = RandomBodyIndex(level, BodyType.Planet, pickupIndex, dropoffIndex);
             int star = RandomBodyIndex(level, BodyType.Star);
             int hole = RandomBodyIndex(level, BodyType.BlackHole);
+            int belt = RandomBodyIndex(level, BodyType.AsteroidBelt);
 
-            var kinds = new List<PassengerTaskKind>(11)
+            var kinds = new List<PassengerTaskKind>(9)
             {
                 PassengerTaskKind.Deadline,
                 PassengerTaskKind.NoRefuel,
                 PassengerTaskKind.NoCollision,
                 PassengerTaskKind.SpeedLimit,
-                PassengerTaskKind.FragileCargo,
-                PassengerTaskKind.NervousSpeed,
+                PassengerTaskKind.NoHeat,
+                PassengerTaskKind.BeltAvoid,
             };
-            if (cometsAvailable)
-                kinds.Add(PassengerTaskKind.CometFlyby);
             if (planet >= 0)
-            {
                 kinds.Add(PassengerTaskKind.RingVisit);
-                kinds.Add(PassengerTaskKind.WaitOnPlanet);
-            }
             if (star >= 0)
-                kinds.Add(PassengerTaskKind.StarBackside);
+                kinds.Add(PassengerTaskKind.StarNearby);
             if (hole >= 0)
                 kinds.Add(PassengerTaskKind.HoleFlyby);
 
@@ -137,10 +130,13 @@ namespace SpaceTaxi.Orders
                         Text = "Не заправляемся в пути — станции пропускайте.",
                     };
                 case PassengerTaskKind.NoCollision:
+                    // v5.3: вкус «хрупкого груза» (владелец: «у меня хрупкий груз —
+                    // не врезаемся»); enforcement прежний — провал только ударами
+                    // С УРОНОМ (мягкие касания не считаются)
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoCollision,
-                        Text = "Ни одного столкновения с повреждением корпуса, пожалуйста.", // enforced: только удары с уроном
+                        Text = "У меня хрупкий груз — не врезаемся, пожалуйста.",
                     };
                 case PassengerTaskKind.SpeedLimit:
                     return new PassengerTask
@@ -149,26 +145,6 @@ namespace SpaceTaxi.Orders
                         Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с весь полёт.",
                         SpeedLimit = QuietSpeedLimit,
                     };
-                case PassengerTaskKind.FragileCargo:
-                    return new PassengerTask
-                    {
-                        Kind = PassengerTaskKind.FragileCargo,
-                        Text = $"Везу посылку — хрупкая! Больше {CargoHitLimit} сильных ударов не выдержит.",
-                    };
-                case PassengerTaskKind.NervousSpeed:
-                    return new PassengerTask
-                    {
-                        Kind = PassengerTaskKind.NervousSpeed,
-                        Text = $"Нервный я: {SpeedStrikeLimit} превышений {QuietSpeedLimit:0} юн/с — и выхожу с жалобой.",
-                        SpeedLimit = QuietSpeedLimit,
-                    };
-                case PassengerTaskKind.CometFlyby:
-                    return new PassengerTask
-                    {
-                        Kind = PassengerTaskKind.CometFlyby,
-                        Text = $"Покажите комету! Пролетите в {CometFlybyDistance:0} юн от неё.",
-                        DistanceThreshold = CometFlybyDistance,
-                    };
                 case PassengerTaskKind.RingVisit:
                     return new PassengerTask
                     {
@@ -176,12 +152,27 @@ namespace SpaceTaxi.Orders
                         Text = $"Зайдём в орбитальное кольцо планеты {level.Bodies[planet].DisplayName} — подлетим вплотную.", // enforced: вход в capture-кольцо
                         TargetBodyIndex = planet,
                     };
-                case PassengerTaskKind.StarBackside:
+                case PassengerTaskKind.StarNearby:
+                    // v5.3 (владелец: «назовем холодрыга — мол замерз, го пролетим
+                    // рядом со звездой»): enforcement = простая близость к звезде
                     return new PassengerTask
                     {
-                        Kind = PassengerTaskKind.StarBackside,
-                        Text = $"Облетим звезду {level.Bodies[star].DisplayName} с внешней стороны системы — говорят, вид необыкновенный.", // enforced: точка дальше звезды от центра мира
+                        Kind = PassengerTaskKind.StarNearby,
+                        Text = $"Я вечный Холодрыга — весь год мёрз! Пролетим рядом со звездой {level.Bodies[star].DisplayName} — погреемся.",
                         TargetBodyIndex = star,
+                        DistanceThreshold = StarNearbyDistance,
+                    };
+                case PassengerTaskKind.NoHeat:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.NoHeat,
+                        Text = "К звёздам не приближайтесь: жар меня пугает.",
+                    };
+                case PassengerTaskKind.BeltAvoid:
+                    return new PassengerTask
+                    {
+                        Kind = PassengerTaskKind.BeltAvoid,
+                        Text = "С детства боюсь, что в корабль врежется астероид — пояса облетайте, пожалуйста.",
                     };
                 case PassengerTaskKind.HoleFlyby:
                     return new PassengerTask
@@ -190,22 +181,16 @@ namespace SpaceTaxi.Orders
                         Text = $"Мимо бездны! Пролетите в {HoleFlybyDistance:0} юн от чёрной дыры — и живыми.",
                         DistanceThreshold = HoleFlybyDistance,
                     };
-                default: // WaitOnPlanet
-                    return new PassengerTask
-                    {
-                        Kind = PassengerTaskKind.WaitOnPlanet,
-                        Text = $"Посидим перед стартом на {level.Bodies[planet].DisplayName} секунд десять. Тишина — тоже путешествие.", // enforced: WaitSeconds = 10
-                        TargetBodyIndex = planet,
-                        WaitSeconds = WaitOnPlanetSeconds,
-                    };
+                default:
+                    return null; // пул гарантированно содержит кейс — недостижимо
             }
         }
 
         // П8.1: успех точки интереса фиксируется только трекингом — в отличие
-        // от условий П5.3, где «не нарушал условие» = молодец
+        // от условий-избегания, где «не нарушал условие» = молодец
         public static bool IsInterestPoint(PassengerTaskKind kind)
         {
-            return kind >= PassengerTaskKind.CometFlyby;
+            return kind >= PassengerTaskKind.RingVisit;
         }
 
         // Н7 Q7.1: жёсткий дедлайн «паникёра» — та же формула «дистанция × коэф»,
@@ -224,11 +209,9 @@ namespace SpaceTaxi.Orders
         {
             switch (task.Kind)
             {
-                case PassengerTaskKind.CometFlyby: return "Комета показана — пассажир в восторге";
                 case PassengerTaskKind.HoleFlyby: return "Мимо бездны пролетели — пассажир доволен";
                 case PassengerTaskKind.RingVisit: return "Орбитальное кольцо планеты пройдено";
-                case PassengerTaskKind.StarBackside: return "Внешняя сторона звезды — вид необыкновенный";
-                case PassengerTaskKind.WaitOnPlanet: return "Пассажир нагулялся — можно взлетать";
+                case PassengerTaskKind.StarNearby: return "Рядом со звездой — пассажир согрелся";
                 default: return "Задание выполнено";
             }
         }
@@ -238,9 +221,11 @@ namespace SpaceTaxi.Orders
             switch (task.Kind)
             {
                 case PassengerTaskKind.Deadline: return "Дедлайн вышел — пассажир опаздывает";
-                case PassengerTaskKind.NoCollision: return "Столкновение с повреждением — задание провалено";
+                case PassengerTaskKind.NoCollision: return "Хрупкий груз разбит — задание провалено";
                 case PassengerTaskKind.NoRefuel: return "Станция использована — задание провалено";
                 case PassengerTaskKind.SpeedLimit: return "Превышение скорости — задание провалено";
+                case PassengerTaskKind.NoHeat: return "Пассажир в зоне жара — задание провалено";
+                case PassengerTaskKind.BeltAvoid: return "Пояс пройден насквозь — задание провалено";
                 default: return "Задание провалено";
             }
         }

@@ -57,16 +57,16 @@ namespace SpaceTaxi.Orders
     public sealed class OrderService : MonoBehaviour
     {
         [Header("Поток карточек")]
-        [Tooltip("Сколько секунд живёт карточка входящего")]
-        public float offerLifetime = 120f;
-        [Tooltip("Новая карточка: минимум через (v5.2: 15→10)")]
-        public float spawnMin = 10f;
-        [Tooltip("Новая карточка: максимум через (v5.2: 30→18)")]
-        public float spawnMax = 18f;
+        [Tooltip("Сколько секунд живёт карточка входящих (v5.3, владелец: 120→90)")]
+        public float offerLifetime = 90f;
+        [Tooltip("Новая карточка: минимум через (v5.3, владелец: 10→20)")]
+        public float spawnMin = 20f;
+        [Tooltip("Новая карточка: максимум через (v5.3, владелец: 18→35)")]
+        public float spawnMax = 35f;
         [Tooltip("Максимум карточек одновременно (лишние старейшие вытесняются)")]
         public int maxOffers = 4;
-        [Tooltip("Сколько карточек сразу на старте")]
-        public int initialOffers = 4;
+        [Tooltip("Карточек при старте сессии (v5.3, владелец: 4→2)")]
+        public int initialOffers = 2;
 
         [Header("Ценообразование")]
         [Tooltip("Пусто — фолбэк с дефолтными числами (PricingConfig.Default)")]
@@ -78,7 +78,6 @@ namespace SpaceTaxi.Orders
         private PassengerCatalog catalog;
         private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
         private Ship ship;            // для трекинга задания «тише едем» (П5.3)
-        private CometSystem cometSystem; // лениво: жива — задание «покажите комету» доступно (П8.1)
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
@@ -381,22 +380,8 @@ namespace SpaceTaxi.Orders
             }
             // хрупкая посылка (Н7 Q7.4): CrashImpact приходит только на удар
             // с уроном (скорость выше посадочной) — это и есть «сильный удар»
-            if (Active.State == OrderState.Aboard && TaskIs(PassengerTaskKind.FragileCargo))
-                OnCargoHit(Active);
-        }
-
-        // удар по борту с грузом: копит повреждения, третий — срыв заказа
-        // (посылка разбита — без выплаты). Промежуточные удары — тост Danger
-        private void OnCargoHit(OrderOffer active)
-        {
-            active.Task.CargoHits++;
-            if (active.Task.CargoHits < PassengerTasks.CargoHitLimit)
-            {
-                OrderWarning?.Invoke($"Посылка повреждена ({active.Task.CargoHits}/{PassengerTasks.CargoHitLimit}) — везите плавнее");
-                return;
-            }
-            active.FailReason = $"посылка разбита ({PassengerTasks.CargoHitLimit} удара)";
-            FailActive();
+            // v5.3: хрупкий груз убран как отдельное задание (владелец) — «хрупкий»
+            // вкус теперь у «без столкновений» (любой удар с уроном = провал)
         }
 
         // платный сервис (заправка/ремонт) на станции при пассажире — задание
@@ -439,11 +424,15 @@ namespace SpaceTaxi.Orders
                 TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(task));
             }
 
-            // нервный пассажир (Н7 Q7.4): превышения копят замечания (эпизод = одно
-            // замечание), предел — жалоба при доставке; заказ не срывается
-            if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.NervousSpeed
+            // v5.3 (владелец): избегания-условия с эпизодами — жар звёзд и пояса
+            // («боязнь жара», «с детства боюсь, что врежется астероид»): 2 эпизода
+            // = жалоба при доставке
+            if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.NoHeat
                 && !task.Failed && ship != null && ship.Body != null)
-                TrackSpeedStrikes(task);
+                TrackAvoidEpisode(task, TrackKind.Heat);
+            if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.BeltAvoid
+                && !task.Failed && ship != null && ship.Body != null)
+                TrackAvoidEpisode(task, TrackKind.Belt);
 
             // точки интереса (П8.1): трекинг в тот же период Aboard→доставка,
             // успех фиксируется один раз — провалить задание может только гибель заказа
@@ -452,29 +441,68 @@ namespace SpaceTaxi.Orders
                 TrackInterestPoint(task);
         }
 
-        // замечания нервного пассажира: одно замечание на эпизод превышения —
-        // «висеть» над лимитом весь полёт == одно замечание (Н7 Q7.4)
-        private void TrackSpeedStrikes(PassengerTask task)
+        // v5.3: эпизоды избегания (жар/пояса) — одно замечание на эпизод
+        // (гистерезис: «висеть» внутри зоны == один эпизод); предел — жалоба
+        // при доставке; заказ не срывается
+        private enum TrackKind { Heat, Belt }
+
+        private void TrackAvoidEpisode(PassengerTask task, TrackKind kind)
         {
-            bool over = ship.Body.linearVelocity.magnitude > task.SpeedLimit;
-            if (!over)
+            bool inside = kind == TrackKind.Heat ? InStarHeat() : InBeltBand();
+            if (!inside)
             {
-                task.SpeedExceeded = false; // эпизод закрыт — новое превышение даст новое замечание
+                task.EpisodeOpen = false; // эпизод закрыт — новый вход даст новое замечание
                 return;
             }
-            if (task.SpeedExceeded)
+            if (task.EpisodeOpen)
                 return; // тот же эпизод — замечание уже засчитано
-            task.SpeedExceeded = true;
-            task.SpeedStrikes++;
-            if (task.SpeedStrikes >= PassengerTasks.SpeedStrikeLimit)
+            task.EpisodeOpen = true;
+            task.Strikes++;
+            int limit = kind == TrackKind.Heat
+                ? PassengerTasks.NoHeatStrikeLimit
+                : PassengerTasks.BeltStrikeLimit;
+            if (task.Strikes >= limit)
             {
                 task.Failed = true;
-                OrderWarning?.Invoke($"Пассажир в ярости: превышений {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit} — будет жалоба");
+                TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(task));
+                OrderWarning?.Invoke($"Пассажир в ярости: замечаний {task.Strikes}/{limit} — будет жалоба");
             }
             else
             {
-                OrderWarning?.Invoke($"Пассажир нервничает: замечание {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit} — сбавьте скорость");
+                OrderWarning?.Invoke(kind == TrackKind.Heat
+                    ? $"Пассажир боится жара: замечание {task.Strikes}/{limit} — подальше от звёзд"
+                    : $"Пассажир боится пояса: замечание {task.Strikes}/{limit} — облетайте");
             }
+        }
+
+        // в зоне жара любой звезды?
+        private bool InStarHeat()
+        {
+            if (gravityField == null)
+                gravityField = FindAnyObjectByType<GravityField>();
+            if (gravityField == null)
+                return false;
+            foreach (CelestialBody body in gravityField.Bodies)
+                if (body is Star star && star.IsInHeatZone(ship.transform.position))
+                    return true;
+            return false;
+        }
+
+        // внутри полосы астероидного пояса?
+        private bool InBeltBand()
+        {
+            if (level == null)
+                return false;
+            Vector2 shipPos = ship.Body != null ? ship.Body.position : (Vector2)ship.transform.position;
+            foreach (CelestialBodyData data in level.Bodies)
+            {
+                if (data.Type != BodyType.AsteroidBelt)
+                    continue;
+                float d = Vector2.Distance(shipPos, data.Position);
+                if (Mathf.Abs(d - data.Radius) <= data.BeltWidth)
+                    return true;
+            }
+            return false;
         }
 
         // срыв заказа «паникёра» (Н7 Q7.1): время вышло — заказ провален
@@ -502,19 +530,6 @@ namespace SpaceTaxi.Orders
 
             switch (task.Kind)
             {
-                case PassengerTaskKind.CometFlyby:
-                    if (cometSystem == null)
-                        cometSystem = FindAnyObjectByType<CometSystem>();
-                    if (cometSystem == null)
-                        return;
-                    foreach (Comet comet in cometSystem.ActiveComets)
-                        if (comet != null // Destroy обнуляет ссылку до чистки списка
-                            && Vector2.Distance(shipPos, comet.transform.position) < task.DistanceThreshold)
-                        {
-                            task.Succeeded = true;
-                            return;
-                        }
-                    break;
 
                 case PassengerTaskKind.HoleFlyby:
                     if (gravityField == null)
@@ -539,26 +554,12 @@ namespace SpaceTaxi.Orders
                     break;
                 }
 
-                case PassengerTaskKind.StarBackside:
+                case PassengerTaskKind.StarNearby:
                 {
+                    // v5.3 (владелец: «пролетим рядом со звездой»): близость, а не тыл
                     CelestialBody star = BodyByIndex(task.TargetBodyIndex);
-                    if (star != null)
-                    {
-                        // тыл звезды относительно центра мира: проекция вектора
-                        // «звезда → корабль» на направление «центр → звезда»
-                        Vector2 away = star.transform.position.normalized;
-                        if (Vector2.Dot(shipPos - (Vector2)star.transform.position, away) > star.Radius)
-                            task.Succeeded = true;
-                    }
-                    break;
-                }
-
-                case PassengerTaskKind.WaitOnPlanet:
-                {
-                    CelestialBody planet = BodyByIndex(task.TargetBodyIndex);
-                    if (planet != null && ship.State == ShipState.Landed && ship.LandedOn == planet)
-                        task.WaitAccumulated += Time.deltaTime; // копится с прерываниями
-                    if (task.WaitAccumulated >= task.WaitSeconds)
+                    if (star != null
+                        && Vector2.Distance(shipPos, star.transform.position) <= task.DistanceThreshold)
                         task.Succeeded = true;
                     break;
                 }
@@ -587,14 +588,6 @@ namespace SpaceTaxi.Orders
                 if (body.DisplayName == name)
                     return body;
             return null;
-        }
-
-        // кометы ставит WorldBuilder всегда; система есть — задание доступно
-        private bool CometsAvailable()
-        {
-            if (cometSystem == null)
-                cometSystem = FindAnyObjectByType<CometSystem>();
-            return cometSystem != null;
         }
 
         private bool TaskIs(PassengerTaskKind kind)
@@ -739,7 +732,7 @@ namespace SpaceTaxi.Orders
             int taskRolls = fat ? FatTaskRolls : 1;
             for (int i = 0; i < taskRolls && offer.Task == null; i++)
                 offer.Task = PassengerTasks.CreateRandom(RouteDistance(offer),
-                    pickup, dropoff, level, CometsAvailable());
+                    pickup, dropoff, level);
             offers.Add(offer);
             OffersChanged?.Invoke();
             OfferAdded?.Invoke();

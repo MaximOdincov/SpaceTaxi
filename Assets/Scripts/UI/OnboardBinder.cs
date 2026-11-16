@@ -666,14 +666,15 @@ namespace SpaceTaxi.UI
                     ? $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Осталось {remaining:0} с</color>"
                     : $"Осталось {remaining:0} с";
             }
-            if (task.Kind == PassengerTaskKind.WaitOnPlanet)
-                return "Посидели " + Mathf.Min(task.WaitAccumulated, task.WaitSeconds).ToString("0")
-                    + "/" + task.WaitSeconds.ToString("0") + " с";
-            // накопительные задания (Н7 Q7.4): счёт показываем, только когда он открыт
-            if (task.Kind == PassengerTaskKind.FragileCargo && task.CargoHits > 0)
-                return $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Повреждений: {task.CargoHits}/{PassengerTasks.CargoHitLimit}</color>";
-            if (task.Kind == PassengerTaskKind.NervousSpeed && task.SpeedStrikes > 0)
-                return $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Замечаний: {task.SpeedStrikes}/{PassengerTasks.SpeedStrikeLimit}</color>";
+            // v5.3: избегания (жар/пояса) — счёт показываем, только когда он открыт
+            if ((task.Kind == PassengerTaskKind.NoHeat || task.Kind == PassengerTaskKind.BeltAvoid)
+                && task.Strikes > 0)
+            {
+                int limit = task.Kind == PassengerTaskKind.NoHeat
+                    ? PassengerTasks.NoHeatStrikeLimit
+                    : PassengerTasks.BeltStrikeLimit;
+                return $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Замечаний: {task.Strikes}/{limit}</color>";
+            }
             return null;
         }
 
