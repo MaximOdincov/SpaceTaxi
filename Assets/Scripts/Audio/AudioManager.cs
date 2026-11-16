@@ -301,6 +301,16 @@ namespace SpaceTaxi.Audio
                 && musicActive.clip.length - musicActive.time <= MusicFadeTime;
             if (ended || ending)
                 AdvanceStationTrack(entry);
+
+            // Н9.4 (владелец: «музыка заканчивается — начинается заново»):
+            // страховка тишины. Штатный конец трека закрывает ветка выше;
+            // watchdog ловит остаточные случаи (застрявший фейд, внешний Stop)
+            // — канал с клипом обязан играть, иначе трек стартует с начала
+            if (musicActive.clip != null && !musicActive.isPlaying)
+            {
+                musicActive.time = 0f;
+                musicActive.Play();
+            }
         }
 
         // Н7 A7.2: следующий клип станции — на втором канале под кроссфейд,
