@@ -26,17 +26,22 @@ namespace SpaceTaxi.Economy
 
         public event Action<float> RatingChanged;
 
+        // довёз — фикс бонус доставки (П8.2)
         public void AddDelivery() => Move(DeliveryBonus);
 
+        // столкновение с повреждением — штраф рейтинга
         public void AddCollisionPenalty() => Move(-CollisionPenalty);
 
         // задание пассажира (П5.3): успех при доставке / жалоба при провале задания
         public void TaskCompleted() => Move(TaskBonus);
 
+        // жалоба пассажира — провал задания
         public void TaskFailed() => Move(-TaskFailPenalty);
 
+        // заказ сорван без гибели (отказ/высадка не туда)
         public void FailNoDeath() => Move(-FailNoDeathPenalty);
 
+        // заказ сорван гибелью корабля
         public void FailWithLoss() => Move(-FailWithLossPenalty);
 
         // восстановление из сейва (П10.1): прямое присвоение — дельты не суммируются,
@@ -48,6 +53,7 @@ namespace SpaceTaxi.Economy
             RatingChanged?.Invoke(Value);
         }
 
+        // единственная точка изменения рейтинга: кламп 0..5 + уведомление подписчиков
         private void Move(float delta)
         {
             float before = Value;

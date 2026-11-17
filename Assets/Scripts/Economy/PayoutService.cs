@@ -34,6 +34,7 @@ namespace SpaceTaxi.Economy
         // null, пока в забеге никто не платил
         public PayoutResult LastResult { get; private set; }
 
+        // привязка получателей выплаты (кошелёк + долг) при сборке сессии
         public void Bind(Wallet wallet, DebtService debt)
         {
             this.wallet = wallet;

@@ -10,6 +10,7 @@ namespace SpaceTaxi.Economy
 
         public int Credits { get; private set; }
 
+        // заработок за доставку/штрафы извне; отрицательные суммы не проходят (через Spend)
         public void Add(int amount)
         {
             if (amount <= 0)
@@ -18,6 +19,7 @@ namespace SpaceTaxi.Economy
             CreditsChanged?.Invoke(Credits);
         }
 
+        // покупка/штраф: атомарно — либо списано, либо false; кредиты не уходят в минус
         public bool TrySpend(int amount)
         {
             if (amount <= 0 || amount > Credits)
