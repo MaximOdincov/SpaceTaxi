@@ -39,6 +39,7 @@ namespace SpaceTaxi.UI
         private const float EntryDrop = 20f;     // въезд нового тоста сверху
         private const int DedupCacheLimit = 32;
 
+        // рядовой тост — уже, тревожный — шире и крупнее
         private static readonly Vector2 NormalSize = new Vector2(700f, 44f);
         private static readonly Vector2 EmphasizedSize = new Vector2(900f, 58f);
 
@@ -48,7 +49,8 @@ namespace SpaceTaxi.UI
             public readonly bool Emphasized;
             public readonly ToastTone Tone;
 
-            public Item(string message, bool emphasized, ToastTone tone)
+            // запись очереди: текст + вид + тон
+        public Item(string message, bool emphasized, ToastTone tone)
             {
                 Message = message;
                 Emphasized = emphasized;
@@ -76,6 +78,7 @@ namespace SpaceTaxi.UI
 
         private bool bound;
 
+        // подписки на события домена (симметричная отписка в OnDestroy)
         private void Awake()
         {
             // П11.1: HUD при панелях гасится корневой группой — тост живёт внутри
@@ -98,6 +101,7 @@ namespace SpaceTaxi.UI
                 pool.Add(CreateView());
         }
 
+        // вид тоста из пула или новый (CanvasGroup для фейда)
         private ToastView CreateView()
         {
             var go = new GameObject("Toast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
@@ -159,6 +163,7 @@ namespace SpaceTaxi.UI
             }
         }
 
+        // дедуп-окно: тот же текст не сыплется дважды подряд
         private bool IsDuplicate(string message)
         {
             float now = Time.unscaledTime;
@@ -174,6 +179,7 @@ namespace SpaceTaxi.UI
             return false;
         }
 
+        // чистка дедуп-кэша от протухших записей
         private void PruneDedupCache(float now)
         {
             List<string> stale = null;
@@ -191,6 +197,7 @@ namespace SpaceTaxi.UI
                     lastShownAt.Remove(key);
         }
 
+        // тик: очередь → показ, дедуп-кэш, тайминги вида
         private void Update()
         {
             float now = Time.unscaledTime;
@@ -330,6 +337,7 @@ namespace SpaceTaxi.UI
             bound = true;
         }
 
+        // показ: из пула, размер по тону, вверху экрана
         private void Display(Item item)
         {
             if (pool.Count == 0)
@@ -356,6 +364,7 @@ namespace SpaceTaxi.UI
             nextShowAt = view.ShownAt + Stagger;
         }
 
+        // тост-строку в пул (фейд уже сыграл)
         private void Retire(int index)
         {
             fading.Add(active[index]);
@@ -363,6 +372,7 @@ namespace SpaceTaxi.UI
             Relayout();
         }
 
+        // пересобрать стопку живых тостов сверху вниз
         private void Relayout()
         {
             float offset = 0f;
@@ -374,6 +384,7 @@ namespace SpaceTaxi.UI
             }
         }
 
+        // реплика пассажира в хвосте тоста: « — «фраза»»
         private static string Prefix(string phrase)
         {
             return string.IsNullOrEmpty(phrase) ? "" : " — «" + phrase + "»";
