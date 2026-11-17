@@ -35,7 +35,9 @@ namespace SpaceTaxi.UI
         // своя метка (waypoint с карты) — зелёная (G-15): единый цвет с ромбом на
         // радаре; на бумажной карте тот же смысл — тёмно-карандашный GreenPencil
         public static readonly Color WaypointGreen = new Color(0.235f, 1f, 0.557f);
+        // зелень стрелки-вейпоинта и её дистанции (гамма HUD)
         private static readonly Color WaypointGreenText = new Color(0.62f, 1f, 0.78f);
+        // янтарь дистанции в контуре тангенциального сближения
         private static readonly Color AmberText = new Color(1f, 0.86f, 0.55f);
         // цель заказа — жёлтый проектного такси (Н4.2.3), жёлтым и остаётся (G-15)
         private static readonly Color TargetYellow = OnboardComputerFactory.TaxiColor;
@@ -104,6 +106,7 @@ namespace SpaceTaxi.UI
         private const float CornerZoneWidth = 360f;
         private const float CornerZoneHeight = 330f;
 
+        // тик индикатора: бинды, метка-маркер, стрелки за экраном, ореол цели
         private void Update()
         {
             if (!Bind())
@@ -111,6 +114,7 @@ namespace SpaceTaxi.UI
             SyncMarker();
         }
 
+        // поздний бинд заказов/уровня: сессия собирается к первому кадру
         private void LateUpdate()
         {
             if (!ordersBound)
@@ -121,6 +125,7 @@ namespace SpaceTaxi.UI
             UpdateWaypointHalo();
         }
 
+        // гасим подписки и свои корневые объекты
         private void OnDestroy()
         {
             // маркер и канвас — корневые объекты, живут только с компонентом
@@ -132,6 +137,7 @@ namespace SpaceTaxi.UI
 
         // ————— привязка —————
 
+        // ленивые бинды домена (сессия/заказы/HUD); false — ещё рано
         private bool Bind()
         {
             if (!ordersBound)
@@ -167,11 +173,13 @@ namespace SpaceTaxi.UI
             return true;
         }
 
+        // смена вейпоинта (кнопка «следить»/клик по карте) — метка переразмещается
         private void OnWaypointChanged()
         {
             waypoint = binder != null ? binder.Waypoint : null;
         }
 
+        // индекс текущей цели активного заказа (забор до посадки, высадка после)
         private void RefreshTargetIndex()
         {
             var active = orders != null ? orders.Active : null;
@@ -182,6 +190,7 @@ namespace SpaceTaxi.UI
 
         // ————— маркер в мире —————
 
+        // позиция/видимость 3D-метки вейпоинта в мире
         private void SyncMarker()
         {
             if (waypoint == null)
@@ -232,12 +241,14 @@ namespace SpaceTaxi.UI
                 && delta.y + r + MarkerTopPad <= halfH;
         }
 
+        // спрятать метку (цель в кадре или вейпоинта нет)
         private void HideMarker()
         {
             if (markerRoot != null && markerRoot.gameObject.activeSelf)
                 markerRoot.gameObject.SetActive(false);
         }
 
+        // тело по имени (через реестр гравитации); нет — null
         private CelestialBody ResolveBody(string displayName)
         {
             if (gravity == null || string.IsNullOrEmpty(displayName))
@@ -248,6 +259,7 @@ namespace SpaceTaxi.UI
             return null;
         }
 
+        // каркас метки строится один раз (стрелка+кольцо кодом)
         private void EnsureMarker()
         {
             if (markerRoot != null)
@@ -272,6 +284,7 @@ namespace SpaceTaxi.UI
             labelGo.GetComponent<MeshRenderer>().sortingOrder = 9;
         }
 
+        // деталь метки: спрайт-часть с сортировкой выше мира
         private SpriteRenderer MakePart(string name)
         {
             var go = new GameObject(name, typeof(SpriteRenderer));
@@ -317,6 +330,7 @@ namespace SpaceTaxi.UI
 
         // ————— краевые стрелки —————
 
+        // стрелки-шевроны для целей за кадром: проекция, расталкивание, клампы зон
         private void UpdateArrows()
         {
             Camera cam = Camera.main;
@@ -369,6 +383,7 @@ namespace SpaceTaxi.UI
             ApplyArrow(targetArrow, targetArrowTip, targetArrowDist, showTarget, posT, angleT, distT);
         }
 
+        // позиция и радиус вейпоинта (для проекции на экран)
         private (Vector2? pos, float radius) WaypointRef()
         {
             if (waypoint == null)
@@ -378,6 +393,7 @@ namespace SpaceTaxi.UI
             return (waypoint.Position, waypoint.Radius);
         }
 
+        // позиция и радиус цели заказа (для проекции на экран)
         private (Vector2? pos, float radius) TargetRef()
         {
             LevelAsset level = session != null ? session.Level : null;
@@ -491,6 +507,7 @@ namespace SpaceTaxi.UI
             return canvasPos;
         }
 
+        // применить состояние стрелки: видимость, позиция, поворот, дистанция
         private void ApplyArrow(RectTransform root, RectTransform tip, TMP_Text distLabel,
             bool show, Vector2 pos, float angle, string distText)
         {
@@ -506,6 +523,7 @@ namespace SpaceTaxi.UI
                 distLabel.text = distText;
         }
 
+        // оверлей-канвас стрелок строится один раз (ScreenSpace, соринг 30)
         private void EnsureArrowUi()
         {
             if (arrowCanvas != null)
@@ -536,6 +554,7 @@ namespace SpaceTaxi.UI
         // при нечитаемой текстуре — StubSprites.
         private static Sprite chevronSprite;
 
+        // спрайт шеврона: один источник с фолбэками (см. комментарий внутри)
         public static Sprite ChevronSprite()
         {
             if (chevronSprite != null)
@@ -656,6 +675,7 @@ namespace SpaceTaxi.UI
             haloRenderer.color = new Color(color.r, color.g, color.b, 0.55f + 0.3f * Mathf.Sin(t * 3.4f));
         }
 
+        // жёлтый ореол цели, видимой в кадре (мировой SpriteRenderer поверх тела)
         private void UpdateTargetHalo()
         {
             CelestialBody body = null;
