@@ -44,6 +44,7 @@ namespace SpaceTaxi.Audio
             public Coroutine Fade;
         }
 
+        // синглтон между сценами: второй инстанс уничтожается (DontDestroyOnLoad ниже)
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -68,6 +69,7 @@ namespace SpaceTaxi.Audio
             musicB = CreateVoice("MusicB");
         }
 
+        // сцена умирает — singleton-ссылку гасим (повторная сцена создаст новый)
         private void OnDestroy()
         {
             if (Instance == this)
@@ -76,6 +78,7 @@ namespace SpaceTaxi.Audio
 
         // --- Одноразовые звуки ---
 
+        // короткий звук: свободный голос пула, интенсивность = громкость/высота
         public void PlayOneShot(SoundId id, float intensity = 1f)
         {
             SoundEntry entry = GetEntry(id);
@@ -117,6 +120,7 @@ namespace SpaceTaxi.Audio
 
         // --- Непрерывные звуки ---
 
+        // включить/выключить луп одним вызовом (жар/радио-гул и т.п.)
         public void SetLoopActive(SoundId id, bool active)
         {
             if (active)
@@ -125,6 +129,7 @@ namespace SpaceTaxi.Audio
                 StopLoop(id);
         }
 
+        // луп: голос из пула, фейд до рабочей громкости; повтор — no-op
         public void StartLoop(SoundId id)
         {
             SoundEntry entry = GetEntry(id);
@@ -152,6 +157,7 @@ namespace SpaceTaxi.Audio
             voice.Fade = StartCoroutine(FadeLoop(voice, 1f));
         }
 
+        // луп: фейд до тишины и удаление голоса из реестра
         public void StopLoop(SoundId id)
         {
             if (!loops.TryGetValue(id, out LoopVoice voice))
@@ -163,6 +169,7 @@ namespace SpaceTaxi.Audio
             voice.Fade = StartCoroutine(FadeLoop(voice, 0f, removeWhenDone: true));
         }
 
+        // интенсивность лупа (0..1): громкость/высота растут к поверхности звезды и т.п.
         public void SetLoopIntensity(SoundId id, float intensity)
         {
             if (!loops.TryGetValue(id, out LoopVoice voice) || voice.FadingOut)
@@ -171,6 +178,7 @@ namespace SpaceTaxi.Audio
             ApplyLoopParams(voice);
         }
 
+        // панорама лупа — позиционирование источника (двигатель, гул)
         public void SetLoopPan(SoundId id, float pan)
         {
             if (!loops.TryGetValue(id, out LoopVoice voice))
@@ -179,6 +187,7 @@ namespace SpaceTaxi.Audio
             voice.Source.panStereo = voice.Pan;
         }
 
+        // применить intensity/pan к голосу: громкость от LoopVolumeMin до полной
         private void ApplyLoopParams(LoopVoice voice)
         {
             float i = voice.Intensity;
@@ -187,6 +196,7 @@ namespace SpaceTaxi.Audio
             voice.Source.pitch = voice.Entry.Pitch * (LoopPitchMin + LoopPitchRange * i);
         }
 
+        // плавный фейд лупа: до рабочей громкости (dir=1) или до тишины (dir=0)
         private IEnumerator FadeLoop(LoopVoice voice, float dir, bool removeWhenDone = false)
         {
             // dir: 1 — до рабочих параметров, 0 — до тишины
@@ -211,6 +221,7 @@ namespace SpaceTaxi.Audio
             }
         }
 
+        // рабочая громкость лупа по интенсивности (группа Music + duck учтутся ниже)
         private float FullLoopVolume(LoopVoice voice)
         {
             float i = voice.Intensity;
@@ -228,6 +239,7 @@ namespace SpaceTaxi.Audio
         // хэндлы из списка не удаляются до StopAllMusicFades)
         private int activeMusicFades;
 
+        // гашение незавершённых кроссфейдов — при смене трека/музыки
         private void StopAllMusicFades()
         {
             foreach (Coroutine fade in musicFades)
@@ -235,6 +247,7 @@ namespace SpaceTaxi.Audio
             musicFades.Clear();
         }
 
+        // музыка: кроссфейд на новый трек/станцию; то же id — no-op
         public void PlayMusic(SoundId id)
         {
             if (id == currentMusic)
@@ -265,6 +278,7 @@ namespace SpaceTaxi.Audio
             MusicStateChanged?.Invoke(); // подписчики узнают о смене трека (меню↔игра)
         }
 
+        // музыка выключается совсем (в меню её включает SceneMusic)
         public void StopMusic()
         {
             currentMusic = SoundId.None;
@@ -380,6 +394,7 @@ namespace SpaceTaxi.Audio
             }
         }
 
+        // станция по индексу (с ним нет вызовов — путь через PlayMusic/ВОЛНА)
         public void PlayStation(int index)
         {
             if (Stations.Length == 0)
@@ -411,6 +426,7 @@ namespace SpaceTaxi.Audio
         // мьют радио: трек продолжает идти (не пауза), звука нет
         public bool MusicMuted { get; private set; }
 
+        // мьют радио: трек продолжает идти (не пауза), звука нет
         public void ToggleMusicMuted()
         {
             MusicMuted = !MusicMuted;
@@ -468,6 +484,7 @@ namespace SpaceTaxi.Audio
             }
         }
 
+        // счётчик активных кроссфейдов + RunCrossfade; сбой корутины не ломает счётчик
         private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
         {
             activeMusicFades++;
@@ -483,6 +500,7 @@ namespace SpaceTaxi.Audio
             }
         }
 
+        // сам кроссфейд: equal-power до целевой громкости; try/finally — счётчик жив
         private IEnumerator RunCrossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
         {
             // A8.1: equal-power (sqrt-кривые вместо линейных) — в середине
@@ -516,6 +534,7 @@ namespace SpaceTaxi.Audio
 
         // --- Громкости групп и настройки ---
 
+        // громкость группы (Music/Sfx/Loops): кламп + PlayerPrefs + живое применение
         public void SetGroupVolume(AudioGroup group, float linear01)
         {
             groupVolumes[group] = Mathf.Clamp01(linear01);
@@ -538,6 +557,7 @@ namespace SpaceTaxi.Audio
                 musicB.volume = target;
         }
 
+        // целевая громкость активной музыки для кроссфейда (группа Music)
         private float CurrentMusicVolume()
         {
             if (currentMusic == SoundId.None)
@@ -546,6 +566,7 @@ namespace SpaceTaxi.Audio
             return (entry != null ? entry.Volume : 1f) * GroupFactor(AudioGroup.Music);
         }
 
+        // чтение громкости группы (настройки/настройки-панель)
         public float GetGroupVolume(AudioGroup group) => groupVolumes.TryGetValue(group, out float v) ? v : 1f;
 
         // Общая громкость; квадратичная кривая — субъективно ровная
@@ -556,8 +577,10 @@ namespace SpaceTaxi.Audio
             SaveVolume("Master", v);
         }
 
+        // общая громкость; квадратичная кривая — субъективно ровная
         public float GetMasterVolume() => Mathf.Sqrt(AudioListener.volume);
 
+        // переприменить параметры всех живых лупов (после групп/дака)
         private void RefreshLoops()
         {
             foreach (LoopVoice voice in loops.Values)
@@ -571,12 +594,14 @@ namespace SpaceTaxi.Audio
             .FindAll((AudioGroup[])System.Enum.GetValues(typeof(AudioGroup)),
                 g => g != AudioGroup.Music && g != AudioGroup.Ui);
 
+        // даккинг: приглушить группы (взрыв/тон) на DuckSeconds
         private void DuckAll()
         {
             if (duckRoutine != null) StopCoroutine(duckRoutine);
             duckRoutine = StartCoroutine(DuckRoutine());
         }
 
+        // дак-фактор на группы → плавное возвращение громкости
         private IEnumerator DuckRoutine()
         {
             foreach (AudioGroup g in duckGroups)
@@ -596,6 +621,7 @@ namespace SpaceTaxi.Audio
 
         // --- Внутреннее ---
 
+        // итоговый множитель: громкость группы × текущий дак-фактор
         private float GroupFactor(AudioGroup group)
         {
             float vol = groupVolumes.TryGetValue(group, out float v) ? v : 1f;
@@ -603,6 +629,7 @@ namespace SpaceTaxi.Audio
             return vol * duck * (group == AudioGroup.Music ? 1f : SfxBoost);
         }
 
+        // запись каталога; пустой записи/клипов нет — Warning раз на id (warnedSilent)
         private SoundEntry GetEntry(SoundId id)
         {
             if (catalog == null)
@@ -631,6 +658,7 @@ namespace SpaceTaxi.Audio
             return clips[index];
         }
 
+        // новый голос-источник ребёнком менеджера (луп или одна выстрел)
         private AudioSource CreateVoice(string name)
         {
             var go = new GameObject("Audio_" + name);
@@ -638,6 +666,7 @@ namespace SpaceTaxi.Audio
             return go.AddComponent<AudioSource>();
         }
 
+        // свободный голос пула one-shot; все заняты — новый (пул растёт редко)
         private AudioSource GetFreeOneShotVoice()
         {
             foreach (AudioSource src in oneShotPool)
@@ -650,13 +679,16 @@ namespace SpaceTaxi.Audio
             return voice;
         }
 
+        // перегрузка по enum-группе
         private static float LoadVolume(AudioGroup g) => LoadVolume(g.ToString());
 
+        // громкость группы из PlayerPrefs (дефолт 1)
         private static float LoadVolume(string key)
         {
             return PlayerPrefs.GetFloat("audio.vol." + key, 1f);
         }
 
+        // громкость группы в PlayerPrefs (настройки переживают сессию)
         private static void SaveVolume(string key, float value)
         {
             PlayerPrefs.SetFloat("audio.vol." + key, value);
@@ -664,7 +696,9 @@ namespace SpaceTaxi.Audio
         }
     }
 
-    // Фасад: Sound.Play(SoundId.Takeoff) из любого кода; без менеджера — тихо
+    // Фасад: Sound.Play(SoundId.Takeoff) из любого кода; без менеджера — тихо.
+    // Каждая перегрузка — безопасный вызов того же метода менеджера
+    // (краткие однострочники без собственных комментариев — имена говорят сами)
     public static class Sound
     {
         public static void Play(SoundId id, float intensity = 1f) =>
