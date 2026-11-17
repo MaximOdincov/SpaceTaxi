@@ -99,3 +99,21 @@
   плотны (29%/26%) — не тронуты (шум не нужен). ОСТАЛОСЬ аннотировать: Economy (~1388), Audio
   (~1043), UI-биндеры (~13k) — в чек-лист владельцу как отслежка.
 - 7c (StationScreenController split) — делегирован unity-scripter, в работе.
+
+## Чекпоинт 5 (~03:30) — аннотация остатка (задача 9), продолжение
+
+Закрыто (каждый батч — отдельный коммит, compile EXIT 0):
+- Н10.15 OrderService — 14 методов; PassengerTask/NpcPortrait проверены (плотны — не тронуты).
+- Н10.17 Economy-деньги: Wallet/PayoutService/RatingService; DebtService/FuelNetwork уже плотны.
+- Н10.18 AudioManager — все методы (синглтон, пул, лупы, кроссфейды, группы, даккинг, каталог,
+  голоса, PlayerPrefs, фасад Sound).
+- Н10.19 WaypointIndicator — 20 методов/полей.
+- Н10.20 ToastNotifier — 11.
+- Н10.21 HudBinder + MinimapBinder — 30.
+Осталось (отслежка, владельцу): MapScreenBinder (3045), OnboardBinder/Factory (частично аннотированы
+правками Н10.4/Н10.7), StationScreenController+секции (после 7c), OnboardComputerPanel/MapScreenController
+и мелкие контроллеры. Игра плейтест-приёмка: «только комментарии» в каждом батче.
+
+ВАЖНО о верификации Н10.21: recompile в момент коммита поймал ПРОМЕЖУТОЧНОЕ состояние 7c
+(StationShowcaseSection в работе у скриптера) — аннотации коммент-only и не могли ломать;
+финальная компиляция сессии (после 7c) подтвердит всё дерево.
