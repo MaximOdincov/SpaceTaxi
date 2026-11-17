@@ -50,8 +50,16 @@ namespace SpaceTaxi.UI
         // мини-строка выполнения под карточкой актива (Н7 Q7.2): этапы ЗАБРАТЬ/ВЕЗИ
         // и таймер «паникёра» (Н7 Q7.1); текст ведёт SlowUpdate
         private TMP_Text activeProgress;
+        // Н10.4: статус-чип задания активного заказа — «выполняется…» →
+        // «✓ выполнено» → «✗ провалено»; узел Expanded/Summary/Status,
+        // текст ведёт SlowUpdate (источник: task.Failed/Succeeded)
+        private TMP_Text activeStatus;
         // галочка этапа: «✓» есть не в каждом атласе (паттерн clockGlyph) — иначе «+»
         private string doneGlyph = "+";
+        // Н10.4: «✗» есть не в каждом атласе (тот же паттерн) — иначе «×»;
+        // «…» при отсутствии глифа — три точки
+        private string failGlyph = "×";
+        private string ellipsis = "...";
         // раскрытие: входящая карточка разворачивается прямо в ленте скролла
         private OrderOffer expandedOffer;
 
@@ -160,6 +168,10 @@ namespace SpaceTaxi.UI
                 ratingPrefix = "★ ";
             if (refs.Font != null && refs.Font.HasCharacter('✓'))
                 doneGlyph = "✓";
+            if (refs.Font != null && refs.Font.HasCharacter('✗'))
+                failGlyph = "✗"; // иначе остаётся «×»
+            if (refs.Font != null && refs.Font.HasCharacter('…'))
+                ellipsis = "…"; // иначе остаётся "..."
         }
 
         private static void SetText(GameObject root, string path, string value)
@@ -195,6 +207,7 @@ namespace SpaceTaxi.UI
                 activeAreaChildren.Clear();
                 activeCardGo = null;
                 activeProgress = null; // строка выполнения гибнет вместе с карточкой
+                activeStatus = null; // чип статуса гибнет вместе с карточкой
                 if (hasActive)
                     BuildActiveOrder();
                 builtActiveOffer = hasActive ? orders.Active : null;
@@ -295,6 +308,8 @@ namespace SpaceTaxi.UI
             }
 
             FillCard(card.transform, offer, activeMode: true);
+            activeStatus = FindText(card.transform, "Expanded/Summary/Status");
+            UpdateActiveStatusChip(); // реальный текст вместо заглушки «статус» с первого кадра
             BuildActiveProgressRow();
         }
 
@@ -649,6 +664,7 @@ namespace SpaceTaxi.UI
             {
                 RefreshLiveDistances(activeCardGo.transform, orders.Active);
                 UpdateActiveWish();
+                UpdateActiveStatusChip();
                 UpdateActiveProgressRow();
                 RefreshCancelState();
             }
@@ -691,6 +707,37 @@ namespace SpaceTaxi.UI
                 return;
             string progress = TaskProgress(task);
             wishText.text = StatLine("Пожелание клиента:", task.Text + (progress != null ? " · " + progress : ""));
+        }
+
+        // Н10.4: статус-чип задания в строке Status активной карточки.
+        // У точек интереса «✓» появляется в момент свершения (TrackInterestPoint
+        // ставит Succeeded в тот же кадр, что и тост-момент); у избегающих
+        // живой статус — только «выполняется…»/«✗ провалено»: успех у них
+        // ставит SettleTask при доставке, когда карточка уже гибнет.
+        // Тосты избегающим НЕ добавлять — владелец выбрал чип вместо тоста.
+        // Сейв восстанавливает Succeeded/Failed — чип верен сразу после лоада
+        private void UpdateActiveStatusChip()
+        {
+            if (activeCardGo == null || orders.Active == null)
+                return;
+            if (activeStatus == null)
+                activeStatus = FindText(activeCardGo.transform, "Expanded/Summary/Status");
+            if (activeStatus == null)
+                return;
+            PassengerTask task = orders.Active.Task;
+            if (task == null || task.Kind == PassengerTaskKind.None)
+            {
+                activeStatus.gameObject.SetActive(false); // задания нет — строка не шумит
+                return;
+            }
+            activeStatus.gameObject.SetActive(true);
+            string label = $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>Задание:</color>";
+            if (task.Failed)
+                activeStatus.text = label + $"<color={ColorHex(OnboardComputerFactory.DangerColor)}> {failGlyph} провалено</color>";
+            else if (task.Succeeded)
+                activeStatus.text = label + $"<color={ColorHex(OnboardComputerFactory.RatingGreen)}> {doneGlyph} выполнено</color>";
+            else
+                activeStatus.text = label + $"<color={ColorHex(OnboardComputerFactory.TaxiColor)}> выполняется{ellipsis}</color>";
         }
 
         // --- Строка выполнения активного заказа (Н7 Q7.2) ---

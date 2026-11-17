@@ -50,8 +50,9 @@ namespace SpaceTaxi.UI
         public const float SummaryHeight = 170f;        // Имя 30 + Откуда/Куда/Маршрут 26×3 + Пожелание 54 + зазоры
         public const float ExpandedContentHeight = DetailAvatarHeight + CardSpacing + SummaryHeight + CardSpacing + AcceptHeight;
         public const float OfferExpandedHeight = 16f + ExpandedContentHeight;
-        // активный заказ — тот же Expanded всегда (без строки статуса и тоггла)
-        public const float ActiveSummaryHeight = SummaryHeight;
+        // активный заказ — тот же Expanded всегда (строка статуса задания
+        // Н10.4 есть, тоггла нет); +28 = строка статуса 26 + зазор 2
+        public const float ActiveSummaryHeight = SummaryHeight + 28f;
         public const float ActiveExpandedContentHeight = DetailAvatarHeight + CardSpacing + ActiveSummaryHeight + CardSpacing + AcceptHeight;
         public const float ActiveCardHeight = 16f + ActiveExpandedContentHeight;
 
@@ -349,7 +350,7 @@ namespace SpaceTaxi.UI
             cardLe.flexibleWidth = 1f;
             ((RectTransform)card.transform).sizeDelta = new Vector2(440f, ActiveCardHeight);
 
-            BuildExpandedBlock(card.transform, ActiveSummaryHeight, false, "Cancel", "Отменить · −Đ 0", DangerColor * 0.9f, bold: false, visible: true);
+            BuildExpandedBlock(card.transform, ActiveSummaryHeight, true, "Cancel", "Отменить · −Đ 0", DangerColor * 0.9f, bold: false, visible: true); // withStatus: строка статуса задания Н10.4
 
             return card;
         }
