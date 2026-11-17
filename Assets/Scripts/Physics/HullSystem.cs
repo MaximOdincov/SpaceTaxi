@@ -75,6 +75,11 @@ namespace SpaceTaxi.Physics
             ShipLost?.Invoke(reason); // сообщить причину
             ship.State = ShipState.Respawning; // окно респавна
             ship.Body.linearVelocity = Vector2.zero; // стоп
+            // Н9.14 (владелец: «сразу после отключения на том же месте появляется
+            // второй»): старый корпус прячется МГНОВЕННО — до телепорта он висел
+            // видимым 0.6с рядом с обломком-призраком (наследие «оператор остаётся
+            // в борту»); на месте потери остаётся только обломок
+            HideVisuals(); // старый корпус исчезает сразу
             StartCoroutine(RespawnAfter(0.6f)); // короткая пауза
         }
 
@@ -195,9 +200,22 @@ namespace SpaceTaxi.Physics
             ship.Fuel = ship.Eff.FuelMax; // полный бак
             ship.PoweredDown = false; // новый борт — не заглушенный
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
-            RestoreVisuals(); // корпус возвращается при респавне (после гибели прятался)
             ship.LandedOn = respawnPlanet; // стоит на стартовой
             ship.State = ShipState.Landed; // состояние «стоит»
+            // Н9.14 (владелец: «спавнишь корабль ещё до начала пролёта камеры»):
+            // корпус невидим, пока камера летит от места смерти к планете старта;
+            // появляется в момент прилёта (кап 2.5с — на случай застрявшей камеры)
+            float waited = 0f; // сколько ждём прилёта
+            Camera cam = Camera.main; // камера слежения
+            while (waited < 2.5f)
+            {
+                yield return null; // кадр ожидания
+                waited += Time.unscaledDeltaTime; // кап и на паузе модалов
+                if (cam != null && Vector2.Distance(cam.transform.position, ship.transform.position)
+                    <= cam.orthographicSize * 1.5f) // камера долетела
+                    break;
+            }
+            RestoreVisuals(); // корпус материализуется под прилетевшей камерой
             HpChanged?.Invoke(); // HUD корпус
             Respawned?.Invoke(); // событие респавна
             Sound.Play(SoundId.Respawn); // звук
