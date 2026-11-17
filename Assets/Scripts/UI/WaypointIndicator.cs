@@ -96,14 +96,13 @@ namespace SpaceTaxi.UI
         private bool waypointInFrame;
         private GravityField haloGravity; // ленивый бинд для ореола цели (см. UpdateTargetHalo)
 
-        // Н9.11 (владелец: «шеврон не должен заходить на UI — останавливается до него»):
-        // прямоугольники HUD-элементов у краёв экрана; стрелка упирается в их границу
-        private RectTransform hudMinimap;
-        private RectTransform hudSpeed;
-        private RectTransform hudFuelTrack;
-        private RectTransform hudFuelIcon;
-        private RectTransform hudHull;
-        private RectTransform hudPanel;
+        // Н10.6 (владелец: «не пускать в ЛЕВЫЙ ВЕРХНИЙ и ПРАВЫЙ ВЕРХНИЙ угол —
+        // останавливается раньше, до миникарты и до HUD»): размер угловых зон
+        // в canvas units от угла (reference 1920×1080, match 0.5). Миникарта
+        // 280×280 + отступ = 312 от угла — 360/330 покрывают с запасом; левый
+        // HUD-кластер (бак/скорость/корпус) ≤260×215 — покрыт
+        private const float CornerZoneWidth = 360f;
+        private const float CornerZoneHeight = 330f;
 
         private void Update()
         {
@@ -360,9 +359,11 @@ namespace SpaceTaxi.UI
                 }
             }
 
-            // Н9.11: стрелка скользит по краю, но не заходит на HUD-элементы
-            posW = ClampOutsideHud(posW);
-            posT = ClampOutsideHud(posT);
+            // Н10.6 (владелец: «не пускать в ЛЕВЫЙ ВЕРХНИЙ и ПРАВЫЙ ВЕРХНИЙ угол —
+            // останавливается раньше, до миникарты и до HUD»): две прямоугольные
+            // угловые зоны вместо контурного обхода (Н9.11 «скачет»)
+            posW = ClampOutsideCorners(posW);
+            posT = ClampOutsideCorners(posT);
 
             ApplyArrow(waypointArrow, waypointArrowTip, waypointArrowDist, showWaypoint, posW, angleW, distW);
             ApplyArrow(targetArrow, targetArrowTip, targetArrowDist, showTarget, posT, angleT, distT);
@@ -444,80 +445,50 @@ namespace SpaceTaxi.UI
             return true;
         }
 
-        // ленивый сбор прямоугольников HUD-элементов (биндеры живут с сценой)
-        private void EnsureHudRects()
+        // Н10.6: стрелка скользит по краю экрана и упирается в границу угловой
+        // зоны («останавливается раньше, до миникарты и до HUD»). canvasPos —
+        // единицы канваса от центра (как ComputeEdge). Едет по верхнему краю —
+        // останавливается по X до зоны; по боковым краям — по Y до низа зоны;
+        // точка строго внутри зоны (редко: расталкивание ушло с края) —
+        // ближайшая свободная граница. Позиция меняется непрерывно вдоль края
+        private Vector2 ClampOutsideCorners(Vector2 canvasPos)
         {
-            if (hudMinimap == null)
-            {
-                var mm = FindAnyObjectByType<MinimapBinder>(FindObjectsInactive.Include);
-                hudMinimap = mm != null ? mm.GetComponent<RectTransform>() : null;
-            }
-            if (hudSpeed == null)
-            {
-                var hud = FindAnyObjectByType<HudBinder>(FindObjectsInactive.Include);
-                if (hud != null)
-                {
-                    hudSpeed = hud.transform.Find("SpeedValue") as RectTransform;
-                    hudFuelTrack = hud.transform.Find("FuelTrack") as RectTransform;
-                    hudFuelIcon = hud.transform.Find("FuelIcon") as RectTransform;
-                    hudHull = hud.transform.Find("HullValue") as RectTransform;
-                }
-            }
-            if (hudPanel == null)
-            {
-                var panel = FindAnyObjectByType<OnboardComputerPanel>(FindObjectsInactive.Include);
-                hudPanel = panel != null ? panel.GetComponent<RectTransform>() : null;
-            }
-        }
-
-        // экранная зона HUD-элемента в пикселях (overlay — position уже в px;
-        // camera-space — проекция через камеру канваса)
-        private static Rect HudRectPx(RectTransform rect)
-        {
-            Vector3[] corners = new Vector3[4];
-            rect.GetWorldCorners(corners);
-            var canvas = rect.GetComponentInParent<Canvas>();
-            var cam = canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera
-                ? canvas.worldCamera
-                : null;
-            Vector2 min = cam != null ? (Vector2)cam.WorldToScreenPoint(corners[0]) : (Vector2)corners[0];
-            Vector2 max = cam != null ? (Vector2)cam.WorldToScreenPoint(corners[2]) : (Vector2)corners[2];
-            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
-        }
-
-        // стрелка прижата к краю экрана: если её точка попадает в расширенную
-        // зону HUD-элемента — сдвигаем вдоль края до границы зоны («останавливается
-        // до элемента»). canvasPos — единицы канваса от центра экрана
-        private Vector2 ClampOutsideHud(Vector2 canvasPos)
-        {
-            EnsureHudRects();
             float sf = arrowCanvas != null ? arrowCanvas.scaleFactor : 1f;
-            Vector2 px = canvasPos * sf; // точка стрелки относительно центра, px
-            float pad = 30f; // отступ от элемента
-            Vector2 halfScreen = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-            float halfW = Screen.width * 0.5f;
-            float halfH = Screen.height * 0.5f;
-
-            foreach (RectTransform rect in new[] { hudMinimap, hudSpeed, hudFuelTrack, hudFuelIcon, hudHull, hudPanel })
+            float halfW = Screen.width / Mathf.Max(sf, 0.001f) * 0.5f;
+            float halfH = Screen.height / Mathf.Max(sf, 0.001f) * 0.5f;
+            float zoneBottom = halfH - CornerZoneHeight;
+            float limitL = -halfW + CornerZoneWidth + 2f; // упор верхнего края слева от зоны
+            float limitR = halfW - CornerZoneWidth - 2f;  // справа
+            float onEdge = 1.5f; // допуск «прижата к краю» (canvas units)
+            bool top = canvasPos.y >= halfH - onEdge;
+            bool left = canvasPos.x <= -halfW + onEdge;
+            bool right = canvasPos.x >= halfW - onEdge;
+            if (top)
             {
-                if (rect == null)
-                    continue;
-                Rect r = HudRectPx(rect);
-                Rect rel = new Rect(r.x - halfScreen.x, r.y - halfScreen.y, r.width, r.height); // от центра
-                Rect zone = new Rect(rel.x - pad, rel.y - pad, rel.width + pad * 2f, rel.height + pad * 2f);
-                if (px.x <= zone.x || px.x >= zone.xMax || px.y <= zone.y || px.y >= zone.yMax)
-                    continue; // вне зоны
-
-                // ближайший край экрана определяет ось скольжения
-                float dTop = halfH - px.y, dBottom = px.y + halfH;
-                float dLeft = px.x + halfW, dRight = halfW - px.x;
-                float minEdge = Mathf.Min(Mathf.Min(dTop, dBottom), Mathf.Min(dLeft, dRight));
-                if (minEdge == dTop || minEdge == dBottom) // верх/низ — скользим по X
-                    px.x = px.x - zone.x < zone.xMax - px.x ? zone.x - 2f : zone.xMax + 2f;
-                else // лево/право — скользим по Y
-                    px.y = px.y - zone.y < zone.yMax - px.y ? zone.y - 2f : zone.yMax + 2f;
+                if (canvasPos.x < limitL)
+                    canvasPos.x = limitL;
+                else if (canvasPos.x > limitR)
+                    canvasPos.x = limitR;
+                return canvasPos;
             }
-            return px / sf;
+            if (left || right)
+            {
+                if (canvasPos.y > zoneBottom - 2f)
+                    canvasPos.y = zoneBottom - 2f;
+                return canvasPos;
+            }
+            // строго внутри левой/правой зоны: ближайшая свободная граница
+            bool inLeft = canvasPos.x <= -halfW + CornerZoneWidth && canvasPos.y >= zoneBottom;
+            bool inRight = canvasPos.x >= halfW - CornerZoneWidth && canvasPos.y >= zoneBottom;
+            if (!inLeft && !inRight)
+                return canvasPos;
+            float boundaryX = inLeft ? limitL : limitR;
+            float boundaryY = zoneBottom - 2f;
+            if (Mathf.Abs(boundaryX - canvasPos.x) <= Mathf.Abs(boundaryY - canvasPos.y))
+                canvasPos.x = boundaryX;
+            else
+                canvasPos.y = boundaryY;
+            return canvasPos;
         }
 
         private void ApplyArrow(RectTransform root, RectTransform tip, TMP_Text distLabel,
