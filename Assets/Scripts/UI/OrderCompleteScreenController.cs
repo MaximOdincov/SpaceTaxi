@@ -228,9 +228,15 @@ namespace SpaceTaxi.UI
                 ? OnboardComputerFactory.RatingGreen
                 : OnboardComputerFactory.DangerColor;
 
-            // статус задания (П8.2) читается напрямую из task (UI-слой), в LastResult не пишется
+            // статус задания (П8.2) читается напрямую из task (UI-слой), в LastResult не пишется.
+            // Н10.8 (аудит §5): строка провала не было ВООБЩЕ — жалоба невидима
+            // (−0.10 маскировался бонусом доставки в общей дельте рейтинга)
             bool taskDone = hasPassenger && offer.Task != null && offer.Task.Succeeded;
-            SetRow(taskRow, taskDone, "Задание пассажира: выполнено");
+            bool taskFailed = hasPassenger && offer.Task != null
+                && (offer.Task.Failed
+                    || (PassengerTasks.IsInterestPoint(offer.Task.Kind) && !offer.Task.Succeeded));
+            SetRow(taskRow, taskDone || taskFailed,
+                taskFailed ? "Задание пассажира: провалено — жалоба" : "Задание пассажира: выполнено");
 
             ScheduleRows();
         }

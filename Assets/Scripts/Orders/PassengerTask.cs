@@ -127,7 +127,9 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoRefuel,
-                        Text = "Не заправляемся в пути — станции пропускайте.",
+                        // Н10.8 (аудит текст↔факт): провал ловит ЛЮБОЙ платный сервис
+                        // (заправка И ремонт) — текст теперь говорит это прямо
+                        Text = "Ни заправки, ни ремонта на станциях — не останавливаемся, пожалуйста.",
                     };
                 case PassengerTaskKind.NoCollision:
                     // v5.3: вкус «хрупкого груза» (владелец: «у меня хрупкий груз —
@@ -142,14 +144,18 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.SpeedLimit,
-                        Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с весь полёт.",
+                        // Н10.8 (аудит): лимит проверяется только с пассажиром на борту
+                        // (TrackTask при Aboard) — «весь полёт» заменено честным «пока я на борту»
+                        Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с, пока я на борту.",
                         SpeedLimit = QuietSpeedLimit,
                     };
                 case PassengerTaskKind.RingVisit:
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.RingVisit,
-                        Text = $"Зайдём в орбитальное кольцо планеты {level.Bodies[planet].DisplayName} — подлетим вплотную.", // enforced: вход в capture-кольцо
+                        // Н10.8 (аудит): засчитывается вход в capture-кольцо (3.3r+30 —
+                        // десятки юн над поверхностью), «вплотную» преувеличивало
+                        Text = $"Зайдём в орбитальное кольцо планеты {level.Bodies[planet].DisplayName} — вид оттуда чудесный.", // enforced: вход в capture-кольцо
                         TargetBodyIndex = planet,
                     };
                 case PassengerTaskKind.StarNearby:
@@ -172,7 +178,9 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.BeltAvoid,
-                        Text = "С детства боюсь, что в корабль врежется астероид — пояса облетайте, пожалуйста.",
+                        // Н10.8 (аудит): замечание — ВХОД В ПОЛОСУ пояса (±BeltWidth от
+                        // осевой), а не удар астероида; текст теперь про полосу
+                        Text = "Астероидные пояса меня пугают — пролетайте мимо, пожалуйста.",
                     };
                 case PassengerTaskKind.HoleFlyby:
                     return new PassengerTask
