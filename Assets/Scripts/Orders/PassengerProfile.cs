@@ -49,6 +49,16 @@ namespace SpaceTaxi.Orders
         [Tooltip("Заказ провален")]
         public string[] Complaints;
 
+        // runtime-инстанс умирает вместе с оффером (ReleaseProfile в
+        // OrderService): сгенерированный портрет — с ним (Н10 Слой 1,
+        // утечка §3.6). NpcPortrait.Release уничтожает только СВОЮ пару
+        // текстура+спрайт; ассетные спрайты и кэш Trimmed общие — no-op.
+        // Ассетные профили Destroy не проходят — OnDestroy и не вызовется
+        private void OnDestroy()
+        {
+            NpcPortrait.Release(Portrait);
+        }
+
         public static string PickPhrase(string[] phrases)
         {
             if (phrases == null || phrases.Length == 0)
