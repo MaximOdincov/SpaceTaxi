@@ -148,6 +148,7 @@ namespace SpaceTaxi.Orders
         public event Action<OrderOffer> OrderAccepted; // принят игроком (тост Н7 Q7.3); RestoreActive не зовёт
         public event Action<string> OrderWarning;      // промежуточное предупреждение задания (Н7 Q7.4) — тост Danger
 
+        // первичная привязка домена к миру: уровень, каталог пассажиров, борт
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
         {
             level = levelAsset;
@@ -173,6 +174,7 @@ namespace SpaceTaxi.Orders
             nextSpawnAt = Time.time + SpawnDelay();
         }
 
+        // тик домена: доживает/протухает поток карточек, трекинг задания, паникёр
         private void Update()
         {
             // смертность карточек; runtime-профили протухших больше не нужны
@@ -206,6 +208,7 @@ namespace SpaceTaxi.Orders
         // домен только сообщает смену цели (А — пока ждёт, Б — на борту)
         private TargetGlowPresenter glowPresenter;
 
+        // доклад презентеру о текущей цели (А — ждёт забор, Б — везёт): имя планеты
         private void UpdateTargetGlow()
         {
             if (glowPresenter == null)
@@ -219,6 +222,7 @@ namespace SpaceTaxi.Orders
                 : PlanetName(Active.State == OrderState.Aboard ? Active.DropoffIndex : Active.PickupIndex));
         }
 
+        // взятие заказа: активным становится ровно один — карточка уходит из ленты
         public bool Accept(OrderOffer offer)
         {
             if (Active != null || !offers.Contains(offer))
@@ -244,6 +248,7 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
+        // отказ от входящей карточки: снять с ленты, runtime-профиль — в утиль
         public bool Decline(OrderOffer offer)
         {
             if (!offers.Contains(offer))
@@ -390,6 +395,7 @@ namespace SpaceTaxi.Orders
         // при доставке; заказ не срывается
         private enum TrackKind { Heat, Belt }
 
+        // эпизоды избегания (жар/пояс) с гистерезисом: открыли — замечание; закрыли без лимита — восстановление
         private void TrackAvoidEpisode(PassengerTask task, TrackKind kind)
         {
             bool inside = kind == TrackKind.Heat ? InStarHeat() : InBeltBand();
@@ -534,11 +540,13 @@ namespace SpaceTaxi.Orders
             return null;
         }
 
+        // есть ли у активного заказа задание данного вида
         private bool TaskIs(PassengerTaskKind kind)
         {
             return Active != null && Active.Task != null && Active.Task.Kind == kind;
         }
 
+        // контакт с планетой: забор пассажира (Aboard) или высадка — итог заказа
         private void OnLanded(Planet planet)
         {
             if (Active == null)
@@ -591,6 +599,7 @@ namespace SpaceTaxi.Orders
             }
         }
 
+        // жёсткий срыв активного заказа (гибель/дедлайн паникёра): жалоба и вылет пассажира
         private void FailActive()
         {
             if (Active == null)
@@ -605,6 +614,7 @@ namespace SpaceTaxi.Orders
             Debug.Log($"[Orders] провален: {failed.Passenger.DisplayName} ({Deliveries}/{Failures})");
         }
 
+        // рождение карточки: пассажир из каталога, концы маршрута, цена, задание
         private void AddOffer(PassengerCatalog catalog)
         {
             if (catalog == null || level == null)
@@ -847,6 +857,7 @@ namespace SpaceTaxi.Orders
             return UnityEngine.Random.Range(spawnMin, spawnMax) * mul;
         }
 
+        // индекс тела по имени (для целей заданий); нет — -1
         private int PlanetIndexByName(string name)
         {
             for (int i = 0; i < level.Bodies.Count; i++)
@@ -855,6 +866,7 @@ namespace SpaceTaxi.Orders
             return -1;
         }
 
+        // имя тела по индексу (карточки/тексты); вне диапазона — «—»
         public string PlanetName(int index)
         {
             return level != null && index >= 0 && index < level.Bodies.Count
@@ -862,6 +874,7 @@ namespace SpaceTaxi.Orders
                 : "?";
         }
 
+        // прямая дистанция забор→высадка (юн) — база цены и дедлайна
         public float RouteDistance(OrderOffer offer)
         {
             if (offer == null || level == null
@@ -871,6 +884,7 @@ namespace SpaceTaxi.Orders
             return Vector2.Distance(level.Bodies[offer.PickupIndex].Position, level.Bodies[offer.DropoffIndex].Position);
         }
 
+        // расстояние от точки до планеты-цели (живые расстояния карточек)
         public float DistanceToPlanet(int index, Vector2 from)
         {
             if (level == null || index < 0 || index >= level.Bodies.Count)
