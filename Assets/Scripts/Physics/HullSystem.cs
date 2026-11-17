@@ -73,7 +73,7 @@ namespace SpaceTaxi.Physics
             if (ship == null || ship.State == ShipState.Respawning) // уже респавнится
                 return;
             ShipLost?.Invoke(reason); // сообщить причину
-            ship.State = ShipState.Respawning; // окно респавна
+            ship.SetState(ShipState.Respawning); // окно респавна (Н10.14: записи через Set-методы)
             ship.Body.linearVelocity = Vector2.zero; // стоп
             // Н9.14 (владелец: «сразу после отключения на том же месте появляется
             // второй»): старый корпус прячется МГНОВЕННО — до телепорта он висел
@@ -94,7 +94,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.Hp <= 0f) // нечего наносить
                 return;
-            ship.Hp = Mathf.Clamp(ship.Hp - amount, 0f, ship.Eff.HpMax); // вычесть с клампом
+            ship.SetHp(ship.Hp - amount); // вычесть (кламп в SetHp — Н10.14)
             HpChanged?.Invoke(); // HUD обновить
             if (ship.Hp <= 0f) // корпус кончился
                 Die();
@@ -113,7 +113,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.ShipConfig == null) // нечего чинить
                 return;
-            ship.Hp = Mathf.Clamp(ship.Hp + amount, 0f, ship.Eff.HpMax); // починить
+            ship.SetHp(ship.Hp + amount); // починить (кламп в SetHp — Н10.14)
             HpChanged?.Invoke(); // HUD
         }
 
@@ -146,7 +146,7 @@ namespace SpaceTaxi.Physics
             // сам корпус на «мёртвую» паузу прячем — видны только частицы (0.6 c)
             ShipExplosion.Spawn(transform.position, Visual != null ? Visual.HalfExtent : 0f, DangerTint); // взрыв
             HideVisuals(); // спрятать корпус
-            ship.State = ShipState.Respawning; // окно респавна
+            ship.SetState(ShipState.Respawning); // окно респавна
             ship.Body.linearVelocity = Vector2.zero; // стоп
             StartCoroutine(RespawnAfter(0.6f)); // короткая пауза на взрыв
         }
@@ -196,12 +196,12 @@ namespace SpaceTaxi.Physics
             }
 
             ship.Body.linearVelocity = Vector2.zero; // стоп
-            ship.Hp = ship.Eff.HpMax; // полный корпус
+            ship.SetHp(ship.Eff.HpMax); // полный корпус
             ship.Fuel = ship.Eff.FuelMax; // полный бак
             ship.PoweredDown = false; // новый борт — не заглушенный
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
             ship.LandedOn = respawnPlanet; // стоит на стартовой
-            ship.State = ShipState.Landed; // состояние «стоит»
+            ship.SetState(ShipState.Landed); // состояние «стоит»
             // Н9.14 (владелец: «спавнишь корабль ещё до начала пролёта камеры»):
             // корпус невидим, пока камера летит от места смерти к планете старта;
             // появляется в момент прилёта (кап 2.5с — на случай застрявшей камеры)

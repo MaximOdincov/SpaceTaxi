@@ -388,7 +388,7 @@ namespace SpaceTaxi.Core
                 if (ship.Body != null) // физическое тело есть
                     ship.Body.linearVelocity = Vector2.zero; // стоит
                 ship.LandedOn = planet; // планета стоянки
-                ship.State = ShipState.Landed; // состояние «стоит»
+                ship.SetState(ShipState.Landed); // состояние «стоит»
             }
             else // летел
             {
@@ -396,7 +396,7 @@ namespace SpaceTaxi.Core
                 if (ship.Body != null) // тело есть
                     ship.Body.linearVelocity = save.Velocity; // скорость
                 ship.LandedOn = null; // без планеты
-                ship.State = ShipState.Flying; // состояние «летит»
+                ship.SetState(ShipState.Flying); // состояние «летит»
                 // нос по вектору скорости (как UpdateHeading); у нуля скорости
                 // вектор «шумит» — оставляем ориентацию спавна
                 if (save.Velocity.magnitude >= 30f) // скорость достаточна
@@ -407,7 +407,7 @@ namespace SpaceTaxi.Core
             }
 
             // Hp > 0: мёртвый корабль в сейв не попадает (гибель → респавн до сейва)
-            ship.Hp = Mathf.Clamp(save.Hp, 1f, ship.Eff.HpMax); // корпус с клампом
+            ship.SetHp(Mathf.Max(1f, save.Hp)); // корпус (пол 1 сохранён, верхний кламп в SetHp — Н10.14)
             ship.Fuel = Mathf.Clamp(save.Fuel, 0f, ship.Eff.FuelMax); // бак с клампом
         }
 

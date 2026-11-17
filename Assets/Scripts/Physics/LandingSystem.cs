@@ -163,7 +163,7 @@ namespace SpaceTaxi.Physics
             Vector2 dir = ((Vector2)ship.transform.position - (Vector2)ship.LandedOn.transform.position).normalized;
             ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
             ship.LandedOn = null;
-            ship.State = ShipState.Flying;
+            ship.SetState(ShipState.Flying); // Н10.14
             Sound.Play(SoundId.Takeoff);
             CameraFollow.AddShake(0.25f); // толчок старта
             GetComponent<ShipController>()?.HoldHeading(1.5f); // подъём низом вперёд
@@ -208,7 +208,7 @@ namespace SpaceTaxi.Physics
 
             // состояние и события — до корутины: UI и заказы видят Landed в кадр контакта
             ship.LandedOn = planet;
-            ship.State = ShipState.Landed;
+            ship.SetState(ShipState.Landed); // Н10.14
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);

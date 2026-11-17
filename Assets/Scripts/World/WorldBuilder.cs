@@ -282,7 +282,7 @@ namespace SpaceTaxi.World
                 level.SpawnAngleDeg - nose); // поза носом наружу
 
             ship.Init(config, shipConfig); // инициализация модели
-            ship.State = ShipState.Landed; // стартует на планете
+            ship.SetState(ShipState.Landed); // стартует на планете (Н10.14)
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet; // планета стоянки
 
             if (controller != null) // контроллер есть

@@ -16,8 +16,30 @@ namespace SpaceTaxi.Physics
     [RequireComponent(typeof(Rigidbody2D))] // физическое тело обязательно
     public class Ship : MonoBehaviour // модель борта: состояние + статы + бак
     {
-        public ShipState State = ShipState.Flying; // текущее состояние (публичное — инварианты на дисциплине)
-        public float Hp = 100f; // корпус
+        // Н10.14 (Слой 3, владелец: «да, сегодня, осторожно»): записи состояния и
+        // корпуса — через Set-методы (прежде 11 прямых записей из 4 файлов,
+        // инварианты держались на дисциплине). Легальные переходы состояния:
+        // Flying↔Landed (посадка/взлёт), →Respawning (гибель/отключение X),
+        // →Swallowed (захват дыры), Respawning→Landed (новый борт у камеры).
+        // Respawning/Swallowed морозит ввод — ShipController читает State
+        public ShipState State { get; private set; } = ShipState.Flying; // текущее состояние
+        public float Hp { get; private set; } = 100f; // корпус
+
+        // единственная точка записи состояния: no-op на повторе; строгая
+        // таблица переходов не вводится — все текущие переходы легальны,
+        // валидация была бы риском для краевых флоу (Н9: осторожно)
+        public void SetState(ShipState value)
+        {
+            if (State == value)
+                return;
+            State = value;
+        }
+
+        // единственная точка записи корпуса: инвариант 0..Eff.HpMax centralized
+        public void SetHp(float value)
+        {
+            Hp = Mathf.Clamp(value, 0f, Eff.HpMax); // кламп раньше дублировался у вызывающих
+        }
 
         // v5.1: борт заглушен оператором в захвате чёрной дыры (BlackHole.
         // RequestAbandon) — двигатели молчат (ShipController), воронка дотягивает
@@ -71,7 +93,7 @@ namespace SpaceTaxi.Physics
 
             UpgradeLevels = ShipStats.NormalizeLevels(null); // стоковые уровни
             RecomputeEff(); // пересчёт статов
-            Hp = Eff.HpMax; // полный корпус
+            SetHp(Eff.HpMax); // полный корпус
             Fuel = Eff.FuelMax; // полный бак
         }
 
@@ -107,7 +129,7 @@ namespace SpaceTaxi.Physics
             // на месте гибели (иначе Crash усыплёт его посадкой)
             if (refill && Hp > 0f) // живой корпус и разрешено
             {
-                Hp = Eff.HpMax; // полный корпус
+                SetHp(Eff.HpMax); // полный корпус
                 Fuel = Eff.FuelMax; // полный бак — сеттер сам шлёт FuelChanged
             }
             Reconfigured?.Invoke(); // подписчики узнали
