@@ -14,35 +14,19 @@ namespace SpaceTaxi.UI
     // (сейвов нет, инвалидацию добавит П10.2). Контроллера в каркасах сцен нет —
     // он появляется сам на каждую сцену; в меню сессии нет и просто ждёт.
     // Панель строится кодом при первом показе и повторно не открывается.
-    public class DismissalScreenController : MonoBehaviour
+    public class DismissalScreenController : ModalScreenControllerBase // Н10.13: общий каркас модалок
     {
         private const int SortingOrder = 200; // поверх всех канвасов сцены
 
         private bool bound;
-        private bool shown;
-        private GameObject screen;
         private TMP_Text reasonText; // причина увольнения — по триггеру (долг/аварии)
         private DebtService debt;
+
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            // домен редактора может не перезагружаться между запусками — снимаем старую подписку
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Spawn();
-        }
-
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            Spawn();
-        }
-
-        private static void Spawn()
-        {
-            if (FindAnyObjectByType<DismissalScreenController>() != null)
-                return;
-            new GameObject("DismissalScreenController").AddComponent<DismissalScreenController>();
+            ModalBootstrap<DismissalScreenController>.Ensure(); // Н10.13: каркас в базе
         }
 
         private void Update()
@@ -65,20 +49,17 @@ namespace SpaceTaxi.UI
 
         private void ShowDismissal()
         {
-            if (shown)
+            if (opened) // Н10.13: терминальный экран — открылся раз и навсегда
                 return;
-            shown = true;
             Sound.Play(SoundId.DismissalTone); // П9.3: тон увольнения до глушения экранов
 
-            if (screen == null)
-                screen = BuildScreen();
+            EnsureScreen();
             // причина по триггеру: долг свыше порога или счётчик аварий (§3.2)
             if (reasonText != null)
                 reasonText.text = debt.IsOverDismissalThreshold
                     ? $"МТО расторгает договор.\nДолг {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} превысил допустимые {UiFormat.Currency} {UiFormat.FormatCredits(debt.DismissalDebtThreshold)}."
                     : "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.";
-            screen.SetActive(true);
-            Time.timeScale = 0f; // как пауза: до выхода в меню мир не живёт
+            ActivateModal(); // Н10.13: timeScale — в базе («как пауза: до выхода в меню мир не живёт»)
 
             // терминальное состояние: пауза/карта/борткомп больше не управляются,
             // иначе ESC снял бы паузу под модальным экраном
@@ -114,7 +95,7 @@ namespace SpaceTaxi.UI
         }
 
         // каркас экрана строится кодом при первом показе (стиль OnboardComputerFactory)
-        private GameObject BuildScreen()
+        protected override GameObject BuildScreen()
         {
             var root = new GameObject("DismissalScreen", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
             root.transform.SetParent(transform, false);

@@ -30,7 +30,7 @@ namespace SpaceTaxi.UI
     // unscaledDeltaTime, старт в момент появления строки. Цвета по знаку:
     // приход (+) — яркий борткомпа, убытки (−) — красный, долг — «спокойный»
     // DebtCalmColor, дельта рейтинга — зелень/красный по знаку.
-    public class OrderCompleteScreenController : MonoBehaviour
+    public class OrderCompleteScreenController : ModalScreenControllerBase // Н10.13: общий каркас модалок
     {
         private const int SortingOrder = 110; // поверх станции (100), ниже увольнения (200)
 
@@ -63,8 +63,6 @@ namespace SpaceTaxi.UI
         }
 
         private bool bound;
-        private bool opened;
-        private GameObject screen;
         private GameSession session;
         private PauseScreenController pauseController;
 
@@ -79,31 +77,13 @@ namespace SpaceTaxi.UI
         private PayoutRow ratingRow;
         private PayoutRow taskRow;
 
-        private float openedAtRealtime;
 
-        public bool IsOpened => opened;
 
-        public bool EscJustClosed { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            // домен редактора может не перезагружаться между запусками — снимаем старую подписку
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            SceneManager.sceneLoaded += OnSceneLoaded;
-            Spawn();
-        }
-
-        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            Spawn();
-        }
-
-        private static void Spawn()
-        {
-            if (FindAnyObjectByType<OrderCompleteScreenController>() != null)
-                return;
-            new GameObject("OrderCompleteScreenController").AddComponent<OrderCompleteScreenController>();
+            ModalBootstrap<OrderCompleteScreenController>.Ensure(); // Н10.13: каркас в базе
         }
 
         private void Update()
@@ -113,34 +93,9 @@ namespace SpaceTaxi.UI
                 return;
 
             Animate();
-
-            var kb = Keyboard.current;
-            if (kb == null)
-                return;
-            // нажатие кадра посадки (Space=Thrust, ESC) не должно закрыть экран
-            // в тот же кадр — он не успел отрисоваться, владелец видит «только тост»
-            if (Time.unscaledTime - openedAtRealtime < CloseGuardSeconds)
-                return;
-            if (kb.escapeKey.wasPressedThisFrame)
-            {
-                Close();
-                EscJustClosed = true;
-            }
-            else if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
-                Close();
+            HandleModalKeys(); // Н10.13: ESC/Enter + гвард кадра открытия — в базе
         }
 
-        private void LateUpdate()
-        {
-            EscJustClosed = false;
-        }
-
-        private void OnDisable()
-        {
-            // страховка: экран сорвало со сцены — мир не должен остаться на паузе
-            if (opened)
-                Time.timeScale = 1f;
-        }
 
         // лениво, пока сессия не соберётся (стиль биндеров)
         private void BindSession()
@@ -164,28 +119,18 @@ namespace SpaceTaxi.UI
             if (session == null || session.Payout == null || session.Payout.LastResult == null)
                 return; // выплаты не было — показывать нечего
 
-            if (screen == null)
-                screen = BuildScreen();
+            EnsureScreen(); // Н10.13: каркас в базе
             Refresh(offer);
-            screen.SetActive(true);
-            opened = true;
-            openedAtRealtime = Time.unscaledTime;
-            Time.timeScale = 0f; // мир ждёт «ПРОДОЛЖИТЬ»
+            ActivateModal();
 
             if (pauseController == null) pauseController = FindAnyObjectByType<PauseScreenController>();
             if (pauseController != null)
                 pauseController.NotifyOrderCompleteOpened();
         }
 
-        private void Close()
+        // Н10.13: само закрытие (timeScale/скрытие) — в базе; хвост — уведомить паузу
+        protected override void OnClosed()
         {
-            if (!opened)
-                return;
-            opened = false;
-            if (screen != null)
-                screen.SetActive(false);
-            Time.timeScale = 1f; // гарантия: любой путь закрытия возвращает мир
-
             if (pauseController == null) pauseController = FindAnyObjectByType<PauseScreenController>();
             if (pauseController != null)
                 pauseController.NotifyOrderCompleteClosed();
@@ -327,7 +272,7 @@ namespace SpaceTaxi.UI
         }
 
         // каркас экрана строится кодом при первом показе (стиль OnboardComputerFactory)
-        private GameObject BuildScreen()
+        protected override GameObject BuildScreen()
         {
             var root = new GameObject("OrderCompleteScreen", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
             root.transform.SetParent(transform, false);
