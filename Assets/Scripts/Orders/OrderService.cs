@@ -200,79 +200,23 @@ namespace SpaceTaxi.Orders
             CheckHurry();
         }
 
-        // подсветка планеты назначения (А — пока ждёт, Б — на борту): компактный
-        // жёлтый ореол «чуть больше тела» (Н5.A7 — большое кольцо-подчёркивание
-        // на посадочном радиусе убрано; оно было чисто визуальным)
-        private Transform targetGlow;
-        private SpriteRenderer glowRenderer;
-        private string glowBodyName;
-        private float glowScaleBase = 1f;
-        private GravityField gravityField;
+        private GravityField gravityField; // реестр тел: трекинг заданий (заполняется лениво)
+
+        // Н10.12: подсветка планеты назначения — презентация (TargetGlowPresenter);
+        // домен только сообщает смену цели (А — пока ждёт, Б — на борту)
+        private TargetGlowPresenter glowPresenter;
 
         private void UpdateTargetGlow()
         {
-            if (Active == null)
+            if (glowPresenter == null)
             {
-                if (targetGlow != null)
-                    targetGlow.gameObject.SetActive(false);
-                return;
+                glowPresenter = FindAnyObjectByType<TargetGlowPresenter>();
+                if (glowPresenter == null)
+                    glowPresenter = new GameObject("TargetGlowPresenter").AddComponent<TargetGlowPresenter>();
             }
-
-            if (gravityField == null)
-                gravityField = FindAnyObjectByType<GravityField>();
-            if (gravityField == null)
-                return;
-
-            int index = Active.State == OrderState.Aboard ? Active.DropoffIndex : Active.PickupIndex;
-            string bodyName = PlanetName(index);
-
-            if (targetGlow == null)
-            {
-                var glowGo = new GameObject("TargetGlow");
-                glowRenderer = glowGo.AddComponent<SpriteRenderer>();
-                glowRenderer.sortingOrder = -2; // позади планеты
-                glowRenderer.sprite = StubSprites.SoftDot(128f, 0.55f); // ПРОСТО жёлтый круг (Н6: не копия спрайта планеты)
-                targetGlow = glowGo.transform;
-            }
-
-            if (glowBodyName != bodyName || targetGlow.parent == null)
-            {
-                glowBodyName = bodyName;
-                foreach (CelestialBody body in gravityField.Bodies)
-                {
-                    if (body.DisplayName != bodyName)
-                        continue;
-                    var bodyRenderer = body.GetComponent<SpriteRenderer>();
-                    // диаметр круга — от реального размера планеты: круг чуть
-                    // больше тела. Видимый шар = bodyScale × контент арта
-                    // (вписывание в Radius делает CelestialBody.Init, шар в мире
-                    // = 2·Radius); SoftDot(128) при масштабе 1 = bounds 128 юн
-                    // (PPU 64/128 = 0.5), делим на размер спрайта ореола и
-                    // масштаб тела-родителя
-                    float softDotUnits = glowRenderer.sprite != null
-                        ? glowRenderer.sprite.bounds.size.x
-                        : 128f;
-                    float bodyScale = Mathf.Max(Mathf.Abs(body.transform.localScale.x), 0.0001f);
-                    float planetUnits = bodyRenderer != null && bodyRenderer.sprite != null
-                        ? Mathf.Max(SpriteArt.ContentSize(bodyRenderer.sprite).x,
-                                    SpriteArt.ContentSize(bodyRenderer.sprite).y)
-                        : 2f * body.Radius / bodyScale;
-                    targetGlow.SetParent(body.transform, false);
-                    glowScaleBase = planetUnits * 1.25f / (softDotUnits * bodyScale);
-                    break;
-                }
-            }
-
-            targetGlow.gameObject.SetActive(glowRenderer.sprite != null);
-            if (!targetGlow.gameObject.activeSelf)
-                return;
-            // пульс масштабом и альфой — заметный жёлтый круг за планетой (Н6)
-            float wave = Mathf.Sin(Time.time * 3f);
-            targetGlow.localScale = Vector3.one * glowScaleBase * (1f + 0.06f * wave);
-            // M8.7 (решение владельца, отмена цвета Н7.7): жёлтый полупрозрачный
-            // пульс (Н5.28) — жёлтый = цель заказа; тон тот же, что у кольца
-            // цели на карте (MapScreenBinder.TargetRingColor)
-            glowRenderer.color = new Color(1f, 0.94f, 0.3f, Mathf.Lerp(0.38f, 0.62f, 0.5f + 0.5f * wave));
+            glowPresenter.SetTarget(Active == null
+                ? null
+                : PlanetName(Active.State == OrderState.Aboard ? Active.DropoffIndex : Active.PickupIndex));
         }
 
         public bool Accept(OrderOffer offer)
