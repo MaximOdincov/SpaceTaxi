@@ -281,7 +281,6 @@ namespace SpaceTaxi.UI
         private Image waypointWideImage;
         private Image waypointPinImage;
         private int targetIndex = -1;
-        private CelestialBodyData lastTargetBody; // чья подпись спрятана под «ЦЕЛЬ: …»
         private float playerHeading;
 
         // подписи тел (заполняются в PlaceAllLabels; читаются ореолом цели)
@@ -1192,6 +1191,12 @@ namespace SpaceTaxi.UI
             }
 
             var placed = new List<Rect>(); // блокеры — только подписи, видимые на текущем тире
+            // Н10.5: подпись планеты-цели отодвигается ЗА внешний радиус жёлтого
+            // кольца (диаметр 1.95× иконки) — имя не тонет под ореолом
+            int ringTargetIdx = ActiveOrderTargetIndex();
+            CelestialBodyData ringTarget = ringTargetIdx >= 0 && ringTargetIdx < level.Bodies.Count
+                ? level.Bodies[ringTargetIdx]
+                : null;
             foreach (CelestialBodyData body in LabelPlacementOrder())
             {
                 string text = LabelText(body);
@@ -1212,6 +1217,8 @@ namespace SpaceTaxi.UI
                 Vector2 labelHalf = labelSize * 0.5f;
 
                 int slot = -1;
+                // Н10.5: у планеты-цели зазор слота отодвигает подпись за кольцо
+                float slotGap = body == ringTarget ? RingClearGap(body, iconHalf) : LabelSlotGap;
                 // ХОТФИКС владельца («чупа-чупсы — палочки странные»): близкий слот
                 // разрешает перекрыть ЧУЖУЮ иконку (мелькающая под чернилами мелочь) —
                 // жёсткие блокеры только чужие подписи и хром; ярлык сидит при своей
@@ -1219,7 +1226,7 @@ namespace SpaceTaxi.UI
                 // проход (все близкие заняты подписями/хромом)
                 for (int i = 0; i < 8 && slot < 0; i++) // низ → верх → право → лево → диагонали
                 {
-                    Rect candidate = CenteredRect(center + SlotOffset(i, iconHalf, LabelSlotGap, labelHalf), labelSize);
+                    Rect candidate = CenteredRect(center + SlotOffset(i, iconHalf, slotGap, labelHalf), labelSize);
                     if (PlacementCollisions(candidate, body, null, placed, chrome) == 0)
                         slot = i;
                 }
@@ -1227,11 +1234,11 @@ namespace SpaceTaxi.UI
                 RectTransform leader = null;
                 if (slot >= 0)
                 {
-                    labelRect.anchoredPosition = center + SlotOffset(slot, iconHalf, LabelSlotGap, labelHalf);
+                    labelRect.anchoredPosition = center + SlotOffset(slot, iconHalf, slotGap, labelHalf);
                 }
                 else // все близкие слоты заняты — шаг дальше + линия-выноска
                 {
-                    float farGap = labelHalf.y + 6f;
+                    float farGap = body == ringTarget ? slotGap + labelHalf.y + 6f : labelHalf.y + 6f;
                     int best = 0, bestCollisions = int.MaxValue;
                     Rect bestRect = Rect.zero;
                     for (int i = 0; i < 8; i++)
@@ -1472,10 +1479,8 @@ namespace SpaceTaxi.UI
                 return;
             labelTierState = state;
             PlaceAllLabels();
-            // ореол цели в этом же кадре перечитает свежие подписи и снова
-            // спрячет подпись своей цели (targetIndex сброшен — re-init)
+            // ореол цели перечитает свежие подписи в своём тике (targetIndex сброшен)
             targetIndex = -1;
-            lastTargetBody = null;
         }
 
         // порядок размещения: хаб первым, затем тела по убыванию радиуса,
@@ -1531,6 +1536,16 @@ namespace SpaceTaxi.UI
                 case 7: sx = -1f; sy = 1f; break;
             }
             return new Vector2(sx * (iconHalf + gap + labelHalf.x), sy * (iconHalf + gap + labelHalf.y));
+        }
+
+        // Н10.5: зазор слота, отодвигающий подпись планеты-цели за внешний
+        // радиус широкого кольца (диаметр 1.95× иконки) — имя планеты не
+        // прячется под ореолом (подавление подписи снято). Контент-единицы:
+        // и кольцо (localScale 1/zoom), и подписи (шрифт /zoom) в контенте
+        // имеют радиус IconSizeOf×0.975 независимо от зума
+        private float RingClearGap(CelestialBodyData body, float iconHalf)
+        {
+            return Mathf.Max(LabelSlotGap, IconSizeOf(body) * 0.975f + 2f - iconHalf);
         }
 
         // число препятствий под кандидатом: чужие подписи, чужие иконки, хром.
@@ -1666,9 +1681,10 @@ namespace SpaceTaxi.UI
                 WithAlpha(TargetRingColor, 0.7f), Vector2.one * TargetRingWidePx, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
-            // v5.1 (владелец: «не подписывай планету цели»): подпись «ЦЕЛЬ: ИМЯ»
-            // убрана — кольцо-ореол само маркирует цель; собственное имя планеты
-            // прячется на время кольца (см. UpdateTargetRing/RestoreTargetLabel)
+            // Н10.5 (владелец: «куда-то пропадает имя планеты, когда взят заказ»):
+            // подпись цели больше не прячется — кольцо-ореол маркирует цель,
+            // имя планеты видно всегда (PlaceAllLabels отодвигает подпись
+            // цели за внешний радиус кольца зазором слота)
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
         }
@@ -1679,7 +1695,8 @@ namespace SpaceTaxi.UI
             return bodySizes.TryGetValue(body, out float size) ? size : 22f;
         }
 
-        // цель активного заказа — жёлтый пульс (заметный издалека) + «цель: имя»
+        // цель активного заказа — жёлтый пульс (заметный издалека); имя планеты
+        // цели видно всегда (Н10.5 — подавление подписи снято)
         private void UpdateTargetRing()
         {
             int index = ActiveOrderTargetIndex();
@@ -1687,24 +1704,12 @@ namespace SpaceTaxi.UI
             {
                 targetRing.gameObject.SetActive(false);
                 targetIndex = -1;
-                RestoreTargetLabel();
                 return;
             }
 
             CelestialBodyData body = level.Bodies[index];
             targetRing.gameObject.SetActive(true);
-            if (targetIndex != index)
-            {
-                RestoreTargetLabel();
-                targetIndex = index;
-                lastTargetBody = body;
-                if (bodyLabels.TryGetValue(body, out TMP_Text own))
-                {
-                    own.enabled = false;
-                    if (labelLeaders.TryGetValue(body, out RectTransform leader) && leader != null)
-                        leader.gameObject.SetActive(false); // выноска прячется вместе с подписью
-                }
-            }
+            targetIndex = index; // Н10.5: подпись цели не прячется — кольцо и имя живут вместе
             targetRing.anchoredPosition = WorldToMap(body.Position);
             targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // M7.1: экранные px постоянны
             // ХОТФИКС владельца: ореол цели ОБНИМАЕТ планету на любом зуме (прежде
@@ -1712,15 +1717,17 @@ namespace SpaceTaxi.UI
             // при приближении терялось внутри диска). Диаметры = экранный диаметр
             // иконки цели × 1.25 / ×1.75 — тот же принцип, что у жёлтого ореола в игре
             float planetPx = IconSizeOf(body) * zoom;
-            targetRingPulse.sizeDelta = Vector2.one * (planetPx * 1.25f);
-            targetRingWide.sizeDelta = Vector2.one * (planetPx * 1.75f);
-            // пульс: кольца дышат размером и альфой
+            // Н10.5 вкусовое (владелец: «подсветку сильнее на жёлтых планетах»):
+            // было 1.25/1.75×, альфы 0.62/0.35, пульс 4.2/3.4
+            targetRingPulse.sizeDelta = Vector2.one * (planetPx * 1.35f);
+            targetRingWide.sizeDelta = Vector2.one * (planetPx * 1.95f);
+            // пульс: кольца дышат размером и альфой (чуть быстрее прежнего)
             float t = Time.unscaledTime;
-            targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 4.2f));
+            targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 5.5f));
             if (targetRingPulseImage != null)
-                targetRingPulseImage.color = WithAlpha(TargetRingColor, 0.62f + 0.3f * Mathf.Sin(t * 3.4f));
+                targetRingPulseImage.color = WithAlpha(TargetRingColor, 0.85f + 0.15f * Mathf.Sin(t * 4.5f));
             if (targetRingWideImage != null)
-                targetRingWideImage.color = WithAlpha(TargetRingColor, 0.35f + 0.25f * Mathf.Sin(t * 3.4f + Mathf.PI));
+                targetRingWideImage.color = WithAlpha(TargetRingColor, 0.55f + 0.2f * Mathf.Sin(t * 4.5f + Mathf.PI));
         }
 
         // ————— свои надписи и контуры (Map Style Editor) —————
@@ -1892,27 +1899,6 @@ namespace SpaceTaxi.UI
                 UnityEditor.AssetDatabase.SaveAssetIfDirty(style);
             }
 #endif
-        }
-
-        private void RestoreTargetLabel()
-        {
-            if (lastTargetBody != null && bodyLabels.TryGetValue(lastTargetBody, out TMP_Text label))
-            {
-                // M7.5: подписи живут через альфу — вернуть текущее фейд-состояние
-                // (актуальная альфа уже записана в цвет: живым фейдом или стартовым гашением)
-                label.enabled = true;
-                float alpha = label.color.a;
-                foreach (LabelFade fade in labelFades)
-                    if (fade.Label == label && !fade.Ghost)
-                    {
-                        alpha = fade.BaseColor.a * fade.K;
-                        break;
-                    }
-                label.alpha = alpha;
-                if (labelLeaders.TryGetValue(lastTargetBody, out RectTransform leader) && leader != null)
-                    leader.gameObject.SetActive(alpha > 0.01f); // выноска toggl вместе с подписью
-            }
-            lastTargetBody = null;
         }
 
         // тело текущего шага активного заказа: пассажир до посадки, цель — с пассажиром
@@ -2945,7 +2931,6 @@ namespace SpaceTaxi.UI
             waypointWideImage = null;
             waypointPinImage = null;
             targetIndex = -1;
-            lastTargetBody = null;
             followButton = null;
             followLabel = null;
             followMode = false;
