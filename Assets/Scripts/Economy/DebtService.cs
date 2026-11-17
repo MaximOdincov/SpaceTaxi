@@ -13,7 +13,7 @@ namespace SpaceTaxi.Economy
         // 16_BETA_PLAN §3.1: разбил арендный корабль — долг +400 Đ
         private const int AccidentDebt = 400;
         // §3.2: три аварии с непогашенными долгами — увольнение
-        private const int DismissalAfterAccidents = 3;
+        public const int DismissalAfterAccidents = 3; // публичный: SaveSystem читает тот же порог (Н10.11)
         // Н7 Q7.8: долг свыше порога — тоже увольнение. Число живёт в
         // PricingConfig (DebtDismissalThreshold, GameSession конфигурирует
         // при старте) — здесь только дефолт плана, пока конфигурации не было

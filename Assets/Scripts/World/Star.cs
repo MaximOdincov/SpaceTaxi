@@ -20,5 +20,18 @@ namespace SpaceTaxi.World
         {
             return Vector2.Distance(point, transform.position) <= HeatRadius; // дистанция до звезды
         }
+
+        // Н10.11: единая формула глубины жара (0 на краю зоны → 1 у поверхности).
+        // Прежде дублировалась в HullSystem (без пола) и HeatAudio (спан с
+        // полом 1) — спан с полом 1 защищает от деления на ноль при
+        // HeatRadius == Radius; 0 вне зоны — вызывающие не проверяют радиус
+        public float HeatDepth(Vector2 point)
+        {
+            float d = Vector2.Distance(transform.position, point);
+            if (d >= HeatRadius)
+                return 0f;
+            float span = Mathf.Max(HeatRadius - Radius, 1f);
+            return Mathf.Clamp01(1f - (d - Radius) / span);
+        }
     }
 }

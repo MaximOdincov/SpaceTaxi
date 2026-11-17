@@ -131,22 +131,10 @@ namespace SpaceTaxi.Economy
         private static bool IsRawOutage(string stationId, PricingConfig pricing)
         {
             int chance = Mathf.Clamp(pricing.FuelOutageChancePct, 0, 100);
-            uint bucket = ((uint)StableHash(stationId) ^ OutageSalt) % 100u;
+            uint bucket = ((uint)DeterministicHash.StableHash(stationId) ^ OutageSalt) % 100u;
             return (int)bucket < chance;
         }
 
-        private static int StableHash(string id)
-        {
-            unchecked
-            {
-                uint hash = 2166136261;
-                for (int i = 0; i < id.Length; i++)
-                {
-                    hash ^= id[i];
-                    hash *= 16777619;
-                }
-                return (int)hash;
-            }
-        }
+
     }
 }

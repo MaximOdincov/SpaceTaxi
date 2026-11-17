@@ -130,7 +130,7 @@ namespace SpaceTaxi.Physics
                 float d = Vector2.Distance(star.transform.position, pos); // дистанция до звезды
                 if (d >= star.HeatRadius) // вне зоны жара
                     continue;
-                float k = Mathf.Clamp01(1f - (d - star.Radius) / (star.HeatRadius - star.Radius)); // глубина зоны
+                float k = star.HeatDepth(pos); // глубина зоны — общая формула с HeatAudio (Н10.11)
                 ApplyDamage(k * star.HeatDamagePerSecond * dt * ship.Eff.HeatMul); // жар-защита корпуса
             }
         }

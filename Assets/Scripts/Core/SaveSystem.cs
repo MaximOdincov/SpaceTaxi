@@ -105,7 +105,7 @@ namespace SpaceTaxi.Core
                 || session.Debt == null || session.Rating == null // сервисы не готовы
                 || session.Fleet == null || session.Ship == null // корабля нет
                 || session.Orders == null // заказы не готовы
-                || session.Debt.UnpaidAccidents >= 3 // увольнение — терминальное состояние
+                || session.Debt.UnpaidAccidents >= DebtService.DismissalAfterAccidents // порог — DebtService (Н10.11); увольнение — терминальное состояние
                 // окно респавна: корабль мёртв на месте гибели — не сохраняем,
                 // иначе continue поднимет его и Abandon списал бы свой корабль
                 || session.Ship.State == ShipState.Respawning // в окне респавна

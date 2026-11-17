@@ -32,23 +32,10 @@ namespace SpaceTaxi.Economy
             int variants = config.PaintVariantCount;
             if (variants == 0)
                 return 0;
-            return Mod(StableHash(config.Id) ^ (slot * SlotSalt), variants + 1);
+            return Mod(DeterministicHash.StableHash(config.Id) ^ (slot * SlotSalt), variants + 1);
         }
 
-        // FNV-1a: строковый GetHashCode рандомизирован между сессиями Unity
-        private static int StableHash(string id)
-        {
-            unchecked
-            {
-                uint hash = 2166136261;
-                for (int i = 0; i < id.Length; i++)
-                {
-                    hash ^= id[i];
-                    hash *= 16777619;
-                }
-                return (int)hash;
-            }
-        }
+
 
         private static int Mod(int value, int m)
         {
