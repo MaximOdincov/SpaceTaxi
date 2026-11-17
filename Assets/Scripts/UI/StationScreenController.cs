@@ -387,7 +387,7 @@ namespace SpaceTaxi.UI
             if (units <= 0 || cost <= 0 || !session.Wallet.TrySpend(cost))
                 return;
             ship.Fuel += units; // сеттер клампит и шлёт FuelChanged — HUD и экран обновятся
-            fuelStatus.text = $"Заправлено {units} ед за {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+            fuelStatus.text = $"Заправлено {units} ед за {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
 
@@ -403,7 +403,7 @@ namespace SpaceTaxi.UI
             fuelStockLine.text = FuelOutage
                 ? "Сеть станции пуста — топлива нет"
                 : available > 0
-                    ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} {StationUI.Currency}/ед"
+                    ? $"Топлива на станции: {available} ед · цена {perUnit:0.##} {UiFormat.Currency}/ед"
                     : ship.Fuel >= ship.Eff.FuelMax - 0.5f
                         ? "Бак полон — заправка не нужна"
                         : "Запас сети ниже текущего топлива";
@@ -428,14 +428,14 @@ namespace SpaceTaxi.UI
 
             fuelOfferLabel.text = FuelOutage
                 ? "Заправка не работает"
-                : $"Заправить: {selected} ед · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+                : $"Заправить: {selected} ед · {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
             fuelButton.interactable = !FuelOutage && selected > 0 && session.Wallet.Credits >= cost;
             fuelButtonLabel.text = FuelOutage
                 ? "ТОПЛИВА НЕТ"
                 : selected <= 0 ? "ВЫБЕРИТЕ ОБЪЁМ"
                 : selected >= available
-                    ? $"ЗАПРАВИТЬ ДО ПОЛНОГО · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}"
-                    : $"ЗАПРАВИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+                    ? $"ЗАПРАВИТЬ ДО ПОЛНОГО · {UiFormat.Currency} {UiFormat.FormatCredits(cost)}"
+                    : $"ЗАПРАВИТЬ · {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
         }
 
         // слайдер объёма: дорожка/заполнение/ручка собираются кодом (схема UGUI Slider)
@@ -568,7 +568,7 @@ namespace SpaceTaxi.UI
                 RepairNetwork.PackCount - 1, tier, Pricing);
             int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
 
-            repairOffer.text = $"Починка: +{Mathf.RoundToInt(amount)} HP · {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+            repairOffer.text = $"Починка: +{Mathf.RoundToInt(amount)} HP · {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
             repairOffer.color = OnboardComputerFactory.BrightColor;
             bool canPay = session.Wallet.Credits >= cost;
             repairButton.interactable = canPay;
@@ -594,7 +594,7 @@ namespace SpaceTaxi.UI
                 return;
             hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — экран пересчитается
             int pct = Mathf.RoundToInt(amount / missing * 100f);
-            hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {StationUI.Currency} {OnboardBinder.FormatCredits(cost)}";
+            hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
             ShowToast($"Отремонтировано на {pct}%", tone: ToastTone.Danger); // Н6 U4: списание — красный
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
@@ -619,7 +619,7 @@ namespace SpaceTaxi.UI
             }
 
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();
-            creditsValue.text = StationUI.Currency + " " + OnboardBinder.FormatCredits(session.Wallet.Credits);
+            creditsValue.text = UiFormat.Currency + " " + UiFormat.FormatCredits(session.Wallet.Credits);
 
             UpdateGauge(fuelSegments, ship.FuelFraction);
             fuelValue.text = Mathf.RoundToInt(ship.Fuel) + "/" + Mathf.RoundToInt(ship.Eff.FuelMax);
@@ -1093,7 +1093,7 @@ namespace SpaceTaxi.UI
                 int price = upgrades.GetPrice((int)fleet.Current.ServiceClass);
                 row.BuyLabel.text = maxed
                     ? "МАКС."
-                    : $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(price)}";
+                    : $"КУПИТЬ · {UiFormat.Currency} {UiFormat.FormatCredits(price)}";
                 row.Buy.interactable = !maxed && price > 0 && session.Wallet.Credits >= price;
                 // S4: гаснет и текстом — при нехватке кредитов подпись тускнеет
                 // (в том же стиле, что «Не хватает Đ N» магазина); Refresh
@@ -1177,8 +1177,8 @@ namespace SpaceTaxi.UI
             debtSection.SetActive(balance > 0);
             if (balance <= 0)
                 return;
-            debtLine.text = $"Долг: {StationUI.Currency} {OnboardBinder.FormatCredits(balance)} · Аварий: {session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
-            repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({StationUI.Currency} {OnboardBinder.FormatCredits(balance)})";
+            debtLine.text = $"Долг: {UiFormat.Currency} {UiFormat.FormatCredits(balance)} · Аварий: {session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
+            repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({UiFormat.Currency} {UiFormat.FormatCredits(balance)})";
             repayButton.interactable = session.Wallet.Credits >= balance;
         }
 
@@ -1605,13 +1605,13 @@ namespace SpaceTaxi.UI
             bool affordable = session.Wallet.Credits >= config.Price;
             shopBuy.interactable = canBuy ? affordable : canSit;
             shopBuyLabel.text = canBuy
-                ? $"КУПИТЬ · {StationUI.Currency} {OnboardBinder.FormatCredits(config.Price)}"
+                ? $"КУПИТЬ · {UiFormat.Currency} {UiFormat.FormatCredits(config.Price)}"
                 : canSit ? "ПЕРЕСЕСТЬ"
                 : current ? "СЕЙЧАС АКТИВЕН"
                 : "НЕТ В ПРОДАЖЕ";
             // недостача кредитов: кнопка гаснет + статус с нехваткой (C2)
             shopStatus.text = canBuy && !affordable
-                ? $"Не хватает {StationUI.Currency} {OnboardBinder.FormatCredits(config.Price - session.Wallet.Credits)}"
+                ? $"Не хватает {UiFormat.Currency} {UiFormat.FormatCredits(config.Price - session.Wallet.Credits)}"
                 : "";
         }
 
@@ -1787,7 +1787,7 @@ namespace SpaceTaxi.UI
             if (!session.Fleet.TryBuy(config, session.Wallet, paintIndex))
                 return;
             Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
-            ShowToast($"Куплен «{config.DisplayName}» (−{StationUI.Currency} {OnboardBinder.FormatCredits(price)})", emphasized: true, tone: ToastTone.Danger); // Н6 U4
+            ShowToast($"Куплен «{config.DisplayName}» (−{UiFormat.Currency} {UiFormat.FormatCredits(price)})", emphasized: true, tone: ToastTone.Danger); // Н6 U4
             // купленной модели «нет в продаже» — витрина листается дальше,
             // сама модель остаётся в списке серой с подписью «ВАШ · В АНГАРЕ»
             FlipShowcase(1);

@@ -269,7 +269,7 @@ namespace SpaceTaxi.UI
             // Н7 Q7.3: тост принятия заказа; «паникёр» предупреждает сразу (Н7 Q7.1)
             orders.OrderAccepted += offer => Show("Заказ принят: " + offer.Passenger.DisplayName
                 + (offer.HurrySeconds > 0f
-                    ? " · ПАССАЖИР ТОРОПИТСЯ: " + OnboardBinder.FormatClock(offer.HurrySeconds) + " на доставку"
+                    ? " · ПАССАЖИР ТОРОПИТСЯ: " + UiFormat.FormatClock(offer.HurrySeconds) + " на доставку"
                     : ""));
 
             // Н7 Q7.4: промежуточные предупреждения задания (повреждение посылки,
@@ -296,7 +296,7 @@ namespace SpaceTaxi.UI
                 if (available <= 0)
                     return;
                 Show($"Топлива на станции: {available} ед · цена " +
-                     $"{StationUI.Currency} {FuelNetwork.PricePerUnit(planet.FuelTier, planet.Sector, pricing):0.##}/ед");
+                     $"{UiFormat.Currency} {FuelNetwork.PricePerUnit(planet.FuelTier, planet.Sector, pricing):0.##}/ед");
             };
 
             var hull = ship.GetComponent<HullSystem>();
@@ -311,15 +311,15 @@ namespace SpaceTaxi.UI
                 // без второго тоста и без ложной причины; гашение (П3.3/П4.2)
                 // тоста не даёт, как и раньше
                 debt.AccidentRegistered += amount =>
-                    Show($"ДОЛГ +{StationUI.Currency} {OnboardBinder.FormatCredits(amount)} за арендный корабль", true, ToastTone.Danger);
+                    Show($"ДОЛГ +{UiFormat.Currency} {UiFormat.FormatCredits(amount)} за арендный корабль", true, ToastTone.Danger);
 
             // выплата за доставку (П4.2): сумма на руки + уход в долг
             if (session.Payout != null)
                 session.Payout.Paid += result =>
                 {
-                    Show($"Доставка: +{StationUI.Currency} {OnboardBinder.FormatCredits(result.Net)}", true, ToastTone.Success);
+                    Show($"Доставка: +{UiFormat.Currency} {UiFormat.FormatCredits(result.Net)}", true, ToastTone.Success);
                     if (result.ToDebt > 0)
-                        Show($"{StationUI.Currency} {OnboardBinder.FormatCredits(result.ToDebt)} ушло в счёт долга", false, ToastTone.Danger);
+                        Show($"{UiFormat.Currency} {UiFormat.FormatCredits(result.ToDebt)} ушло в счёт долга", false, ToastTone.Danger);
                 };
 
             // кометы (П6.3): предупреждение за 20 с до входа в систему

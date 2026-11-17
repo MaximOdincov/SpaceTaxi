@@ -25,7 +25,6 @@ namespace SpaceTaxi.UI
         // «★ 3.0»: префикс пуст, если атлас не дал глиф звезды (сброс dynamic-атласа)
         private string ratingPrefix = "";
         // символ валюты проекта и глиф часов (есть не в каждом атласе — проверка при бинде)
-        private const string Currency = "Đ";
         private bool clockGlyph;
         // анимация денег: показанное значение догоняет целевое (как рейтинг)
         private float moneyShown = -1f;
@@ -63,6 +62,7 @@ namespace SpaceTaxi.UI
         // раскрытие: входящая карточка разворачивается прямо в ленте скролла
         private OrderOffer expandedOffer;
 
+        // Н10.9: «Đ»/FormatCredits/FormatClock переехали в UiFormat (Слой 1)
         [Tooltip("Единый шрифт панели: применяется ко всем текстам каркаса и карточек. Пусто — шрифт часов старого каркаса")]
         [SerializeField] private TMP_FontAsset panelFont;
 
@@ -304,7 +304,7 @@ namespace SpaceTaxi.UI
                 // деньги штрафа списывает GameSession на OrderCancelled (Wallet/DebtService)
                 cancel.GetComponent<Button>().onClick.AddListener(() => orders.CancelActive());
                 int penalty = OrderService.CancelPenalty(offer.Price);
-                SetText(card.gameObject, "Expanded/Cancel/Text", "Отменить · −" + Currency + " " + penalty);
+                SetText(card.gameObject, "Expanded/Cancel/Text", "Отменить · −" + UiFormat.Currency + " " + penalty);
             }
 
             FillCard(card.transform, offer, activeMode: true);
@@ -483,7 +483,7 @@ namespace SpaceTaxi.UI
                 cancel.GetComponent<Button>().interactable = orders.Active.State == OrderState.Active
                     || ship.State == ShipState.Landed;
                 int penalty = OrderService.CancelPenalty(orders.Active.Price);
-                SetText(activeCardGo, "Expanded/Cancel/Text", "Отменить · −" + Currency + " " + penalty);
+                SetText(activeCardGo, "Expanded/Cancel/Text", "Отменить · −" + UiFormat.Currency + " " + penalty);
             }
         }
 
@@ -543,7 +543,7 @@ namespace SpaceTaxi.UI
             float toPassenger = orders.DistanceToPlanet(offer.PickupIndex, ship.transform.position);
             SetText(card, "Compact/Info/Dist",
                 "Расстояние до пассажира: " + toPassenger.ToString("0") + " юн.");
-            SetText(card, "Expanded/Accept/Text", "Взять заказ · " + Currency + " " + FormatCredits(offer.Price));
+            SetText(card, "Expanded/Accept/Text", "Взять заказ · " + UiFormat.Currency + " " + UiFormat.FormatCredits(offer.Price));
 
             OrderOffer captured = offer;
             var accept = card.transform.Find("Expanded/Accept");
@@ -803,7 +803,7 @@ namespace SpaceTaxi.UI
             float remaining = offer.HurryRemaining(Time.time);
             Color color = Color.Lerp(OnboardComputerFactory.TaxiColor, OnboardComputerFactory.DangerColor,
                 1f - Mathf.Clamp01(remaining / HurryWarnSeconds));
-            return $"<color={ColorHex(color)}>ТОРОПИТСЯ: {FormatClock(remaining)} · срыв заказа</color>";
+            return $"<color={ColorHex(color)}>ТОРОПИТСЯ: {UiFormat.FormatClock(remaining)} · срыв заказа</color>";
         }
 
         private static string ColorHex(Color color)
@@ -839,26 +839,9 @@ namespace SpaceTaxi.UI
         private void UpdateMoneyText()
         {
             if (moneyValue != null && moneyShown >= 0f)
-                moneyValue.text = Currency + " " + FormatCredits(Mathf.RoundToInt(moneyShown));
+                moneyValue.text = UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(moneyShown));
         }
 
-        // компактный формат: 10000 -> 10k, 1 400 000 -> 1.4m — размер строки предсказуем
-        public static string FormatCredits(int value)
-        {
-            if (value >= 1_000_000)
-                return (value / 1_000_000f).ToString("0.#", CultureInfo.InvariantCulture) + "m";
-            if (value >= 1000)
-                return (value / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
-            return value.ToString();
-        }
-
-        // таймеры заказов в mm:ss (Н7 Q7.1): округление вверх — «0:59» не висит
-        // две секунды; используется и HudBinder-ом в подсказке цели
-        public static string FormatClock(float seconds)
-        {
-            int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
-            return total / 60 + ":" + (total % 60).ToString("00", CultureInfo.InvariantCulture);
-        }
 
         // рейтинг догоняет целевое значение, цвет — динамика (красный/зелёный)
         private void ShowRating(float value)
@@ -939,7 +922,7 @@ namespace SpaceTaxi.UI
         {
             if (debtValue == null || debtShown < 0f)
                 return;
-            debtValue.text = "Текущий долг: " + Currency + " " + FormatCredits(Mathf.RoundToInt(debtShown));
+            debtValue.text = "Текущий долг: " + UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(debtShown));
             debtValue.color = debtRising && debtTarget > debtShown + 0.5f
                 ? OnboardComputerFactory.DangerColor
                 : OnboardComputerFactory.DebtCalmColor;
@@ -957,7 +940,7 @@ namespace SpaceTaxi.UI
             TMP_Text label = debtRepayButton.GetComponentInChildren<TMP_Text>();
             if (label != null)
             {
-                label.text = "ПОГАСИТЬ · " + Currency + " " + FormatCredits(amount);
+                label.text = "ПОГАСИТЬ · " + UiFormat.Currency + " " + UiFormat.FormatCredits(amount);
                 label.color = amount > 0
                     ? OnboardComputerFactory.BrightColor
                     : OnboardComputerFactory.LabelColor;
@@ -981,7 +964,7 @@ namespace SpaceTaxi.UI
             FindAnyObjectByType<ToastNotifier>()?.Show(
                 full
                     ? "Долг погашен"
-                    : $"Долг уменьшен: −{Currency} {FormatCredits(amount)} · осталось {Currency} {FormatCredits(debt.Balance)}",
+                    : $"Долг уменьшен: −{UiFormat.Currency} {UiFormat.FormatCredits(amount)} · осталось {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)}",
                 full, full ? ToastTone.Success : ToastTone.Danger);
         }
 

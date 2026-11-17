@@ -23,8 +23,6 @@ namespace SpaceTaxi.UI
     // блоками ≥ 10-12, ничего не слеплено.
     public static class StationUI
     {
-        // символ валюты в текстах станции; числа форматирует OnboardBinder.FormatCredits
-        public const string Currency = "Đ";
 
         // --- Кнопка станции: фон ButtonColor фабрики, текст ярче (BrightColor),
         // hover/pressed через Button ColorTint (паттерн PlayerButton фабрики).
@@ -44,7 +42,7 @@ namespace SpaceTaxi.UI
         }
 
         // --- Хедер попапа: «СТАНЦИЯ · …» слева в стиле борткомпа (точка-линк,
-        // BrightColor), кредиты «Đ N» справа (формат OnboardBinder.FormatCredits),
+        // BrightColor), кредиты «Đ N» справа (формат UiFormat.FormatCredits),
         // крестик закрытия в правом верхнем углу панели — клик закрывает попап
         // (Esc закрывает тем же Close() контроллера). Крестик вне лейаута,
         // поверх угла; строка резервирует справа 40px, тексты с ним не наезжают ---
@@ -66,7 +64,7 @@ namespace SpaceTaxi.UI
             OnboardComputerFactory.Flexible(refs.Title.gameObject);
             refs.Title.alignment = TextAlignmentOptions.Left;
 
-            refs.Credits = OnboardComputerFactory.Text(row, Currency + " 0", 26f,
+            refs.Credits = OnboardComputerFactory.Text(row, UiFormat.Currency + " 0", 26f,
                 OnboardComputerFactory.TaxiColor, "Credits");
             OnboardComputerFactory.FixedHeight(refs.Credits.gameObject, 36f);
             OnboardComputerFactory.FixedWidth(refs.Credits.gameObject, 132f);

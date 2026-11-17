@@ -183,7 +183,7 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             if (toDebt > 0) // кошелёк не покрыл
                 Debt.AddCharge(toDebt); // остаток в долг (не авария)
             FindAnyObjectByType<UI.ToastNotifier>()?.Show( // тост о штрафе
-                $"{reason}: штраф −{UI.StationUI.Currency} {UI.OnboardBinder.FormatCredits(penalty)}", // текст суммы
+                $"{reason}: штраф −{UI.UiFormat.Currency} {UI.UiFormat.FormatCredits(penalty)}", // текст суммы
                 emphasized, UI.ToastTone.Danger); // красный тон
             Debug.Log($"[Economy] {reason}: {penalty} Đ (кошелёк {fromWallet}, долг {toDebt})"); // журнал
         }

@@ -52,7 +52,7 @@ namespace SpaceTaxi.Core
             }
 
             FleetService fleet = session.Fleet; // парк кораблей
-            GUILayout.Label($"Корабль: {fleet.Current?.DisplayName} · {UI.StationUI.Currency} {UI.OnboardBinder.FormatCredits(session.Wallet.Credits)}"); // статус
+            GUILayout.Label($"Корабль: {fleet.Current?.DisplayName} · {UI.UiFormat.Currency} {UI.UiFormat.FormatCredits(session.Wallet.Credits)}"); // статус
 
             GUILayout.BeginHorizontal(); // строка выдачи денег
             creditsField = GUILayout.TextField(creditsField); // поле суммы

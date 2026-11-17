@@ -75,7 +75,7 @@ namespace SpaceTaxi.UI
             // причина по триггеру: долг свыше порога или счётчик аварий (§3.2)
             if (reasonText != null)
                 reasonText.text = debt.IsOverDismissalThreshold
-                    ? $"МТО расторгает договор.\nДолг {StationUI.Currency} {OnboardBinder.FormatCredits(debt.Balance)} превысил допустимые {StationUI.Currency} {OnboardBinder.FormatCredits(debt.DismissalDebtThreshold)}."
+                    ? $"МТО расторгает договор.\nДолг {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} превысил допустимые {UiFormat.Currency} {UiFormat.FormatCredits(debt.DismissalDebtThreshold)}."
                     : "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.";
             screen.SetActive(true);
             Time.timeScale = 0f; // как пауза: до выхода в меню мир не живёт
@@ -151,7 +151,7 @@ namespace SpaceTaxi.UI
             reason.alignment = TextAlignmentOptions.Center;
             reasonText = reason; // текст причины подменяется при показе (Н7 Q7.8)
             var stats = OnboardComputerFactory.Text(content,
-                $"Непогашенный долг: {StationUI.Currency} {OnboardBinder.FormatCredits(debt.Balance)} · аварий: {debt.UnpaidAccidents}",
+                $"Непогашенный долг: {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} · аварий: {debt.UnpaidAccidents}",
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 

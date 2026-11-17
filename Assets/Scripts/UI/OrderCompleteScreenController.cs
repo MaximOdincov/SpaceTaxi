@@ -24,8 +24,8 @@ namespace SpaceTaxi.UI
     // кодом при первом показе (паттерн StationScreen П3.1).
     // Н-9: строки разбивки появляются по одной (выезд слева + фейд 0.2 с,
     // интервал 0.15 с). Вся анимация — по unscaledTime: модал живёт при
-    // timeScale = 0. Н4.4: суммы в валюте борткомпа (Đ + компактный формат
-    // OnboardBinder.FormatCredits) и каждая денежная строка прокатывается
+    // timeScale = 0. Н4.4: суммы в валюте борткомпа (UiFormat + компактный формат
+    // UiFormat.FormatCredits) и каждая денежная строка прокатывается
     // счётчиком — паттерн AnimateMoney: значение догоняет целевое по
     // unscaledDeltaTime, старт в момент появления строки. Цвета по знаку:
     // приход (+) — яркий борткомпа, убытки (−) — красный, долг — «спокойный»
@@ -41,7 +41,6 @@ namespace SpaceTaxi.UI
 
         // валюта борткомпа (как OnboardBinder); минус в суммах — U+2212,
         // как в подписях кнопок панели («Отменить · −Đ N»)
-        private const string Currency = "Đ";
 
         // строка разбивки: группа (альфа) + внутренний текст (слайд). Текст —
         // ребёнок строки, а не прямой элемент layout-группы: та двигает только
@@ -268,7 +267,7 @@ namespace SpaceTaxi.UI
         // тот же, что у денег в шапке (предсказуемая ширина строки под «…»)
         private static string FormatSigned(int value)
         {
-            return (value < 0 ? "−" : "+") + Currency + " " + OnboardBinder.FormatCredits(Mathf.Abs(value));
+            return (value < 0 ? "−" : "+") + UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.Abs(value));
         }
 
         // последовательность показа: видимые строки по одной, старт следующей

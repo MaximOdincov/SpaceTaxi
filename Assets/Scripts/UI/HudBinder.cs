@@ -482,7 +482,7 @@ namespace SpaceTaxi.UI
                 Color timerColor = Color.Lerp(OnboardComputerFactory.TaxiColor, OnboardComputerFactory.DangerColor,
                     1f - Mathf.Clamp01(remaining / OnboardBinder.HurryWarnSeconds));
                 goalHint.text += $"<color=#{ColorUtility.ToHtmlStringRGB(timerColor)}> · ОСТАЛОСЬ "
-                    + OnboardBinder.FormatClock(remaining) + " · срыв заказа</color>";
+                    + UiFormat.FormatClock(remaining) + " · срыв заказа</color>";
             }
         }
 
