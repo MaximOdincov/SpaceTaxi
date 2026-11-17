@@ -41,13 +41,16 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private float currentAlpha = 1f;
 
+        // горящий/погашенный сегмент бака
         private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
+        // безопасная/опасная скорость (жар звёзд красит стрелку)
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SpeedDanger = new Color(1f, 0.35f, 0.3f, 1f);
         // зелёный HUD-иконок — BrightColor каркаса борткомпа (принятый зелёный)
         private static readonly Color IconGreen = OnboardComputerFactory.BrightColor;
 
+        // каркас HUD собирается кодом + подписки на корпус/бак/рейтинг
         private void Awake()
         {
             dimGroup = GetComponent<CanvasGroup>();
@@ -353,6 +356,7 @@ namespace SpaceTaxi.UI
             sirenRight = MakeSiren("SirenRight", new Vector2(0.97f, 0.72f), danger);
         }
 
+        // иконка-сирена (комета/пояс) в HUD-колонке
         private Image MakeSiren(string name, Vector2 anchor, Sprite danger)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image));
@@ -379,6 +383,7 @@ namespace SpaceTaxi.UI
                 hullSystem.HpChanged -= UpdateHull;
         }
 
+        // тик HUD: подсказка цели, спидометр, корпуса/бак/сирены
         private void Update()
         {
             if (!bound)
@@ -446,6 +451,7 @@ namespace SpaceTaxi.UI
 
         private SpaceTaxi.Core.GameSession cachedSession; // кэш — поиск каждый кадр не нужен
 
+        // строка «ЗАКАЗ · забрать/вези …» над миром (кэш строк — без аллокаций)
         private void UpdateGoalHint()
         {
             if (cachedSession == null)
@@ -486,11 +492,13 @@ namespace SpaceTaxi.UI
             }
         }
 
+        // процент корпуса в HUD (из HpFraction)
         private void UpdateHull()
         {
             hullValue.text = Mathf.RoundToInt(ship.HpFraction * 100f) + "%";
         }
 
+        // сегменты бака: горит = доля топлива
         private void UpdateFuel()
         {
             int lit = Mathf.CeilToInt(ship.FuelFraction * fuelSegments.Length);
@@ -553,6 +561,7 @@ namespace SpaceTaxi.UI
             }
         }
 
+        // луп сирены при тревоге (жар/сирены): старт/стоп один раз
         private void SetAlarm(bool on)
         {
             if (alarmOn == on)
@@ -564,6 +573,7 @@ namespace SpaceTaxi.UI
                 Sound.StopLoop(SoundId.Alarm);
         }
 
+        // корабль в зоне жара любой звезды — стрелка скорости краснеет
         private bool IsInHeat()
         {
             if (gravity == null)

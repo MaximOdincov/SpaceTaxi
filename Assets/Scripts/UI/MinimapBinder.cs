@@ -63,19 +63,28 @@ namespace SpaceTaxi.UI
 
         // — палитра «прибора» —
         private static readonly Color PanelColor = new Color(0.015f, 0.06f, 0.035f, 0.85f);
+        // сетка-развёртка
         private static readonly Color GridColor = new Color(0.35f, 0.85f, 0.55f);
+        // планеты — спокойная зелень
         private static readonly Color PlanetColor = new Color(0.6f, 0.85f, 0.68f);
+        // звёзды — тепло
         private static readonly Color StarColor = new Color(1f, 0.78f, 0.32f);
+        // дыра — тёмное ядро
         private static readonly Color HoleCoreColor = new Color(0.05f, 0.04f, 0.09f);
+        // дыра — фиолетовый ореол воронки
         private static readonly Color HoleHaloColor = new Color(0.55f, 0.35f, 0.85f, 0.3f);
+        // станции ремонта — холодный синий
         private static readonly Color RepairColor = new Color(0.7f, 0.82f, 0.95f);
         private static readonly Color StationNoTierColor = new Color(1f, 0.88f, 0.35f); // тир не задан
         // G-15: цель заказа — жёлтая (TaxiColor, как HUD/карта/стрелка), своя
         // метка (waypoint) — зелёная, единый цвет с маркером в мире (Н-8/G-15)
         private static readonly Color TargetColor = OnboardComputerFactory.TaxiColor;
         private static readonly Color WaypointColor = WaypointIndicator.WaypointGreen;
+        // корабль — самый яркий маркер прибора
         private static readonly Color ShipColor = new Color(0.93f, 1f, 0.96f);          // корабль — самый яркий маркер прибора
+        // предупреждение о комете
         private static readonly Color CometWarnColor = new Color(1f, 0.42f, 0.36f);
+        // буи-подсказки маршрута
         private static readonly Color BuoyColor = new Color(0.45f, 0.85f, 0.6f, 0.9f);
 
         // тир топливной сети (Н-4): 1 — бедная/дешёвая … 4 — люкс (полный бак)
@@ -163,6 +172,7 @@ namespace SpaceTaxi.UI
                 Destroy(transform.GetChild(i).gameObject);
         }
 
+        // тик радара: свип, маркеры, буи, предупреждение кометы
         private void Update()
         {
             if (!TryBind())
@@ -191,6 +201,7 @@ namespace SpaceTaxi.UI
 
         // ————— привязка (лениво, как у остальных биндеров) —————
 
+        // ленивый бинд сессии (стиль биндеров)
         private bool TryBind()
         {
             if (session == null)
@@ -217,6 +228,7 @@ namespace SpaceTaxi.UI
             return true;
         }
 
+        // подписка на события комет (симметричная отписка в OnDestroy — Н9.7)
         private void BindComets()
         {
             if (cometsBound)
@@ -259,6 +271,7 @@ namespace SpaceTaxi.UI
                 ?? Resources.Load<TMP_FontAsset>("Excalifont SDF");
         }
 
+        // комета войдёт через кромку — показать направление предупреждения
         private void OnCometIncoming(Vector2 entry, Vector2 direction)
         {
             cometWarnEntry = entry;
@@ -266,6 +279,7 @@ namespace SpaceTaxi.UI
             cometWarnUntil = Time.time + (cometSystem != null ? cometSystem.WarningSeconds : 20f);
         }
 
+        // комета заспавнилась — предупреждение снято
         private void OnCometSpawned()
         {
             cometWarnUntil = 0f;
@@ -273,6 +287,7 @@ namespace SpaceTaxi.UI
 
         // ————— постройка —————
 
+        // рамка/хром прошлого билда — снести при пересборке
         private void ClearChrome()
         {
             if (chrome != null)
@@ -296,6 +311,7 @@ namespace SpaceTaxi.UI
             cometDots.Clear();
         }
 
+        // сборка прибора: панель, сетка, слои маркеров (кодом, сцена не правится)
         private void Build(float diameter)
         {
             float radius = diameter * 0.5f;
@@ -479,6 +495,7 @@ namespace SpaceTaxi.UI
 
         // ————— покадровое обновление —————
 
+        // вращающийся свип-луч радара
         private void UpdateSweep()
         {
             if (sweep == null)
@@ -509,6 +526,7 @@ namespace SpaceTaxi.UI
             }
         }
 
+        // буи-маркеры маршрута в радаре
         private void UpdateBuoys()
         {
             for (int i = 0; i < buoys.Count; i++)
