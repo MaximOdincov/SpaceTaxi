@@ -319,8 +319,19 @@ namespace SpaceTaxi.World
                 return;
             if (!wasCaptured)
                 return; // вне захвата дыры отключать нечего
-            ship.PoweredDown = true;
-            Debug.Log("[BlackHole] борт заглушен оператором — воронка дотягивает до потери связи");
+            ship.PoweredDown = true; // борт глушится мгновенно
+            // Н9.12 (владелец дважды: «нажимаю X — ничего не происходит», «корабля
+            // нет — в этом прикол»): X = НЕМЕДЛЕННАЯ пересадка. Старый борт остаётся
+            // у дыры ПОЛНОРАЗМЕРНЫМ обломком и медленно затягивается за
+            // BlackHoleWreckSeconds (120с), оператор сразу получает новый борт на
+            // стартовой планете (Abandon). Прежний флоу «оператор остаётся в борту
+            // до конца окна» читался как «ничего не происходит», а обломок после
+            // окна рождался сжатым до 25% и усыхал до невидимости
+            if (CaptureWreckPose(out Sprite sprite, out float scale, out float angular, out float spin))
+                WreckSystem.Ensure().SpawnOrbital(this, ship.transform.position, sprite, scale,
+                    angular, spin, config.BlackHoleWreckSeconds);
+            hull.Abandon(AbandonedReason);
+            Debug.Log("[BlackHole] борт отключён оператором — обломок остался у дыры, оператор на стартовой");
         }
 
         // масштаб сжатия: 1 → BlackHoleMinScale (порог гибели по размеру)
