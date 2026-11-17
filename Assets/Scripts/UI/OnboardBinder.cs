@@ -1046,23 +1046,23 @@ namespace SpaceTaxi.UI
             }
             else if (manager.CurrentTrack == SoundId.MusicStation2)
             {
-                // волна 2 → волна 3 (классика). Записи может не быть в каталоге:
-                // плейлист менеджера собирается только из записей с клипами, а
-                // PlayMusic пустую станцию молча пропускает — мёртвую волну не
-                // включаем, остаёмся на месте и предупреждаем тостом
-                if (!StationInPlaylist(manager, SoundId.MusicStation3))
-                {
-                    FindAnyObjectByType<ToastNotifier>()?.Show(
-                        "ВОЛНА 3: ещё не настроена", false, ToastTone.Neutral);
+                // волна 2 → волна 3 (классика). Н10.7: пустая станция пропускается
+                // МОЛЧА к следующей НЕ пустой по кругу; пусты все — остаёмся на
+                // текущей (владелец: ВОЛНА никогда не оставляет тишину)
+                SoundId station = manager.NextValidStation(SoundId.MusicStation3, 1);
+                if (station == SoundId.None)
                     return;
-                }
-                manager.PlayMusic(SoundId.MusicStation3);
+                manager.PlayMusic(station);
             }
             else
             {
-                // волна 1 → волна 2: запоминаем, куда вернуться по кругу на волну 1
+                // волна 1 → волна 2: запоминаем, куда вернуться по кругу на волну 1.
+                // Н10.7: пустая станция пропускается молча к следующей НЕ пустой
                 wave1Track = manager.CurrentTrack;
-                manager.PlayMusic(SoundId.MusicStation2);
+                SoundId station = manager.NextValidStation(SoundId.MusicStation2, 1);
+                if (station == SoundId.None)
+                    return;
+                manager.PlayMusic(station);
             }
             RefreshMusicPlayer(); // событие MusicStateChanged придёт и так — дублируем для мгновенной метки
         }
@@ -1076,17 +1076,6 @@ namespace SpaceTaxi.UI
                 || wave1Track == SoundId.MusicStation3
                 ? SoundId.MusicFlight
                 : wave1Track;
-        }
-
-        // у станции есть клипы: плейлист менеджера содержит только валидные записи
-        // группы Music; каталог собран до игры — в сессии состав не меняется
-        private static bool StationInPlaylist(AudioManager manager, SoundId station)
-        {
-            IReadOnlyList<SoundId> tracks = manager.MusicPlaylist;
-            for (int i = 0; i < tracks.Count; i++)
-                if (tracks[i] == station)
-                    return true;
-            return false;
         }
 
         // имя станции и метка мьюта по состоянию менеджера; событие MusicStateChanged

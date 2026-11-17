@@ -387,6 +387,27 @@ namespace SpaceTaxi.Audio
             PlayMusic(Stations[((index % Stations.Length) + Stations.Length) % Stations.Length]);
         }
 
+        // Н10.7: первая станция с клипами от target по кругу (dir ±1), включая
+        // сам target. Все пусты — None (вызывающий остаётся на текущей): ВОЛНА
+        // не должна оставлять тишину. Валидность через GetEntry — тот же
+        // источник, что у MusicPlaylist (запись есть и клипы не пусты)
+        public SoundId NextValidStation(SoundId target, int dir)
+        {
+            if (Stations.Length == 0)
+                return SoundId.None;
+            int start = System.Array.IndexOf(Stations, target);
+            if (start < 0)
+                return SoundId.None;
+            for (int i = 0; i < Stations.Length; i++)
+            {
+                int index = ((start + dir * i) % Stations.Length + Stations.Length) % Stations.Length;
+                SoundId candidate = Stations[index];
+                if (GetEntry(candidate) != null)
+                    return candidate;
+            }
+            return SoundId.None;
+        }
+
         // мьют радио: трек продолжает идти (не пауза), звука нет
         public bool MusicMuted { get; private set; }
 
