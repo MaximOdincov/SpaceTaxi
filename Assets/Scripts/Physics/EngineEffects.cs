@@ -381,6 +381,14 @@ namespace SpaceTaxi.Physics
             renderer.sortingOrder = SortOrderFlame;
         }
 
+        // кэш материалов частиц (Н10 Слой 1, §3.6): прежде — new Material на
+        // КАЖДЫЙ Rebind, а слоты при Rebind сносятся и материал оставался
+        // в памяти без владельца. Один материал на шейдер корабля — слоты
+        // делят его (свойств никто не мутирует индивидуально); если Unity
+        // выгрузил материал (UnloadUnusedAssets без ссылок) — пересоздаём
+        private static readonly System.Collections.Generic.Dictionary<Shader, Material> particleMaterials =
+            new System.Collections.Generic.Dictionary<Shader, Material>();
+
         // материал частиц: шейдер SpriteRenderer корабля (или Sprites/Default) +
         // кружок-заглушка; Repeat нужен для тайлинга вдоль шлейфа (как в SpeedTrail)
         private static Material MakeParticleMaterial(Transform spriteHost)
@@ -389,9 +397,14 @@ namespace SpaceTaxi.Physics
             Shader shader = src != null && src.sharedMaterial != null
                 ? src.sharedMaterial.shader
                 : Shader.Find("Sprites/Default");
+            if (shader != null && particleMaterials.TryGetValue(shader, out Material cached) && cached != null)
+                return cached;
             Texture2D tex = StubSprites.Circle(8).texture;
             tex.wrapMode = TextureWrapMode.Repeat;
-            return new Material(shader) { mainTexture = tex };
+            Material mat = new Material(shader) { mainTexture = tex };
+            if (shader != null)
+                particleMaterials[shader] = mat;
+            return mat;
         }
 
         // дефолтное пламя: белое-в-желту ядро → оранж/красный → дымный хвост;
