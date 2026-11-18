@@ -202,7 +202,6 @@ namespace SpaceTaxi.UI
 
         // анимации карты (Н6.K7): взрыв — кольцо+искры; стоянка — тень-подставка
         private HullSystem hull;
-        private LandingSystem landing; // Н12: для автоснятия метки при посадке
 
         private void Awake()
         {
@@ -332,8 +331,6 @@ namespace SpaceTaxi.UI
             // симметричная отписка (конвенция проекта)
             if (hull != null)
                 hull.Died -= OnShipDied;
-            if (landing != null)
-                landing.ShipLanded -= OnShipLanded;
         }
 
         // экран изменился — лист и контент пересчитываются в следующем кадре
@@ -664,27 +661,6 @@ namespace SpaceTaxi.UI
                 return;
             hull.Died -= OnShipDied;
             hull.Died += OnShipDied;
-            BindWaypointArrival(); // Н12: та же ленивая привязка корабля
-        }
-
-        // Н12.2: посадка на помеченную планету снимает метку (как у цели заказа —
-        // «прилетел — и метка снялась»); симметричная отписка в OnDestroy
-        private void BindWaypointArrival()
-        {
-            if (landing == null)
-                landing = FindAnyObjectByType<LandingSystem>();
-            if (landing == null)
-                return;
-            landing.ShipLanded -= OnShipLanded;
-            landing.ShipLanded += OnShipLanded;
-        }
-
-        private void OnShipLanded(World.Planet planet)
-        {
-            if (Waypoint == null || planet == null)
-                return;
-            if (Waypoint.DisplayName == planet.DisplayName)
-                ClearWaypoint(); // прилетели на помеченное — метка больше не нужна
         }
 
         private void OnShipDied()

@@ -45,6 +45,7 @@ namespace SpaceTaxi.UI
         private GameSession session;
         private OrderService orders;
         private MapScreenBinder binder;
+        private LandingSystem landing; // Н12.2b: посадка снимает метку // Н12.2b: посадка снимает метку
         private GravityField gravity;
         private Ship ship;
         private TMP_FontAsset font;
@@ -133,6 +134,9 @@ namespace SpaceTaxi.UI
                 Destroy(markerRoot.gameObject);
             if (arrowCanvas != null)
                 Destroy(arrowCanvas.gameObject);
+            // Н12.2b: симметричная отписка (конвенция проекта)
+            if (landing != null)
+                landing.ShipLanded -= OnShipLanded;
         }
 
         // ————— привязка —————
@@ -163,6 +167,15 @@ namespace SpaceTaxi.UI
                 }
             }
 
+            // Н12.2b: индикатор активен всегда (HUD) — посадка снимает метку,
+            // даже если карта закрыта (биндер карты спит с закрытой картой)
+            if (landing == null)
+            {
+                landing = FindAnyObjectByType<LandingSystem>();
+                if (landing != null)
+                    landing.ShipLanded += OnShipLanded;
+            }
+
             if (gravity == null)
                 gravity = FindAnyObjectByType<GravityField>();
             if (ship == null)
@@ -174,6 +187,16 @@ namespace SpaceTaxi.UI
         }
 
         // смена вейпоинта (кнопка «следить»/клик по карте) — метка переразмещается
+        // Н12.2b: прилетели на помеченную планету — метка снимается сама
+        // (как у цели заказа: довёз — и цель погасла)
+        private void OnShipLanded(Planet planet)
+        {
+            if (binder == null || binder.Waypoint == null || planet == null)
+                return;
+            if (binder.Waypoint.DisplayName == planet.DisplayName)
+                binder.ClearWaypoint();
+        }
+
         private void OnWaypointChanged()
         {
             waypoint = binder != null ? binder.Waypoint : null;
