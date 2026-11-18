@@ -176,3 +176,33 @@ StationShowcaseSection 718, host-контракт IStationSectionHost). Выпо
 редакторе — задокументированная ловушка stale-сцены) сделано безопасно: push
 feature/beta-annotated → origin/feature/beta (fast-forward — beta является предком) + push
 annotated-ветки + локальный ref feature/beta обновлён `git branch -f` без переключения.
+
+---
+
+# Н11 — вечер 18.11 (владелец бодрствует): «спрятать сложность в тулкиты»
+
+Запрос владельца: (1) убрать неиспользуемый код (references 0), (2) крупные куски построения
+UI/карты выделить как «библиотеку», чтобы объяснять API, а не простыни. Фейковое происхождение
+(«скачано») — отклонено: честная подача «мой мини-тулкит» даёт тот же эффект защиты без риска
+«покажи ссылку» (см. STUDY_PLAN Вечер 5).
+
+## Чекпоинт 1 — мёртвый код + UiKit
+
+- **Аудит** (Temp/audit_dead_code.py → dead_code_report.txt): 30 сырых кандидатов; вторая
+  проверка исключила ложные — UnityEvent-обработчики в сценах (Resume/StartNewGame/...),
+  интерфейсы EventSystem (OnBeginDrag/...), схема сейва (TaskWaitSeconds — сохранена),
+  поля-совместимость ассетов (MinSpeed/BlackHoleDeathProximity — уже помечены).
+- **Н11.1**: −244 строки мёртвого кода (AudioManager до-мьютные члены, PaperMapArt карандашная
+  эра, GameSession.CurrentShip, Ship.ApplyModelVisual, PhysicsConfig формулы-дубли,
+  RepairNetwork.MaxPackIndex, PassengerPools.Pick*, MapScreenBinder.RemoveLastAnnotation,
+  ShipAudio.SetInput+вызов).
+- **Н11.2**: сборка **SpaceTaxi.UiKit** (asmdef, ноль игровых зависимостей): UiTheme/Ui/UiBox.
+  УРОК: asmdef-и не ссылаются друг на друга автоматически — SpaceTaxi.Gameplay получил явные
+  ссылки SpaceTaxi.UiKit + UnityEngine.UI (скрипты игры НЕ в Assembly-CSharp, а в Gameplay-
+  сборке — я этого не знал до отладки CS0246). Фабрика борткомпа делегирует примитивы UiKit
+  (публичный API прежний). Приёмка: борткомп и станция рендерятся байт-в-байт (скриншоты).
+- **Н11.4**: ToastNotifier.CreateView — fluent-миграция. УРОКИ API: UiBox.Size()/Fixed* работают
+  ТОЛЬКО под LayoutGroup → добавлен UiBox.Absolute(w,h) для свободных узлов (тож сжимался в
+  квадрат 100×100); Background по умолчанию raycast=false. Игровой тост рендерится как прежде.
+- **Н11.3**: STUDY_PLAN «Вечер 5» — вопросы самопроверки и ответы «откуда это?».
+- PaperMap-расщепление — unity-scripter в работе.
