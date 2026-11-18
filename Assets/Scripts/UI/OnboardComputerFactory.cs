@@ -76,7 +76,25 @@ namespace SpaceTaxi.UI
 
         public static OnboardRefs Build(Transform panel, bool destroyImmediate = false, TMP_FontAsset fontOverride = null)
         {
-            // шрифт: явный override от биндера → старый мокап-титул → дефолт TMP
+            ResolveFont(panel, fontOverride); // шрифт: override → старый мокап-титул → дефолт TMP
+            ClearOldContent(panel, destroyImmediate); // старое содержимое сносим (кроме рамки и фона)
+            var root = BuildRootStack(panel); // вертикальная стопка секций
+
+            var refs = new OnboardRefs { Font = currentFont };
+
+            BuildHeader(root.transform, refs); // СОСТОЯНИЕ: часы · деньги · рейтинг
+            BuildDebtRow(root.transform, refs); // строка долга с кнопкой гашения
+            BuildActiveSection(root.transform, refs); // АКТИВНЫЙ ЗАКАЗ
+            BuildIncomingScroll(root.transform, refs); // ВХОДЯЩИЕ ЗАКАЗЫ
+            BuildRadio(root.transform, refs); // ЭФИР
+            BuildAbandonButton(root.transform, refs); // ОТКЛЮЧИТЬ КОРАБЛЬ
+
+            return refs;
+        }
+
+        // шрифт: явный override от биндера → старый мокап-титул → дефолт TMP
+        private static void ResolveFont(Transform panel, TMP_FontAsset fontOverride)
+        {
             TMP_FontAsset font = fontOverride;
             if (font == null)
             {
@@ -87,8 +105,11 @@ namespace SpaceTaxi.UI
             if (font == null)
                 font = TMP_Settings.defaultFontAsset;
             currentFont = font;
+        }
 
-            // старое содержимое сносим (кроме рамки и фона)
+        // старое содержимое сносим (кроме рамки и фона)
+        private static void ClearOldContent(Transform panel, bool destroyImmediate)
+        {
             for (int i = panel.childCount - 1; i >= 0; i--)
             {
                 string n = panel.GetChild(i).name;
@@ -100,7 +121,11 @@ namespace SpaceTaxi.UI
                         Object.Destroy(panel.GetChild(i).gameObject);
                 }
             }
+        }
 
+        // корневая вертикальная стопка секций
+        private static GameObject BuildRootStack(Transform panel)
+        {
             var root = new GameObject("Stack", typeof(RectTransform));
             root.transform.SetParent(panel, false);
             Stretch((RectTransform)root.transform);
@@ -111,17 +136,19 @@ namespace SpaceTaxi.UI
             rootLayout.childControlHeight = true;
             rootLayout.childForceExpandWidth = true;
             rootLayout.childForceExpandHeight = false;
+            return root;
+        }
 
-            var refs = new OnboardRefs { Font = font };
-
-            // --- СОСТОЯНИЕ: время у левого края · деньги строго по центру панели · ★ рейтинг у правого края ---
+        // --- СОСТОЯНИЕ: время у левого края · деньги строго по центру панели · ★ рейтинг у правого края ---
+        private static void BuildHeader(Transform root, OnboardRefs refs)
+        {
             // якоря вручную (ignoreLayout): равные трети дают центр «своей» ячейки,
             // а не панели; деньги ставим якорем в середину ширины Header
-            var header = H("Header", root.transform);
+            var header = H("Header", root);
             FixedHeight(header, 44f);
             var headerRect = (RectTransform)header.transform;
             // глиф «⏲» есть не в каждом атласе: без него — просто время
-            bool clockGlyph = font.HasCharacter('⏲');
+            bool clockGlyph = currentFont.HasCharacter('⏲');
             refs.Clock = Text(header, clockGlyph ? "⏲ 15:30" : "15:30", 36f, BrightColor, "Clock");
             AnchorHeaderEdge(refs.Clock.transform as RectTransform, isLeft: true);
             refs.Clock.alignment = TextAlignmentOptions.Left;
@@ -131,14 +158,17 @@ namespace SpaceTaxi.UI
             refs.MoneyValue.alignment = TextAlignmentOptions.Center;
             // рейтинг — текст «★ 3.0»: глиф звезды испечён в атласы JetBrainsMono;
             // без глифа (сброс dynamic-атласа в билде) биндер пишет просто «3.0»
-            bool starGlyph = font.HasCharacter('★');
+            bool starGlyph = currentFont.HasCharacter('★');
             refs.RatingValue = Text(header, starGlyph ? "★ 3.0" : "3.0", 36f, RatingGreen, "RatingValue");
             AnchorHeaderEdge(refs.RatingValue.transform as RectTransform, isLeft: false);
             refs.RatingValue.alignment = TextAlignmentOptions.Right;
+        }
 
-            // --- Строка долга: значение слева + кнопка досрочного гашения (Н7 Q7.6);
-            // пустая → скрыта, секции ниже поднимаются ---
-            var debtRow = H("DebtRow", root.transform);
+        // --- Строка долга: значение слева + кнопка досрочного гашения (Н7 Q7.6);
+        // пустая → скрыта, секции ниже поднимаются ---
+        private static void BuildDebtRow(Transform root, OnboardRefs refs)
+        {
+            var debtRow = H("DebtRow", root);
             FixedHeight(debtRow, 30f);
             // forceExpandWidth делил бы излишек поровну и «плыл» бы шириной кнопки —
             // как в PlayerRow: текст забирает всё лишнее, кнопка строго своя
@@ -152,9 +182,12 @@ namespace SpaceTaxi.UI
             refs.DebtRepayButton = debtRepay.GetComponent<Button>();
             refs.DebtRow = debtRow;
             refs.DebtRow.SetActive(false);
+        }
 
-            // --- АКТИВНЫЙ ЗАКАЗ: всегда в детальном виде, строит биндер ---
-            var active = Section(root.transform, "// АКТИВНЫЙ ЗАКАЗ", "ActiveSection");
+        // --- АКТИВНЫЙ ЗАКАЗ: всегда в детальном виде, строит биндер ---
+        private static void BuildActiveSection(Transform root, OnboardRefs refs)
+        {
+            var active = Section(root, "// АКТИВНЫЙ ЗАКАЗ", "ActiveSection");
             refs.ActiveSection = active;
             var activeArea = new GameObject("ActiveArea", typeof(RectTransform));
             activeArea.transform.SetParent(active.transform, false);
@@ -165,9 +198,12 @@ namespace SpaceTaxi.UI
             activeLayout.childForceExpandWidth = true;
             activeLayout.childForceExpandHeight = false;
             refs.ActiveArea = (RectTransform)activeArea.transform;
+        }
 
-            // --- ВХОДЯЩИЕ ЗАКАЗЫ: карточки биндер кладёт в скролл ---
-            var incoming = Section(root.transform, "// ВХОДЯЩИЕ ЗАКАЗЫ", "IncomingSection");
+        // --- ВХОДЯЩИЕ ЗАКАЗЫ: карточки биндер кладёт в скролл ---
+        private static void BuildIncomingScroll(Transform root, OnboardRefs refs)
+        {
+            var incoming = Section(root, "// ВХОДЯЩИЕ ЗАКАЗЫ", "IncomingSection");
             var scrollWrap = new GameObject("OffersScroll", typeof(RectTransform), typeof(ScrollRect));
             scrollWrap.transform.SetParent(incoming.transform, false);
             var wrapElement = scrollWrap.AddComponent<LayoutElement>();
@@ -206,9 +242,12 @@ namespace SpaceTaxi.UI
             scroll.scrollSensitivity = 24f;
 
             refs.OrderArea = contentRect;
+        }
 
-            // --- ЭФИР: заголовок секции, плеер, прогресс, мьют ---
-            var radio = Section(root.transform, "// ЭФИР", "RadioSection");
+        // --- ЭФИР: заголовок секции, плеер, прогресс, мьют ---
+        private static void BuildRadio(Transform root, OnboardRefs refs)
+        {
+            var radio = Section(root, "// ЭФИР", "RadioSection");
             var playerRow = H("PlayerRow", radio.transform);
             FixedHeight(playerRow, 44f);
             var playerRowLayout = playerRow.GetComponent<HorizontalLayoutGroup>();
@@ -240,17 +279,18 @@ namespace SpaceTaxi.UI
             muteLe.minHeight = 34f;
             muteLe.flexibleWidth = 1f;
             refs.RadioMute = muteGo.GetComponent<Button>();
+        }
 
-            // --- ОТКЛЮЧИТЬ КОРАБЛЬ: тревожная красная, клик сразу запускает
-            // штатный пайплайн потери (HullSystem.Abandon → респавн/долг/парк)
-            var abandon = Button(root.transform, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
+        // --- ОТКЛЮЧИТЬ КОРАБЛЬ: тревожная красная, клик сразу запускает
+        // штатный пайплайн потери (HullSystem.Abandon → респавн/долг/парк)
+        private static void BuildAbandonButton(Transform root, OnboardRefs refs)
+        {
+            var abandon = Button(root, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
                 DangerDark, 18f, "AbandonButton");
             var abandonLe = abandon.AddComponent<LayoutElement>();
             abandonLe.minHeight = 40f;
             abandonLe.flexibleWidth = 1f;
             refs.AbandonButton = abandon.GetComponent<Button>();
-
-            return refs;
         }
 
         // --- Элементы каркаса ---

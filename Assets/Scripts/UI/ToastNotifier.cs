@@ -201,7 +201,20 @@ namespace SpaceTaxi.UI
             float now = Time.unscaledTime;
             float dt = Time.unscaledDeltaTime;
 
-            // истёкшие — в затухание, слот освобождается сразу
+            ExpireShown(now, dt); // истёкшие — в затухание
+            EvictOldestIfNeeded(now); // вытеснение старейшего
+            ShowPending(now); // добор из очереди
+            SlideStack(dt); // сдвиг стека
+            FadeRetired(dt); // затухание ушедших
+
+            if (bound)
+                return;
+            BindDomainEvents(); // ленивая привязка к событиям сессии и корабля
+        }
+
+        // истёкшие — в затухание, слот освобождается сразу
+        private void ExpireShown(float now, float dt)
+        {
             for (int i = active.Count - 1; i >= 0; i--)
             {
                 var view = active[i];
@@ -209,21 +222,30 @@ namespace SpaceTaxi.UI
                 if (now >= view.HideAt)
                     Retire(i);
             }
+        }
 
-            // очередь ждёт, слотов нет — вытесняем старейший прожитый тост
+        // очередь ждёт, слотов нет — вытесняем старейший прожитый тост
+        private void EvictOldestIfNeeded(float now)
+        {
             if (pending.Count > 0 && active.Count >= MaxVisible
                 && now - active[active.Count - 1].ShownAt >= EvictAfter)
                 Retire(active.Count - 1);
+        }
 
-            // добор из очереди: стаггер между тостами одного кадра, аварийные — без задержки
+        // добор из очереди: стаггер между тостами одного кадра, аварийные — без задержки
+        private void ShowPending(float now)
+        {
             while (pending.Count > 0 && active.Count < MaxVisible
                 && (now >= nextShowAt || pending[0].Emphasized))
             {
                 Display(pending[0]);
                 pending.RemoveAt(0);
             }
+        }
 
-            // плавный сдвиг стека при появлении/уходе соседей
+        // плавный сдвиг стека при появлении/уходе соседей
+        private void SlideStack(float dt)
+        {
             for (int i = 0; i < active.Count; i++)
             {
                 var view = active[i];
@@ -231,8 +253,11 @@ namespace SpaceTaxi.UI
                 if (!Mathf.Approximately(y, view.TargetY))
                     view.Rect.anchoredPosition = new Vector2(0f, Mathf.MoveTowards(y, view.TargetY, SlideSpeed * dt));
             }
+        }
 
-            // затухание ушедших на месте
+        // затухание ушедших на месте
+        private void FadeRetired(float dt)
+        {
             for (int i = fading.Count - 1; i >= 0; i--)
             {
                 var view = fading[i];
@@ -244,9 +269,11 @@ namespace SpaceTaxi.UI
                     pool.Add(view);
                 }
             }
+        }
 
-            if (bound)
-                return;
+        // тосты вешаются на события заказов/корабля, как только сессия и корабль появляются на сцене
+        private void BindDomainEvents()
+        {
             var session = FindAnyObjectByType<GameSession>();
             var ship = FindAnyObjectByType<Ship>();
             if (session == null || session.Orders == null || ship == null)

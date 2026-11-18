@@ -77,21 +77,6 @@ namespace SpaceTaxi.Physics
         private const int SortOrderFlame = 3;
         private const int SortOrderSpark = 4;
 
-        // палитра: главный — белое-в-желту ядро → оранж → красный → дымный хвост
-        private static readonly Color MainCore = new Color(1f, 0.96f, 0.7f);
-        private static readonly Color MainFire = new Color(1f, 0.62f, 0.2f);
-        private static readonly Color MainEmber = new Color(0.95f, 0.32f, 0.1f);
-        private static readonly Color MainSmoke = new Color(0.5f, 0.38f, 0.34f);
-        // ретро — мятно-голубой «пых»
-        private static readonly Color RetroCore = new Color(0.85f, 1f, 0.92f);
-        private static readonly Color RetroGlow = new Color(0.5f, 0.9f, 1f);
-        private static readonly Color RetroFade = new Color(0.3f, 0.62f, 0.85f);
-        // искры: главные — белые-в-оранж, ретро — белые-в-мяту
-        private static readonly Color SparkHot = new Color(1f, 1f, 0.88f);
-        private static readonly Color SparkFade = new Color(1f, 0.45f, 0.12f);
-        private static readonly Color SparkRetroHot = new Color(0.92f, 1f, 0.95f);
-        private static readonly Color SparkRetroFade = new Color(0.45f, 0.9f, 1f);
-
         private Ship ship;
         private ShipController controller;
         private ShipModelVisual model;
@@ -202,7 +187,7 @@ namespace SpaceTaxi.Physics
             if (main == null)
                 return;
             Transform anchor = main.transform;
-            Material mat = MakeParticleMaterial(anchor);
+            Material mat = EngineFlameArt.MakeParticleMaterial(anchor);
             rcsLeft = MakeRcs(anchor, "RcsLeft", new Vector2(-1.1f, 1.2f), new Vector2(-1f, 0.45f), mat);
             rcsRight = MakeRcs(anchor, "RcsRight", new Vector2(1.1f, 1.2f), new Vector2(1f, 0.45f), mat);
         }
@@ -274,7 +259,7 @@ namespace SpaceTaxi.Physics
             // createdSlots НЕ попадают — они не «созданы кодом»
             if (!allowDefault)
                 return null;
-            Material mat = MakeParticleMaterial(slot);
+            Material mat = EngineFlameArt.MakeParticleMaterial(slot);
             var flameGo = new GameObject("DefaultFlame");
             flameGo.transform.SetParent(slot, false);
             flameGo.transform.localRotation = Quaternion.FromToRotation(Vector3.forward, exhaustDir);
@@ -288,7 +273,7 @@ namespace SpaceTaxi.Physics
         private ParticleSystem BuildRootSlot(Transform root, string slotName, Vector3 localPos,
             Vector2 exhaustDir, bool isMain, bool allowDefault)
         {
-            Material rootMat = MakeParticleMaterial(root);
+            Material rootMat = EngineFlameArt.MakeParticleMaterial(root);
             var go = new GameObject(slotName);
             go.transform.SetParent(root, false);
             go.transform.localPosition = localPos;
@@ -365,7 +350,7 @@ namespace SpaceTaxi.Physics
 
             var color = ps.colorOverLifetime;
             color.enabled = true;
-            color.color = new ParticleSystem.MinMaxGradient(RetroFlameGradient());
+            color.color = new ParticleSystem.MinMaxGradient(EngineFlameArt.RetroFlameGradient());
 
             var size = ps.sizeOverLifetime;
             size.enabled = true;
@@ -379,32 +364,6 @@ namespace SpaceTaxi.Physics
             renderer.material = mat;
             renderer.trailMaterial = mat;
             renderer.sortingOrder = SortOrderFlame;
-        }
-
-        // кэш материалов частиц (Н10 Слой 1, §3.6): прежде — new Material на
-        // КАЖДЫЙ Rebind, а слоты при Rebind сносятся и материал оставался
-        // в памяти без владельца. Один материал на шейдер корабля — слоты
-        // делят его (свойств никто не мутирует индивидуально); если Unity
-        // выгрузил материал (UnloadUnusedAssets без ссылок) — пересоздаём
-        private static readonly System.Collections.Generic.Dictionary<Shader, Material> particleMaterials =
-            new System.Collections.Generic.Dictionary<Shader, Material>();
-
-        // материал частиц: шейдер SpriteRenderer корабля (или Sprites/Default) +
-        // кружок-заглушка; Repeat нужен для тайлинга вдоль шлейфа (как в SpeedTrail)
-        private static Material MakeParticleMaterial(Transform spriteHost)
-        {
-            var src = spriteHost.GetComponent<SpriteRenderer>();
-            Shader shader = src != null && src.sharedMaterial != null
-                ? src.sharedMaterial.shader
-                : Shader.Find("Sprites/Default");
-            if (shader != null && particleMaterials.TryGetValue(shader, out Material cached) && cached != null)
-                return cached;
-            Texture2D tex = StubSprites.Circle(8).texture;
-            tex.wrapMode = TextureWrapMode.Repeat;
-            Material mat = new Material(shader) { mainTexture = tex };
-            if (shader != null)
-                particleMaterials[shader] = mat;
-            return mat;
         }
 
         // дефолтное пламя: белое-в-желту ядро → оранж/красный → дымный хвост;
@@ -438,7 +397,7 @@ namespace SpaceTaxi.Physics
             var color = ps.colorOverLifetime;
             color.enabled = true;
             color.color = new ParticleSystem.MinMaxGradient(
-                isMain ? MainFlameGradient() : RetroFlameGradient());
+                isMain ? EngineFlameArt.MainFlameGradient() : EngineFlameArt.RetroFlameGradient());
 
             // пламя: рождается узким у сопла, раздувается, хвост схлопывается
             var size = ps.sizeOverLifetime;
@@ -489,7 +448,7 @@ namespace SpaceTaxi.Physics
             var color = ps.colorOverLifetime;
             color.enabled = true;
             color.color = new ParticleSystem.MinMaxGradient(
-                isMain ? SparkGradient() : RetroSparkGradient());
+                isMain ? EngineFlameArt.SparkGradient() : EngineFlameArt.RetroSparkGradient());
 
             var size = ps.sizeOverLifetime;
             size.enabled = true;
@@ -525,108 +484,10 @@ namespace SpaceTaxi.Physics
             trails.sizeAffectsLifetime = false;
             trails.dieWithParticles = true;     // след умирает с частицей — без «каши»
             trails.inheritParticleColor = true; // цвет наследует пламя/искру
-            trails.colorOverTrail = new ParticleSystem.MinMaxGradient(TrailFadeGradient());
+            trails.colorOverTrail = new ParticleSystem.MinMaxGradient(EngineFlameArt.TrailFadeGradient());
             trails.minVertexDistance = TrailMinVertexDistance;
             trails.worldSpace = false;
             trails.textureMode = ParticleSystemTrailTextureMode.Tile; // тайлинг как в SpeedTrail
-        }
-
-        // главный: белое-в-желту ядро → оранж → красный → лёгкий дымный хвост
-        private static Gradient MainFlameGradient()
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(MainCore, 0f),
-                    new GradientColorKey(MainFire, 0.18f),
-                    new GradientColorKey(MainEmber, 0.45f),
-                    new GradientColorKey(MainSmoke, 0.75f),
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0.95f, 0.18f),
-                    new GradientAlphaKey(0.6f, 0.5f),
-                    new GradientAlphaKey(0.25f, 0.78f),
-                    new GradientAlphaKey(0f, 1f),
-                });
-            return g;
-        }
-
-        // ретро: холодный мятно-голубой, без дымного хвоста
-        private static Gradient RetroFlameGradient()
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(RetroCore, 0f),
-                    new GradientColorKey(RetroGlow, 0.3f),
-                    new GradientColorKey(RetroFade, 0.75f),
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0.7f, 0.4f),
-                    new GradientAlphaKey(0f, 1f),
-                });
-            return g;
-        }
-
-        private static Gradient SparkGradient()
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(SparkHot, 0f),
-                    new GradientColorKey(SparkFade, 0.6f),
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0.9f, 0.6f),
-                    new GradientAlphaKey(0f, 1f),
-                });
-            return g;
-        }
-
-        private static Gradient RetroSparkGradient()
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(SparkRetroHot, 0f),
-                    new GradientColorKey(SparkRetroFade, 0.6f),
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0.9f, 0.6f),
-                    new GradientAlphaKey(0f, 1f),
-                });
-            return g;
-        }
-
-        // след наследует цвет частицы, сам гасит только альфу вдоль длины
-        private static Gradient TrailFadeGradient()
-        {
-            var g = new Gradient();
-            g.SetKeys(
-                new[]
-                {
-                    new GradientColorKey(Color.white, 0f),
-                    new GradientColorKey(Color.white, 1f),
-                },
-                new[]
-                {
-                    new GradientAlphaKey(1f, 0f),
-                    new GradientAlphaKey(0.4f, 0.6f),
-                    new GradientAlphaKey(0f, 1f),
-                });
-            return g;
         }
     }
 }

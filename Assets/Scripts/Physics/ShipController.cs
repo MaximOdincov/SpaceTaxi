@@ -97,12 +97,7 @@ namespace SpaceTaxi.Physics
 
             if (ship.State != ShipState.Flying) // не в полёте — ввод гасим
             {
-                ThrustOn = false; // тяга выкл
-                BrakeOn = false; // тормоз выкл
-                StrafeLevel = 0f; // стрейф нулевой
-                InLandingRing = false; // вне колец
-                EnginePower = 1f; // базовая тяга
-                retroAttitude = false; // ориентация сброшена
+                SilenceControls();
                 return;
             }
 
@@ -110,6 +105,50 @@ namespace SpaceTaxi.Physics
             Vector2 pos = ship.transform.position; // позиция
             float dt = Time.fixedDeltaTime; // шаг физики
 
+            Planet planet; // ближайшая планета
+            float planetDist; // дистанция до неё
+            float v = ApplyGravityAndRings(ref velocity, pos, dt, out planet, out planetDist); // гравитация, качели, ближайшая планета
+
+            // Посадочный режим
+            float engMul = 1f; // базовый множитель тяги
+            if (planet != null && planetDist < planet.LandingRing) // внутри посадочного кольца
+                engMul = config.EngineMultiplier; // тяга усилена
+            InLandingRing = engMul > 1f; // признак кольца
+            EnginePower = engMul; // для эффектов/индикации
+
+            ReadEngines(dt, out bool thrustOn, out bool brakeOn, out float strafe); // двигатели + топливо
+
+            UpdateRetroAttitude(v, planet, planetDist, thrustOn, brakeOn); // вход/выход липкой ориентации
+
+            UpdateFuelLog(); // пороги — лог по одному разу
+
+            // Все ускорения — к вектору скорости
+            if (v > config.MinControlSpeed) // корабль движется
+                ApplyMovingControl(ref velocity, v, pos, dt, thrustOn, brakeOn, strafe, engMul); // разгон/тормоз/стрейф
+            else
+                ApplyStoppedControl(ref velocity, dt, thrustOn, strafe, engMul); // разворот на месте и толчок
+
+            ship.Body.linearVelocity = velocity; // записать итоговую скорость
+
+            UpdateHeading(velocity, v, planet, planetDist); // доворот носа
+        }
+
+        // не в полёте: индикацию гасим, «липкая» ориентация сброшена
+        private void SilenceControls()
+        {
+            ThrustOn = false; // тяга выкл
+            BrakeOn = false; // тормоз выкл
+            StrafeLevel = 0f; // стрейф нулевой
+            InLandingRing = false; // вне колец
+            EnginePower = 1f; // базовая тяга
+            retroAttitude = false; // ориентация сброшена
+        }
+
+        // гравитация от всех тел, качели в кольцах захвата и ближайшая планета;
+        // возвращает модуль скорости после гравитации/буста, velocity меняется на месте
+        private float ApplyGravityAndRings(ref Vector2 velocity, Vector2 pos, float dt,
+            out Planet planet, out float planetDist)
+        {
             // Гравитация от всех тел
             if (gravity != null) // реестр есть
                 velocity += gravity.GetAccelerationAt(pos, config) * dt; // добавить притяжение
@@ -117,8 +156,8 @@ namespace SpaceTaxi.Physics
             float v = velocity.magnitude; // модуль скорости
 
             // Качель + ближайшая планета
-            Planet planet = null; // ближайшая планета
-            float planetDist = float.MaxValue; // дистанция до неё
+            planet = null; // ближайшая планета
+            planetDist = float.MaxValue; // дистанция до неё
             if (gravity != null) // реестр есть
             {
                 foreach (CelestialBody body in gravity.Bodies) // по всем телам
@@ -151,16 +190,16 @@ namespace SpaceTaxi.Physics
                 }
             }
 
-            // Посадочный режим
-            float engMul = 1f; // базовый множитель тяги
-            if (planet != null && planetDist < planet.LandingRing) // внутри посадочного кольца
-                engMul = config.EngineMultiplier; // тяга усилена
-            InLandingRing = engMul > 1f; // признак кольца
-            EnginePower = engMul; // для эффектов/индикации
+            return v;
+        }
 
-            bool thrustOn = thrustAction != null && thrustAction.IsPressed(); // тяга нажата
-            bool brakeOn = brakeAction != null && brakeAction.IsPressed(); // тормоз нажат
-            float strafe = strafeAction != null ? strafeAction.ReadValue<float>() : 0f; // уровень стрейфа
+        // читаем действия ввода и списываем топливо за любую тягу;
+        // пустой бак или заглушенный борт — двигатели молчат
+        private void ReadEngines(float dt, out bool thrustOn, out bool brakeOn, out float strafe)
+        {
+            thrustOn = thrustAction != null && thrustAction.IsPressed(); // тяга нажата
+            brakeOn = brakeAction != null && brakeAction.IsPressed(); // тормоз нажат
+            strafe = strafeAction != null ? strafeAction.ReadValue<float>() : 0f; // уровень стрейфа
 
             // Топливо: расход на любую тягу, пустой бак — двигатели молчат
             if (thrustOn || brakeOn || Mathf.Abs(strafe) > 0f) // есть активные двигатели
@@ -182,8 +221,11 @@ namespace SpaceTaxi.Physics
             ThrustOn = thrustOn; // для эффектов
             BrakeOn = brakeOn;
             StrafeLevel = strafe;
+        }
 
-            // Вход/выход липкой ориентации
+        // Вход/выход липкой ориентации
+        private void UpdateRetroAttitude(float v, Planet planet, float planetDist, bool thrustOn, bool brakeOn)
+        {
             bool finalApproach = InLandingRing && planet != null // финальное сближение
                 && planetDist < planet.Radius + 40f && v < 50f; // близко и медленно
             if (retroAttitude) // уже в ретро-позиции
@@ -195,8 +237,11 @@ namespace SpaceTaxi.Physics
             {
                 retroAttitude = true; // встать двигателями к планете
             }
+        }
 
-            // Пороги — лог по одному разу
+        // Пороги — лог по одному разу
+        private void UpdateFuelLog()
+        {
             if (ship.Fuel > ship.Eff.FuelMax * 0.1f) // бак выше 10%
             {
                 lowFuelLogged = false; // сброс флагов лога
@@ -216,72 +261,69 @@ namespace SpaceTaxi.Physics
                 Debug.Log("[Fuel] бак пуст — двигатели не работают");
 #endif
             }
-
-            // Все ускорения — к вектору скорости
-            if (v > config.MinControlSpeed) // корабль движется
-            {
-                headingDir = velocity / v; // курс живёт, пока корабль движется
-                Vector2 dir = headingDir; // то же деление — без повторного
-                if (thrustOn && v < shipConfig.MaxV) // тяга до потолка скорости
-                    velocity += dir * (ship.Eff.Thrust * engMul * dt); // разгон по курсу
-                if (brakeOn) // торможение
-                {
-                    // Анти-ховер (Н4.11): тормоз каждый кадр занулял скорость
-                    // (retro·dt ≫ g·dt) — корабль реально висел в воздухе. Теперь
-                    // тормоз не может погасить гравитацию: у падающего корабля
-                    // (скорость по направлению гравитации) есть мин. скорость
-                    // падения = BrakeHoverFraction × локальная гравитация. В пустоте
-                    // пол нулевой — можно остановиться. Тормоз никогда не
-                    // разгоняет (nv зажат и сверху текущей v) — джиттера на пороге нет.
-                    Vector2 gravityNow = gravity != null // локальная гравитация
-                        ? gravity.GetAccelerationAt(pos, config)
-                        : Vector2.zero;
-                    float brakeFloor = gravityNow.magnitude > 0f // падаем по гравитации
-                        && Vector2.Dot(velocity, gravityNow) > 0f
-                        ? config.BrakeHoverFraction * gravityNow.magnitude // мин. скорость падения
-                        : 0f;
-                    float nv = Mathf.Clamp( // новая скорость торможения
-                        v - ship.Eff.Retro * engMul * dt, // гасим тормозом
-                        Mathf.Min(brakeFloor, v), // не ниже «пола» и не выше текущей
-                        v); // тормоз не разгоняет
-                    velocity *= nv / Mathf.Max(0.0001f, v); // нормировать к новой скорости
-                }
-                if (Mathf.Abs(strafe) > 0f) // боковая тяга
-                {
-                    Vector2 perp = new Vector2(dir.y, -dir.x); // перпендикуляр курсу
-                    float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad; // потолок угловой скорости
-                    float strafeAcc = Mathf.Min(ship.Eff.Strafe, v * maxTurn); // ускорение стрейфа
-                    velocity += perp * (strafe * strafeAcc * engMul * dt); // боковое ускорение
-                }
-            }
-            else
-            {
-                // остановившийся корабль: A/D — разворот на месте, SPACE — толчок
-                // по носу (старое поведение «кнопки мертвы до разгона»
-                // выглядело нелогично — жалоба плейтеста)
-                if (Mathf.Abs(strafe) > 0f) // разворот на месте
-                {
-                    float turn = -strafe * config.StrafeMaxTurnRate * Mathf.Deg2Rad * engMul * dt; // шаг поворота
-                    headingDir = new Vector2( // повернуть вектор курса
-                        headingDir.x * Mathf.Cos(turn) - headingDir.y * Mathf.Sin(turn), // поворот X
-                        headingDir.x * Mathf.Sin(turn) + headingDir.y * Mathf.Cos(turn)); // поворот Y
-                    float nose = Mathf.Atan2(headingDir.y, headingDir.x) * Mathf.Rad2Deg - spriteNoseAngle; // мировой угол носа
-                    float current = ship.Body.rotation; // текущий поворот
-                    float step = Mathf.Clamp( // шаг к цели с потолком скорости
-                        Mathf.DeltaAngle(current, nose) * config.HeadingTurnRate * dt,
-                        -config.HeadingMaxTurnSpeed * dt,
-                        config.HeadingMaxTurnSpeed * dt);
-                    ship.Body.MoveRotation(current + step); // повернуть тело
-                }
-                if (thrustOn) // толчок с места
-                    velocity = headingDir * (ship.Eff.Thrust * engMul * dt); // старт по курсу
-            }
-
-            ship.Body.linearVelocity = velocity; // записать итоговую скорость
-
-            UpdateHeading(velocity, v, planet, planetDist); // доворот носа
         }
 
+        // разгон по курсу, торможение с анти-ховером и боковая тяга
+        private void ApplyMovingControl(ref Vector2 velocity, float v, Vector2 pos, float dt,
+            bool thrustOn, bool brakeOn, float strafe, float engMul)
+        {
+            headingDir = velocity / v; // курс живёт, пока корабль движется
+            Vector2 dir = headingDir; // то же деление — без повторного
+            if (thrustOn && v < shipConfig.MaxV) // тяга до потолка скорости
+                velocity += dir * (ship.Eff.Thrust * engMul * dt); // разгон по курсу
+            if (brakeOn) // торможение
+            {
+                // Анти-ховер (Н4.11): тормоз каждый кадр занулял скорость
+                // (retro·dt ≫ g·dt) — корабль реально висел в воздухе. Теперь
+                // тормоз не может погасить гравитацию: у падающего корабля
+                // (скорость по направлению гравитации) есть мин. скорость
+                // падения = BrakeHoverFraction × локальная гравитация. В пустоте
+                // пол нулевой — можно остановиться. Тормоз никогда не
+                // разгоняет (nv зажат и сверху текущей v) — джиттера на пороге нет.
+                Vector2 gravityNow = gravity != null // локальная гравитация
+                    ? gravity.GetAccelerationAt(pos, config)
+                    : Vector2.zero;
+                float brakeFloor = gravityNow.magnitude > 0f // падаем по гравитации
+                    && Vector2.Dot(velocity, gravityNow) > 0f
+                    ? config.BrakeHoverFraction * gravityNow.magnitude // мин. скорость падения
+                    : 0f;
+                float nv = Mathf.Clamp( // новая скорость торможения
+                    v - ship.Eff.Retro * engMul * dt, // гасим тормозом
+                    Mathf.Min(brakeFloor, v), // не ниже «пола» и не выше текущей
+                    v); // тормоз не разгоняет
+                velocity *= nv / Mathf.Max(0.0001f, v); // нормировать к новой скорости
+            }
+            if (Mathf.Abs(strafe) > 0f) // боковая тяга
+            {
+                Vector2 perp = new Vector2(dir.y, -dir.x); // перпендикуляр курсу
+                float maxTurn = config.StrafeMaxTurnRate * Mathf.Deg2Rad; // потолок угловой скорости
+                float strafeAcc = Mathf.Min(ship.Eff.Strafe, v * maxTurn); // ускорение стрейфа
+                velocity += perp * (strafe * strafeAcc * engMul * dt); // боковое ускорение
+            }
+        }
+
+        // остановившийся корабль: A/D — разворот на месте, SPACE — толчок
+        // по носу (старое поведение «кнопки мертвы до разгона»
+        // выглядело нелогично — жалоба плейтеста)
+        private void ApplyStoppedControl(ref Vector2 velocity, float dt, bool thrustOn, float strafe, float engMul)
+        {
+            if (Mathf.Abs(strafe) > 0f) // разворот на месте
+            {
+                float turn = -strafe * config.StrafeMaxTurnRate * Mathf.Deg2Rad * engMul * dt; // шаг поворота
+                headingDir = new Vector2( // повернуть вектор курса
+                    headingDir.x * Mathf.Cos(turn) - headingDir.y * Mathf.Sin(turn), // поворот X
+                    headingDir.x * Mathf.Sin(turn) + headingDir.y * Mathf.Cos(turn)); // поворот Y
+                float nose = Mathf.Atan2(headingDir.y, headingDir.x) * Mathf.Rad2Deg - spriteNoseAngle; // мировой угол носа
+                float current = ship.Body.rotation; // текущий поворот
+                float step = Mathf.Clamp( // шаг к цели с потолком скорости
+                    Mathf.DeltaAngle(current, nose) * config.HeadingTurnRate * dt,
+                    -config.HeadingMaxTurnSpeed * dt,
+                    config.HeadingMaxTurnSpeed * dt);
+                ship.Body.MoveRotation(current + step); // повернуть тело
+            }
+            if (thrustOn) // толчок с места
+                velocity = headingDir * (ship.Eff.Thrust * engMul * dt); // старт по курсу
+        }
         // Нос: обычно по вектору скорости, на посадке — ретро или вертикально от планеты
         // взлёт: не разворачивать нос сразу — подъём «низом вперёд», как стоял
         public void HoldHeading(float seconds) // удержать ориентацию
