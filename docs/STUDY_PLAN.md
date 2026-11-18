@@ -153,3 +153,28 @@ Core/Physics/World); рядом держи открытые `docs/ARCHITECTURE.m
    куда идёт клик по листу? (TryScreenToSheet → проекция)
 8. Мёртвый код: как отличал настоящий от ложного? (references-0 → проверка UnityEvent в
    YAML сцен, интерфейсов EventSystem, serialized-полей ассетов, схемы сейва)
+
+### Карта папок после Н12 (учить по папкам = учить по ролям)
+```
+Assets/Scripts/
+├── Core/         GameSession (композиционный корень), SaveSystem, DebugCheats
+│   └── Art/      StubSprites/SpriteArt/WorldSprites — процедурная графика проекта
+├── Physics/      Ship, ShipController (FixedUpdate — диспетчер шагов), LandingSystem,
+│                 HullSystem, CameraFollow, EngineEffects + EngineFlameArt (палитра пламени)
+├── World/        LevelAsset, тела (Planet/Star/BlackHole), WorldBuilder
+├── Orders/       OrderService (поток заказов), PassengerTask (задания), Generator
+├── Economy/      Wallet/Debt/Pricing/Fleet/ShopStock/Repair — деньги
+├── Audio/        AudioManager (пул/лупы/кроссфейды) + HeatAudio/ShipAudio/SceneMusic
+├── UiKit/        ОТДЕЛЬНАЯ СБОРКА: UiTheme/Ui/UiBox — весь UI строится через неё
+└── UI/
+    ├── Hud/      HudBinder, MinimapBinder, WaypointIndicator (всегда активные приборы)
+    ├── Onboard/  борткомп: биндер + фабрика + панель
+    ├── Station/  станция: контроллер + 2 секции + StationUI
+    ├── Screens/  модалки (общий ModalScreenControllerBase + Pause/Dismissal/OrderComplete/Settings)
+    ├── Map/      карта: тонкий диспетчер + PaperMap/ (проекция/подписи/хром/кольца/аннотации)
+    ├── Menu/     главное меню
+    └── (корень)  UiFormat, ToastNotifier, SceneFlowButtons — сквозные
+```
+Вопрос-ответ на защите: «почему UiKit отдельно?» — «сборка без игровых зависимостей, экраны —
+декларативные спецификации; GameSession-asmdef ссылается на неё явно». «Почему Map/ отдельная
+папка?» — «карта — самый большой экран: диспетчер + 5 подсистем в PaperMap/».

@@ -57,3 +57,16 @@ WaypointChanged). Симметричная отписка в OnDestroy. Перв
   Урок: SpaceTaxi.Gameplay не видел PaperMapUi — asmdef одна, но using добавить.
 - Пакет C+D (методы-истории ShipController/ToastNotifier/Factory + EngineEffects-арт) —
   скриптер в работе. Пакет A (папки) — после скриптера, оркестратором.
+
+## Чекпоинт 5 — финал Н12 (~02:00, 19.11)
+
+- **Н12.5 пакет C**: методы-истории — ShipController.FixedUpdate 196→44 (диспетчер + 7 шагов),
+  ToastNotifier.Update 140→15 (5 фаз + BindDomainEvents), OnboardComputerFactory.Build 181→17
+  (9 построителей). Автосверка дословности на каждом шаге (скриптер).
+- **Н12.5 пакет D**: EngineEffects 632→493 + EngineFlameArt.cs 150 (палитра/материал/градиенты).
+- **Н12.6 пакет A**: папки UI/ → Hud/, Onboard/, Station/, Screens/, Map/(+PaperMap/), Core/Art/.
+  Переезды .cs+.meta парой, namespace не менялся. Приёмка: свежий старт 0 ошибок, все экраны
+  живы (борткомп/карта/станция — первый NRE станции был stale-сессией переезда).
+- Итог Н12: 9 коммитов; игра ПОЧИНЕНА (старт чистый); метка-автоснятие; чёткие пороги;
+  дедупы; методы-истории; папки. Остаток свага на будущее: пакет E (OrderService-трекер),
+  OnboardBinder-секции (стадия «карточки»), Editor/ подпапки.
