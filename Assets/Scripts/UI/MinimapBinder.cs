@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using TMPro;
 using UnityEngine;
+using SpaceTaxi.UI.PaperMap;
 using UnityEngine.UI;
 using SpaceTaxi.Core;
 using SpaceTaxi.Orders;
@@ -758,13 +759,11 @@ namespace SpaceTaxi.UI
             return StationNoTierColor; // тир 0 — сеть не задана, базовая жёлтая
         }
 
-        private static Color WithAlpha(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
+        private static Color WithAlpha(Color color, float alpha) => PaperMapUi.WithAlpha(color, alpha); // Н12.4
 
         private static string FormatDistance(float d)
         {
-            if (d < 1000f)
-                return ((int)d).ToString(CultureInfo.InvariantCulture);
-            return (d / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
+            return UiFormat.Distance(d); // Н12.4: единый формат в UiFormat
         }
 
         private static RectTransform MakeStretch(string name, RectTransform parent)

@@ -52,10 +52,10 @@ namespace SpaceTaxi.UI
         private const int SortingOrder = 100; // поверх HUD/паузы, ниже увольнения (200)
         private const int SegmentCount = 10;  // как в HUD
 
-        // цвета сегментов — как в HudBinder; используются и секцией
-        // улучшений (полоски уровней), поэтому internal
-        internal static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
-        internal static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
+        // цвета сегментов — палитра в HudPalette (Н12.4); используются
+        // и секцией улучшений (полоски уровней), поэтому internal
+        internal static readonly Color SegmentOn = HudPalette.SegmentOn;
+        internal static readonly Color SegmentOff = HudPalette.SegmentOff;
 
         private bool bound;
         private bool opened;

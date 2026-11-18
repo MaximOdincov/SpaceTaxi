@@ -41,9 +41,9 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private float currentAlpha = 1f;
 
-        // горящий/погашенный сегмент бака
-        private static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);
-        private static readonly Color SegmentOff = new Color(0.059f, 0.2f, 0.125f, 0.824f);
+        // горящий/погашенный сегмент бака — палитра в HudPalette (Н12.4)
+        private static readonly Color SegmentOn = HudPalette.SegmentOn;
+        private static readonly Color SegmentOff = HudPalette.SegmentOff;
         // безопасная/опасная скорость (жар звёзд красит стрелку)
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SpeedDanger = new Color(1f, 0.35f, 0.3f, 1f);

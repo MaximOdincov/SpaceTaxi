@@ -746,9 +746,7 @@ namespace SpaceTaxi.UI
 
         private static string FormatDistance(float d)
         {
-            if (d < 1000f)
-                return ((int)d).ToString();
-            return (d / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
+            return UiFormat.Distance(d); // Н12.4: единый формат в UiFormat
         }
 
         // пересчёт текста только при изменении дистанции на ≥10 — без аллокаций в кадр

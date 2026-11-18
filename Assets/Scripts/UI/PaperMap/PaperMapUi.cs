@@ -39,19 +39,8 @@ namespace SpaceTaxi.UI.PaperMap
             return rect;
         }
 
-        internal static int StableHash(string text)
-        {
-            unchecked
-            {
-                uint h = 2166136261u;
-                foreach (char c in text)
-                {
-                    h ^= c;
-                    h *= 16777619u;
-                }
-                return (int)h;
-            }
-        }
+        // Н12.4: один FNV-1a на проект — Economy.DeterministicHash
+        internal static int StableHash(string text) => SpaceTaxi.Economy.DeterministicHash.StableHash(text);
 
         internal static Rect CenteredRect(Vector2 center, Vector2 size)
         {

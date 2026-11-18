@@ -29,5 +29,14 @@ namespace SpaceTaxi.UI
             int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
             return total / 60 + ":" + (total % 60).ToString("00", CultureInfo.InvariantCulture);
         }
+
+        // Н12.4: дистанция «834 юн» / «2.1k юн» — прежде дублировалась в
+        // WaypointIndicator и MinimapBinder
+        public static string Distance(float юн)
+        {
+            if (юн < 1000f)
+                return ((int)юн).ToString(CultureInfo.InvariantCulture);
+            return (юн / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "k";
+        }
     }
 }
