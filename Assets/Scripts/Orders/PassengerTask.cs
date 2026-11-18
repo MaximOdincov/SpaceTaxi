@@ -164,7 +164,8 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.StarNearby,
-                        Text = $"Я вечный Холодрыга — весь год мёрз! Пролетим рядом со звездой {level.Bodies[star].DisplayName} — погреемся.",
+                        // Н12.3: дистанция успеха — прямо в тексте (= StarNearbyDistance)
+                        Text = $"Я вечный Холодрыга — весь год мёрз! Пролетим со звездой {level.Bodies[star].DisplayName} рядом: подлетите к ней ближе 400 юн.",
                         TargetBodyIndex = star,
                         DistanceThreshold = StarNearbyDistance,
                     };
@@ -172,7 +173,8 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoHeat,
-                        Text = "К звёздам не приближайтесь: жар меня пугает.",
+                        // Н12.3 (владелец: «пиши чёткое значение»): порог — прямо в тексте
+                        Text = "К звёздам не приближайтесь: жар меня пугает. Вошли в жар — замечание; два замечания — провал.",
                     };
                 case PassengerTaskKind.BeltAvoid:
                     return new PassengerTask
@@ -180,7 +182,8 @@ namespace SpaceTaxi.Orders
                         Kind = PassengerTaskKind.BeltAvoid,
                         // Н10.8 (аудит): замечание — ВХОД В ПОЛОСУ пояса (±BeltWidth от
                         // осевой), а не удар астероида; текст теперь про полосу
-                        Text = "Астероидные пояса меня пугают — пролетайте мимо, пожалуйста.",
+                        // Н12.3: порог эпизодов — прямо в тексте (HUD показывает «Замечаний: X/2»)
+                        Text = "Астероидные пояса меня пугают — пролетайте мимо. Вошли в пояс — замечание; два замечания — провал.",
                     };
                 case PassengerTaskKind.HoleFlyby:
                     return new PassengerTask

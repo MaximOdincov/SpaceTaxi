@@ -335,7 +335,13 @@ namespace SpaceTaxi.UI
             // пряталась совсем, и реплики пассажира не было видно нигде)
             PassengerTask task = offer.Task;
             bool hasTask = task != null && task.Kind != PassengerTaskKind.None;
-            string wishValue = hasTask ? task.Text : PassengerWish(offer);
+            // Н12.3: реплика без задания (пул мечт) помечается явно — игрок видит,
+            // что отслеживать тут нечего (у заданий есть чип статуса)
+            // Н12.3: реплика без задания (пул мечт) помечается явно — игрок видит,
+            // что отслеживать тут нечего (у заданий есть чип статуса). Один вызов
+            // PassengerWish: внутри случайный выбор — дважды звать нельзя
+            string wishRaw = hasTask ? null : PassengerWish(offer);
+            string wishValue = hasTask ? task.Text : (wishRaw != null ? wishRaw + " " + NoTaskMark() : null);
             var wishNode = card.Find("Expanded/Summary/Wish");
             if (wishNode != null)
                 wishNode.gameObject.SetActive(!string.IsNullOrEmpty(wishValue));
@@ -367,6 +373,13 @@ namespace SpaceTaxi.UI
             if (offer.Task != null && offer.Task.Kind != PassengerTaskKind.None)
                 return !string.IsNullOrEmpty(offer.Task.Text);
             return !string.IsNullOrEmpty(PassengerWish(offer));
+        }
+
+        // Н12.3: приглушённая пометка «без задания» для реплик-мечт (не путать
+        // с отслеживаемыми заданиями, у которых есть чип статуса)
+        private static string NoTaskMark()
+        {
+            return "<color=" + ColorHex(OnboardComputerFactory.LabelColor) + ">(без задания)</color>";
         }
 
         // реплика пожелания пассажира (пул Wishes) для строки без задания;
