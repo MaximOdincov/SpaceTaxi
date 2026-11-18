@@ -110,7 +110,12 @@ namespace SpaceTaxi.UI
                 .Background(new Color(0.031f, 0.078f, 0.047f, 0.92f)); // raycast off — как прежде
             var go = box.Go;
 
-            var group = go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
+            // Н12: CanvasGroup гарантируем отдельными стейтментами — «??» на
+            // Unity-ссылке ненадёжен (fake-null уничтоженного компонента не
+            // триггерит правую часть, и доступ ронял Awake на старте)
+            var group = go.GetComponent<CanvasGroup>();
+            if (group == null)
+                group = go.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
 
             var label = box.Label("", 22f, new Color(0.66f, 1f, 0.8f), null, "Text");
