@@ -40,3 +40,20 @@ WaypointChanged). Симметричная отписка в OnDestroy. Перв
   NoTaskMark(); один вызов PassengerWish — внутри случайный выбор). Урок: PickPhrase случаен,
   двойной вызов дал бы разные фразы.
 - Живая проверка: TASK-текст с порогом и FLAVOR-реплика в ленте (Temp/n12_texts.png).
+
+## Чекпоинт 4 — метка: правило в правильном месте (Н12.2b) + сваг
+
+- Первый вариант автоснятия в MapScreenBinder НЕ РАБОТАЛ по существу: биндер карты СПИТ
+  с закрытой картой (goActive=False, OnEnable не звался) — событие посадки пропадало.
+  Правило переезжает в ВСЕГДА-активный WaypointIndicator (Н12.2b): Bind() биндит
+  LandingSystem.ShipLanded → OnShipLanded: DisplayName совпал → binder.ClearWaypoint().
+  Приёмка: unit-прогон через reflection (позитив CLEARED / негатив kept) + игровой след
+  (маркер МТО снялся при пересадке на МТО). Урок: «владелец состояния» должен быть
+  жив всегда — UI-биндеры экранов спят вместе с экраном.
+- **Сваг-рекон** (unity-analyst): карта кандидатов упрощения (топ-15 + папочная структура).
+  Пакеты: A папки, B дедупы, C методы-истории, D секции, E трекер (опц.).
+- **Н12.4 пакет B**: UiFormat.Distance (FormatDistance ×2), WithAlpha последняя копия,
+  StableHash → DeterministicHash (один FNV-1a), HudPalette (сегменты ×2 файлов).
+  Урок: SpaceTaxi.Gameplay не видел PaperMapUi — asmdef одна, но using добавить.
+- Пакет C+D (методы-истории ShipController/ToastNotifier/Factory + EngineEffects-арт) —
+  скриптер в работе. Пакет A (папки) — после скриптера, оркестратором.
