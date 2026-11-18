@@ -1857,18 +1857,6 @@ namespace SpaceTaxi.UI
             return ann;
         }
 
-        // удалить последнюю аннотацию (кнопка окна)
-        public bool RemoveLastAnnotation()
-        {
-            var list = Style.annotations;
-            if (list.Count == 0)
-                return false;
-            list.RemoveAt(list.Count - 1);
-            PersistStyle();
-            if (built)
-                BuildAnnotations();
-            return true;
-        }
 
         // применить стиль, правленный в Map Style Editor: пересборка листа
         // (не построена — применится при следующем открытии карты)

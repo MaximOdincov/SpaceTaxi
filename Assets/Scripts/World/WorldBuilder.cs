@@ -223,13 +223,11 @@ namespace SpaceTaxi.World
             GameObject go; // объект корабля
             Ship ship; // модель
             ShipController controller; // контроллер
-            ShipAudio shipAudio; // аудио
             if (shipPrefab != null) // есть префаб
             {
                 go = Object.Instantiate(shipPrefab.gameObject); // инстанс префаба
                 ship = go.GetComponent<Ship>();
                 controller = go.GetComponent<ShipController>();
-                shipAudio = go.GetComponent<ShipAudio>();
             }
             else // кодовая сборка
             {
@@ -242,7 +240,7 @@ namespace SpaceTaxi.World
                 collider.radius = 4f; // стартовый радиус (заменит ShipModelVisual)
                 ship = go.AddComponent<Ship>(); // модель
                 controller = go.AddComponent<ShipController>(); // контроллер
-                shipAudio = go.AddComponent<ShipAudio>(); // аудио
+                go.AddComponent<ShipAudio>(); // аудио (лупы движка самодеятельны)
                 go.AddComponent<LandingSystem>(); // посадка
                 go.AddComponent<HeatAudio>(); // жар
                 go.AddComponent<TrajectoryPredictor>(); // прогноз
@@ -287,8 +285,7 @@ namespace SpaceTaxi.World
 
             if (controller != null) // контроллер есть
                 controller.SetInput(input); // передать ввод
-            if (shipAudio != null) // аудио есть
-                shipAudio.SetInput(input);
+
             var hull = go.GetComponent<HullSystem>(); // корпус
             if (hull != null) // из префаба
                 hull.Init(level);

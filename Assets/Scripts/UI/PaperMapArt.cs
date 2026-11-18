@@ -44,10 +44,6 @@ namespace SpaceTaxi.UI
             return LoadSingle("paper_sheet");
         }
 
-        public static Sprite Note()
-        {
-            return LoadSingle("paper_note");
-        }
 
         // Жёлтая бумага карты — фон владельца Art/background.png (Resources/Art).
         // null — фолбэк: ровный цвет Paper.
@@ -109,10 +105,6 @@ namespace SpaceTaxi.UI
             return GridCell("map_icons", IconGrid, IconGrid, cell);
         }
 
-        public static Sprite Stamp(int cell)
-        {
-            return GridCell("map_stamps", StampGridX, StampGridY, cell);
-        }
 
         // — процедурные карандашные спрайты (кэш в статике) —
         // Н5.21-5: пунктирные кольца-линии (орбиты, сеть, пояс, штриховка) убраны
@@ -124,127 +116,7 @@ namespace SpaceTaxi.UI
         return RingSprite("target", 256, 0.94f, 0.99f, 1f, 1f, 0.012f);
     }
 
-    // карандашный штрих пунктира маршрута: короткий, чуть толще к середине
-    public static Sprite RouteDash()
-    {
-        if (cache.TryGetValue("routedash", out Sprite s) && s != null)
-            return s;
-        var tex = StubSprites.CreateMaskTexture(64, (x, y) =>
-        {
-            float taper = 0.10f + 0.07f * (1f - Mathf.Abs(x)); // толще в середине штриха
-            return Mathf.Abs(x) < 0.84f && Mathf.Abs(y) < taper;
-        });
-        s = Sprite.Create(tex, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
-        cache["routedash"] = s;
-        return s;
-    }
 
-    // ————— процедурный карандаш: тела как будто обведены от руки —————
-    // сид (хэш имени) фиксирует дрожь руки: форма тела держится между открытиями.
-    // Вариантов немного (кэш по сиду % N) — текстуры не плодятся на каждый объект.
-
-    // планета: двойной неровный контур + штриховка-тень с одной стороны + 2-3 кратера-дуги
-    public static Sprite PlanetPencil(int seed)
-    {
-        return PencilSprite("planet", seed % 12, 192, dr =>
-        {
-            float p1 = (float)dr.NextDouble() * 6.283f;
-            float p2 = (float)dr.NextDouble() * 6.283f;
-            float p3 = (float)dr.NextDouble() * 6.283f;
-            float hatch = (float)dr.NextDouble() * 6.283f;
-            float hx = Mathf.Cos(hatch), hy = Mathf.Sin(hatch);
-            int craterCount = 2 + dr.Next(2); // 2..3 кратера
-            var craterX = new float[craterCount];
-            var craterY = new float[craterCount];
-            var craterR = new float[craterCount];
-            for (int i = 0; i < craterCount; i++)
-            {
-                float ang = (float)dr.NextDouble() * 6.283f;
-                float dist = 0.12f + (float)dr.NextDouble() * 0.30f;
-                craterX[i] = Mathf.Cos(ang) * dist;
-                craterY[i] = Mathf.Sin(ang) * dist;
-                craterR[i] = 0.10f + (float)dr.NextDouble() * 0.15f;
-            }
-            return (x, y) =>
-            {
-                float r = Mathf.Sqrt(x * x + y * y);
-                float a = Mathf.Atan2(y, x);
-                float w1 = 1f + 0.05f * Mathf.Sin(3f * a + p1) + 0.028f * Mathf.Sin(5f * a + p2);
-                float rr = r / w1;
-                if (Mathf.Abs(rr - 0.80f) < 0.030f)
-                    return true; // внешний контур
-                float w2 = 1f + 0.06f * Mathf.Sin(4f * a + p3) + 0.025f * Mathf.Sin(7f * a + p1);
-                float rr2 = r / w2;
-                if (Mathf.Abs(rr2 - 0.70f) < 0.020f)
-                    return true; // второй проход карандаша
-                if (rr2 < 0.70f && rr2 > 0.42f && x * hx + y * hy > 0.30f
-                    && Mathf.Repeat((x + y) * 5.5f + hatch, 1f) < 0.5f)
-                    return true; // штриховка-тень по краю
-                for (int i = 0; i < craterCount; i++)
-                {
-                    float dx = x - craterX[i], dy = y - craterY[i];
-                    if (rr2 < 0.74f && Mathf.Abs(Mathf.Sqrt(dx * dx + dy * dy) - craterR[i]) < 0.026f)
-                        return true; // кратер-дуга
-                }
-                return false;
-            };
-        });
-    }
-
-    // звезда: ядро с двойным контуром, штриховкой и короткими неровными лучами
-    public static Sprite StarSketch(int seed)
-    {
-        return PencilSprite("star", seed % 8, 192, dr =>
-        {
-            float p1 = (float)dr.NextDouble() * 6.283f;
-            float p2 = (float)dr.NextDouble() * 6.283f;
-            float hatch = (float)dr.NextDouble() * 6.283f;
-            float hx = Mathf.Cos(hatch), hy = Mathf.Sin(hatch);
-            int rayCount = 7 + dr.Next(3);
-            float rayPhaseDeg = (float)dr.NextDouble() * 360f;
-            return (x, y) =>
-            {
-                float r = Mathf.Sqrt(x * x + y * y);
-                float a = Mathf.Atan2(y, x);
-                float w = 1f + 0.06f * Mathf.Sin(4f * a + p1) + 0.03f * Mathf.Sin(6f * a + p2);
-                float rr = r / w;
-                if (Mathf.Abs(rr - 0.52f) < 0.032f || Mathf.Abs(rr - 0.43f) < 0.020f)
-                    return true; // двойной контур ядра
-                if (rr < 0.43f && rr > 0.16f && x * hx + y * hy > 0.05f
-                    && Mathf.Repeat((x + y) * 6f + hatch, 1f) < 0.45f)
-                    return true; // штриховка ядра
-                if (r < 0.60f || r > 0.96f)
-                    return false;
-                float deg = a * Mathf.Rad2Deg;
-                float taper = 1f - (r - 0.60f) / 0.36f; // лучь уже к кончику
-                for (int k = 0; k < rayCount; k++)
-                {
-                    float ak = k * 360f / rayCount + rayPhaseDeg + 4f * Mathf.Sin(r * 11f + k);
-                    if (Mathf.Abs(Mathf.DeltaAngle(deg, ak)) < (0.06f + 0.05f * taper) * Mathf.Rad2Deg)
-                        return true;
-                }
-                return false;
-            };
-        });
-    }
-
-    // чёрная дыра: сплошное рваное пятно + внешний контур — «прожжённая» дырка
-    public static Sprite HoleSketch(int seed)
-    {
-        return PencilSprite("hole", seed % 6, 160, dr =>
-        {
-            float p1 = (float)dr.NextDouble() * 6.283f;
-            float p2 = (float)dr.NextDouble() * 6.283f;
-            return (x, y) =>
-            {
-                float r = Mathf.Sqrt(x * x + y * y);
-                float a = Mathf.Atan2(y, x);
-                float w = 1f + 0.05f * Mathf.Sin(3f * a + p1) + 0.03f * Mathf.Sin(5f * a + p2);
-                float rr = r / w;
-                return rr < 0.62f || Mathf.Abs(rr - 0.72f) < 0.024f;
-            };
-        });
-    }
 
     // комета: кружок-голова с двойным контуром + штриховой хвост (голова смотрит вправо — по курсу)
     public static Sprite CometIcon()
@@ -272,19 +144,6 @@ namespace SpaceTaxi.UI
         });
         s = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f);
         cache["comet"] = s;
-        return s;
-    }
-
-    // карандашные спрайты: пейнтер получает сид-рандом и возвращает маску пикселей
-    private static Sprite PencilSprite(string kind, int variant, int size,
-        System.Func<System.Random, System.Func<float, float, bool>> painter)
-    {
-        string key = kind + ":" + variant;
-        if (cache.TryGetValue(key, out Sprite s) && s != null)
-            return s;
-        var tex = StubSprites.CreateMaskTexture(size, painter(new System.Random(variant * 7349 + kind.Length * 131)));
-        s = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size);
-        cache[key] = s;
         return s;
     }
 
@@ -388,25 +247,6 @@ namespace SpaceTaxi.UI
             return Mathf.Clamp01(0.75f + 0.25f * n);
         }
 
-        // карандашная рамка (кнопки/записка): прозрачная середина, рваный контур
-        public static Sprite InkFrame()
-        {
-            if (cache.TryGetValue("inkframe", out Sprite s) && s != null)
-                return s;
-            var tex = StubSprites.CreateMaskTexture(128, (x, y) =>
-            {
-                float d = Mathf.Max(Mathf.Abs(x), Mathf.Abs(y));
-                float wob = 0.015f * Mathf.Sin(Mathf.Atan2(y, x) * 5f + 2f)
-                          + 0.01f * Mathf.Sin(9f * x + 3f * y);
-                d += wob;
-                return d >= 0.86f && d <= 0.96f;
-            });
-            // border задаётся только при создании (Sprite.border — read only)
-            s = Sprite.Create(tex, new Rect(0f, 0f, 128f, 128f), new Vector2(0.5f, 0.5f), 128f,
-                0, SpriteMeshType.FullRect, new Vector4(16f, 16f, 16f, 16f)); // 9-slice: 16+16 < высота кнопки 40
-            cache["inkframe"] = s;
-            return s;
-        }
 
         // — внутреннее —
         // (курсор-pointer убран: Н6.K8 — курсор системный всегда)

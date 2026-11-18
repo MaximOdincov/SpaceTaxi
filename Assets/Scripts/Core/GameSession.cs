@@ -35,8 +35,6 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
         public InputActionAsset Input => input;
         // каталог пассажиров: восстановление пассажира активного заказа из сейва (П10.1)
         public PassengerCatalog Passengers => passengerCatalog;
-        // текущий корабль теперь живёт в парке; поле сцены currentShip не читается
-        public ShipConfig CurrentShip => Fleet.Current;
 
         private bool accidentRegistered; // один инцидент = один долг
         private bool passengerAboardAtLoss; // пассажир был на борту при потере корабля (Н7 Q7.5)

@@ -350,7 +350,6 @@ namespace SpaceTaxi.Audio
 
         public SoundId CurrentTrack => currentMusic;
 
-        public bool MusicPaused => musicPaused;
 
         // треки для плеера: группа Music, но эмбиент — подложка SceneMusic,
         // не трек; записи без клипов в плейлист не попадают
@@ -385,22 +384,6 @@ namespace SpaceTaxi.Audio
 
         private int stationClipIndex;
 
-        public int CurrentStation
-        {
-            get
-            {
-                int index = System.Array.IndexOf(Stations, currentMusic);
-                return index >= 0 ? index : 0;
-            }
-        }
-
-        // станция по индексу (с ним нет вызовов — путь через PlayMusic/ВОЛНА)
-        public void PlayStation(int index)
-        {
-            if (Stations.Length == 0)
-                return;
-            PlayMusic(Stations[((index % Stations.Length) + Stations.Length) % Stations.Length]);
-        }
 
         // Н10.7: первая станция с клипами от target по кругу (dir ±1), включая
         // сам target. Все пусты — None (вызывающий остаётся на текущей): ВОЛНА
@@ -457,20 +440,6 @@ namespace SpaceTaxi.Audio
             MusicStateChanged?.Invoke();
         }
 
-        // ▶/⏸ плеера: mute музыкальных каналов — кроссфейд и timeScale не трогаем;
-        // при тишине запуск плейлиста вместо бессмысленного переключения mute
-        public void ToggleMusicPause()
-        {
-            if (currentMusic == SoundId.None)
-            {
-                PlayPlaylistNext(1);
-                return;
-            }
-            musicPaused = !musicPaused;
-            musicA.mute = musicPaused;
-            musicB.mute = musicPaused;
-            MusicStateChanged?.Invoke();
-        }
 
         // доля проигранного трека для прогресс-бара (0..1)
         public float MusicProgress

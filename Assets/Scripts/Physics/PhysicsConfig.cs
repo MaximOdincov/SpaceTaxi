@@ -77,12 +77,6 @@ namespace SpaceTaxi.Physics
             return GravityParamK * body.Radius * body.Mass * fieldScale; // K × радиус × масса
         }
 
-        public float OrbitRingOf(CelestialBody body) // кольцо захвата тела
-        {
-            return body.Radius * CaptureRingK + CaptureRingBase; // формула кольца
-        }
-
-        public static float CircularVelocity(float g, float d) => Mathf.Sqrt(g / d); // круговая скорость
 
         public static float EscapeVelocity(float g, float d) => Mathf.Sqrt(2f * g / d); // скорость убегания
     }

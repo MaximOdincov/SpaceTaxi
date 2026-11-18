@@ -26,9 +26,6 @@ namespace SpaceTaxi.Audio
         private float lastHp = -1f;
         private bool serviceHpGain;
 
-        // ввод читается через ShipController (ThrustOn/BrakeOn/StrafeLevel) —
-        // свой биндинг не нужен, метод оставлен для WorldBuilder
-        public void SetInput(InputActionAsset asset) { }
 
         private void Awake()
         {

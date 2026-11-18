@@ -11,12 +11,6 @@ namespace SpaceTaxi.Economy
     {
         public const int PackCount = 3; // мелкий / средний / полный
 
-        // максимальный индекс пакета, который станция тира вообще берётся делать
-        public static int MaxPackIndex(int tier)
-        {
-            int t = tier <= 0 ? PricingConfig.BaseRepairTier : tier;
-            return Mathf.Clamp(t, 1, PackCount) - 1;
-        }
 
         // --- Круг тиров кораблей, который берёт мастерская (С4): бедная (T1)
         // обслуживает корабли тиров 1–2, средняя (T2) — 1–3, лучшие (T3+) —

@@ -30,18 +30,6 @@ namespace SpaceTaxi.Orders
         [Tooltip("Заказ провален")]
         public string[] Complaints;
 
-        public string PickName()
-        {
-            return Names != null && Names.Length > 0
-                ? Names[UnityEngine.Random.Range(0, Names.Length)]
-                : null;
-        }
 
-        public string PickSurname()
-        {
-            return Surnames != null && Surnames.Length > 0
-                ? Surnames[UnityEngine.Random.Range(0, Surnames.Length)]
-                : null;
-        }
     }
 }

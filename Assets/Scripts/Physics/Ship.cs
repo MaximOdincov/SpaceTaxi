@@ -176,12 +176,6 @@ namespace SpaceTaxi.Physics
             spriteRenderer.sprite = sprite != null ? sprite : StubSprites.ShipTriangle(); // арт или треугольник
         }
 
-        // применить визуал текущей модели (WorldBuilder после Init)
-        public void ApplyModelVisual() // построить визуал после сборки
-        {
-            if (ShipConfig != null) // модель назначена
-                ApplyModelSprite(ShipConfig);
-        }
 
         private void RecomputeEff() // пересчёт эффективных статов
         {
