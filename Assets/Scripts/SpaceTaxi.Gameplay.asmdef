@@ -3,7 +3,9 @@
     "rootNamespace": "SpaceTaxi",
     "references": [
         "Unity.InputSystem",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "SpaceTaxi.UiKit",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

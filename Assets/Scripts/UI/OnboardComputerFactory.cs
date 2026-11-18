@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UiKit;
 using UnityEngine.UI;
 using SpaceTaxi.Audio;
 
@@ -256,23 +257,14 @@ namespace SpaceTaxi.UI
 
         private static GameObject Section(Transform parent, string title, string name)
         {
-            var section = new GameObject(name, typeof(RectTransform));
-            section.transform.SetParent(parent, false);
-            var layout = section.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            var section = Ui.Column(parent.transform, name, 4f); // Н11: UiKit
 
             var heading = Text(section, title, 21f, LabelColor, "Heading");
             // 28, не 26: строка 21pt ≈ 27.7 — Ellipsis при меньшей высоте
             // обрезает заголовок до нуля видимых символов
             FixedHeight(heading.gameObject, 28f);
-            var line = new GameObject("Line", typeof(RectTransform), typeof(Image));
-            line.transform.SetParent(section.transform, false);
-            line.GetComponent<Image>().color = new Color(LabelColor.r, LabelColor.g, LabelColor.b, 0.4f);
-            FixedHeight(line, 2f);
+            var line = Ui.Image(section.transform, null, UiTheme.Divider, "Line"); // Н11: UiKit
+            FixedHeight(line.gameObject, 2f);
             return section;
         }
 
@@ -496,59 +488,27 @@ namespace SpaceTaxi.UI
 
         public static void Stretch(RectTransform rect)
         {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            Ui.Stretch(rect); // Н11: UiKit
         }
 
         // --- Общие помощники ---
 
         public static GameObject H(string name, Transform parent)
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var layout = go.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = true;
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            return go;
+            return Ui.Row(parent, name); // Н11: примитив в UiKit
         }
 
         // зелёная рамка по контуру узла (карточка/аватар) — UI.Outline, цвет лейблов
         public static void Frame(GameObject go, float thickness = 2f)
         {
-            var outline = go.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = LabelColor;
-            outline.effectDistance = new Vector2(thickness, -thickness);
+            Ui.Frame(go, LabelColor, thickness); // Н11: UiKit
         }
 
         // рамка прямоугольником из 4 тонких полосок — для узлов с прозрачной
         // картинкой: UI.Outline продублировал бы сам портрет 4 раза со смещением
         public static void RectBorder(GameObject go, float thickness = 2f, Color? color = null)
         {
-            var parent = (RectTransform)go.transform;
-            Color frameColor = color ?? LabelColor;
-            void Bar(string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
-            {
-                var bar = new GameObject(name, typeof(RectTransform), typeof(Image));
-                bar.transform.SetParent(parent, false);
-                var img = bar.GetComponent<Image>();
-                img.color = frameColor;
-                img.raycastTarget = false;
-                var rt = (RectTransform)bar.transform;
-                rt.anchorMin = anchorMin;
-                rt.anchorMax = anchorMax;
-                rt.offsetMin = offsetMin;
-                rt.offsetMax = offsetMax;
-            }
-            Bar("BorderTop", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -thickness), new Vector2(0f, 0f));
-            Bar("BorderBottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, thickness));
-            Bar("BorderLeft", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(thickness, 0f));
-            Bar("BorderRight", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-thickness, 0f), new Vector2(0f, 0f));
+            Ui.RectBorder(go, color ?? LabelColor, thickness); // Н11: UiKit
         }
 
         // элемент шапки, прижатый к левому/правому краю строки; вне лейаута.
@@ -566,7 +526,7 @@ namespace SpaceTaxi.UI
             rect.pivot = new Vector2(edge, 0.5f);
             rect.sizeDelta = new Vector2(240f, 48f);
             rect.anchoredPosition = new Vector2(isLeft ? 12f : -12f, 0f);
-            Le(rect.gameObject).ignoreLayout = true;
+            Ui.IgnoreLayout(rect.gameObject); // Н11: UiKit
         }
 
         // деньги: ровно по центру ширины панели, независимо от соседних текстов
@@ -577,7 +537,7 @@ namespace SpaceTaxi.UI
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(260f, 48f);
             rect.anchoredPosition = Vector2.zero;
-            Le(rect.gameObject).ignoreLayout = true;
+            Ui.IgnoreLayout(rect.gameObject); // Н11: UiKit
         }
 
         // однолинейный текст с обрезкой «…»: базовая политика панели.
@@ -586,40 +546,16 @@ namespace SpaceTaxi.UI
         // 23pt ≈ 30.4), иначе текст «есть, но невидим» (ноль видимых символов)
         public static TMP_Text Text(GameObject parent, string content, float size, Color color, string name = "Text")
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent.transform, false);
-            var text = go.GetComponent<TextMeshProUGUI>();
-            text.font = currentFont != null ? currentFont : TMP_Settings.defaultFontAsset;
-            text.fontSize = size;
-            text.color = color;
-            text.text = content;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.raycastTarget = false;
-            return text;
+            return Ui.Label(parent.transform, content, size, color, currentFont, name); // Н11: примитив в UiKit
         }
 
         public static GameObject Button(Transform parent, string label, Color background, Color textColor, float size,
             string name = null, bool framed = true)
         {
-            var go = new GameObject(name ?? label, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
-            var bg = go.GetComponent<Image>();
-            bg.color = background;
-            // рамка и светлый верх — силуэт кнопки читается сразу; мелким тогглам не нужна
-            if (framed)
-            {
-                var outline = go.AddComponent<UnityEngine.UI.Outline>();
-                outline.effectColor = new Color(0.55f, 0.85f, 0.7f, 0.55f);
-                outline.effectDistance = new Vector2(2f, -2f);
-            }
-            var text = Text(go, label, size, textColor);
-            Stretch(text.rectTransform);
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = true;
+            var button = Ui.Button(parent, label, background, textColor, size, currentFont, name, framed); // Н11: UiKit
             // хук первым — щелчок звучит до обработчиков, добавленных вызывателем
-            UiSfx.Hook(go.GetComponent<Button>());
-            return go;
+            UiSfx.Hook(button);
+            return button.gameObject;
         }
 
         // кнопки плеера: без масштабирования при нажатии — только цветовой отклик
@@ -637,7 +573,7 @@ namespace SpaceTaxi.UI
             return button;
         }
 
-        // get-or-add: один LayoutElement на узел (Flexible + Fixed* поверх него)
+        // Н11: размеры/лейаут-элемент — в UiKit (Fixed*/Flexible/IgnoreLayout)
         private static LayoutElement Le(GameObject go)
         {
             var le = go.GetComponent<LayoutElement>();
@@ -646,34 +582,22 @@ namespace SpaceTaxi.UI
 
         public static void FixedSize(GameObject go, float width, float height)
         {
-            var le = Le(go);
-            le.minWidth = width;
-            le.minHeight = height;
-            le.preferredWidth = width;
-            le.preferredHeight = height;
-            le.flexibleWidth = 0f;
-            le.flexibleHeight = 0f;
+            Ui.FixedSize(go, width, height);
         }
 
         public static void FixedHeight(GameObject go, float height)
         {
-            var le = Le(go);
-            le.minHeight = height;
-            le.preferredHeight = height;
-            le.flexibleHeight = 0f;
+            Ui.FixedHeight(go, height);
         }
 
         public static void FixedWidth(GameObject go, float width)
         {
-            var le = Le(go);
-            le.minWidth = width;
-            le.preferredWidth = width;
-            le.flexibleWidth = 0f;
+            Ui.FixedWidth(go, width);
         }
 
         public static void Flexible(GameObject go)
         {
-            Le(go).flexibleWidth = 1f;
+            Ui.Flexible(go);
         }
     }
 }
