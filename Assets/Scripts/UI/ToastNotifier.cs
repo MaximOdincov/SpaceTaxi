@@ -104,23 +104,17 @@ namespace SpaceTaxi.UI
         // вид тоста из пула или новый (CanvasGroup для фейда)
         private ToastView CreateView()
         {
-            var go = new GameObject("Toast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
-            go.transform.SetParent(transform, false);
+            // Н11: сборка через UiKit — «панель с фоном + текст», рутина в тулките
+            var box = UiKit.UiBox.Box(transform, "Toast")
+                .Size(NormalSize.x, NormalSize.y)
+                .Background(new Color(0.031f, 0.078f, 0.047f, 0.92f)); // raycast off — как прежде
+            var go = box.Go;
 
-            var image = go.GetComponent<Image>();
-            image.color = new Color(0.031f, 0.078f, 0.047f, 0.92f);
-            image.raycastTarget = false;
-
-            var group = go.GetComponent<CanvasGroup>();
+            var group = go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
 
-            var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textGo.transform.SetParent(go.transform, false);
-            var label = textGo.GetComponent<TextMeshProUGUI>();
-            label.fontSize = 22f;
-            label.color = new Color(0.66f, 1f, 0.8f);
+            var label = box.Label("", 22f, new Color(0.66f, 1f, 0.8f), null, "Text");
             label.alignment = TextAlignmentOptions.Center;
-            label.raycastTarget = false;
             var labelRect = label.rectTransform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
@@ -132,8 +126,7 @@ namespace SpaceTaxi.UI
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = NormalSize;
-
+            rect.sizeDelta = NormalSize; // абсолютный размер: тост вне лейаута (Н11)
             // вью ждёт в пуле невидимым — иначе три плашки висят на экране
             // с первого кадра сцены до первого прогона через цикл фейда
             go.SetActive(false);

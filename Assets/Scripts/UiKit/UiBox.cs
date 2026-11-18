@@ -74,11 +74,22 @@ namespace UiKit
             return this;
         }
 
-        public UiBox Background(Color color, Sprite sprite = null)
+        // фон панели: по умолчанию raycast off (декор); под кнопки/клики — raycast: true
+        public UiBox Background(Color color, Sprite sprite = null, bool raycast = false)
         {
             var img = Go.GetComponent<Image>() ?? Go.AddComponent<Image>();
             img.sprite = sprite;
             img.color = color;
+            img.raycastTarget = raycast;
+            return this;
+        }
+
+        // абсолютный размер свободного узла (вне лейаута): sizeDelta напрямую.
+        // Size/FixedHeight работают только под LayoutGroup — у свободного узла
+        // LayoutElement никто не читает
+        public UiBox Absolute(float width, float height)
+        {
+            Rect.sizeDelta = new Vector2(width, height);
             return this;
         }
 
