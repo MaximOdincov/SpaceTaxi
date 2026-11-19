@@ -25,7 +25,7 @@ namespace SpaceTaxi.UI
     public sealed class StationUpgradesSection
     {
         // подпись счётчика аварий (§3.2: увольнение после третьей непогашенной)
-        private const int MaxUnpaidAccidents = 3;
+
 
         // шаблоны описания прибавки ОДНОГО уровня: проценты считаются из
         // UpgradeConfig (максимум / 3, шкала линейная) — числа не дублируются
@@ -298,7 +298,7 @@ namespace SpaceTaxi.UI
             debtSection.SetActive(balance > 0);
             if (balance <= 0)
                 return;
-            debtLine.text = $"Долг: {UiFormat.Currency} {UiFormat.FormatCredits(balance)} · Аварий: {host.Session.Debt.UnpaidAccidents}/{MaxUnpaidAccidents}";
+            debtLine.text = $"Долг: {UiFormat.Currency} {UiFormat.FormatCredits(balance)}"; // Н13.1: счётчик аварий удалён
             repayLabel.text = $"ПОГАСИТЬ ДОСРОЧНО ({UiFormat.Currency} {UiFormat.FormatCredits(balance)})";
             repayButton.interactable = host.Session.Wallet.Credits >= balance;
         }

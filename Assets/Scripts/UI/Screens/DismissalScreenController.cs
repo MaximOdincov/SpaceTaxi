@@ -8,7 +8,7 @@ using SpaceTaxi.Economy;
 
 namespace SpaceTaxi.UI
 {
-    // Экран увольнения (проигрыш): 3 аварии с непогашенными долгами или долг
+    // Экран увольнения (проигрыш, Н13.1): долг свыше порога — аварии только добавляют долг
     // свыше порога (Н7 Q7.8). Показ по DebtService.Dismissal: timeScale = 0
     // (как пауза), панель поверх всего, кнопка «В МЕНЮ» сбрасывает забег
     // (сейвов нет, инвалидацию добавит П10.2). Контроллера в каркасах сцен нет —
@@ -19,7 +19,7 @@ namespace SpaceTaxi.UI
         private const int SortingOrder = 200; // поверх всех канвасов сцены
 
         private bool bound;
-        private TMP_Text reasonText; // причина увольнения — по триггеру (долг/аварии)
+        private TMP_Text reasonText; // причина увольнения — по триггеру (долг)
         private DebtService debt;
 
 
@@ -54,11 +54,11 @@ namespace SpaceTaxi.UI
             Sound.Play(SoundId.DismissalTone); // П9.3: тон увольнения до глушения экранов
 
             EnsureScreen();
-            // причина по триггеру: долг свыше порога или счётчик аварий (§3.2)
+            // причина по триггеру: долг свыше порога (Н13.1: аварии — только долг)
             if (reasonText != null)
                 reasonText.text = debt.IsOverDismissalThreshold
                     ? $"МТО расторгает договор.\nДолг {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} превысил допустимые {UiFormat.Currency} {UiFormat.FormatCredits(debt.DismissalDebtThreshold)}."
-                    : "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.";
+                    : "МТО расторгает договор.\nДолги не возвращены.";
             ActivateModal(); // Н10.13: timeScale — в базе («как пауза: до выхода в меню мир не живёт»)
 
             // терминальное состояние: пауза/карта/борткомп больше не управляются,
@@ -127,12 +127,12 @@ namespace SpaceTaxi.UI
             var title = OnboardComputerFactory.Text(content, "УВОЛЕН", 64f, OnboardComputerFactory.DangerColor, "Title");
             title.alignment = TextAlignmentOptions.Center;
             var reason = OnboardComputerFactory.Text(content,
-                "МТО расторгает договор.\nДолги не возвращены, аварий слишком много.",
+                "МТО расторгает договор.\nДолги не возвращены.",
                 26f, OnboardComputerFactory.BrightColor, "Reason");
             reason.alignment = TextAlignmentOptions.Center;
             reasonText = reason; // текст причины подменяется при показе (Н7 Q7.8)
             var stats = OnboardComputerFactory.Text(content,
-                $"Непогашенный долг: {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} · аварий: {debt.UnpaidAccidents}",
+                $"Непогашенный долг: {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)}",
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 

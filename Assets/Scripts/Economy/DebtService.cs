@@ -12,20 +12,18 @@ namespace SpaceTaxi.Economy
     {
         // 16_BETA_PLAN §3.1: разбил арендный корабль — долг +400 Đ
         private const int AccidentDebt = 400;
-        // §3.2: три аварии с непогашенными долгами — увольнение
-        public const int DismissalAfterAccidents = 3; // публичный: SaveSystem читает тот же порог (Н10.11)
+
         // Н7 Q7.8: долг свыше порога — тоже увольнение. Число живёт в
         // PricingConfig (DebtDismissalThreshold, GameSession конфигурирует
         // при старте) — здесь только дефолт плана, пока конфигурации не было
         private const int DefaultDismissalDebtThreshold = 2000;
 
         private int balance;
-        private int unpaidAccidents;
+
         private int dismissalDebtThreshold = DefaultDismissalDebtThreshold;
 
         public int Balance => balance;
 
-        public int UnpaidAccidents => unpaidAccidents;
 
         // порог долга, после которого забег терминален (конфигурируется из PricingConfig)
         public int DismissalDebtThreshold => dismissalDebtThreshold;
@@ -51,10 +49,12 @@ namespace SpaceTaxi.Economy
         }
 
         // долг за потерю арендного корабля; «арендный ли» решает вызывающий
+        // Н13.1 (владелец: «проигрываешь только, когда долг больше определённой
+        // суммы — независимо от аварий»): авария — просто +400 Đ долга;
+        // счётчик аварий и правило «3 аварии = увольнение» удалены
         public void RegisterAccident()
         {
             balance += AccidentDebt;
-            unpaidAccidents++;
             NotifyBalanceChanged();
             AccidentRegistered?.Invoke(AccidentDebt); // после DebtChanged: UI обновится раньше тоста
         }
@@ -78,8 +78,6 @@ namespace SpaceTaxi.Economy
                 return;
             balance -= Math.Min(amount, balance);
             DebtChanged?.Invoke(balance);
-            if (balance == 0)
-                unpaidAccidents = 0;
         }
 
         // единая точка после роста баланса: событие + проверка увольнения
@@ -88,20 +86,19 @@ namespace SpaceTaxi.Economy
         private void NotifyBalanceChanged()
         {
             DebtChanged?.Invoke(balance);
-            if (balance > dismissalDebtThreshold || unpaidAccidents >= DismissalAfterAccidents)
+            if (balance > dismissalDebtThreshold) // Н13.1: единственное условие увольнения
                 Dismissal?.Invoke();
         }
 
-        // восстановление из сейва (П10.1): баланс и счётчик аварий целиком.
-        // Dismissal на загрузке не файрим: терминальное состояние (3 аварии)
+        // восстановление из сейва (П10.1): только баланс (Н13.1: счётчик аварий
+        // удалён). Dismissal на загрузке не файрим: терминальное состояние
         // сейвом не сохраняется — Save его пропускает
-        public void Restore(int restoredBalance, int restoredAccidents)
+        public void Restore(int restoredBalance)
         {
             int clamped = Math.Max(0, restoredBalance);
-            if (clamped == balance && Math.Max(0, restoredAccidents) == unpaidAccidents)
+            if (clamped == balance)
                 return; // как Wallet.Restore: без события — иначе ложный тон долга при загрузке
             balance = clamped;
-            unpaidAccidents = Math.Max(0, restoredAccidents);
             DebtChanged?.Invoke(balance);
         }
     }

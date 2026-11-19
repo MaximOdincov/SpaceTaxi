@@ -37,7 +37,7 @@ namespace SpaceTaxi.Core
             public string LevelName; // имя уровня (сейв чужого уровня не грузится)
             public int Credits; // кредиты кошелька
             public int DebtBalance; // сумма долга
-            public int UnpaidAccidents; // непогашенные аварии аренды
+
             public float Rating; // рейтинг таксиста
             public int Deliveries; // счётчик доставок
             public int Failures; // счётчик провалов
@@ -105,7 +105,7 @@ namespace SpaceTaxi.Core
                 || session.Debt == null || session.Rating == null // сервисы не готовы
                 || session.Fleet == null || session.Ship == null // корабля нет
                 || session.Orders == null // заказы не готовы
-                || session.Debt.UnpaidAccidents >= DebtService.DismissalAfterAccidents // порог — DebtService (Н10.11); увольнение — терминальное состояние
+
                 // окно респавна: корабль мёртв на месте гибели — не сохраняем,
                 // иначе continue поднимет его и Abandon списал бы свой корабль
                 || session.Ship.State == ShipState.Respawning // в окне респавна
@@ -119,7 +119,7 @@ namespace SpaceTaxi.Core
                 LevelName = session.Level.LevelName, // имя уровня
                 Credits = session.Wallet.Credits, // кредиты
                 DebtBalance = session.Debt.Balance, // долг
-                UnpaidAccidents = session.Debt.UnpaidAccidents, // аварии
+
                 Rating = session.Rating.Value, // рейтинг
                 Deliveries = session.Orders.Deliveries, // доставки
                 Failures = session.Orders.Failures, // провалы
@@ -320,7 +320,7 @@ namespace SpaceTaxi.Core
                 return;
 
             session.Wallet?.Restore(data.Credits); // кредиты
-            session.Debt?.Restore(data.DebtBalance, data.UnpaidAccidents); // долг и аварии
+            session.Debt?.Restore(data.DebtBalance); // долг (Н13.1: без счётчика аварий)
             session.Rating?.Restore(data.Rating); // рейтинг
             session.Orders?.RestoreCounters(data.Deliveries, data.Failures); // счётчики заказов
 
