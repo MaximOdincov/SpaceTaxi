@@ -81,7 +81,6 @@ namespace SpaceTaxi.UI
         // метка (waypoint) — зелёная, единый цвет с маркером в мире (Н-8/G-15)
         private static readonly Color TargetColor = OnboardComputerFactory.TaxiColor;
         private static readonly Color WaypointColor = WaypointIndicator.WaypointGreen;
-        // корабль — самый яркий маркер прибора
         private static readonly Color ShipColor = new Color(0.93f, 1f, 0.96f);          // корабль — самый яркий маркер прибора
         // предупреждение о комете
         private static readonly Color CometWarnColor = new Color(1f, 0.42f, 0.36f);
@@ -162,7 +161,7 @@ namespace SpaceTaxi.UI
         // — процедурные спрайты прибора (UI рисует по sizeDelta, PPU не важен) —
         private static Sprite thickRingSprite;   // кольцо потолще: цель, станции, дыра
         private static Sprite diamondSprite;     // waypoint-метка
-            private static Sprite sweepWideSprite;   // развёртка: широкий тусклый сектор
+        private static Sprite sweepWideSprite;   // развёртка: широкий тусклый сектор
         private static Sprite sweepNarrowSprite; // развёртка: узкий яркий сектор
         private static Sprite shipIconSprite;    // иконка игрока (G-15)
 
@@ -202,7 +201,6 @@ namespace SpaceTaxi.UI
 
         // ————— привязка (лениво, как у остальных биндеров) —————
 
-        // ленивый бинд сессии (стиль биндеров)
         private bool TryBind()
         {
             if (session == null)
@@ -312,7 +310,7 @@ namespace SpaceTaxi.UI
             cometDots.Clear();
         }
 
-        // сборка прибора: панель, сетка, слои маркеров (кодом, сцена не правится)
+        // сборка прибора: панель, сетка, слои маркеров
         private void Build(float diameter)
         {
             float radius = diameter * 0.5f;

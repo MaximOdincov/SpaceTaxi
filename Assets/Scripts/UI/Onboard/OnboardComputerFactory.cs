@@ -76,18 +76,18 @@ namespace SpaceTaxi.UI
 
         public static OnboardRefs Build(Transform panel, bool destroyImmediate = false, TMP_FontAsset fontOverride = null)
         {
-            ResolveFont(panel, fontOverride); // шрифт: override → старый мокап-титул → дефолт TMP
-            ClearOldContent(panel, destroyImmediate); // старое содержимое сносим (кроме рамки и фона)
-            var root = BuildRootStack(panel); // вертикальная стопка секций
+            ResolveFont(panel, fontOverride);
+            ClearOldContent(panel, destroyImmediate);
+            var root = BuildRootStack(panel);
 
             var refs = new OnboardRefs { Font = currentFont };
 
-            BuildHeader(root.transform, refs); // СОСТОЯНИЕ: часы · деньги · рейтинг
-            BuildDebtRow(root.transform, refs); // строка долга с кнопкой гашения
-            BuildActiveSection(root.transform, refs); // АКТИВНЫЙ ЗАКАЗ
-            BuildIncomingScroll(root.transform, refs); // ВХОДЯЩИЕ ЗАКАЗЫ
-            BuildRadio(root.transform, refs); // ЭФИР
-            BuildAbandonButton(root.transform, refs); // ОТКЛЮЧИТЬ КОРАБЛЬ
+            BuildHeader(root.transform, refs);
+            BuildDebtRow(root.transform, refs);
+            BuildActiveSection(root.transform, refs);
+            BuildIncomingScroll(root.transform, refs);
+            BuildRadio(root.transform, refs);
+            BuildAbandonButton(root.transform, refs);
 
             return refs;
         }
@@ -174,7 +174,7 @@ namespace SpaceTaxi.UI
             // как в PlayerRow: текст забирает всё лишнее, кнопка строго своя
             debtRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
             refs.DebtValue = Text(debtRow, "Текущий долг: Đ 0", 22f, DebtCalmColor, "DebtValue");
-            Flexible(refs.DebtValue.gameObject); // текст забирает остаток ширины строки
+            Flexible(refs.DebtValue.gameObject);
             // сумма на кнопке ставит биндер: min(долг, кошелёк) — списывает
             // сколько есть, остаток остаётся долгом; без денег гаснет (С4)
             var debtRepay = Button(debtRow.transform, "ПОГАСИТЬ · Đ 0", ButtonColor, BrightColor, 16f, "DebtRepayButton");

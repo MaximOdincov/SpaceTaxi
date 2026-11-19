@@ -45,7 +45,7 @@ namespace SpaceTaxi.UI
         private GameSession session;
         private OrderService orders;
         private MapScreenBinder binder;
-        private LandingSystem landing; // Н12.2b: посадка снимает метку // Н12.2b: посадка снимает метку
+        private LandingSystem landing; // Н12.2b: посадка снимает метку
         private GravityField gravity;
         private Ship ship;
         private TMP_FontAsset font;
@@ -126,7 +126,6 @@ namespace SpaceTaxi.UI
             UpdateWaypointHalo();
         }
 
-        // гасим подписки и свои корневые объекты
         private void OnDestroy()
         {
             // маркер и канвас — корневые объекты, живут только с компонентом
@@ -186,7 +185,6 @@ namespace SpaceTaxi.UI
             return true;
         }
 
-        // смена вейпоинта (кнопка «следить»/клик по карте) — метка переразмещается
         // Н12.2b: прилетели на помеченную планету — метка снимается сама
         // (как у цели заказа: довёз — и цель погасла)
         private void OnShipLanded(Planet planet)
@@ -552,7 +550,7 @@ namespace SpaceTaxi.UI
                 distLabel.text = distText;
         }
 
-        // оверлей-канвас стрелок строится один раз (ScreenSpace, соринг 30)
+        // оверлей-канвас стрелок строится один раз
         private void EnsureArrowUi()
         {
             if (arrowCanvas != null)
@@ -583,7 +581,6 @@ namespace SpaceTaxi.UI
         // при нечитаемой текстуре — StubSprites.
         private static Sprite chevronSprite;
 
-        // спрайт шеврона: один источник с фолбэками (см. комментарий внутри)
         public static Sprite ChevronSprite()
         {
             if (chevronSprite != null)
@@ -649,7 +646,7 @@ namespace SpaceTaxi.UI
             tip.sizeDelta = new Vector2(56f, 56f);
             tip.anchoredPosition = new Vector2(0f, 12f);
             Image tipImage = tipGo.GetComponent<Image>();
-            Sprite chevron = ChevronSprite(); // иконка Шеврон.png из Art/icons (v5.1)
+            Sprite chevron = ChevronSprite();
             tipImage.sprite = chevron != null ? chevron : StubSprites.TargetChevron();
             tipImage.preserveAspect = true; // спрайт не сплющивается в квадрат tip'а
             tipImage.color = color;
