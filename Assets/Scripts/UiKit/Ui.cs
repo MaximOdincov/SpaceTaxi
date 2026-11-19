@@ -117,6 +117,64 @@ namespace UiKit
             return img;
         }
 
+        // --- слайдер (Н13.6): трек + Fill + Handle; геометрия тулкита —
+        // игровые экраны не подгоняют внутренние rect'ы ---
+        public static Slider Slider(Transform parent, string name, Color track, Color fill, Color handleColor)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Slider));
+            go.transform.SetParent(parent, false);
+            var slider = go.GetComponent<UnityEngine.UI.Slider>();
+            slider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+
+            var trackImg = Child(go.transform, "Background", track);
+            var trackRect = (RectTransform)trackImg.transform;
+            trackRect.anchorMin = new Vector2(0f, 0.25f);
+            trackRect.anchorMax = new Vector2(1f, 0.75f);
+
+            var fillArea = new GameObject("Fill Area", typeof(RectTransform));
+            fillArea.transform.SetParent(go.transform, false);
+            var fillRect = (RectTransform)fillArea.transform;
+            fillRect.anchorMin = new Vector2(0f, 0.25f);
+            fillRect.anchorMax = new Vector2(1f, 0.75f);
+            fillRect.pivot = new Vector2(0.5f, 0.5f);
+            fillRect.offsetMin = new Vector2(-5f, 0f);
+            fillRect.offsetMax = new Vector2(-20f, 0f);
+            var fillImg = Child(fillArea.transform, "Fill", fill);
+            var fillInner = (RectTransform)fillImg.transform;
+            fillInner.anchorMin = Vector2.zero;
+            fillInner.anchorMax = new Vector2(0.8f, 1f);
+
+            var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+            handleArea.transform.SetParent(go.transform, false);
+            var handleAreaRect = (RectTransform)handleArea.transform;
+            handleAreaRect.anchorMin = Vector2.zero;
+            handleAreaRect.anchorMax = Vector2.one;
+            handleAreaRect.offsetMin = new Vector2(10f, 0f);
+            handleAreaRect.offsetMax = new Vector2(-10f, 0f);
+            var handleImg = Child(handleArea.transform, "Handle", handleColor);
+            var handleRect = (RectTransform)handleImg.transform;
+            handleRect.anchorMin = new Vector2(0.5f, 0f);
+            handleRect.anchorMax = new Vector2(0.5f, 1f);
+            handleRect.sizeDelta = new Vector2(10f, 0f);
+
+            slider.fillRect = fillImg.rectTransform;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handleImg;
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            return slider;
+        }
+
+        // одноразовый ребёнок-картинка (внутри слайдера)
+        private static Image Child(Transform parent, string name, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var img = go.GetComponent<Image>();
+            img.color = color;
+            return img;
+        }
+
         // --- размеры в лейаутах (один LayoutElement на узел) ---
 
         private static LayoutElement Le(GameObject go)

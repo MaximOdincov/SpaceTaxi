@@ -19,6 +19,9 @@ namespace UiKit
         public GameObject Go { get; }
         public RectTransform Rect { get; }
 
+        // TMP-текст узла, если он текстовый (LabelBox) — для правки alignment и т.п.
+        public TMP_Text Text => Go != null ? Go.GetComponent<TMP_Text>() : null;
+
         private UiBox(GameObject go)
         {
             Go = go;
@@ -141,6 +144,12 @@ namespace UiKit
 
         // --- дети: примитивы возвращают их GameObject (для ссылок на TMP/Button) ---
 
+        // цепляемая версия: бокс текстового узла (FixedHeight/Flexible и т.д.)
+        public UiBox LabelBox(string text, float size, Color color, TMP_FontAsset font = null, string name = "Text")
+        {
+            return Wrap(Ui.Label(Rect, text, size, color, font, name).gameObject);
+        }
+
         public TMP_Text Label(string text, float size, Color color, TMP_FontAsset font = null, string name = "Text")
         {
             return Ui.Label(Rect, text, size, color, font, name);
@@ -153,6 +162,12 @@ namespace UiKit
             if (onClick != null)
                 button.onClick.AddListener(onClick);
             return button;
+        }
+
+        // слайдер-ряд: примитив Ui.Slider внутри бокса (Н13.6 — настройки)
+        public Slider SliderBox(string name, Color track, Color fill, Color handleColor)
+        {
+            return Ui.Slider(Rect, name, track, fill, handleColor);
         }
 
         public Image Image(Sprite sprite, Color color, string name = "Image")
