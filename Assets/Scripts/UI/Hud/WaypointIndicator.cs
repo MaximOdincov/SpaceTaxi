@@ -495,12 +495,16 @@ namespace SpaceTaxi.UI
             float sf = arrowCanvas != null ? arrowCanvas.scaleFactor : 1f;
             float halfW = Screen.width / Mathf.Max(sf, 0.001f) * 0.5f;
             float halfH = Screen.height / Mathf.Max(sf, 0.001f) * 0.5f;
+            // Н13.5: при открытом борткомпе «левый край» = правый край его колонны —
+            // стрелки скользят по границе панели, не заходя на неё
+            bool onboardShown = OnboardShown();
+            float leftEdge = onboardShown ? -halfW + OnboardColumnUnits() : -halfW;
             float zoneBottom = halfH - CornerZoneHeight;
-            float limitL = -halfW + CornerZoneWidth + 2f; // упор верхнего края слева от зоны
+            float limitL = leftEdge + CornerZoneWidth + 2f; // упор верхнего края слева от зоны
             float limitR = halfW - CornerZoneWidth - 2f;  // справа
             float onEdge = 1.5f; // допуск «прижата к краю» (canvas units)
             bool top = canvasPos.y >= halfH - onEdge;
-            bool left = canvasPos.x <= -halfW + onEdge;
+            bool left = canvasPos.x <= leftEdge + onEdge;
             bool right = canvasPos.x >= halfW - onEdge;
             if (top)
             {
@@ -512,12 +516,14 @@ namespace SpaceTaxi.UI
             }
             if (left || right)
             {
-                if (canvasPos.y > zoneBottom - 2f)
+                if (onboardShown && left)
+                    canvasPos.x = leftEdge + 2f; // у колонны борткомпа — стрелка правее панели
+                else if (canvasPos.y > zoneBottom - 2f)
                     canvasPos.y = zoneBottom - 2f;
                 return canvasPos;
             }
             // строго внутри левой/правой зоны: ближайшая свободная граница
-            bool inLeft = canvasPos.x <= -halfW + CornerZoneWidth && canvasPos.y >= zoneBottom;
+            bool inLeft = canvasPos.x <= leftEdge + CornerZoneWidth && canvasPos.y >= zoneBottom;
             bool inRight = canvasPos.x >= halfW - CornerZoneWidth && canvasPos.y >= zoneBottom;
             if (!inLeft && !inRight)
                 return canvasPos;
@@ -729,14 +735,30 @@ namespace SpaceTaxi.UI
 
         private bool IsAnyPanelOpen()
         {
+            // Н13.5 (владелец: «чеврон не показывает, пока стоишь на планете»):
+            // борткомп — левая колонна, стрелки уходят правее её края (зона в
+            // ClampOutsideCorners) и продолжают работать; гасят стрелки только
+            // полноэкранные панели: карта/станция/пауза
             if (mapController == null) mapController = FindAnyObjectByType<MapScreenController>();
-            if (onboard == null) onboard = FindAnyObjectByType<OnboardComputerPanel>();
             if (station == null) station = FindAnyObjectByType<StationScreenController>();
             if (pause == null) pause = FindAnyObjectByType<PauseScreenController>();
             return (mapController != null && mapController.IsOpened)
-                || (onboard != null && onboard.IsShown)
                 || (station != null && station.IsOpened)
                 || (pause != null && pause.IsPaused);
+        }
+
+        // Н13.5: борткомп открыт? (для лево-колонной зоны клампа)
+        private bool OnboardShown()
+        {
+            if (onboard == null) onboard = FindAnyObjectByType<OnboardComputerPanel>();
+            return onboard != null && onboard.IsShown;
+        }
+
+        // ширина колонны борткомпа в canvas units (замер панели; фолбэк 480)
+        private float OnboardColumnUnits()
+        {
+            var rt = onboard != null ? onboard.transform as RectTransform : null;
+            return rt != null && rt.rect.width > 100f ? rt.rect.width : 480f;
         }
 
         private Vector2 ShipPos()

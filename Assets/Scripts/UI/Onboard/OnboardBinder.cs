@@ -97,7 +97,6 @@ namespace SpaceTaxi.UI
         public const float HurryWarnSeconds = 60f;
         private const float ProgressRowHeight = 26f; // высота строк сводки (17pt + запас)
         // §3.2: увольнение после третьей непогашенной аварии (как в StationScreenController)
-        private const int MaxUnpaidAccidents = 3;
 
         private void Awake()
         {

@@ -42,6 +42,8 @@ namespace SpaceTaxi.Physics
         // покоя, мгновенный телепорт давал подпрыгивание — тело замораживается,
         // поза доводится плавно (A5)
         private Coroutine landingPinch;
+        // Н13.4: минимальный зазор капсулы до планеты после дожима (без подпрыгивания)
+        private const float LandGap = 0.05f;
         private RigidbodyConstraints2D savedConstraints;
 
         private void FixedUpdate()
@@ -243,7 +245,25 @@ namespace SpaceTaxi.Physics
                 ShipPlacement.TeleportLanded(ship, Vector2.Lerp(fromPos, toPos, k), Mathf.LerpAngle(fromAngle, toAngle, k));
             }
             if (ship != null && ship.Body != null)
+            {
+                // Н13.4 (владелец: «приземляется чуть ниже, чем надо, а потом резко
+                // подпрыгивает»): поза дожима оставляла капсулу пересекающей планету —
+                // возврат физики выталкивал её видимым прыжком. До возврата солверу
+                // разводим коллайдеры на гарантированный зазор
+                var capsule = ship.GetComponent<Collider2D>();
+                var planetCol = planet.GetComponent<Collider2D>();
+                if (capsule != null && planetCol != null)
+                {
+                    var d = Physics2D.Distance(capsule, planetCol);
+                    if (d.distance < LandGap)
+                    {
+                        Vector2 push = ((Vector2)ship.transform.position - (Vector2)planet.transform.position).normalized * (LandGap - d.distance);
+                        ship.Body.position += push; // и тело, и transform — иначе кадр интерполяции
+                        ship.transform.position += (Vector3)push;
+                    }
+                }
                 ship.Body.constraints = savedConstraints;
+            }
             landingPinch = null;
         }
 
