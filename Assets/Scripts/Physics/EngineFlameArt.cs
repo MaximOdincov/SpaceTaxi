@@ -13,7 +13,7 @@ namespace SpaceTaxi.Physics
         private static readonly Color MainFire = new Color(1f, 0.62f, 0.2f);
         private static readonly Color MainEmber = new Color(0.95f, 0.32f, 0.1f);
         private static readonly Color MainSmoke = new Color(0.5f, 0.38f, 0.34f);
-        // ретро — мятно-голубой «пых»
+        // ретро — мятно-голубой «пых», без дымного хвоста
         private static readonly Color RetroCore = new Color(0.85f, 1f, 0.92f);
         private static readonly Color RetroGlow = new Color(0.5f, 0.9f, 1f);
         private static readonly Color RetroFade = new Color(0.3f, 0.62f, 0.85f);
@@ -49,7 +49,6 @@ namespace SpaceTaxi.Physics
             return mat;
         }
 
-        // главный: белое-в-желту ядро → оранж → красный → лёгкий дымный хвост
         internal static Gradient MainFlameGradient()
         {
             var g = new Gradient();
@@ -72,7 +71,6 @@ namespace SpaceTaxi.Physics
             return g;
         }
 
-        // ретро: холодный мятно-голубой, без дымного хвоста
         internal static Gradient RetroFlameGradient()
         {
             var g = new Gradient();
