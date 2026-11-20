@@ -26,13 +26,13 @@ namespace SpaceTaxi.Economy
                 return false;
             Credits -= amount;
             CreditsChanged?.Invoke(Credits);
-            // звон монет на любое успешное списание (Н6/Z): заправка, ремонт,
+            // звон монет на любое успешное списание: заправка, ремонт,
             // покупка, улучшение, штраф за отмену — точка одна, здесь
             Sound.Play(SoundId.MoneySpend);
             return true;
         }
 
-        // восстановление из сейва (П10.1): прямой присёт баланса — Add только
+        // восстановление из сейва: прямой присёт баланса — Add только
         // плюсует, TrySpend не умеет ставить произвольное значение
         public void Restore(int credits)
         {

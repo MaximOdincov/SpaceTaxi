@@ -8,22 +8,17 @@ using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.UI
 {
-    // Бортовой компьютер: панель на автоматических layout-группах. Каркас всегда
-    // строится фабрикой (в рантайме — поверх старого мокапа префаба: Frame и
-    // Background сохраняются, остальное сносится), живые данные — по ссылкам
-    // из OnboardRefs и событиям систем. Входящие карточки раскрываются IN PLACE
-    // (анимация высоты обёртки Detail), активный заказ живёт в закреплённой
-    // секции и всегда детальный. Политика переполнения: тексты не меняют высоту
-    // узлов, всё лишнее обрезается «…» на стороне фабрики.
-    // Секции класса — partial-файлы рядом: карточки заказов — OnboardBinder.Cards.cs,
-    // деньги/рейтинг/долг/чип статуса/строка выполнения — OnboardBinder.Stats.cs,
-    // плеер «ЭФИР» — OnboardBinder.Radio.cs.
+    // Бортовой компьютер: каркас строит OnboardComputerFactory (в Awake),
+    // живые данные — по ссылкам OnboardRefs и событиям систем. Входящие
+    // карточки раскрываются на месте (анимация высоты), активный заказ —
+    // всегда детальный. Класс разбит на partial-файлы: карточки заказов —
+    // OnboardBinder.Cards.cs, деньги/рейтинг/долг — OnboardBinder.Stats.cs,
+    // плеер «ЭФИР» — OnboardBinder.Radio.cs
     public partial class OnboardBinder : MonoBehaviour
     {
         private TMP_Text clock;
-        // символ валюты проекта и глиф часов (есть не в каждом атласе — проверка при бинде)
+        // глиф часов есть не в каждом атласе — проверяем при бинде
         private bool clockGlyph;
-        // Н10.9: «Đ»/FormatCredits/FormatClock переехали в UiFormat (Слой 1)
         [Tooltip("Единый шрифт панели: применяется ко всем текстам каркаса и карточек. Пусто — шрифт часов старого каркаса")]
         [SerializeField] private TMP_FontAsset panelFont;
         private Ship ship;
@@ -39,18 +34,17 @@ namespace SpaceTaxi.UI
         private void Awake()
         {
             ApplyPanelFont();
-            // каркас всегда кодом: и для старых сцен, и поверх мокапа префаба
+            // каркас всегда строится кодом
             BindRefs(OnboardComputerFactory.Build(transform, fontOverride: panelFont));
             SetupMusicPlayer();
         }
 
         private void OnDestroy()
         {
-            // AudioManager переживает сцену — иначе событие пришло бы в разрушенный биндер
+            // AudioManager и события сессии переживают сцену — отписываемся,
+            // иначе события придут в разрушенный биндер (NRE)
             if (musicBound && audioManager != null)
                 audioManager.MusicStateChanged -= RefreshMusicPlayer;
-            // симметричная отписка от всего, на что подписались при бинде
-            // (события в разрушенный биндер = NRE, проект уже ломался на этом)
             if (wallet != null)
                 wallet.CreditsChanged -= ShowCredits;
             if (debt != null)
@@ -64,8 +58,7 @@ namespace SpaceTaxi.UI
                 rating.RatingChanged -= ShowRating;
         }
 
-        // шрифт панели: panelFont или шрифт часов стоящего каркаса — старого
-        // (префаб) или нового (после редакторной перестройки)
+        // шрифт: panelFont или шрифт часов стоящего каркаса
         private void ApplyPanelFont()
         {
             if (panelFont == null)
@@ -85,12 +78,10 @@ namespace SpaceTaxi.UI
             ratingValue = refs.RatingValue;
             debtRow = refs.DebtRow;
             debtValue = refs.DebtValue;
-            // клик-хук при бинде каркаса (как плеер «ЭФИР»): сумма/доступность
-            // читаются в момент клика, когда wallet/debt уже привязаны
+            // сумма/доступность читаются в момент клика, когда wallet/debt уже привязаны
             debtRepayButton = refs.DebtRepayButton;
             if (debtRepayButton != null)
-                debtRepayButton.onClick.AddListener(RepayDebtNow);
-            activeSection = refs.ActiveSection;
+                debtRepayButton.onClick.AddListener(RepayDebtNow);            activeSection = refs.ActiveSection;
             activeArea = refs.ActiveArea;
             orderArea = refs.OrderArea;
             abandonButton = refs.AbandonButton;
@@ -149,15 +140,15 @@ namespace SpaceTaxi.UI
                 }
                 orders.OffersChanged += RefreshOrder;
                 orders.ActiveOrderChanged += RefreshOrder;
-                // слот рейтинга (§3.7): живёт событием, первичный показ при бинде
+                // рейтинг: первичный показ при бинде, дальше — событием
                 if (session.Rating != null)
                 {
                     rating = session.Rating;
                     rating.RatingChanged += ShowRating;
                     ShowRating(rating.Value);
                 }
-                // «ОТКЛЮЧИТЬ КОРАБЛЬ»: сразу штатный пайплайн потери (HullSystem →
-                // респавн, DebtService.RegisterAccident за аренду, Fleet.NotifyShipLost)
+                // «ОТКЛЮЧИТЬ КОРАБЛЬ»: клик запускает штатный пайплайн потери
+                // (HullSystem → респавн, долг за аренду, смена корабля)
                 if (abandonButton != null && hull != null)
                     abandonButton.onClick.AddListener(() => hull.Abandon("ОТКЛЮЧЁН ОПЕРАТОРОМ"));
                 RefreshOrder();
@@ -178,7 +169,7 @@ namespace SpaceTaxi.UI
 
             if (debt != null)
                 RefreshDebt(debt.Balance); // страховка от пропущенного события
-            // прогресс трека плеера (П9.3): доля clip position/length, опрос в SlowUpdate
+            // прогресс трека: опрос в SlowUpdate
             if (progressFill != null && audioManager != null)
                 progressFill.anchorMax = new Vector2(audioManager.MusicProgress, 1f);
 

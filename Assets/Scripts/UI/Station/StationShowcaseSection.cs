@@ -5,17 +5,16 @@ using UnityEngine.UI;
 using SpaceTaxi.Audio;
 using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
+using UiKit;
 
 namespace SpaceTaxi.UI
 {
-    // --- Н-3а: витрина магазина — одна модель на экране, листание,
-    // ротация покрасок, покупка показанного варианта (шаг 7c: вынесена из
-    // StationScreenController как есть; Refresh — по RefreshShop контроллера,
-    // ротация слота — UpdateRotation из его Update) ---
+    // Витрина магазина: одна модель на экране, листание стрелками, выбор
+    // покраски свотчами; Refresh дергает контроллер, ротацию слота отслеживает
+    // UpdateRotation из его Update
     public sealed class StationShowcaseSection
     {
-        // витрина (C2): слева таблица статов с риской текущего значения, справа
-        // большая модель в выбранной расцветке; S3 — модель крупнее (+20-30%)
+        // слева статы с риской текущего значения, справа большая модель
         private const float ShowcaseSpriteW = 310f;
         private const float ShowcaseSpriteH = 260f;
         private const int StatCount = 6; // Thrust, MaxV, FuelMax, HpMax, Retro, StrafeAcc
@@ -26,14 +25,11 @@ namespace SpaceTaxi.UI
         // зазор между подписью/значением и полоской стата (воздух 8-10)
         private const float StatBarGap = 8f;
         private const float StatRowHeight = 24f; // строка 17pt ≈ 22.4 — правило 1.32
-        // свотчи расцветок (S3: крупнее, своей строкой на всю колонку):
-        // 38px — 9 штук влезает в колонку 434px, при большем числе — 32px
+        // свотчи: 38px, при числе больше 9 — 32px
         private const float SwatchSize = 38f;
         private const float SwatchSizeSmall = 32f;
 
-        // подписи статов витрины (C2); ВСЕ статы «больше = лучше»: тормозной
-        // путь переименован в «Мощность торможения» (поле Retro, больше =
-        // лучше). Индексы совпадают со StatValue/CurrentStatValue
+        // все статы «больше = лучше»; индексы совпадают со StatValue/CurrentStatValue
         private static readonly string[] StatLabels =
         {
             "Тяга", "Макс. скорость", "Бак", "Прочность", "Мощность торможения", "Манёвренность",
@@ -43,9 +39,8 @@ namespace SpaceTaxi.UI
 
         private GameObject shopWindow;    // витрина магазина — только вкладка МАГАЗИН
 
-        // витрина (Н-3а): каталог из Resources сортируется по цене один раз,
-        // листается стрелками; показанный вариант покраски ротирует
-        // ShopStockService (раз в 2 игровых часа) — витрина меняется сама
+        // каталог из Resources сортируется по цене один раз; показанный вариант
+        // покраски ротирует ShopStockService раз в 2 игровых часа
         private ShipConfig[] shipCatalog;
         private int showcaseIndex;
         private int showcasePaintIndex; // покраска на витрине сейчас: 0 = заводская, 1..N — PaintVariants
@@ -54,10 +49,9 @@ namespace SpaceTaxi.UI
         private Image showcaseSprite;
         private TMP_Text showcaseName;
         private TMP_Text showcasePaint;
-        // C2: таблица 6 статов — полоска модели + риска текущего значения +
-        // подкрашенный отрезок разницы
+        // таблица 6 статов: полоска модели + риска текущего значения + отрезок разницы
         private ShowStatRowRefs[] showcaseStatRows;
-        private TMP_Text showcaseState;    // «ВАШ · СЕЙЧАС АКТИВЕН» / «В АРЕНДЕ …» — вместо бейджа
+        private TMP_Text showcaseState;    // «ВАШ · СЕЙЧАС АКТИВЕН» / «В АРЕНДЕ …»
         private GameObject paintSwatchRow; // свотчи расцветок: выбор меняет большой спрайт
         private Image[] paintSwatchIcons;  // иконки свотчей по индексу покраски
         private ShipConfig swatchConfig;   // модель, под которую собраны свотчи
@@ -70,8 +64,7 @@ namespace SpaceTaxi.UI
             this.host = host;
         }
 
-        // строит витрину в переданном родителе (как прежде BuildShowcaseBlock
-        // в BuildScreen)
+        // строит витрину в переданном родителе
         public void Build(Transform parent)
         {
             BuildShowcaseBlock(parent);
@@ -90,8 +83,7 @@ namespace SpaceTaxi.UI
                 shopWindow.SetActive(visible);
         }
 
-        // ротация витрины (Н-3а): слот сменился — витрина перерисовывается
-        // сама («за витриной интересно наблюдать»); проверка дешёвая — пара int
+        // слот ротации сменился — витрина перерисовывается сама
         public void UpdateRotation()
         {
             if (shopWindow == null || !shopWindow.activeSelf)
@@ -101,11 +93,8 @@ namespace SpaceTaxi.UI
                 RefreshShowcase(); // внутри обновит stockSlot
         }
 
-        // строка таблицы статов витрины (C2): подпись | полоска модели с риской
-        // текущего значения | значение модели. Полоска: нейтральный fill —
-        // рассматриваемый корабль, подкрашенный отрезок — разница с твоим
-        // (зелёный — рассматриваемый лучше, красный — хуже), янтарная риска —
-        // твоё текущее значение поверх всех слоёв
+        // строка стата: подпись | полоска с риской | значение.
+        // Риска — твоё текущее значение, отрезок — разница (зелёный/красный)
         private sealed class ShowStatRowRefs
         {
             public TMP_Text Label;
@@ -116,8 +105,8 @@ namespace SpaceTaxi.UI
             public RectTransform Tick;      // риска текущего значения
         }
 
-        // каталог читается из Resources один раз; порядок витрины — по цене
-        // (при равенстве по тиру и имени, чтобы список не плясал)
+        // каталог из Resources один раз; порядок — по цене (при равенстве
+        // по тиру и имени — чтобы список не плясал)
         private ShipConfig[] Catalog()
         {
             if (shipCatalog != null)
@@ -139,9 +128,7 @@ namespace SpaceTaxi.UI
             return shipCatalog;
         }
 
-        // каркас витрины (C2): слева таблица статов + свотчи расцветки, справа
-        // большая модель в выбранной расцветке; внизу навигация [←] имя [→],
-        // подпись статуса владения и кнопка покупки
+        // каркас: слева статы + свотчи, справа модель, внизу навигация и кнопка
         private void BuildShowcaseBlock(Transform parent)
         {
             shopWindow = StationUI.Section(parent, "// МАГАЗИН", "ShopWindow");
@@ -149,19 +136,10 @@ namespace SpaceTaxi.UI
             var showcaseRow = OnboardComputerFactory.H("ShowcaseRow", shopWindow.transform);
 
             // --- левая колонка: 6 статов + выбор расцветки ---
-            var statsColumn = new GameObject("StatsColumn", typeof(RectTransform));
-            statsColumn.transform.SetParent(showcaseRow.transform, false);
-            var statsLayout = statsColumn.AddComponent<VerticalLayoutGroup>();
-            statsLayout.spacing = 6f;
-            statsLayout.childControlWidth = true;
-            statsLayout.childControlHeight = true;
-            statsLayout.childForceExpandWidth = true;
-            statsLayout.childForceExpandHeight = false;
-            var statsElement = statsColumn.AddComponent<LayoutElement>();
-            statsElement.flexibleWidth = 1f;
+            var statsColumn = OnboardComputerFactory.V("StatsColumn", showcaseRow.transform, 6f);
+            OnboardComputerFactory.Flexible(statsColumn);
 
-            // Н7 U7.3: одна короткая легенда-подпись — янтарная риска на каждой
-            // полоске это ТВОЙ эффективный стат (владелец: «непонятна»)
+            // легенда: янтарная риска — твой текущий стат
             var tickCaption = OnboardComputerFactory.Text(statsColumn, "ЯНТАРНАЯ РИСКА — ТВОЙ ТЕКУЩИЙ СТАТ",
                 14f, OnboardComputerFactory.TaxiColor, "TickCaption");
             OnboardComputerFactory.FixedHeight(tickCaption.gameObject, 18f);
@@ -170,11 +148,8 @@ namespace SpaceTaxi.UI
             for (int i = 0; i < StatCount; i++)
                 showcaseStatRows[i] = BuildStatRow(statsColumn.transform, i, StatLabels[i]);
 
-            // выбор расцветки: свотчи (заводская + PaintVariants); клик меняет
-            // большой спрайт, покупка берёт выбранный вариант (механика бывшего
-            // FlipPaint — индекс живёт в showcasePaintIndex). S3: подпись своей
-            // строкой, свотчи — своей строкой на всю ширину колонки: крупным
-            // свотчам (38px) не тесно в одной строке с подписью
+            // выбор расцветки: клик по свотчу меняет большой спрайт,
+            // покупка берёт выбранный вариант
             var paintCaption = OnboardComputerFactory.Text(statsColumn, "РАСКРАВКА", 15f,
                 OnboardComputerFactory.LabelColor, "PaintCaption");
             OnboardComputerFactory.FixedHeight(paintCaption.gameObject, 20f);
@@ -187,25 +162,13 @@ namespace SpaceTaxi.UI
             OnboardComputerFactory.FixedHeight(showcasePaint.gameObject, 20f);
 
             // --- правая колонка: большая модель ---
-            var spriteColumn = new GameObject("SpriteColumn", typeof(RectTransform));
-            spriteColumn.transform.SetParent(showcaseRow.transform, false);
-            var spriteColumnLayout = spriteColumn.AddComponent<VerticalLayoutGroup>();
-            spriteColumnLayout.spacing = 6f;
-            spriteColumnLayout.childControlWidth = true;
-            spriteColumnLayout.childControlHeight = true;
-            spriteColumnLayout.childForceExpandWidth = true;
-            spriteColumnLayout.childForceExpandHeight = false;
-            var spriteElement = spriteColumn.AddComponent<LayoutElement>();
-            spriteElement.minWidth = ShowcaseSpriteW;
-            spriteElement.preferredWidth = ShowcaseSpriteW;
-            spriteElement.flexibleWidth = 0f;
+            var spriteColumn = OnboardComputerFactory.V("SpriteColumn", showcaseRow.transform, 6f);
+            OnboardComputerFactory.FixedWidth(spriteColumn, ShowcaseSpriteW);
 
             var box = new GameObject("SpriteBox", typeof(RectTransform), typeof(Image));
             box.transform.SetParent(spriteColumn.transform, false);
             showcaseSprite = box.GetComponent<Image>();
-            showcaseSprite.color = new Color(
-                OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                OnboardComputerFactory.LabelColor.b, 0.08f);
+            showcaseSprite.color = Ui.WithAlpha(OnboardComputerFactory.LabelColor, 0.08f);
             showcaseSprite.preserveAspect = true;
             // рамка как у кнопок фабрики — карточка читается как один блок
             var frame = box.AddComponent<Outline>();
@@ -213,9 +176,7 @@ namespace SpaceTaxi.UI
             frame.effectDistance = new Vector2(2f, -2f);
             OnboardComputerFactory.FixedSize(box, ShowcaseSpriteW, ShowcaseSpriteH);
 
-            // --- навигация (C2): компактные стрелки-каркасные кнопки (40×40,
-            // меньше прежних 48×160), название с тиром по центру; «ВЫ ЗДЕСЬ»
-            // убрано — статус владения подписью под названием ---
+            // навигация: стрелки 40×40 и название с тиром; статус владения — подписью ниже
             var navRow = OnboardComputerFactory.H("NavBar", shopWindow.transform);
             OnboardComputerFactory.FixedHeight(navRow.gameObject, 44f);
             navRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
@@ -223,7 +184,7 @@ namespace SpaceTaxi.UI
             showcaseName = OnboardComputerFactory.Text(navRow, "", 21f,
                 OnboardComputerFactory.BrightColor, "ModelName");
             OnboardComputerFactory.Flexible(showcaseName.gameObject);
-            // 36, не 28: строка 21pt ≈ 27.7 — Ellipsis при меньшей высоте режет заголовок
+            // 36: 21pt ≈ 27.7 — запас против вертикального Ellipsis
             OnboardComputerFactory.FixedHeight(showcaseName.gameObject, 36f);
             showcaseName.alignment = TextAlignmentOptions.Center;
             BuildNavArrow(navRow.transform, "→", () => FlipShowcase(1));
@@ -233,7 +194,8 @@ namespace SpaceTaxi.UI
             OnboardComputerFactory.FixedHeight(showcaseState.gameObject, 20f);
             showcaseState.alignment = TextAlignmentOptions.Center;
 
-            shopBuy = StationScreenController.BuildServiceButton(shopWindow.transform, "ShopBuyButton", ConfirmShopAction, out shopBuyLabel);
+            shopBuy = StationUI.ServiceButton(shopWindow.transform, "ShopBuyButton", ConfirmShopAction);
+            shopBuyLabel = shopBuy.GetComponentInChildren<TMP_Text>();
             shopStatus = OnboardComputerFactory.Text(shopWindow, "", 17f, OnboardComputerFactory.TaxiColor, "Status");
             OnboardComputerFactory.FixedHeight(shopStatus.gameObject, 23f);
 
@@ -241,14 +203,9 @@ namespace SpaceTaxi.UI
             RefreshShowcase();
         }
 
-        // строка таблицы статов (C2): подпись | полоска | значение модели.
-        // Полоска: дорожка → нейтральный fill модели → подкрашенный отрезок
-        // разницы → янтарная риска текущего значения (поверх всех слоёв).
-        // S1: полоска на ВСЮ ширину колонки — дети посажены явными якорями:
-        // HorizontalLayoutGroup с childForceExpandWidth принудительно делает
-        // flexible ≥ 1 у ВСЕХ детей (LayoutGroup.GetChildSizes) и lerp-дистрибуция
-        // по min/preferred между TMP-текстами и LayoutElement сжимала полоску
-        // до ~60px при живом месте слева и справа
+        // строка стата: подпись | полоска | значение. Дети посажены явными
+        // якорями, НЕ лейаутом: HorizontalLayoutGroup с childForceExpandWidth
+        // сжимал полоску между текстами до ~60px
         private ShowStatRowRefs BuildStatRow(Transform parent, int index, string label)
         {
             var rowGo = new GameObject("Stat_" + index, typeof(RectTransform));
@@ -266,7 +223,7 @@ namespace SpaceTaxi.UI
             labelRect.offsetMax = new Vector2(StatLabelWidth, 0f);
             refs.Label.alignment = TextAlignmentOptions.Left;
 
-            // полоска: всё место между подписью и значением (S1)
+            // полоска: всё место между подписью и значением
             var bar = new GameObject("Bar", typeof(RectTransform));
             bar.transform.SetParent(rowGo.transform, false);
             var barRect = (RectTransform)bar.transform;
@@ -279,11 +236,11 @@ namespace SpaceTaxi.UI
             track.transform.SetParent(bar.transform, false);
             OnboardComputerFactory.Stretch((RectTransform)track.transform);
             var trackImage = track.GetComponent<Image>();
-            trackImage.color = new Color(dim.r, dim.g, dim.b, 0.12f);
+            trackImage.color = Ui.WithAlpha(dim, 0.12f);
             trackImage.raycastTarget = false;
 
-            refs.ValueFill = BuildBarFill(track.transform, new Color(dim.r, dim.g, dim.b, 0.45f), "ValueFill");
-            refs.DeltaFill = BuildBarFill(track.transform, dim, "DeltaFill");
+            refs.ValueFill = StationUI.FillChild(track.transform, Ui.WithAlpha(dim, 0.45f), "ValueFill");
+            refs.DeltaFill = StationUI.FillChild(track.transform, dim, "DeltaFill");
             refs.DeltaImage = refs.DeltaFill.GetComponent<Image>();
             refs.Tick = BuildTick(track.transform);
 
@@ -298,7 +255,7 @@ namespace SpaceTaxi.UI
             return refs;
         }
 
-        // отрезок полоски между двумя долями (0..1): риски/подкраска разницы
+        // отрезок полоски между двумя долями 0..1 (подкраска разницы)
         private static void SetSegment(RectTransform fill, float from, float to)
         {
             float a = Mathf.Clamp01(Mathf.Min(from, to));
@@ -309,9 +266,8 @@ namespace SpaceTaxi.UI
             fill.offsetMax = Vector2.zero;
         }
 
-        // риска-засечка текущего значения (C2): вертикальная полоска, ширину
-        // стата показывает от всей дорожки. Н7 U7.3 (владелец: «непонятна») —
-        // крупнее (6px) и с выносом ±2px за дорожку, чтобы читалась маркером
+        // риска текущего значения: вертикальная полоска 6px с выносом за
+        // дорожку — чтобы читалась как маркер
         private static RectTransform BuildTick(Transform track)
         {
             var tick = new GameObject("Tick", typeof(RectTransform), typeof(Image));
@@ -330,27 +286,10 @@ namespace SpaceTaxi.UI
             float x = Mathf.Clamp01(fraction);
             tick.anchorMin = new Vector2(x, 0f);
             tick.anchorMax = new Vector2(x, 1f);
-            tick.sizeDelta = new Vector2(6f, 0f); // высоту дают якоря (+вынос BuildTick), ширина — 6px (Н7 U7.3)
+            tick.sizeDelta = new Vector2(6f, 0f); // ширина 6px, высоту дают якоря
         }
 
-        // fill-дочка: левый край закреплён, правый двигает SetFill (доля 0..1)
-        private static RectTransform BuildBarFill(Transform parent, Color color, string name)
-        {
-            var fill = new GameObject(name, typeof(RectTransform), typeof(Image));
-            fill.transform.SetParent(parent, false);
-            var rect = (RectTransform)fill.transform;
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            var image = fill.GetComponent<Image>();
-            image.color = color;
-            image.raycastTarget = false;
-            return rect;
-        }
-
-        // стрелка навигации витрины (C2): компактная каркасная StationUI.Button
-        // 40×40 — меньше прежних 48×160, звук уже хукнут каркасом
+        // компактная стрелка 40×40; звук уже хукнут каркасом
         private static void BuildNavArrow(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
         {
             var go = StationUI.Button(parent, label, 18f, "NavArrow");
@@ -373,10 +312,8 @@ namespace SpaceTaxi.UI
             RefreshShowcase();
         }
 
-        // свотчи расцветки собираются под модель: заводская (индекс 0) +
-        // PaintVariants; старые уничтожаются — число вариантов у моделей разное.
-        // U8.1: у арендной модели не-стандартные варианты недоступны (S7 Н6:
-        // аренда = заводская покраска) — рисуются серыми, некликабельными
+        // свотчи пересобираются под модель (число вариантов разное);
+        // у аренды нестандартные — серые и некликабельные
         private void RebuildPaintSwatches(ShipConfig config)
         {
             if (paintSwatchRow == null || config == null)
@@ -386,17 +323,14 @@ namespace SpaceTaxi.UI
             int count = config.PaintVariantCount + 1;
             paintSwatchIcons = new Image[count];
             bool locked = config.IsRental;
-            // крупный свотч 38px: 9 штук влезают в колонку 434px; больше — мелкий
+            // крупный свотч 38px; при числе больше 9 — мелкий
             float size = count > 9 ? SwatchSizeSmall : SwatchSize;
             for (int i = 0; i < count; i++)
                 paintSwatchIcons[i] = BuildPaintSwatch(config, i, size, locked);
             UpdatePaintSwatches();
         }
 
-        // свотч: спрайт варианта (арта нет — затенение по тиру), ColorTint hover,
-        // звук хуком каркаса ПЕРВЫМ, рамка-Outline только у выбранного.
-        // locked (аренда): свотч не-стандартной покраски некликабелен —
-        // паттерн «КУПИТЬ без денег» (S4)
+        // свотч: рамка только у выбранного; звук хукнут каркасом первым
         private Image BuildPaintSwatch(ShipConfig config, int paintIndex, float size, bool locked)
         {
             var go = new GameObject("Swatch_" + paintIndex, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -426,16 +360,15 @@ namespace SpaceTaxi.UI
             colors.pressedColor = new Color(0.6f, 1f, 0.78f);
             button.colors = colors;
             if (locked && paintIndex > 0)
-                button.interactable = false; // аренда: только заводская (S7)
-            UiSfx.Hook(button); // каркас: хук первым, слушатели вызывающего после
+                button.interactable = false; // аренда: только заводская
+            UiSfx.Hook(button); // хук первым, слушатели вызывающего — после
             int captured = paintIndex;
             button.onClick.AddListener(() => SelectShowcasePaint(captured));
             return icon;
         }
 
-        // выбор расцветки свотчем (механика бывшего FlipPaint): большой спрайт
-        // перерисовывается, покупка берёт выбранный индекс. U8.1: у аренды
-        // не-стандартная покраска закрыта (страховка помимо disabled-свотча)
+        // выбор расцветки: большой спрайт перерисовывается, покупка возьмёт
+        // выбранный индекс
         private void SelectShowcasePaint(int paintIndex)
         {
             ShipConfig config = showcaseShip;
@@ -444,15 +377,14 @@ namespace SpaceTaxi.UI
             if (paintIndex < 0 || paintIndex > config.PaintVariantCount)
                 return;
             if (config.IsRental && paintIndex > 0)
-                return; // аренда = заводская покраска (S7 Н6)
+                return; // аренда = только заводская покраска
             showcasePaintIndex = paintIndex;
             ApplyShowcaseSprite(host.Session.Fleet, config, paintIndex);
             UpdatePaintSwatches();
             showcasePaint.text = PaintLineText(config, paintIndex, config.IsRental);
         }
 
-        // подсветка выбранного свотча: рамка + полный цвет, невыбранные серее;
-        // закрытые (аренда) — заметно приглушены, у выделения рамки нет
+        // подсветка выбранного свотча: рамка + полный цвет; закрытые — глуше
         private void UpdatePaintSwatches()
         {
             ShipConfig config = swatchConfig;
@@ -463,7 +395,7 @@ namespace SpaceTaxi.UI
                 bool selected = i == showcasePaintIndex;
                 var image = paintSwatchIcons[i];
                 Color baseColor = image.sprite != null ? Color.white : TierShade(config.Tier);
-                float dim = config.IsRental && i > 0 ? 0.38f : 0.62f; // U8.1: закрытый — глуше
+                float dim = config.IsRental && i > 0 ? 0.38f : 0.62f; // закрытый — глуше
                 image.color = selected
                     ? baseColor
                     : new Color(baseColor.r * dim, baseColor.g * dim, baseColor.b * dim, baseColor.a);
@@ -473,10 +405,8 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // витрина перечитывается на каждый RefreshShop (деньги/парк) и при
-        // смене слота ротации из Update — показанный вариант меняется сам.
-        // Ручной выбор расцветки (свотч) переживает перечитывание денег/парка:
-        // сбрасывается только сменой модели или слота ротации
+        // перечитывается на каждый RefreshShop (деньги/парк) и при смене слота
+        // ротации; ручной выбор покраски сбрасывается только сменой модели/слота
         private void RefreshShowcase()
         {
             ShipConfig[] catalog = Catalog();
@@ -493,7 +423,7 @@ namespace SpaceTaxi.UI
             if (modelChanged || slotChanged)
                 showcasePaintIndex = ShopStockService.DisplayPaintIndex(config, slot);
             if (config.IsRental)
-                showcasePaintIndex = 0; // U8.1: аренда всегда заводская (S7 Н6)
+                showcasePaintIndex = 0; // аренда всегда заводская
             if (swatchConfig != config)
             {
                 swatchConfig = config;
@@ -501,8 +431,7 @@ namespace SpaceTaxi.UI
             }
             ApplyShowcaseSprite(fleet, config, showcasePaintIndex);
 
-            // название по центру навигации: «ЯЙЦО · ТИР 2»; статус владения —
-            // подпись под названием вместо бейджа «ВЫ ЗДЕСЬ» (C2)
+            // «ЯЙЦО · ТИР 2» + статус владения
             showcaseName.text = config.DisplayName.ToUpper() + " · ТИР " + config.Tier;
             showcaseState.text = OwnershipLine(fleet, config);
             UpdateShowcaseStats(config);
@@ -521,13 +450,13 @@ namespace SpaceTaxi.UI
                 : canSit ? "ПЕРЕСЕСТЬ"
                 : current ? "СЕЙЧАС АКТИВЕН"
                 : "НЕТ В ПРОДАЖЕ";
-            // недостача кредитов: кнопка гаснет + статус с нехваткой (C2)
+            // недостача кредитов: кнопка гаснет + строка с нехваткой
             shopStatus.text = canBuy && !affordable
                 ? $"Не хватает {UiFormat.Currency} {UiFormat.FormatCredits(config.Price - host.Session.Wallet.Credits)}"
                 : "";
         }
 
-        // подпись статуса владения под названием (C2): честно и коротко
+        // статус владения под названием
         private static string OwnershipLine(FleetService fleet, ShipConfig config)
         {
             bool current = IsCurrent(fleet, config);
@@ -540,9 +469,8 @@ namespace SpaceTaxi.UI
             return config.IsRental ? "АРЕНДА" : "";
         }
 
-        // спрайт витрины: показанный вариант покраски или заводской; арта нет
-        // вовсе — заглушка-треугольник с затенением по тиру; «в ангаре» — серым.
-        // Один источник для полного рефреша и листания покраски
+        // спрайт показанного варианта; нет арта — заглушка по тиру;
+        // своя модель «в ангаре» — серым
         private void ApplyShowcaseSprite(FleetService fleet, ShipConfig config, int paintIndex)
         {
             Sprite sprite = config.GetPaintSprite(paintIndex);
@@ -554,8 +482,7 @@ namespace SpaceTaxi.UI
                 : Color.white;
         }
 
-        // строка «Расцветка: …» под именем модели на витрине; аренда — всегда
-        // заводская (U8.1/S7), варианты ей не продаются
+        // строка «Расцветка: …» под названием модели
         private static string PaintLineText(ShipConfig config, int paintIndex, bool rental = false)
         {
             if (rental)
@@ -567,10 +494,7 @@ namespace SpaceTaxi.UI
                     : $"Расцветка: вариант {paintIndex} из {variants} (ротация 2 игрочаса)";
         }
 
-        // значение стата модели по индексам StatLabels. ВСЕ статы «больше =
-        // лучше» (C2): Retro сравнивается напрямую — тормозной путь с его
-        // инверсией убран, вместо него «Мощность торможения». Retro=0 —
-        // глобальный фолбэк из PhysicsConfig, как в полёте
+        // значение стата модели по индексам StatLabels (все «больше = лучше»)
         private float StatValue(ShipConfig config, int index)
         {
             switch (index)
@@ -584,8 +508,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // модельное торможение или глобальное (ShipStats.Compute использует 80
-        // как последний фолбэк — то же число здесь); 0 не отдаём
+        // модельное Retro или глобальный фолбэк (80); 0 не отдаём
         private float RetroOf(ShipConfig config)
         {
             if (config != null && config.Retro > 0f)
@@ -594,9 +517,8 @@ namespace SpaceTaxi.UI
             return global > 0f ? global : 80f;
         }
 
-        // «твоё текущее значение» для риски (C2): эффективные статы живого
-        // корабля — улучшения учтены (тяга/бак/прочность/манёвр растут с
-        // уровнями); MaxV улучшениями не меняется — из конфига текущей модели
+        // твоё текущее значение: эффективные статы с учётом улучшений
+        // (MaxV улучшениями не меняется — из конфига модели)
         private float CurrentStatValue(int index)
         {
             ShipConfig baseline = host.Session != null && host.Session.Fleet != null ? host.Session.Fleet.Current : null;
@@ -613,9 +535,8 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // масштаб полоски — общий максимум стата по всему каталогу и твоим
-        // текущим значениям (посчитан в коде, C2): полоски всех моделей
-        // сопоставимы между собой, риска не выходит за дорожку
+        // масштаб — максимум по каталогу и твоим статам: полоски всех моделей
+        // сопоставимы, риска не выходит за дорожку
         private float StatScale(int index, float value, float current)
         {
             float max = Mathf.Max(value, current);
@@ -626,9 +547,8 @@ namespace SpaceTaxi.UI
             return max > 0f ? max : 1f;
         }
 
-        // таблица статов (C2): полоска — значение рассматриваемой модели,
-        // риска — твоё текущее, отрезок между ними подкрашен: зелёный — модель
-        // лучше, красный — хуже (все статы «больше = лучше», инверсий нет)
+        // полоска — модель, риска — твоё значение; отрезок между ними
+        // зелёный/красный по сравнению
         private void UpdateShowcaseStats(ShipConfig config)
         {
             if (showcaseStatRows == null || config == null || host.Session == null || host.Session.Fleet == null)
@@ -642,7 +562,7 @@ namespace SpaceTaxi.UI
                 float currentFraction = Mathf.Clamp01(current / max);
 
                 var row = showcaseStatRows[i];
-                StationScreenController.SetFill(row.ValueFill, valueFraction);
+                StationUI.SetFill(row.ValueFill, valueFraction);
                 SetSegment(row.DeltaFill, currentFraction, valueFraction);
                 SetTick(row.Tick, currentFraction);
 
@@ -656,8 +576,8 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // «Яйцо» из фолбэка (инстанс в памяти) и ассет egg_rental — одна модель:
-        // до первой пересадки Current не совпадает по ссылке с витриной аренды
+        // «Яйцо» из фолбэка и ассет аренды — одна модель: до первой пересадки
+        // Current не совпадает с витриной по ссылке
         private static bool IsCurrent(FleetService fleet, ShipConfig config)
         {
             if (fleet.Current == config)
@@ -668,6 +588,7 @@ namespace SpaceTaxi.UI
 
         // затенение заглушки по тиру: Т1 — приглушённая, Т5 — яркая
         private static Color TierShade(int tier)
+
         {
             float t = Mathf.Clamp01((tier - 1) / 4f);
             var dim = OnboardComputerFactory.LabelColor;
@@ -675,10 +596,9 @@ namespace SpaceTaxi.UI
             return Color.Lerp(dim, OnboardComputerFactory.BrightColor, t);
         }
 
-        // единственная кнопка витрины: покупка показанного варианта или
-        // пересадка в свой/арендный корабль. Правила покупки — в
-        // FleetService.TryBuy: не-аренда, Price > 0, не куплен; после оплаты
-        // TryBuy сразу пересаживает (полные HP/бак), ShipChanged перерисует сам
+        // единственная кнопка: покупка показанного варианта или пересадка.
+        // Правила — в FleetService.TryBuy (после оплаты сразу пересаживает,
+        // ShipChanged перерисует витрину сам)
         private void ConfirmShopAction()
         {
             if (host.Session == null || host.Session.Fleet == null || showcaseShip == null || !host.CanOpen())
@@ -692,16 +612,14 @@ namespace SpaceTaxi.UI
             int price = config.Price;
             if (price <= 0)
                 return; // «НЕТ В ПРОДАЖЕ» — кнопка серая, но поток проверяет сам
-            // покупка показанного варианта: индекс покраски берём с витрины
-            // (листание переписывает showcasePaintIndex), иначе «показано X,
-            // куплено Y»
+            // покупка берёт индекс покраски с витрины — «показано X, куплено X»
             int paintIndex = showcasePaintIndex;
             if (!host.Session.Fleet.TryBuy(config, host.Session.Wallet, paintIndex))
                 return;
-            Sound.Play(SoundId.PurchaseCash); // П9.3: касса на покупку корабля
-            host.ShowToast($"Куплен «{config.DisplayName}» (−{UiFormat.Currency} {UiFormat.FormatCredits(price)})", emphasized: true, tone: ToastTone.Danger); // Н6 U4
-            // купленной модели «нет в продаже» — витрина листается дальше,
-            // сама модель остаётся в списке серой с подписью «ВАШ · В АНГАРЕ»
+            Sound.Play(SoundId.PurchaseCash); // касса на покупку корабля
+            host.ShowToast($"Куплен «{config.DisplayName}» (−{UiFormat.Currency} {UiFormat.FormatCredits(price)})", emphasized: true, tone: ToastTone.Danger); // списание — красный
+            // купленная модель остаётся в списке серой («ВАШ · В АНГАРЕ»),
+            // витрина листается дальше
             FlipShowcase(1);
         }
 
@@ -710,7 +628,7 @@ namespace SpaceTaxi.UI
             if (host.Session == null || host.Session.Fleet == null || config == null || !host.CanOpen())
                 return;
             if (IsCurrent(host.Session.Fleet, config))
-                return; // уже за штурвалом — кнопка и не должна была быть видна
+                return; // уже за штурвалом
             host.Session.Fleet.SwitchTo(config);
             host.ShowToast($"Пересел в «{config.DisplayName}»");
         }

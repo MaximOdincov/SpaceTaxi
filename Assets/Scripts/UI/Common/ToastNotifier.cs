@@ -7,11 +7,11 @@ using SpaceTaxi.Economy;
 using SpaceTaxi.Orders;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
+using UiKit;
 
 namespace SpaceTaxi.UI
 {
-    // Тон тоста (Н6 U4): Danger — деньги ушли (долг/штраф/покупка/сервис),
-    // Success — деньги пришли или успех заказа, Neutral — информационное
+    // Тон тоста: Danger — деньги ушли, Success — пришли/успех, Neutral — просто информация
     public enum ToastTone
     {
         Neutral,
@@ -19,9 +19,8 @@ namespace SpaceTaxi.UI
         Success
     }
 
-    // Тосты событий заказов и корабля: ОДИН на экране (владелец Н9.5:
-    // «максимум одно, не накладываются»), очередь со стаггером и дедупом,
-    // аварийные (emphasized) идут первыми
+    // Тосты событий заказов и корабля: на экране один, остальные ждут в
+    // очереди (с дедупом одинаковых текстов); аварийные показываются первыми
     public class ToastNotifier : MonoBehaviour
     {
         [Tooltip("Сколько секунд висит обычный тост")]
@@ -81,14 +80,13 @@ namespace SpaceTaxi.UI
         // подписки на события домена (симметричная отписка в OnDestroy)
         private void Awake()
         {
-            // П11.1: HUD при панелях гасится корневой группой — тост живёт внутри
-            // HUD, но должен читаться поверх панелей: своя альфа без родителей
+            // своя альфа: HUD при панелях гасится группой, а тост должен
+            // читаться поверх
             var rootGroup = gameObject.AddComponent<CanvasGroup>();
             rootGroup.blocksRaycasts = false;
             rootGroup.ignoreParentGroups = true;
 
-            // поверх карты/паузы (один канвас) и станции/модала завершения
-            // (100/110), под увольнением (200)
+            // поверх станции (100) и завершения заказа (110), под увольнением (200)
             var topCanvas = gameObject.AddComponent<Canvas>();
             topCanvas.overrideSorting = true;
             topCanvas.sortingOrder = 120;
@@ -104,15 +102,14 @@ namespace SpaceTaxi.UI
         // вид тоста из пула или новый (CanvasGroup для фейда)
         private ToastView CreateView()
         {
-            // Н11: сборка через UiKit — «панель с фоном + текст», рутина в тулките
-            var box = UiKit.UiBox.Box(transform, "Toast")
+            // сборка через UiKit: панель с фоном + текст
+            var box = UiBox.Box(transform, "Toast")
                 .Size(NormalSize.x, NormalSize.y)
-                .Background(new Color(0.031f, 0.078f, 0.047f, 0.92f)); // raycast off — как прежде
+                .Background(UiTheme.Panel); // raycast off — тост клики не ест
             var go = box.Go;
 
-            // Н12: CanvasGroup гарантируем отдельными стейтментами — «??» на
-            // Unity-ссылке ненадёжен (fake-null уничтоженного компонента не
-            // триггерит правую часть, и доступ ронял Awake на старте)
+            // отдельные стейтменты, не «??»: fake-null Unity-объекта не
+            // триггерит правую часть
             var group = go.GetComponent<CanvasGroup>();
             if (group == null)
                 group = go.AddComponent<CanvasGroup>();
@@ -131,7 +128,7 @@ namespace SpaceTaxi.UI
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = NormalSize; // абсолютный размер: тост вне лейаута (Н11)
+            rect.sizeDelta = NormalSize; // абсолютный размер: тост вне лейаута
             // вью ждёт в пуле невидимым — иначе три плашки висят на экране
             // с первого кадра сцены до первого прогона через цикл фейда
             go.SetActive(false);
@@ -140,8 +137,7 @@ namespace SpaceTaxi.UI
             return new ToastView { Go = go, Rect = rect, Label = label, Group = group };
         }
 
-        // Н6 U4: tone — цвет текста по смыслу события; дефолт Neutral (жёлтый),
-        // чужие вызовы без тона остаются валидными
+        // дефолт Neutral — вызовы Show без тона остаются валидными
         public void Show(string message, bool emphasized = false, ToastTone tone = ToastTone.Neutral)
         {
             if (string.IsNullOrEmpty(message) || IsDuplicate(message))
@@ -285,35 +281,29 @@ namespace SpaceTaxi.UI
             orders.OrderDelivered += offer => Show("ЗАКАЗ ВЫПОЛНЕН: " + offer.Passenger.DisplayName
                 + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Thanks)), true, ToastTone.Success);
             orders.OrderFailed += offer => Show(
-                // Н7 Q7.1/Q7.4: срыв по таймеру или разбитый груз называют причину
+                // срыв по таймеру или повреждению называют причину
                 string.IsNullOrEmpty(offer.FailReason)
                     ? "Заказ провален" + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints))
                     : "СРЫВ ЗАКАЗА: " + offer.FailReason + Prefix(PassengerProfile.PickPhrase(offer.Passenger.Complaints)),
                 true, ToastTone.Danger);
 
-            // v5.2: тост-момент — отклик в момент свершения/срыва задания.
-            // Н9.5: финальные тосты TaskSucceeded/TaskFailed сняты — они
-            // дублировались: момент в полёте + «ЗАКАЗ ВЫПОЛНЕН» и выплата на
-            // доставке давали три плашки разом (владелец: «слишком много»)
+            // отклик в момент свершения/срыва задания пассажира
             orders.TaskMomentSuccess += text => Show(text, false, ToastTone.Success);
             orders.TaskMomentFail += text => Show(text, true, ToastTone.Danger);
 
-            // Н7 Q7.3: тост принятия заказа; «паникёр» предупреждает сразу (Н7 Q7.1)
+            // тост принятия; торопящийся пассажир предупреждает сразу
             orders.OrderAccepted += offer => Show("Заказ принят: " + offer.Passenger.DisplayName
                 + (offer.HurrySeconds > 0f
                     ? " · ПАССАЖИР ТОРОПИТСЯ: " + UiFormat.FormatClock(offer.HurrySeconds) + " на доставку"
                     : ""));
 
-            // Н7 Q7.4: промежуточные предупреждения задания (повреждение посылки,
-            // замечание нервному пилоту)
+            // промежуточные предупреждения задания
             orders.OrderWarning += message => Show(message, false, ToastTone.Danger);
 
             var landing = ship.GetComponent<LandingSystem>();
             landing.StationServiced += station => Show($"Станция «{station}»: сервис оплачен", false, ToastTone.Danger);
             landing.StationHint += planet => Show("Станция: [B] — " + StationServices(planet));
-            // запас топливной сети при посадке (Н-4): сколько единиц продают и по чём
-            // (с районным множителем, Н4.5); пустая сеть — своё сообщение, чтобы
-            // игрок сразу знал, что слайдер тут не поможет
+            // запас и цена топлива сети при посадке; пустая сеть — своё сообщение
             landing.ShipLanded += planet =>
             {
                 if (!planet.HasFuel || session.Orders == null)
@@ -337,15 +327,11 @@ namespace SpaceTaxi.UI
 
             var debt = session.Debt;
             if (debt != null)
-                // Н7 A-FIX: «за арендный корабль» — только на аварию аренды
-                // (RegisterAccident → AccidentRegistered). Недостача штрафа идёт
-                // в AddCharge (GameSession.ChargePenalty уже тостует штраф сам) —
-                // без второго тоста и без ложной причины; гашение (П3.3/П4.2)
-                // тоста не даёт, как и раньше
+                // долг за аренду — только при аварии арендного корабля
                 debt.AccidentRegistered += amount =>
                     Show($"ДОЛГ +{UiFormat.Currency} {UiFormat.FormatCredits(amount)} за арендный корабль", true, ToastTone.Danger);
 
-            // выплата за доставку (П4.2): сумма на руки + уход в долг
+            // выплата за доставку: сумма на руки + уход в долг
             if (session.Payout != null)
                 session.Payout.Paid += result =>
                 {
@@ -354,7 +340,7 @@ namespace SpaceTaxi.UI
                         Show($"{UiFormat.Currency} {UiFormat.FormatCredits(result.ToDebt)} ушло в счёт долга", false, ToastTone.Danger);
                 };
 
-            // кометы (П6.3): предупреждение за 20 с до входа в систему
+            // предупреждение о приближении кометы
             var comets = FindAnyObjectByType<CometSystem>();
             if (comets != null)
                 comets.CometIncoming += (entry, direction) => Show("Комета приближается!", true);
@@ -415,8 +401,7 @@ namespace SpaceTaxi.UI
             return string.IsNullOrEmpty(phrase) ? "" : " — «" + phrase + "»";
         }
 
-        // цвет текста по тону (Н6 U4) — палитра борткомпа: красный = списание,
-        // зелёный = приход/успех, жёлтый = нейтральное
+        // цвет по тону: красный — списание, зелёный — приход, жёлтый — нейтральное
         private static Color ToneColor(ToastTone tone)
         {
             switch (tone)
@@ -430,8 +415,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // перечень услуг станции по флагам планеты (Н-3): комбинации «есть заправка»/
-        // «есть мастерская», у хаба плюс магазин
+        // перечень услуг станции по флагам планеты
         private static string StationServices(World.Planet planet)
         {
             var parts = new System.Collections.Generic.List<string>(3);

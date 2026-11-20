@@ -4,14 +4,9 @@ using UnityEngine;
 
 namespace SpaceTaxi.UI
 {
-    // Редактируемый стиль карты (запрос владельца после Н8): все визуальные ручки
-    // MapScreenBinder в одном ассете + свои надписи и контуры с окном видимости
-    // по зуму. Дефолты = значения констант на момент выноса (Н8.13): пустой
-    // ассет не меняет карту ни на пиксель. Расположение планет СЮДА НЕ входит —
-    // оно в LevelAsset (Level Editor), по решению владельца зафиксировано.
-    // Правится окном Space Taxi → Map Style Editor; карта перестраивается на лету
-    // (MapScreenBinder.RefreshMapStyle). Ассет по умолчанию:
-    // Assets/Resources/MapStyle_Default.asset — подхватывается автоматически.
+    // Редактируемый стиль карты: визуальные ручки и свои надписи/контуры с окном
+    // видимости по зуму. Правится окном Space Taxi → Map Style Editor, карта
+    // перестраивается на лету; дефолт — Assets/Resources/MapStyle_Default.asset.
     [CreateAssetMenu(fileName = "MapStyle_Default", menuName = "Space Taxi/Map Style")]
     public class MapStyleConfig : ScriptableObject
     {

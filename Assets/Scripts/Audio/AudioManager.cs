@@ -15,8 +15,8 @@ namespace SpaceTaxi.Audio
         private const float LoopPitchMin = 0.9f;
         private const float LoopPitchRange = 0.22f;
         private const float LoopFadeTime = 0.15f;   // нарастание/затухание лупа, без щелчков
-        private const float MusicFadeTime = 2.5f;   // кроссфейд треков (A8.1: мягче)
-        // Н7 A7.1: не-музыкальные группы (Sfx/Ui/Engine) громче музыки на ~35%:
+        private const float MusicFadeTime = 2.5f;   // кроссфейд треков
+        // не-музыкальные группы (Sfx/Ui/Engine) громче музыки на ~35%:
         // события «не пробивались» сквозь станцию. Одна точка — GroupFactor,
         // действует на one-shots и лупы; Music не трогается
         private const float SfxBoost = 1.35f;
@@ -289,7 +289,7 @@ namespace SpaceTaxi.Audio
             MusicStateChanged?.Invoke();
         }
 
-        // --- Плейлист музыки (П9.3) ---
+        // --- Плейлист музыки ---
 
         private SoundId[] playlist;       // треки каталога для плеера борткомпа
         private AudioSource musicActive;  // канал текущего трека (для прогресса)
@@ -298,7 +298,7 @@ namespace SpaceTaxi.Audio
         // смена трека/паузы — имя и состояние для UI плеера
         private void Update()
         {
-            // Н7 A7.2: конец трека станции — следующий клип этой же станции
+            // конец трека станции — следующий клип этой же станции
             // КРОСФЕЙДОМ, не обрывом: стартуем за MusicFadeTime до конца клипа,
             // второй канал подхватывает — треки перекрываются. Фолбэк — уже
             // закончившийся канал (лаг/смена станции посреди фейда): тот же
@@ -316,7 +316,6 @@ namespace SpaceTaxi.Audio
             if (ended || ending)
                 AdvanceStationTrack(entry);
 
-            // Н9.4 (владелец: «музыка заканчивается — начинается заново»):
             // страховка тишины. Штатный конец трека закрывает ветка выше;
             // watchdog ловит остаточные случаи (застрявший фейд, внешний Stop)
             // — канал с клипом обязан играть, иначе трек стартует с начала
@@ -327,7 +326,7 @@ namespace SpaceTaxi.Audio
             }
         }
 
-        // Н7 A7.2: следующий клип станции — на втором канале под кроссфейд,
+        // следующий клип станции — на втором канале под кроссфейд,
         // тот же механизм чередования, что в PlayMusic. Фейдится только музыка:
         // одноразовые SFX и лупы (отдельные голоса) не затрагиваются
         private void AdvanceStationTrack(SoundEntry entry)
@@ -385,7 +384,7 @@ namespace SpaceTaxi.Audio
         private int stationClipIndex;
 
 
-        // Н10.7: первая станция с клипами от target по кругу (dir ±1), включая
+        // первая станция с клипами от target по кругу (dir ±1), включая
         // сам target. Все пусты — None (вызывающий остаётся на текущей): ВОЛНА
         // не должна оставлять тишину. Валидность через GetEntry — тот же
         // источник, что у MusicPlaylist (запись есть и клипы не пусты)
@@ -472,7 +471,7 @@ namespace SpaceTaxi.Audio
         // сам кроссфейд: equal-power до целевой громкости; try/finally — счётчик жив
         private IEnumerator RunCrossfade(AudioSource fadeIn, AudioSource fadeOut, float targetVolume)
         {
-            // A8.1: equal-power (sqrt-кривые вместо линейных) — в середине
+            // equal-power (sqrt-кривые вместо линейных) — в середине
             // кроссфейда суммарная громкость двух каналов не проваливается,
             // перелив слышится ровным. Стартовую громкость уходящего канала
             // фиксируем один раз: множитель sqrt(1-k) честно гасит её к нулю

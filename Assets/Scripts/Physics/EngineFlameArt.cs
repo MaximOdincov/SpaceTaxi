@@ -23,9 +23,7 @@ namespace SpaceTaxi.Physics
         private static readonly Color SparkRetroHot = new Color(0.92f, 1f, 0.95f);
         private static readonly Color SparkRetroFade = new Color(0.45f, 0.9f, 1f);
 
-        // кэш материалов частиц (Н10 Слой 1, §3.6): прежде — new Material на
-        // КАЖДЫЙ Rebind, а слоты при Rebind сносятся и материал оставался
-        // в памяти без владельца. Один материал на шейдер корабля — слоты
+        // кэш материалов частиц: один материал на шейдер корабля — слоты
         // делят его (свойств никто не мутирует индивидуально); если Unity
         // выгрузил материал (UnloadUnusedAssets без ссылок) — пересоздаём
         private static readonly System.Collections.Generic.Dictionary<Shader, Material> particleMaterials =

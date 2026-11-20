@@ -6,14 +6,13 @@ namespace SpaceTaxi.Economy
 {
     // Парк кораблей: владение купленными моделями, аренда «Яйца» как фолбэк,
     // уровни улучшений купленных кораблей (аренда всегда сток).
-    // Владелец — GameSession (создаётся в Awake); UI магазина — экран станции
-    // (П3.2), долг за потерю аренды — в П2.2
+    // Живёт в GameSession (создаётся в Awake); UI магазина — экран станции
     public sealed class FleetService
     {
         private readonly List<ShipConfig> owned = new List<ShipConfig>();
         // уровни улучшений по ShipConfig.Id: [Engine, Tank, Hull, Maneuver], 0..3
         private readonly Dictionary<string, int[]> upgradeLevels = new Dictionary<string, int[]>();
-        // выбранная покраска по ShipConfig.Id (S7): 0 = заводская, 1..N —
+        // выбранная покраска по ShipConfig.Id: 0 = заводская, 1..N —
         // PaintVariants. Запоминается при покупке/восстановлении и
         // подставляется при пересадке — иначе SwitchTo сбрасывал бы корпус
         // на заводскую (баг «купил расцветку — корабль стандартный»)
@@ -24,8 +23,8 @@ namespace SpaceTaxi.Economy
         // всегда валиден: старт новой игры — арендное «Яйцо»
         public ShipConfig Current { get; private set; }
 
-        // покраска текущего корабля: 0 = заводская, 1..N — PaintVariants (Н-3а).
-        // Купленная покраска переживает пересадки — см. paintByShipId (S7)
+        // покраска текущего корабля: 0 = заводская, 1..N — PaintVariants.
+        // Купленная покраска переживает пересадки — см. paintByShipId
         public int CurrentPaintIndex { get; private set; }
 
         public IReadOnlyList<ShipConfig> OwnedShips => owned;
@@ -33,13 +32,13 @@ namespace SpaceTaxi.Economy
         // конфиг улучшений — для UI магазина и проверки цен
         public UpgradeConfig Upgrades => upgradeConfig;
 
-        // смена текущего корабля — для UI (П3+)
+        // смена текущего корабля — для UI
         public event Action ShipChanged;
 
-        // сменилась покраска текущего корабля — для UI (Н-3а)
+        // сменилась покраска текущего корабля — для UI
         public event Action PaintChanged;
 
-        // уровни улучшений изменились — для UI (П3.3)
+        // уровни улучшений изменились — для UI
         public event Action UpgradesChanged;
 
         public FleetService()
@@ -98,12 +97,12 @@ namespace SpaceTaxi.Economy
             return true;
         }
 
-        // Пересадка (П3.2, станция): в любой СВОЙ корабль или обратно в аренду
+        // Пересадка (станция): в любой СВОЙ корабль или обратно в аренду
         // (аренда всегда «в наличии» — своего продавать не нужно). Чужие и
         // непродаваемые модели — no-op. Корпус пересаживается сразу, новый
-        // корпус = полные HP и бак (решение координатора: повреждения в бете
+        // корпус = полные HP и бак (повреждения
         // не персистятся). Уже текущий — no-op без события.
-        // S7: покраска берётся из памяти по модели — купленный вариант
+        // покраска берётся из памяти по модели — купленный вариант
         // сохраняется при переключениях туда-обратно
         public void SwitchTo(ShipConfig config)
         {
@@ -115,7 +114,7 @@ namespace SpaceTaxi.Economy
         }
 
         // Улучшение: только на купленный (аренда всегда сток), уровень < 3,
-        // цена уровня — UpgradeConfig.GetPrice по классу корабля (§1.9).
+        // цена уровня — UpgradeConfig.GetPrice по классу корабля.
         // Пересадки нет, но живой корпус этого корабля сразу пересчитывает Eff
         // (полные HP/бак — семантика Reconfigure «нового корпуса»)
         public bool TryUpgrade(ShipConfig config, UpgradeLine line, Wallet wallet)
@@ -148,14 +147,14 @@ namespace SpaceTaxi.Economy
             if (Current != null && !string.IsNullOrEmpty(Current.Id))
             {
                 upgradeLevels.Remove(Current.Id); // улучшения сгорают вместе с корпусом
-                paintByShipId.Remove(Current.Id); // покраска тоже (S7)
+                paintByShipId.Remove(Current.Id); // покраска тоже
             }
             owned.Remove(Current);
             SetCurrent(ShipConfig.EggRentalFallback);
         }
 
-        // восстановление парка из сейва (П10.1): владение, уровни, текущая модель
-        // и её покраска (Н-3а). Конфиги резолвит вызывающий (SaveSystem) из
+        // восстановление парка из сейва: владение, уровни, текущая модель
+        // и её покраска. Конфиги резолвит вызывающий (SaveSystem) из
         // каталога Resources/Ships; кривой текущий id — аренда (фолбэк), чужие
         // в списке владения пропускаются.
         // SetCurrent пересобирает Eff живого корпуса с полными HP/баком («пересадка»),
@@ -194,11 +193,11 @@ namespace SpaceTaxi.Economy
             return levels;
         }
 
-        // Пересадка с покраской (Н-3а): кривой индекс (нет варианта/чужой
+        // Пересадка с покраской: кривой индекс (нет варианта/чужой
         // слот) — заводская. Reconfigure применяет спрайт со СТАРЫМ индексом,
         // SetPaint тут же ставит правильный — двойное присвоение спрайта
         // дешевле размазывания покраски по перегрузкам Reconfigure.
-        // S7: явный индекс (покупка/восстановление из сейва) запоминается
+        // явный индекс (покупка/восстановление из сейва) запоминается
         // по модели — SwitchTo потом подставляет его же
         private void SetCurrent(ShipConfig config, int paintIndex = 0)
         {

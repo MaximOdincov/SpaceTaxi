@@ -10,24 +10,22 @@ namespace SpaceTaxi.Physics
         Flying = 0, // в полёте
         Landed = 1, // стоит на планете
         Respawning = 2, // окно респавна после гибели
-        Swallowed = 3, // затянуло за горизонт дыры (Н-10): болтается без управления до отключения
+        Swallowed = 3, // затянуло за горизонт дыры: болтается без управления до отключения
     }
 
     [RequireComponent(typeof(Rigidbody2D))] // физическое тело обязательно
     public class Ship : MonoBehaviour // модель борта: состояние + статы + бак
     {
-        // Н10.14 (Слой 3, владелец: «да, сегодня, осторожно»): записи состояния и
-        // корпуса — через Set-методы (прежде 11 прямых записей из 4 файлов,
-        // инварианты держались на дисциплине). Легальные переходы состояния:
-        // Flying↔Landed (посадка/взлёт), →Respawning (гибель/отключение X),
-        // →Swallowed (захват дыры), Respawning→Landed (новый борт у камеры).
-        // Respawning/Swallowed морозит ввод — ShipController читает State
+        // Записи состояния и корпуса — через Set-методы. Легальные переходы
+        // состояния: Flying↔Landed (посадка/взлёт), →Respawning (гибель/
+        // отключение X), →Swallowed (захват дыры), Respawning→Landed (новый
+        // борт у камеры). Respawning/Swallowed морозит ввод — ShipController
+        // читает State
         public ShipState State { get; private set; } = ShipState.Flying; // текущее состояние
         public float Hp { get; private set; } = 100f; // корпус
 
         // единственная точка записи состояния: no-op на повторе; строгая
-        // таблица переходов не вводится — все текущие переходы легальны,
-        // валидация была бы риском для краевых флоу (Н9: осторожно)
+        // таблица переходов не вводится — валидация была бы риском для краевых флоу
         public void SetState(ShipState value)
         {
             if (State == value)
@@ -38,10 +36,10 @@ namespace SpaceTaxi.Physics
         // единственная точка записи корпуса: инвариант 0..Eff.HpMax centralized
         public void SetHp(float value)
         {
-            Hp = Mathf.Clamp(value, 0f, Eff.HpMax); // кламп раньше дублировался у вызывающих
+            Hp = Mathf.Clamp(value, 0f, Eff.HpMax); // кламп в диапазон 0..HpMax
         }
 
-        // v5.1: борт заглушен оператором в захвате чёрной дыры (BlackHole.
+        // борт заглушен оператором в захвате чёрной дыры (BlackHole.
         // RequestAbandon) — двигатели молчат (ShipController), воронка дотягивает
         // до конца окна; сбрасывается при респавне
         public bool PoweredDown { get; set; } // флаг заглушенного борта
@@ -54,7 +52,7 @@ namespace SpaceTaxi.Physics
         // уровни улучшений [Engine, Tank, Hull, Maneuver], 0..3; 0 = сток
         public int[] UpgradeLevels { get; private set; }
 
-        // покраска корпуса: 0 = заводская, 1..N — PaintVariants (Н-3а);
+        // покраска корпуса: 0 = заводская, 1..N — PaintVariants;
         // переживает Reconfigure (улучшения/респавн не перекрашивают)
         public int PaintIndex { get; private set; }
 
@@ -135,7 +133,7 @@ namespace SpaceTaxi.Physics
             Reconfigured?.Invoke(); // подписчики узнали
         }
 
-        // Спрайт покраски (Н-3а): вариант или заводская — решает GetPaintSprite.
+        // Спрайт покраски: вариант или заводская — решает GetPaintSprite.
         // Перекрашивает текущий корпус; смена модели проходит через Reconfigure
         public void SetPaint(int paintIndex) // сменить покраску
         {

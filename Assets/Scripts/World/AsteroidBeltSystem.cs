@@ -11,8 +11,8 @@ namespace SpaceTaxi.World
     // В GravityField не регистрируется (без гравитации), урон — на принимающей стороне.
     public class AsteroidBeltSystem : MonoBehaviour
     {
-        // числа §3.8 — не менять (кроме радиусной вилки: расширена владельцем
-        // 2026-11-14 «масштаб должен сохраняться», было 4-10)
+        // числа плотности пояса — не менять; радиусная вилка шире (3-13),
+        // чтобы масштаб астероидов сохранялся
         private const int MinAsteroids = 24;
         private const int MaxAsteroids = 40;
         private const float MinAsteroidRadius = 3f;
@@ -21,7 +21,7 @@ namespace SpaceTaxi.World
         private const float ToastZoneMargin = 20f;  // предупреждение на подлёте к поясу
         private const float ToastResetMargin = 50f; // флаг сбрасывается дальше зоны (повторный вход = новый тост)
 
-        // константа движения (решение координатора, не баланс §3.8)
+        // константа движения, не баланс плотности
         [Tooltip("Угловая скорость вращения пояса, рад/с")]
         public float BeltOrbitSpeed = 0.12f;
 
@@ -107,7 +107,7 @@ namespace SpaceTaxi.World
             go.AddComponent<Asteroid>().Init(radius);
         }
 
-        // отсев планет на оси (П7.1): rejection sampling до N попыток, затем сдвиг
+        // отсев планет на оси: rejection sampling до N попыток, затем сдвиг
         // угла по кругу; перекрыт весь круг (планета накрывает пояс) — ставим как есть
         private float PickClearAngle(float asteroidRadius, float distance)
         {

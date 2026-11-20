@@ -8,25 +8,22 @@ using SpaceTaxi.Economy;
 
 namespace SpaceTaxi.UI
 {
-    // Экран увольнения (проигрыш, Н13.1): долг свыше порога — аварии только добавляют долг
-    // свыше порога (Н7 Q7.8). Показ по DebtService.Dismissal: timeScale = 0
-    // (как пауза), панель поверх всего, кнопка «В МЕНЮ» сбрасывает забег
-    // (сейвов нет, инвалидацию добавит П10.2). Контроллера в каркасах сцен нет —
-    // он появляется сам на каждую сцену; в меню сессии нет и просто ждёт.
-    // Панель строится кодом при первом показе и повторно не открывается.
-    public class DismissalScreenController : ModalScreenControllerBase // Н10.13: общий каркас модалок
+    // Экран увольнения (проигрыш): долг превысил порог — МТО расторгает
+    // договор. Показ по событию DebtService.Dismissal, мир на паузе, панель
+    // поверх всего (200). Кнопка «В МЕНЮ» сбрасывает забег (сейв удаляется).
+    // Появляется сам на каждой сцене и ждёт сессию
+    public class DismissalScreenController : ModalScreenControllerBase
     {
         private const int SortingOrder = 200; // поверх всех канвасов сцены
 
         private bool bound;
-        private TMP_Text reasonText; // причина увольнения — по триггеру (долг)
+        private TMP_Text reasonText;
         private DebtService debt;
-
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            ModalBootstrap<DismissalScreenController>.Ensure(); // Н10.13: каркас в базе
+            ModalBootstrap<DismissalScreenController>.Ensure();
         }
 
         private void Update()
@@ -39,27 +36,25 @@ namespace SpaceTaxi.UI
             debt = session.Debt;
             debt.Dismissal += ShowDismissal; // подписка одна за жизнь сессии
             bound = true;
-            // Н7 Q7.8: сейв мог сохранить долг выше порога (Save знает только
-            // про счётчик аварий) — событие на загрузке не файрится, проверяем
-            // при бинде. Первый кадр сцены — безопасный момент: открытых
-            // экранов станции/борткомпа ещё нет
+            // сейв мог сохранить долг выше порога — события на загрузке не
+            // будет, проверяем при бинде
             if (debt.IsOverDismissalThreshold)
                 ShowDismissal();
         }
 
         private void ShowDismissal()
         {
-            if (opened) // Н10.13: терминальный экран — открылся раз и навсегда
+            if (opened) // терминальный экран — открылся раз и навсегда
                 return;
-            Sound.Play(SoundId.DismissalTone); // П9.3: тон увольнения до глушения экранов
+            Sound.Play(SoundId.DismissalTone); // тон увольнения
 
             EnsureScreen();
-            // причина по триггеру: долг свыше порога (Н13.1: аварии — только долг)
+            // причина: долг свыше порога
             if (reasonText != null)
                 reasonText.text = debt.IsOverDismissalThreshold
                     ? $"МТО расторгает договор.\nДолг {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)} превысил допустимые {UiFormat.Currency} {UiFormat.FormatCredits(debt.DismissalDebtThreshold)}."
                     : "МТО расторгает договор.\nДолги не возвращены.";
-            ActivateModal(); // Н10.13: timeScale — в базе («как пауза: до выхода в меню мир не живёт»)
+            ActivateModal(); // timeScale = 0 — в базе
 
             // терминальное состояние: пауза/карта/борткомп больше не управляются,
             // иначе ESC снял бы паузу под модальным экраном
@@ -79,8 +74,7 @@ namespace SpaceTaxi.UI
 
         private void GoToMenu()
         {
-            // увольнение сбрасывает забег (§3.9): сейв удаляется, «Продолжить»
-            // становится неактивным (П10.2); автосейв выхода в меню его не
+            // увольнение сбрасывает забег: сейв удаляется; автосейв его не
             // воскресит — Save пропускает терминальное состояние
             SaveSystem.DeleteSave();
             var flow = FindAnyObjectByType<SceneFlowButtons>();
@@ -94,7 +88,7 @@ namespace SpaceTaxi.UI
             SceneManager.LoadScene("MainMenu");
         }
 
-        // каркас экрана строится кодом при первом показе (стиль OnboardComputerFactory)
+        // каркас строится кодом при первом показе
         protected override GameObject BuildScreen()
         {
             var root = new GameObject("DismissalScreen", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
@@ -102,7 +96,7 @@ namespace SpaceTaxi.UI
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
-            // Масштаб как у сценического канваса (1920x1080, match 0.5)
+            // масштаб как у канваса сцены
             var scaler = root.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -130,14 +124,13 @@ namespace SpaceTaxi.UI
                 "МТО расторгает договор.\nДолги не возвращены.",
                 26f, OnboardComputerFactory.BrightColor, "Reason");
             reason.alignment = TextAlignmentOptions.Center;
-            reasonText = reason; // текст причины подменяется при показе (Н7 Q7.8)
+            reasonText = reason; // текст причины подменяется при показе
             var stats = OnboardComputerFactory.Text(content,
                 $"Непогашенный долг: {UiFormat.Currency} {UiFormat.FormatCredits(debt.Balance)}",
                 20f, OnboardComputerFactory.LabelColor, "Stats");
             stats.alignment = TextAlignmentOptions.Center;
 
-            // подтверждение увольнения — выраженно красная кнопка: полная заливка
-            // DangerColor (была 28% прозрачность), светлый текст борткомпа
+            // выраженно красная кнопка: полная заливка DangerColor
             var menu = OnboardComputerFactory.Button(content.transform, "В МЕНЮ",
                 OnboardComputerFactory.DangerColor,
                 OnboardComputerFactory.BrightColor, 26f, "ButtonMenu");
@@ -146,9 +139,7 @@ namespace SpaceTaxi.UI
             menuLayout.preferredWidth = 260f;
             menuLayout.minHeight = 56f;
             menuLayout.preferredHeight = 56f;
-            // hover: встроенный ColorTint (паттерн PlayerButton фабрики) — под
-            // курсором красный светлеет; тон умножается на цвет фона, поэтому
-            // компоненты >1 дают более светлый красный
+            // hover через ColorTint: компоненты >1 дают более светлый красный
             var menuButton = menu.GetComponent<Button>();
             menuButton.transition = Selectable.Transition.ColorTint;
             var menuColors = menuButton.colors;

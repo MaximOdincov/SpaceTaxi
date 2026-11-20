@@ -8,14 +8,10 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема «вид» бумажной карты (Н11): проекция мира на лист, зум, пан,
-    // следование за ракетой —
-    // Мировые метрики (центр, масштаб вписывания, граница мира) и «камера» вида:
-    // зум колесом/кнопками/анимацией, пан ЛКМ-драгом, режим «следить за ракетой».
-    // Выделена из MapScreenBinder (Н11): тела методов перенесены дословно.
-    // Записи состояния вида делает только эта подсистема (ApplyZoom/Reset),
-    // остальные слои карты читают zoom/scale через инъекцию; Content/SheetRect
-    // строит PaperMapChrome, CanvasCam находит хост.
+    // подсистема «вид» бумажной карты: проекция мира на лист, зум (колесо/
+    // кнопки/анимация), пан ЛКМ-драгом, следование за ракетой. Мировые метрики
+    // (масштаб вписывания, граница мира) и записи состояния вида — только здесь;
+    // Content/SheetRect строит PaperMapChrome.
     internal sealed class PaperMapProjection
     {
         private readonly MapScreenBinder host;
@@ -26,26 +22,22 @@ namespace SpaceTaxi.UI.PaperMap
             this.host = host;
         }
 
-        internal void SetPointerOverChrome(Func<Vector2, bool> handler) // Н11: тест «курсор над хромом»
+        internal void SetPointerOverChrome(Func<Vector2, bool> handler) // тест «курсор над хромом»
         {
             pointerOverChrome = handler;
         }
 
-        // — инъекция (Н11): лист/зум-контейнер строит PaperMapChrome, камеру — хост —
+        // инъекция: лист/зум-контейнер строит PaperMapChrome, камеру — хост
         internal RectTransform Content { get => content; set => content = value; }
         internal RectTransform SheetRect { get => sheetRect; set => sheetRect = value; }
         internal Camera CanvasCam { get => canvasCam; set => canvasCam = value; }
         internal Button FollowButton { get => followButton; set => followButton = value; }
         internal TMP_Text FollowLabel { get => followLabel; set => followLabel = value; }
 
-        // — вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору —
-        // Н6.HF1 → M8.3: минимальный зум считается в BuildMap от реального окна
-        // (поле minViewZoom) так, чтобы при полном отдалении по каждой оси было
-        // видно ≤ 100% диаметра мира — «полный отъезд = весь мир + поля бумаги»
-        // (прежде 0.62 поднимало порог зума ×1.77 и мир не влезал целиком)
+        // вид: базовый масштаб = весь мир вписан в лист, дальше зум к курсору.
+        // Минимальный зум считается в BuildMap: полный отъезд показывает весь мир
         private const float MinZoomWorldFraction = 1.0f; // доля диаметра мира в окне при минимальном зуме
-        // — визуальные ручки теперь в MapStyleConfig (Map Style Editor); свойства
-        // читают стиль — точки вызова сохранены, дефолты = прежние константы —
+        // визуальные ручки — в MapStyleConfig (Map Style Editor)
         private float MaxViewZoom => Style.maxViewZoom;     // от максимального отъезда до одной планеты крупно
         private float InitialViewZoom => Style.initialViewZoom; // карта открывается приближенной к игроку
         private const float ZoomDuration = 0.22f;
@@ -55,26 +47,24 @@ namespace SpaceTaxi.UI.PaperMap
         private const float ViewInset = 76f;       // отступ клампа ракеты от края листа, px (ракета 64 + подпись «ВЫ» внизу)
         private const float RubberMargin = 1.15f;  // мягкий вынос за край при перетаскивании
 
-        // режим «следить за ракетой» (Н6.K6): камера плавно держит ракету в центре.
-        // Пан и выбор тела сбрасывают фиксацию НАВСЕГДА (до повторного клика кнопки) —
-        // выбрано вместо «пауза на время перетаскивания»: предсказуемо, без рывка
-        // возврата после отпускания
+        // режим «следить за ракетой»: пан и выбор тела сбрасывают фиксацию до
+        // повторного клика кнопки — предсказуемо, без рывка возврата
         private const float FollowLerpSpeed = 5f;  // скорость догоняющего лерпа, 1/с (экспоненциальное сглаживание)
 
         private const float ClickDragGuard = 6f;   // сдвиг больше этого — пан, а не клик
 
-        // — инъекция: ссылки строятся хромом/хостом, тела методов читают поля дословно —
+        // инъекция: ссылки строятся хромом/хостом
         private Camera canvasCam; // null для Screen Space Overlay — так и нужно утилитам
         private RectTransform sheetRect;   // лист бумаги: ровно окно карты минус борткомп
         private RectTransform content;     // зум-контейнер: бумага + весь нарисованный мир
 
         private Vector2 worldCenter; // центр карты = origin мира (граница HullSystem — от него)
         private float mapRadius;
-        private float bodyEdgeRadius; // фактический край тел/кометной зоны — от него туман (M8.3)
+        private float bodyEdgeRadius; // фактический край тел/кометной зоны — от него туман
         private float scale = 1f;
 
         private float zoom = 1f;
-        private float minViewZoom = 1f; // нижний порог зума отдаления; считается в BuildMap (Н6.HF1)
+        private float minViewZoom = 1f; // нижний порог зума отдаления; считается в BuildMap
         private float zoomFrom = 1f;
         private float zoomTo = 1f;
         private float zoomT = 1f;
@@ -83,19 +73,18 @@ namespace SpaceTaxi.UI.PaperMap
         private Vector2 offTo;
         private bool zoomAnim;
 
-        // пан: ЛКМ-драг по листу и столу; клик (сдвиг ≤ ClickDragGuard) —
-        // клик-выбор метки (M8.8)
+        // пан: ЛКМ-драг по листу и столу; клик (сдвиг ≤ ClickDragGuard) — клик-выбор метки
         private bool dragging;
         private bool suppressClick; // нажатие переросло в пан — кликом не считать
         private float dragMoved;
         private Vector2 dragSheetPos;
 
-        // режим «следить за ракетой» (Н6.K6)
+        // режим «следить за ракетой»
         private bool followMode;
         private Button followButton;
         private TMP_Text followLabel;
 
-        // — наружу подсистемам/хосту (Н11): только чтение; записи — через методы выше —
+        // наружу подсистемам/хосту: только чтение; записи — через методы выше
         internal float Zoom => zoom;
         internal Vector2 ZoomOffset => zoomOffset;
         internal float Scale => scale;
@@ -109,19 +98,17 @@ namespace SpaceTaxi.UI.PaperMap
         private LevelAsset level => host.Level;
         private MapStyleConfig Style => host.Style;
         private bool built => host.IsBuilt;
-        private static Color WithAlpha(Color color, float alpha) => PaperMapUi.WithAlpha(color, alpha); // Н11
+        private static Color WithAlpha(Color color, float alpha) => PaperMapUi.WithAlpha(color, alpha);
         private const float ContentMargin = PaperMapUi.ContentMargin; // окно вида внутри листа (SheetClampView)
 
-        // — мировые метрики: из BuildMap (Н11) — граница мира по bbox тел,
-        // масштаб «весь мир вписан в лист», порог минимального отдаления.
-        // Вызывается хостом в BuildMap; GameRadiusOf — хост (честные радиусы
-        // построенных тел с множителями)
+        // мировые метрики: граница мира, масштаб «весь мир вписан в лист»,
+        // порог минимального отдаления; радиусы тел — хост (GameRadiusOf)
         internal void ComputeWorldMetrics()
         {
             // граница мира = кольцо буёв (HullSystem бросает «ПОТЕРЯНА СВЯЗЬ» от origin)
             mapRadius = level.WorldRadius;
             float extX = 0f, extY = 0f; // bbox всех тел уровня — то, что обязано влезть
-            bodyEdgeRadius = 0f;        // фактический край тел — от него туман (M8.3)
+            bodyEdgeRadius = 0f;        // фактический край тел — от него туман
             foreach (CelestialBodyData body in level.Bodies)
             {
                 float gameRadius = host.GameRadiusOf(body);
@@ -149,9 +136,8 @@ namespace SpaceTaxi.UI.PaperMap
             scale = Mathf.Min(w / (2f * extX * FitMargin), h / (2f * extY * FitMargin));
             scale = Mathf.Max(scale, 0.012f);
 
-            // Н6.HF1 → M8.3: порог отдаления — при минимальном зуме по каждой оси
-            // видно ≤ MinZoomWorldFraction (1.0) диаметра мира: полный отъезд
-            // показывает весь мир, поля бумаги дают FitMargin
+            // порог отдаления: при минимальном зуме по каждой оси видно
+            // ≤ MinZoomWorldFraction диаметра мира — полный отъезд показывает весь мир
             float minByWidth = w / (scale * 2f * extX * MinZoomWorldFraction);
             float minByHeight = h / (scale * 2f * extY * MinZoomWorldFraction);
             minViewZoom = Mathf.Min(MaxViewZoom, Mathf.Max(minByWidth, minByHeight));
@@ -162,7 +148,7 @@ namespace SpaceTaxi.UI.PaperMap
             return (world - worldCenter) * scale;
         }
 
-        // ————— стартовый вид: приближено к игроку (Н5.21-8) —————
+        // ————— стартовый вид: приближено к игроку —————
 
         // карта открывается сфокусированной на позиции игрока (Ship); корабль
         // недоступен — планета старта; зум InitialViewZoom: окрестности игрока,
@@ -192,8 +178,7 @@ namespace SpaceTaxi.UI.PaperMap
             ZoomAt(pos, scroll.y > 0f ? WheelStep : 1f / WheelStep);
         }
 
-        // Н6.K5: WASD-пан убран — клавиши больше не двигают карту, игра под
-        // картой ловит их без конфликта. Пан — только мышью (ЛКМ-драг).
+        // пан — только мышью (ЛКМ-драг): игра под картой ловит клавиши без конфликта
 
         private void ZoomAt(Vector2 screenPos, float factor)
         {
@@ -229,7 +214,7 @@ namespace SpaceTaxi.UI.PaperMap
             ApplyZoom(s, ClampZoomOffset(sheetOffset, s));
         }
 
-        // ————— режим «следить за ракетой» (Н6.K6) —————
+        // ————— режим «следить за ракетой» —————
 
         internal void ToggleFollow()
         {
@@ -270,15 +255,15 @@ namespace SpaceTaxi.UI.PaperMap
                 && RectTransformUtility.ScreenPointToLocalPointInRectangle(sheetRect, screenPos, canvasCam, out sheetLocal);
         }
 
-        // — пан: обработчики интерфейса хоста (Н11: тела перенесены из биндера) —
+        // пан: обработчики интерфейса хоста
         internal void BeginDrag(PointerEventData eventData, Func<PointerEventData, bool> pressOnChrome)
         {
             if (eventData.button != PointerEventData.InputButton.Left || pressOnChrome(eventData))
                 return;
             dragging = true;
             zoomAnim = false; // рука перебивает анимацию зума
-            // Н6.K6: пан — ручное управление видом; фиксация на ракете выключается
-            // до повторного клика кнопки (без «дёргающего» возврата)
+            // пан — ручное управление видом; фиксация на ракете выключается
+            // до повторного клика кнопки
             followMode = false;
             RefreshFollowButton();
             TryScreenToSheet(eventData.position, out dragSheetPos);
@@ -291,13 +276,13 @@ namespace SpaceTaxi.UI.PaperMap
             Vector2 delta = pos - dragSheetPos;
             dragMoved += delta.magnitude;
             if (dragMoved > ClickDragGuard)
-                suppressClick = true; // перетащили — это пан, не клик-выбор (M8.8)
+                suppressClick = true; // перетащили — это пан, не клик
             dragSheetPos = pos;
             // резиновый вынос за край; на отпускании лист плавно вернётся в границы мира
             ApplyZoom(zoom, ClampZoomOffset(zoomOffset + delta, zoom, RubberMargin));
         }
 
-        // (тело OnPointerDown хоста — Н11)
+        // тело OnPointerDown хоста
         internal void PressReset()
         {
             suppressClick = false;
@@ -347,7 +332,7 @@ namespace SpaceTaxi.UI.PaperMap
             if (content == null)
                 return;
             content.localScale = Vector3.one * s;
-            content.anchoredPosition = offset; // бумага — ребёнок контента: двигается одним слоем (Н5.26)
+            content.anchoredPosition = offset; // бумага — ребёнок контента: двигается одним слоем
         }
 
         // зум/пан не выносят содержимое за экран; margin > 1 — резиновый вынос при перетаскивании
@@ -376,7 +361,6 @@ namespace SpaceTaxi.UI.PaperMap
             => pointerOverChrome != null && pointerOverChrome(pos);
 
         // карта закрылась — вид сбрасываем, следующий вход с чистого экрана
-        // (часть OnDisable хоста, Н11); кляксы гибелей — у подсистемы аннотаций
         internal void OnMapDisabled()
         {
             dragging = false;
@@ -387,7 +371,7 @@ namespace SpaceTaxi.UI.PaperMap
             zoomAnim = false;
         }
 
-        // пересборка карты: вид сбрасывается целиком (часть RebuildAll хоста, Н11)
+        // пересборка карты: вид сбрасывается целиком
         internal void Reset()
         {
             dragging = false;
@@ -400,7 +384,5 @@ namespace SpaceTaxi.UI.PaperMap
             followLabel = null;
             followMode = false;
         }
-
-        // (Н11-step2-projection-applied)
     }
 }

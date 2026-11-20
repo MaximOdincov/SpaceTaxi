@@ -7,34 +7,10 @@ using TMPro;
 
 namespace SpaceTaxi.UI
 {
-    // Точка входа ревампа главного меню (бриф E, «лицо игры»). ВСЁ строится кодом
-    // при загрузке сцены MainMenu — .unity не правится: спавн через
-    // RuntimeInitializeOnLoadMethod + подписка на sceneLoaded (обе точки
-    // покрывают и запуск сразу в меню, и возврат из игры).
-    //
-    // Монтируется первым ребёнком канваса UI_Root, поэтому рисуется ПОД сценическим
-    // UI (TerminalPanel/SettingsUI поверх — их биндинги и переходы не тронуты):
-    //
-    //   MenuBackdrop (контроллер, ловит клики по пустому месту)
-    //   ├── ClickCatcher      — невидимый Image на весь экран (IPointerClickHandler)
-    //   ├── Nebula            — туманность (медленный дрейф)
-    //   ├── StarsFar          — дальние звёзды (тусклые, мерцают медленно)
-    //   ├── StarsMid          — средние
-    //   ├── StarsNear         — ближние яркие (мерцают быстро)
-    //   └── EggShip           — яйцо-такси (клик = точная цель)
-    //
-    // Слои живут ТОЛЬКО автономным дрейфом (E8.3: мышиный параллакс убран —
-    // владельца «подташнивает»): sway + медленное плавание в противофазе (E4);
-    // запас площади слоя ±400px скрывает края. Клик по экрану — ловушка
-    // кликов передаёт точку яйцу (MenuEggShip); кнопки перехватывают свои
-    // клики через ClickTarget в StarButtonDecorator (Н6). Название —
-    // MenuStarTitle, кнопки — StarButtonDecorator (E2/E3 + Н6: без плашек,
-    // шрифта и рамки — только звёздный текст; E8.2: под наведением жёлтеют
-    // САМИ звёзды, ореолов-подложек нет).
-    // Зелёные заливки прошлой итерации
-    // (Frame/Background панели) и оранжевый мокап-квадрат «Image» гасятся:
-    // фон меню — только живой звёздный слой; это чистый визуал без скриптов,
-    // биндинги не затронуты.
+    // Фон главного меню: строится кодом при загрузке сцены (RuntimeInitializeOnLoadMethod
+    // + sceneLoaded) и монтируется первым ребёнком канваса UI_Root — рисуется под
+    // сценическим UI. Дети: ClickCatcher (ловит клики по пустому месту), Nebula,
+    // StarsFar/Mid/Near, EggShip; название и кнопки — MenuStarTitle/StarButtonDecorator.
     public sealed class MenuBackdropController : MonoBehaviour, IPointerClickHandler
     {
         private const string SceneName = "MainMenu";
@@ -71,11 +47,9 @@ namespace SpaceTaxi.UI
             HidePanelFills(canvasGo.transform);
         }
 
-        // бриф E1: зелёная заливка прошлой итерации — TerminalPanel несёт Frame
-        // (мятный) и Background (тёмно-зелёный), растянутые с запасом за пределы
-        // панели (sizeDelta ~1324x276) поверх звёзд. Обе плоские заливки
-        // (Image без спрайта, у объектов нет скриптов) гасим — фон меню только
-        // звёздный параллакс; контент панели (логотип, кнопки, футер) не тронут
+        // TerminalPanel несёт Frame и Background — плоские заливки (Image без
+        // спрайта, скриптов нет), перекрывающие звёзды. Гасим их: фон меню —
+        // только звёздный слой; контент панели (логотип, кнопки, футер) не тронут
         private static void HidePanelFills(Transform canvas)
         {
             Transform panel = canvas.Find("MainMenuUI/TerminalPanel");
@@ -158,11 +132,9 @@ namespace SpaceTaxi.UI
 
         private void BuildLayers()
         {
-            // глубина как в игре (E4): дальние — тусклее, мельче и мерцают
-            // медленно; ближние — ярче, крупнее, мерцают быстро и искрят.
-            // PhaseShift разводит слои по фазе (far 0.75π vs near 1.75π —
-            // противофаза), медленное плавание Drift* — у слоёв встречные
-            // направления: глубина читается без мыши (E8.3)
+            // глубина: дальние — тусклее, мельче и мерцают медленнее; ближние —
+            // ярче, крупнее и искрят. PhaseShift и встречные Drift* разводят
+            // слои по фазе и направлению — глубина читается без параллакса
             layers.Add(MakeLayer("Nebula", new MenuStarLayer.Config
             {
                 Count = 5, SizeMin = 700f, SizeMax = 1400f,
@@ -238,7 +210,7 @@ namespace SpaceTaxi.UI
             var eggRect = (RectTransform)go.transform;
             eggRect.anchorMin = new Vector2(0.5f, 0.5f);
             eggRect.anchorMax = new Vector2(0.5f, 0.5f);
-            eggRect.sizeDelta = new Vector2(96f, 96f); // бриф E5: было 220 — скромнее и ленивее
+            eggRect.sizeDelta = new Vector2(96f, 96f); // небольшой — яйцо не спорит с панелью
 
             Image image = go.GetComponent<Image>();
             Sprite sprite = MenuEggShip.LoadSprite();
@@ -293,9 +265,8 @@ namespace SpaceTaxi.UI
                 BuildContent();
             }
 
-            // E8.3: мышиный параллакс убран (владелец: «подташнивает») — слои
-            // живут только автономным дрейфом: sway + медленное плавание.
-            // Unscaled — меню не зависит от timeScale.
+            // слои живут только автономным дрейфом (sway + медленное плавание),
+            // параллакса на мышь нет. Unscaled — меню не зависит от timeScale.
             float time = Time.unscaledTime;
             for (int i = 0; i < layers.Count; i++)
             {
@@ -303,16 +274,15 @@ namespace SpaceTaxi.UI
                 Vector2 sway = new(
                     Mathf.Sin(time * layer.SwaySpeed) * layer.SwayAmplitude,
                     Mathf.Cos(time * layer.SwaySpeed * 0.7f) * layer.SwayAmplitude);
-                // медленное плавание слоя в своём направлении (E4): период ~минута,
-                // у слоёв встречные углы — слои расходятся/сходятся, глубина
-                // читается без мыши; фазовый сдвиг i*2.4 рад разводит соседние
+                // медленное плавание в своём направлении (период ~минута, у слоёв
+                // встречные углы); фазовый сдвиг i*2.4 рад разводит соседние слои
                 float drift = Mathf.Sin(time * layer.DriftSpeed + i * 2.4f) * layer.DriftAmplitude;
                 Vector2 driftOffset = new(Mathf.Cos(layer.DriftAngleRad) * drift, Mathf.Sin(layer.DriftAngleRad) * drift);
                 layer.ApplyOffset(sway + driftOffset);
             }
         }
 
-        // клик по пустому месту — яйцо летит в точку (E.3); клики по кнопкам
+        // клик по пустому месту — яйцо летит в точку; клики по кнопкам
         // перехватываются кнопками и сюда не доходят
         public void OnPointerClick(PointerEventData eventData)
         {

@@ -5,11 +5,10 @@ namespace SpaceTaxi.Physics
     // Следование за кораблём с опережением по курсу, зум по скорости, дрожь от ударов
     public class CameraFollow : MonoBehaviour // один экземпляр, синглтон для тряски
     {
-        // ХОТФИКС владельца: камера дальше от корабля (~+21%) — «приближение чуть
-        // меньше и вообще чуть отдали»
+        // камера отодвинута от корабля (~+21%) — выбранное расстояние обзора
         private const float FlightViewHeight = 320f;  // медленный полёт — ближе
         private const float FastViewHeight = 680f;    // отъезд на максималке
-        private const float LandingViewHeight = 300f; // посадка/ретро (владелец: «слишком сильно приближение при посадке» — 230 → 300, зум мягче)
+        private const float LandingViewHeight = 300f; // посадка/ретро — приближение мягче, чем в полёте
         private const float LookaheadSeconds = 0.45f; // взгляд вперёд
         private const float LookaheadMax = 130f;      // предел смещения
         private const float ShakeDecay = 1.6f;        // спад trauma в секунду
@@ -51,7 +50,7 @@ namespace SpaceTaxi.Physics
             // Пауза (модал завершения, меню ESC) ставит timeScale=0, но
             // LateUpdate живёт в реальном времени: в scaled-времени камера
             // замирала со смещением lookahead и после закрытия модала видимо
-            // «уплывала» доседать на корабль (Н-9). На unscaled — стоит на
+            // «уплывала» доседать на корабль. На unscaled — стоит на
             // корабле уже во время модала, после закрытия догонять нечего
             float dt = Time.timeScale > 0f ? Time.deltaTime : Time.unscaledDeltaTime; // время кадра
 

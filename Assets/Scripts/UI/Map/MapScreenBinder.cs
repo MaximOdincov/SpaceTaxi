@@ -11,80 +11,21 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Карта (M) — «нарисованная от руки на старой жёлтой бумаге» (Н5.F + фиксы Н5.21 + Н6.K).
-    // Лист ровно вписан в окно карты минус зона бортового компьютера (панель 480 px
-    // слева; TAB убирает панель — лист каждый раз перекладывается). Бумага
-    // (M8.3: бесшовный тайл кропа Art/background.png, Image.Tiled) лежит ВНУТРИ
-    // зум-контента и СЧИТАЕТСЯ ОТ МИРА: размер = 2×граница мира×поля, тайл = 512
-    // мировых юнитов — плотность зерна постоянна в юнитах мира, зум крутит бумагу
-    // вместе с телами честно (прежде зерно было привязано к листу и «приближало»
-    // вместе с ним). Тёмный стол (Backdrop) начинается ПРАВЕЕ борткомпа — панель
-    // остаётся яркой при открытой карте (Н6.K1). Декор for_fun и компас-роза
-    // убраны (Н6.K2), легенда — без подложки, чернила прямо на бумаге (Н6.K3).
-    // Н6.HF4 сносил клики по телам; M8.8 вернул МИНИМАЛЬНЫЙ клик-выбор (без
-    // записок/зум-при-клике/чипа): клик по телу (отличение от пана — порог
-    // сдвига 6 px) ставит/снимает СВОЮ метку — зелёная булавка + зелёный
-    // пульсирующий ореол на карте (зелёный = метка игрока), червон на радаре
-    // и скобка в мире живут от Waypoint API. Правый клик / Esc (при открытой
-    // карте) метку снимают. Осталось: пан ЛКМ, зум колесом
-    // и кнопками (кламп minViewZoom..MaxViewZoom), следование за ракетой,
-    // маркеры заказов (жёлтая цель). Waypoint-контракт
-    // (Waypoint/WaypointChanged/Set/Clear/ToggleWaypoint) — для
-    // WaypointIndicator/MinimapBinder.
-    // Подписи — блок «иконка+имя» (картографическая модель 8 слотов, Н6.HF4):
-    // подпись живёт ПРИ своей иконке на фиксированном близком расстоянии,
-    // порядок размещения хаб → тела по радиусу → пояса; занятые слоты
-    // блокируются, при занятых всех 8 — шаг дальше + тонкая чернильная
-    // выноска. Decluttering по зуму (Н6.HF4.1): подписи трёх тиров видимости —
-    // хаб/звёзды/дыра/пояса всегда, планеты от 22 юн с contentScale ≥ 0.20,
-    // мелкие с ≥ 0.32 (contentScale = zoom/MaxViewZoom); при пересечении порога
-    // подписи переразмещаются — скрытые не занимают слоты у видимых, выноска
-    // прячется вместе со своей подписью.
-    // Иконки тел — чистая графика (raycastTarget=false), М7.2: честный размер —
-    // диаметр px = 2 × игровой радиус × scale (игровой радиус = построенное тело
-    // из GravityField: data.Radius × PlanetSizeMul/VisualSizeMul), спрайт —
-    // реальный игровой (K10-подход), вписан контентом арта как в Init.
-    // М7.1: цель заказа и метка — константный ЭКРАННЫЙ размер (counter-scale).
-    // Весь текст карты — только Excalifont (mapFont из сцены, фолбэк —
-    // Resources). Взрыв корабля — два расходящихся кольца с искрами и
-    // чернильный крест «здесь я погиб» до закрытия карты (Н6.K7 + M7.4,
-    // подписка не ленивая — ловит смерть и при закрытой карте), стоянка —
-    // тень-подставка (Н6.K7) и чернильное кольцо вокруг планеты (M7.3).
-    // Курсор системный всегда (Н6.K8). Отдаление
-    // клампится — при минимальном зуме виден ВЕСЬ мир (≤ 100% диаметра, M8.3:
-    // прежде было ≤ 62% и мир не влезал целиком; поля бумаги дают FitMargin).
-    // M7.5 (скайрим-дисциплина, конспект R) + M8.1/M8.2/M8.7 (вкус владельца):
-    // бумага (арт владельца) + чернила для текста/служебной графики. Тела —
-    // реальные игровые спрайты в РОДНЫХ цветах, без отмывки и теней-копий;
-    // ракета-маркер — родной цвет арта. Цель заказа — жёлтый полупрозрачный
-    // пульс (жёлтый = цель); красный Alarm — только смерть (клякса/взрыв);
-    // метка-waypoint — зелёные булавка+кольцо (M8.8, зелёный = метка игрока).
-    // Край мира — мягкая туманная
-    // кромка без рамки-обода (BuildWorldEdge), районы — крупные географические
-    // надписи с разрядкой,
-    // легенда — компактный ключ с честными значками построенных тел,
-    // линейка — тоньше и только на крупных зумах (SyncRuler), подписи —
-    // альфа-фейд 0.12с на смене тира (StepLabelFades).
-    // Карта открывается ПРИБЛИЖЕННОЙ К ИГРОКУ (зум 9; нет корабля — планета
-    // старта). Публичный контракт: Waypoint + WaypointChanged +
-    // Set/Clear/ToggleWaypoint (WaypointIndicator, MinimapBinder), SetView и
-    // Esc-договорённость TryHandleEscape (оркестратор, MapScreenController).
-    // Вид: колесо — зум к курсору ×1.2 (весь мир ↔ одна планета), ЛКМ-драг —
-    // пан (Н6.K5: WASD-пан убран, W больше не двигает карту — игра под картой
-    // ловит тягу честно).
+    // Карта уровня: лист, «нарисованный от руки» на старой бумаге. Строит иконки
+    // тел, подписи, метки; зум, пан, клик-выбор тела (метка игрока). Наружу:
+    // Waypoint + WaypointChanged, Set/Clear/ToggleWaypoint, SetView, TryHandleEscape.
     public class MapScreenBinder : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
         IPointerDownHandler, IPointerClickHandler
     {
         [SerializeField] private TMP_FontAsset mapFont; // Excalifont-Regular SDF — назначен в сцене
-        [SerializeField] private MapStyleConfig style;  // стиль карты (ручки владельца); null → Resources
+        [SerializeField] private MapStyleConfig style;  // стиль карты; null → Resources
 
         // — свои надписи/контуры (Map Style Editor): режим клика по карте —
         public static bool AnnotationPlacementMode;     // левый клик ставит аннотацию, правый отменяет
         public static AnnotationKind PlacementKind = AnnotationKind.Label;
 
         // стиль карты: назначенный в сцене → Resources/MapStyle_Default → временные
-        // дефолты (значения = константы Н8.13 — карта не меняется). Кэшируется;
-        // правится окном Space Taxi → Map Style Editor
+        // дефолты. Кэшируется; правится окном Space Taxi → Map Style Editor
         public MapStyleConfig Style
         {
             get
@@ -100,20 +41,13 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // M7.2: относительная нормировка (RefIconPx/maxBodyRadius) убрана — иконка
-        // = честный игровой диаметр 2 × Radius_game × scale; минимум — различимая
-        // точка (4 px контента ≈ 9 px экрана на минимальном зуме; при 6 px
-        // «минимальные» планеты уровня раздувались до 1.8× и отношение
-        // «px карты / радиус мира» переставало быть единым)
+        // минимум — различимая точка (4 px контента ≈ 9 px экрана на минимальном зуме)
         private const float MinIconPx = 4f;
 
-        // M8.8: клик-выбор — различение клика от пана (минимальная версия из
-        // истории Н5.18-Н6.8) + минимальный радиус попадания в тело
         private const float PickMinScreenPx = 14f; // мелкие тела кликаются в радиусе 14 экранных px
 
-        // — waypoint для WaypointIndicator/MinimapBinder (Н-8): свойство + событие.
-        // M8.8: способ задания — клик по телу на карте (минимальный клик-выбор,
-        // повторный клик/правый клик/Esc снимают)
+        // метка игрока для WaypointIndicator/MinimapBinder: ставится кликом по телу,
+        // снимается повторным/правым кликом или Esc
         public CelestialBodyData Waypoint { get; private set; }
         public event Action WaypointChanged;
 
@@ -141,9 +75,8 @@ namespace SpaceTaxi.UI
                 SetWaypoint(body);
         }
 
-        // Esc из контроллера: M8.8 — при открытой карте Esc сначала снимает
-        // СВОЮ метку (карта остаётся открытой), без метки — Esc закрывает карту
-        // целиком (контракт с MapScreenController: true — Esc съеден)
+        // Esc: при открытой карте сначала снимает метку игрока (карта остаётся),
+        // без метки — закрывает карту (контракт с MapScreenController: true — Esc съеден)
         public bool TryHandleEscape()
         {
             if (Waypoint == null)
@@ -159,11 +92,11 @@ namespace SpaceTaxi.UI
         private TMP_FontAsset font;
         private bool built;
 
-        // карта построена и сейчас на экране (Map Style Editor: статус «правки видны сразу»)
+        // карта построена и сейчас на экране
         public bool IsBuilt => built;
-        internal LevelAsset Level => level; // Н11: подсистемам нужен уровень
-        internal RectTransform MapRect => mapRect; // Н11: хром строит лист от корня карты
-        internal TMP_FontAsset Font => font; // Н11: шрифт карты для подсистем
+        internal LevelAsset Level => level; // подсистемам нужен уровень
+        internal RectTransform MapRect => mapRect; // хром строит лист от корня карты
+        internal TMP_FontAsset Font => font; // шрифт карты для подсистем
         private float builtWidth;
         private Camera canvasCam; // null для Screen Space Overlay — так и нужно утилитам
 
@@ -172,35 +105,34 @@ namespace SpaceTaxi.UI
 
         private bool relayoutPending;              // экран изменился — пересчитать лист
 
-        // M7.2: построенные тела уровня (ключ — DisplayName, совпадает с именем
+        // построенные тела уровня (ключ — DisplayName, совпадает с именем
         // GameObject): источник честного радиуса (Radius уже с PlanetSizeMul)
-        // и реального игрового спрайта
+        // и игрового спрайта
         private readonly Dictionary<string, CelestialBody> gameBodies = new Dictionary<string, CelestialBody>();
 
-        // — Н11: подсистемы бумажной карты (Assets/Scripts/UI/PaperMap, та же сборка) —
-        // создаются в Awake (CreateSubsystems); хост передаёт себя как контекст
+        // подсистемы бумажной карты (Assets/Scripts/UI/PaperMap) — создаются в
+        // Awake (CreateSubsystems); хост передаёт себя как контекст
         private PaperMapProjection view;
-        private PaperMapChrome chrome; // Н11: хром листа (стол/бумага/легенда/линейка/кнопки/районы)
-        private PaperMapLabels labels; // Н11: подписи тел (слоты/выноски/фейды)
-        private PaperMapRings rings;   // Н11: кольца цели/метки, маркер ракеты, край мира, кометы
-        private PaperMapAnnotations annotations; // Н11: слой аннотаций + эффекты смерти
+        private PaperMapChrome chrome; // хром листа (стол/бумага/легенда/линейка/кнопки/районы)
+        private PaperMapLabels labels; // подписи тел (слоты/выноски/фейды)
+        private PaperMapRings rings;   // кольца цели/метки, маркер ракеты, край мира, кометы
+        private PaperMapAnnotations annotations; // слой аннотаций + эффекты смерти
 
-        // — шимы к подсистемам вида/хрома: тела методов хоста остаются дословными,
-        // состояние зума/пана живёт в PaperMapProjection, лист/хром — в PaperMapChrome —
+        // шимы к подсистемам: зум/пан живёт в PaperMapProjection, лист/хром — в PaperMapChrome
         private float zoom => view.Zoom;
         private Vector2 zoomOffset => view.ZoomOffset;
         private float scale => view.Scale;
         private Vector2 worldCenter => view.WorldCenter;
         private bool suppressClick => view.SuppressClick;
-        private RectTransform content => view.Content;     // Н11: зум-контейнер строит PaperMapChrome
-        private Vector2 WorldToMap(Vector2 world) => view.WorldToMap(world); // Н11: иконки тел на карте
-        private float playerHeading => rings.PlayerHeading;      // Н11: последний курс маркера
+        private RectTransform content => view.Content;     // зум-контейнер строит PaperMapChrome
+        private Vector2 WorldToMap(Vector2 world) => view.WorldToMap(world); // иконки тел на карте
+        private float playerHeading => rings.PlayerHeading;      // последний курс маркера
         private bool TryScreenToSheet(Vector2 screenPos, out Vector2 sheetLocal)
             => view.TryScreenToSheet(screenPos, out sheetLocal);
         private bool PressOnChrome(PointerEventData eventData)
-            => chrome.PressedOnChrome(eventData); // Н11: хром-тест клика — PaperMapChrome
+            => chrome.PressedOnChrome(eventData); // хром-тест клика — PaperMapChrome
 
-        // анимации карты (Н6.K7): взрыв — кольцо+искры; стоянка — тень-подставка
+        // анимации карты: взрыв — кольцо+искры; стоянка — тень-подставка
         private HullSystem hull;
 
         private void Awake()
@@ -209,9 +141,7 @@ namespace SpaceTaxi.UI
             Canvas canvas = GetComponentInParent<Canvas>();
             canvasCam = canvas != null ? canvas.worldCamera : null;
 
-            // корень карты — на весь канвас: сценическая заготовка несла старые
-            // отступы «под борткомп», из-за чего резерв ширины панели в LayoutSheet
-            // складывался с ними и карта не доставала до борткомпа (Н5.26)
+            // корень карты — на весь канвас (отступы под борткомп считает LayoutSheet)
             mapRect.anchorMin = Vector2.zero;
             mapRect.anchorMax = Vector2.one;
             mapRect.offsetMin = Vector2.zero;
@@ -220,14 +150,14 @@ namespace SpaceTaxi.UI
             // заготовку из сцены стираем целиком — лист рисуем кодом
             ClearChildren(transform);
             font = ResolveFont();
-            CreateSubsystems(); // Н11: подсистемы бумажной карты
+            CreateSubsystems(); // подсистемы бумажной карты
             view.CanvasCam = canvasCam; // инъекция: камера канваса (null = Screen Space Overlay)
             chrome.BuildChrome();
             DeathListener.Ensure(this);
         }
 
-        // Н11: подсистемы бумажной карты — та же сборка (без asmdef), namespace
-        // SpaceTaxi.UI.PaperMap; хост передаёт себя как контекст и связи соседей
+        // подсистемы бумажной карты (namespace SpaceTaxi.UI.PaperMap);
+        // хост передаёт себя как контекст и связи соседей
         private void CreateSubsystems()
         {
             view = new PaperMapProjection(this);
@@ -240,12 +170,12 @@ namespace SpaceTaxi.UI
 
         private void OnEnable()
         {
-            BindHullDeath(); // M7.4: подписка не ленивая — смерть до первого Update тоже ловится
-            view.FocusOnPlayer(); // повторные открытия — карта сразу приближена к игроку (Н5.21-8)
+            BindHullDeath(); // подписка не ленивая — смерть до первого Update тоже ловится
+            view.FocusOnPlayer(); // повторные открытия — карта сразу приближена к игроку
         }
 
-        // шрифт: сцена (Excalifont) → ресурсы Excalifont → HUD → дефолт TMP.
-        // Н5.21-3: на карте только Excalifont — все тексты идут через MakeLabel.
+        // шрифт: сцена (Excalifont) → ресурсы Excalifont → HUD → дефолт TMP;
+        // все тексты карты идут через MakeLabel
         private TMP_FontAsset ResolveFont()
         {
             if (Style.fontOverride != null)
@@ -291,7 +221,7 @@ namespace SpaceTaxi.UI
                 built = true;
                 builtWidth = mapRect.rect.width;
                 chrome.RestackChrome();
-                view.FocusOnPlayer(); // Н5.21-8: первый вход — сразу приближено к игроку
+                view.FocusOnPlayer(); // первый вход — сразу приближено к игроку
                 labels.SyncLabelVisibility(); // FocusOnPlayer поднял зум — тиры подписей сразу по нему
                 return;
             }
@@ -313,12 +243,12 @@ namespace SpaceTaxi.UI
             view.UpdateZoomAnim();
             view.HandleWheel();
             labels.SyncLabelVisibility(); // decluttering: переразмещение подписей при смене тира зума
-            labels.StepLabelFades();      // M7.5: альфа-фейд на смене тира вместо мгновенного popping
-            chrome.SyncRuler();           // M7.5: линейка — только на крупных зумах
-            chrome.SyncSectorFade();      // M7.5: районы гаснут на приближении (скайрим-поведение)
+            labels.StepLabelFades();      // альфа-фейд на смене тира
+            chrome.SyncRuler();           // линейка — только на крупных зумах
+            chrome.SyncSectorFade();      // районы гаснут на приближении
             view.UpdateFollow();
             rings.UpdatePlayerMarker();
-            rings.UpdateLandedRing();    // M7.3: кольцо стоянки вокруг планеты
+            rings.UpdateLandedRing();    // кольцо стоянки вокруг планеты
             rings.UpdateTargetRing();
             rings.UpdateWaypointVisual();
             rings.UpdateComets();
@@ -342,14 +272,12 @@ namespace SpaceTaxi.UI
 
         private void OnDisable()
         {
-            // карта закрылась — вид сбрасываем, следующий вход с чистого экрана;
-            // кляксы гибелей и отложенный burst живут «до закрытия карты» (M7.4)
-            view.OnMapDisabled(); // Н11: пан/зум — состояние подсистемы вида
+            // карта закрылась — вид и кляксы гибелей сбрасываем, следующий вход
+            // с чистого экрана
+            view.OnMapDisabled(); // пан/зум — подсистема вида
             relayoutPending = false;
-            annotations.OnMapDisabled(); // Н11: кляксы гибелей — подсистема аннотаций
+            annotations.OnMapDisabled(); // кляксы гибелей — подсистема аннотаций
         }
-
-        // ————— каркас: стол, лист, бумага, экранное (вне зум-контейнера) —————
 
         // ————— содержимое листа —————
 
@@ -357,9 +285,9 @@ namespace SpaceTaxi.UI
         {
             chrome.LayoutSheet(); // размеры окна уже известны — лист актуален
 
-            // M7.2: реальные тела уровня — радиус (уже с PlanetSizeMul) и игровой
-            // спрайт; имя тела = имя GameObject (WorldBuilder). Заполняется ДО
-            // bbox: честный fit считает игровые радиусы (M8.3)
+            // реальные тела уровня — радиус (уже с PlanetSizeMul) и игровой спрайт;
+            // имя тела = имя GameObject (WorldBuilder). Заполняется до bbox —
+            // честный fit считает игровые радиусы
             gameBodies.Clear();
             GravityField gravity = FindAnyObjectByType<GravityField>();
             if (gravity != null)
@@ -367,23 +295,16 @@ namespace SpaceTaxi.UI
                     if (gameBody != null && !string.IsNullOrEmpty(gameBody.DisplayName))
                         gameBodies[gameBody.DisplayName] = gameBody;
 
-            view.ComputeWorldMetrics(); // Н11: граница мира/bbox/масштаб/порог отдаления — подсистема вида
-            chrome.ApplyPaperSize(); // Н11: M8.3 — бумага от мира (PaperMapChrome)
-
-            // рамка листа снята (владелец Н9.2: «убери бежевую рамку по краю»)
+            view.ComputeWorldMetrics(); // граница мира/bbox/масштаб/порог отдаления — подсистема вида
+            chrome.ApplyPaperSize(); // бумага от мира (PaperMapChrome)
 
             // слои снизу вверх: районы → край мира → пояса → подписи → тела →
-            // кометы → метка/цель (игрок — на листе, выше всех). Нарисованные
-            // линии (рамки районов, орбиты, кольца дистанций, сетка, пунктирные
-            // пути) убраны совсем — Н5.21-5. Н6.HF4: кликов по телам больше нет,
-            // иконки и подписи — чистая графика (raycastTarget=false); подписи
-            // живут при своих иконках (PlaceAllLabels), слой ниже иконок — чтобы
-            // «отошедшая» подпись читалась поверх чужих, но не накрывала тела
+            // кометы → метка/цель. Иконки и подписи — чистая графика
+            // (raycastTarget=false); слой подписей ниже иконок — подпись
+            // читается поверх чужих, но не накрывает тела
             chrome.BuildSectorLayer(content);
-            // M7.5: туман/обод — отдельный слой ВНЕ edgeRoot: CollectStaticChrome
-            // собирает детей edgeRoot как блокирующие rects слотов подписей, а
-            // кромка накрывает весь лист (2222×2222 px) — каждый слот «столкался»
-            // с туманом и все подписи уходили в дальний слот с выноской-«палкой»
+            // туманная кромка — отдельный слой вне edgeRoot: дети edgeRoot
+            // блокируют слоты подписей, а кромка накрывает весь лист
             rings.BuildEdgeLayers(content);
             beltsRoot = MakeRect("Belts", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             labels.CreateLabelsRoot(content);
@@ -396,16 +317,16 @@ namespace SpaceTaxi.UI
             chrome.BuildSectorLabels();
             rings.BuildCometZone();
             rings.BuildWorldEdge();
-            chrome.BuildLegend(); // M7.5: компактный ключ с честными значками — до PlaceAllLabels (блокирует слоты)
-            BuildAnnotations(); // свои надписи/контуры владельца (Map Style Editor) — поверх подписей
+            chrome.BuildLegend(); // компактный ключ с честными значками — до PlaceAllLabels (блокирует слоты)
+            BuildAnnotations(); // свои надписи/контуры (Map Style Editor) — поверх подписей
             foreach (CelestialBodyData body in level.Bodies)
                 if (body.Type == BodyType.AsteroidBelt)
                     CreateBelt(body);
             foreach (CelestialBodyData body in level.Bodies)
                 if (body.Type != BodyType.AsteroidBelt)
                     CreateBody(body);
-            labels.BindEdgeRoot(rings.EdgeRoot); // Н11: слоты читают край мира (буи/«потеря связи»)
-            labels.PlaceAllLabels(); // Н6.HF4: подписи блоками «иконка+имя» — после всех иконок
+            labels.BindEdgeRoot(rings.EdgeRoot); // слоты читают край мира (буи/«потеря связи»)
+            labels.PlaceAllLabels(); // подписи блоками «иконка+имя» — после всех иконок
 
             // кометы под ореолами цели/метки: ореол не должен прятаться под пролетевшей кометой
             rings.CreateCometsLayer(content);
@@ -414,13 +335,10 @@ namespace SpaceTaxi.UI
             rings.BuildTargetRing();
             rings.BuildPlayerMarker();
 
-            // Н5.21-8 → Н6-fix: FocusOnPlayer вызывается ПОСЛЕ built=true (в Update —
-            // внутри BuildMap гвард !built молча съедал приближение к игроку)
+            // первый фокус на игроке — после built=true
             chrome.BuildRuler(); // линейка зависит от scale — известен только здесь
             chrome.SyncTitle();
         }
-
-        // ————— кометная зона / край мира —————
 
         // ————— пояса астероидов: камни map_asteroid по кольцу —————
 
@@ -430,11 +348,9 @@ namespace SpaceTaxi.UI
             Vector2 pos = WorldToMap(body.Position);
             labels.SetIconSize(body, diameter);
 
-            // камни: ОДИН спрайт map_asteroid — детерминированный разброс по кольцу.
-            // M7.2: ширина кольца честная — в игре камни летят в Radius ± BeltWidth/2
-            // (AsteroidBeltSystem.Init), карта больше не расширяет пояс ×1.7.
-            // Кликовая зона пояса снесена (Н6.HF4): карта без кликов по телам;
-            // подпись строится в PlaceAllLabels
+            // камни: один спрайт map_asteroid, детерминированный разброс по кольцу;
+            // в игре камни летят в Radius ± BeltWidth/2 (AsteroidBeltSystem.Init) —
+            // ширина кольца честная
             Sprite rock = PaperMapArt.MapSprite("map_asteroid");
             if (rock != null)
             {
@@ -445,11 +361,9 @@ namespace SpaceTaxi.UI
                     float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
                     float rr = (body.Radius + (float)(rng.NextDouble() * 2.0 - 1.0) * body.BeltWidth * 0.5f) * scale;
                     Vector2 p = pos + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
-                    // ХОТФИКС владельца №2: камни пояса МЕЛЬЧЕ — «в реальности раз в
-                    // 10 меньше» (прежде 6-28px); теперь 2-8px степенным распределением —
-                    // текстура полосы, не галька
+                    // 2-8px степенным распределением — текстура полосы, а не галька
                     float size = 2f + Mathf.Pow((float)rng.NextDouble(), 2.2f) * 6f;
-                    // M8.1: камни — родной цвет арта (отмывка снята по вкусу владельца)
+                    // камни — родный цвет арта
                     RectTransform stone = MakeImage("Rock_" + i, beltsRoot, rock,
                         Color.white, Vector2.one * size, false);
                     stone.anchoredPosition = p;
@@ -461,25 +375,21 @@ namespace SpaceTaxi.UI
         }
 
         private static int StableHash(string text)
-            => PaperMapUi.StableHash(text); // Н11: реализация в PaperMapUi
+            => PaperMapUi.StableHash(text); // реализация в PaperMapUi
 
-        // ————— тела: реальный игровой облик, честный размер (M7.2) —————
+        // ————— тела: реальный игровой облик, честный размер —————
 
         private void CreateBody(CelestialBodyData body)
         {
-            // диаметр px = 2 × игровой радиус × scale: игровой радиус берём у
-            // построенного тела (CelestialBody.Init умножил data.Radius на
-            // PlanetSizeMul/VisualSizeMul — жалоба «по карте влетишь, а в игре
-            // пролетаешь мимо»). Относительная нормировка maxBodyRadius убрана:
-            // отношение «px карты / радиус мира» одно для всех тел.
+            // диаметр px = 2 × игровой радиус × scale: радиус берём у построенного
+            // тела (CelestialBody.Init умножил data.Radius на PlanetSizeMul/
+            // VisualSizeMul) — размер тела на карте совпадает с игровым
             float d = Mathf.Max(MinIconPx, GameRadiusOf(body) * 2f * scale);
-            // v5.1 (владелец: «на карте просто увеличь иконку черной дыры, а не
-            // рисуй ореол»): иконка дыры ×2 — фиолетовая зона-ореол убрана
+            // иконка дыры ×2 — без отдельного ореола
             if (body.Type == BodyType.BlackHole)
                 d *= 2f;
-            // ХОТФИКС владельца (день после Н8): на карте — КАРТОГРАФИЧЕСКИЕ спрайты
-            // Art/map (услуги читаются с иконки), не игровые арты планет; честный
-            // размер (d) остаётся прежним — меняется только текстура
+            // картографические спрайты Art/map (услуги читаются с иконки), не
+            // игровые арты планет; честный размер d не меняется
             Sprite art = MapSpriteOf(body);
             // вписываем КОНТЕНТ арта (альфа-границы, в мировых юнитах спрайта),
             // как вписывает тело CelestialBody.Init — видимый шар карты = шар игры
@@ -495,8 +405,7 @@ namespace SpaceTaxi.UI
             group.sizeDelta = size;
             group.anchoredPosition = WorldToMap(body.Position);
 
-            // иконка — чистая графика: без рейкаста, hover и кликов (Н6.HF4);
-            // цвет — родной цвет арта (M8.1: чернильная отмывка снята по вкусу владельца)
+            // иконка — чистая графика: без рейкаста и кликов; цвет — родный цвет арта
             MakeImage("Icon", group, art, Color.white, size, false);
             labels.SetIconSize(body, d);
             // подпись строится в PlaceAllLabels — блоками «иконка+имя» по приоритету
@@ -504,7 +413,7 @@ namespace SpaceTaxi.UI
 
         // игровой радиус тела: у построенного тела Radius уже с множителем;
         // мир ещё не построен (карта открыта раньше) — зеркало логики Init по данным
-        internal float GameRadiusOf(CelestialBodyData body) // Н11: читает подсистема вида
+        internal float GameRadiusOf(CelestialBodyData body) // читает подсистема вида
         {
             if (gameBodies.TryGetValue(body.DisplayName, out CelestialBody gameBody) && gameBody != null)
                 return gameBody.Radius;
@@ -514,11 +423,9 @@ namespace SpaceTaxi.UI
             return body.Radius * mul;
         }
 
-        // спрайт иконки тела на карте — КАРТОГРАФИЧЕСКИЙ (Art/map: map_planet/
-        // map_taxi_planet/map_gas_station/map_repair/map_sun/map_black_hole;
-        // услуги читаются с иконки). Хотфикс владельца после Н8: прежде здесь был
-        // игровой спрайт планеты. Картографии нет (арт удалён/не найден) —
-        // прежний источник, игровой спрайт построенного тела
+        // спрайт иконки — картографический (Art/map: map_planet/map_taxi_planet/
+        // map_gas_station/map_repair/map_sun/map_black_hole; услуги читаются
+        // с иконки); нет арта — игровой спрайт построенного тела
         private Sprite MapSpriteOf(CelestialBodyData body)
         {
             Sprite map = BodySprite(body);
@@ -533,7 +440,7 @@ namespace SpaceTaxi.UI
             return null;
         }
 
-        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // Н11: общий темп фейдов — PaperMapUi
+        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // общий темп фейдов — PaperMapUi
 
         // спрайт тела: хаб — планета-такси, заправка/мастерская — «планеты со
         // станцией» (услуги читаются с иконки, отдельные значки не нужны)
@@ -556,12 +463,10 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // ————— метка (waypoint) и цель заказа —————
-
         // ————— свои надписи и контуры (Map Style Editor) —————
 
         private void BuildAnnotations()
-            => annotations.BuildAnnotations(); // Н11: слой аннотаций — подсистема
+            => annotations.BuildAnnotations(); // слой аннотаций — подсистема
 
         // поставить аннотацию в точку мира (клик из Map Style Editor / API):
         // дописывает в стиль, перерисовывает слой; ассет сохраняется — аннотации
@@ -601,7 +506,7 @@ namespace SpaceTaxi.UI
         }
 
         // правки стиля из плея пишутся в ассет — аннотации/ручки переживают выход
-        internal void PersistStyle() // Н11: пишет правки стиля в ассет (аннотации)
+        internal void PersistStyle() // пишет правки стиля в ассет
         {
 #if UNITY_EDITOR
             if (style != null && UnityEditor.AssetDatabase.Contains(style))
@@ -613,7 +518,7 @@ namespace SpaceTaxi.UI
         }
 
         // тело текущего шага активного заказа: пассажир до посадки, цель — с пассажиром
-        internal int ActiveOrderTargetIndex() // Н11: читают подписи и кольца цели
+        internal int ActiveOrderTargetIndex() // читают подписи и кольца цели
         {
             var orders = session != null ? session.Orders : null;
             var active = orders != null ? orders.Active : null;
@@ -622,11 +527,10 @@ namespace SpaceTaxi.UI
                 : active.State == OrderState.Aboard ? active.DropoffIndex : active.PickupIndex;
         }
 
-        internal Ship Ship => ship; // Н11: состояние корабля для маркера (ленивый поиск — в ShipPosition)
-        internal HullSystem Hull => hull; // Н11: подсистеме смерти нужен hull
-        // ————— игрок: ракета, видна всегда —————
+        internal Ship Ship => ship; // состояние корабля для маркера (ленивый поиск — в ShipPosition)
+        internal HullSystem Hull => hull; // подсистеме смерти нужен hull
 
-        internal Transform ShipPosition() // Н11: читает подсистема колец
+        internal Transform ShipPosition() // читает подсистема колец
         {
             if (ship == null)
                 ship = FindAnyObjectByType<Ship>();
@@ -634,10 +538,9 @@ namespace SpaceTaxi.UI
             return ship != null ? ship.transform : null;
         }
 
-        // ориентация корпуса в мировых градусах (M8.5: поза посадки маркера) —
-        // та же конвенция, что в MinimapBinder.HullHeadingDeg: поворот тела +
-        // нос спрайта ShipController
-        internal float HullHeadingDeg() // Н11: читает подсистема колец
+        // ориентация корпуса в мировых градусах — та же конвенция, что в
+        // MinimapBinder.HullHeadingDeg: поворот тела + нос спрайта ShipController
+        internal float HullHeadingDeg() // читает подсистема колец
         {
             if (ship == null)
                 ship = FindAnyObjectByType<Ship>();
@@ -648,11 +551,9 @@ namespace SpaceTaxi.UI
             return ship.Body.rotation + nose;
         }
 
-        // взрыв на карте (Н6.K7 + M7.4): подписка на смерть корабля — НЕ ленивая:
-        // вешается в OnEnable, поллится в Update и дублируется постоянным
-        // DeathListener (карта-то неактивна, пока закрыта). -=+ += идемпотентны:
-        // domain reload в пле стирает delegate-списки событий (не сериализуются),
-        // ранний early-return после этого молча терял смерть (найдено приёмкой Н7)
+        // подписка на смерть корабля не ленивая: OnEnable + полл в Update +
+        // постоянный DeathListener (карта неактивна, пока закрыта). Переподписка
+        // -=/+= идемпотентна — переживает domain reload
         private void BindHullDeath()
         {
             if (hull == null)
@@ -664,12 +565,11 @@ namespace SpaceTaxi.UI
         }
 
         private void OnShipDied()
-            => annotations.OnShipDied(); // Н11: эффекты смерти — подсистема аннотаций
+            => annotations.OnShipDied(); // эффекты смерти — подсистема аннотаций
 
-        // M7.4: постоянный слушатель смерти — сам байндер неактивен, пока карта
-        // закрыта, и не словил бы смерть до первого открытия карты. Живёт в
-        // DontDestroyOnLoad, самоуничтожается при смерти владельца (смена сцены);
-        // переподписка идемпотентна — переживает domain reload в пле
+        // постоянный слушатель смерти: байндер неактивен, пока карта закрыта.
+        // Живёт в DontDestroyOnLoad, самоуничтожается при смерти хоста (смена
+        // сцены); переподписка идемпотентна
         private sealed class DeathListener : MonoBehaviour
         {
             private MapScreenBinder owner;
@@ -691,7 +591,7 @@ namespace SpaceTaxi.UI
             {
                 if (owner == null)
                 {
-                    Destroy(gameObject); // владелец умер (смена сцены) — слушатель не нужен
+                    Destroy(gameObject); // хост уничтожен (смена сцены) — слушатель не нужен
                     return;
                 }
                 if (hull == null)
@@ -709,9 +609,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // ————— живые кометы: map_cometa по курсу —————
-
-        internal Vector2 PlayerWorldPosition() // Н11: читает подсистема вида
+        internal Vector2 PlayerWorldPosition() // читает подсистема вида
         {
             Transform shipT = ShipPosition();
             if (shipT != null)
@@ -726,20 +624,18 @@ namespace SpaceTaxi.UI
         }
 
         // программный вид для тестов/оркестратора: зум и смещение контента
-        // (тело — в PaperMapProjection.SetView, Н11)
         public void SetView(float viewZoom, Vector2 sheetOffset)
             => view.SetView(viewZoom, sheetOffset);
 
         public void OnBeginDrag(PointerEventData eventData)
-            => view.BeginDrag(eventData, PressOnChrome); // Н11: пан — подсистема вида
+            => view.BeginDrag(eventData, PressOnChrome); // пан — подсистема вида
 
         public void OnDrag(PointerEventData eventData)
-            => view.Drag(eventData); // Н11: пан — подсистема вида
+            => view.Drag(eventData); // пан — подсистема вида
 
-        // M8.8: клик-выбор. Нажатие сбрасывает «перетащили» — клик снова жив;
-        // клик по телу ставит/снимает метку (ToggleWaypoint), правый — снимает
+        // клик по телу ставит/снимает метку (ToggleWaypoint), правный клик — снимает
         public void OnPointerDown(PointerEventData eventData)
-            => view.PressReset(); // Н11: пан-состояние — подсистема вида
+            => view.PressReset(); // пан-состояние — подсистема вида
 
         public void OnPointerClick(PointerEventData eventData)
         {
@@ -773,10 +669,8 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // тело под курсором (минимальный вариант из истории Н5.18-Н6.8, без
-        // записок/чипа/зум-при-клике): ближайшее тело, у которого точка мира
-        // внутри честного радиуса (мелкие — в радиусе PickMinScreenPx экрана).
-        // Пояса не кликабельны: метка ставится на точку, у пояса она бессмысленна
+        // тело под курсором: ближайшее, у которого точка мира внутри честного
+        // радиуса (мелкие — в радиусе PickMinScreenPx экрана). Пояса не кликабельны
         private bool PickBodyAt(Vector2 screenPos, out CelestialBodyData picked)
         {
             picked = null;
@@ -802,18 +696,18 @@ namespace SpaceTaxi.UI
         }
 
         public void OnEndDrag(PointerEventData eventData)
-            => view.EndDrag(eventData); // Н11: пан — подсистема вида
+            => view.EndDrag(eventData); // пан — подсистема вида
 
         private void RebuildAll()
         {
             ClearChildren(transform);
-            chrome.Reset(); // Н11: хром — лист/бумага/секторы/легенда/линейка/кнопки
+            chrome.Reset(); // хром — лист/бумага/секторы/легенда/линейка/кнопки
             beltsRoot = null;
             bodiesRoot = null;
-            labels.Reset(); // Н11: подписи/размеры иконок — подсистема
-            rings.Reset(); // Н11: кольца/маркеры/край мира/кометы — подсистема
-            annotations.Reset(); // Н11: слой аннотаций + эффекты смерти — подсистема
-            view.Reset(); // Н11: пан/зум/следование — подсистема вида
+            labels.Reset(); // подписи/размеры иконок — подсистема
+            rings.Reset(); // кольца/маркеры/край мира/кометы — подсистема
+            annotations.Reset(); // слой аннотаций + эффекты смерти — подсистема
+            view.Reset(); // пан/зум/следование — подсистема вида
             chrome.BuildChrome();
             BuildMap();
             built = true;
@@ -826,29 +720,17 @@ namespace SpaceTaxi.UI
         // ————— хелперы —————
 
         private static void ClearChildren(Transform t)
-            => PaperMapUi.ClearChildren(t); // Н11: реализация в PaperMapUi
+            => PaperMapUi.ClearChildren(t); // реализация в PaperMapUi
 
         private static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 offsetMin, Vector2 offsetMax)
-            => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax); // Н11: PaperMapUi
+            => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax); // PaperMapUi
 
         private static RectTransform MakeImage(string name, Transform parent, Sprite sprite, Color color, Vector2 size, bool raycast)
-            => PaperMapUi.MakeImage(name, parent, sprite, color, size, raycast); // Н11: PaperMapUi
+            => PaperMapUi.MakeImage(name, parent, sprite, color, size, raycast); // PaperMapUi
 
         private static Color WithAlpha(Color color, float alpha)
-            => PaperMapUi.WithAlpha(color, alpha); // Н11: реализация в PaperMapUi
+            => PaperMapUi.WithAlpha(color, alpha); // реализация в PaperMapUi
 
     }
 }
-
-// Н11-step1-papermapui-applied
-
-// Н11-step2-projection-applied
-
-// Н11-step4b1-applied
-
-// Н11-step4b2-applied
-
-// Н11-step5-rings-applied
-
-// Н11-step6-annotations-applied

@@ -4,8 +4,9 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI
 {
-    // Арт «экспедиционной бумаги»: загрузка из Resources + процедурные фолбэки.
-    // Канонические пути для владельца (PNG импортировать как Sprite, у коллажей — Multiple):
+    // Арт «экспедиционной бумаги»: загрузка из Resources + процедурные фолбэки
+    // (нет ресурса — рисуем «карандашом» кодом). Канонические пути (PNG — Sprite,
+    // у коллажей — Multiple):
     //   Assets/Resources/Map/paper_sheet.png  (1024×1024) — лист карты
     //   Assets/Resources/Map/paper_note.png   (512×384)   — записка/легенда
     //   Assets/Resources/Map/map_icons.png    (коллаж 3×3, ячейки слева направо сверху вниз:
@@ -13,23 +14,18 @@ namespace SpaceTaxi.UI
     //                                          4 комета, 5 буй, 6 корабль, 7 цель, 8 метка)
     //   Assets/Resources/Map/map_stamps.png   (коллаж 2×3: 0 заправка, 1 мастерская, 2 хаб,
     //                                          3 метка-waypoint, 4 потеря связи, 5 резерв)
-    // Нет ресурса — рисуем «карандашом» кодом, карта остаётся рабочей.
     public static class PaperMapArt
     {
         public const int IconGrid = 3;   // map_icons: 3×3
         public const int StampGridX = 2; // map_stamps: 2×3
         public const int StampGridY = 3;
 
-        // — палитра «бумага + чернила» (M7.5, скайрим-дисциплина R; ревизия M8.1/M8.7) —
-        // Бумага — арт владельца (Art/background.png, тёплая сепия, не трогается) + фолбэки.
-        // Тела — РЕАЛЬНЫЕ игровые спрайты в родных цветах (отмывка снята владельцем);
-        // чернила — текст и служебная графика листа. Цель заказа — жёлтый
-        // (MapScreenBinder.TargetRingColor); красный зарезервирован за смертью.
+        // палитра «бумага + чернила»: бумага — тёплая сепия (Art/background.png);
+        // тела — реальные игровые спрайты в родных цветах; чернила — текст и
+        // служебная графика листа. Жёлтый — цель заказа, красный — только смерть.
         public static readonly Color Ink = new Color(0.243f, 0.184f, 0.137f);     // #3E2F23 — основные чернила
         public static readonly Color InkSoft = new Color(0.420f, 0.329f, 0.235f); // #6B543C — вторичные (периферия, пояса, кромка)
-        // M8.7: янтарный акцент ВЫВЕДЕН из употребления (владелец вернул жёлтый
-        // цели — MapScreenBinder.TargetRingColor); цвет оставлен в палитре как
-        // вторичный, целью заказа больше не назначается
+        // янтарный акцент — вторичный цвет, целью заказа не назначается
         public static readonly Color Accent = new Color(0.706f, 0.325f, 0.035f);  // #B45309 — жжёный янтарь
         public static readonly Color Alarm = new Color(0.549f, 0.169f, 0.118f);   // #8C2B1E — красный: ТОЛЬКО смерть
         public static readonly Color Paper = new Color(0.89f, 0.80f, 0.59f);
@@ -45,19 +41,17 @@ namespace SpaceTaxi.UI
         }
 
 
-        // Жёлтая бумага карты — фон владельца Art/background.png (Resources/Art).
+        // Жёлтая бумага карты — Art/background.png (Resources/Art).
         // null — фолбэк: ровный цвет Paper.
         public static Sprite SheetArt()
         {
             return LoadArt("background");
         }
 
-        // M8.3: бесшовный тайл бумаги для Image.Tiled — кроп 512×512 из
-        // Art/background.png (генерируется из чистой центральной зоны листа с
-        // перекрёстным затуханием краёв; ассет Assets/Resources/Art/map/paper_tile.png).
-        // Тайлится Image'ом карты с pixelsPerUnitMultiplier = 1/scale — один тайл
-        // всегда 512 мировых юнитов, зерно не «приближается» вместе с листом.
-        // PPU спрайта 100 = канонический referencePixelsPerUnit канваса
+        // бесшовный тайл бумаги для Image.Tiled — кроп 512×512 из
+        // Art/background.png (ассет Assets/Resources/Art/map/paper_tile.png).
+        // Тайлится с расчётным pixelsPerUnitMultiplier — один тайл всегда
+        // 512 мировых юнитов, зерно не «приближается» вместе с зумом.
         public static Sprite PaperTile()
         {
             string key = "paper_tile";
@@ -71,7 +65,7 @@ namespace SpaceTaxi.UI
             return s;
         }
 
-        // Иконки тел владельца из Assets/Resources/Art/map: map_planet, map_sun,
+        // Иконки тел из Assets/Resources/Art/map: map_planet, map_sun,
         // map_black_hole, map_gas_station, map_repair, map_taxi_planet,
         // map_asteroid, map_rocket, map_cometa, map_for_fun_1/2.
         // Импорт бывает Single/Multiple — пробуем Sprite, потом "<имя>_0", потом текстуру.
@@ -107,8 +101,6 @@ namespace SpaceTaxi.UI
 
 
         // — процедурные карандашные спрайты (кэш в статике) —
-        // Н5.21-5: пунктирные кольца-линии (орбиты, сеть, пояс, штриховка) убраны
-        // вместе с их генераторами — остались только ореолы и штрих разделителя.
 
     // сплошной карандашный обвод (цель заказа, ореолы)
     public static Sprite TargetRing()
@@ -196,13 +188,11 @@ namespace SpaceTaxi.UI
             return s;
         }
 
-        // край мира (M7.5): туманная кромка — бумага «растворяется» к границе.
-        // RGBA-текстура с плавной альфой (не бинарный крап CreateMaskTexture:
-        // при зуме 9 один техель крапа — 34px блоб), лёгкая мраморность синусами
-        // — читается как пятно старой бумаги на любом зуме. ВНУТРЕННИЙ край
-        // полосы лежит на доле EdgeFogBorderFrac радиуса спрайта — вызывающий
-        // счcитает картинку так, чтобы растворение начиналось ЗАРАНЕЕ, до
-        // кольца буёв (пан-клампы листа не дают заглянуть дальше ~R, Н6.HF1)
+        // край мира: туманная кромка — бумага «растворяется» к границе.
+        // RGBA-текстура с плавной альфой и лёгкой мраморностью синусами —
+        // читается как пятно старой бумаги на любом зуме. Внутренний край
+        // полосы — на доле EdgeFogBorderFrac радиуса спрайта: растворение
+        // начинается заранее, до кольца буёв
         public const float EdgeFogBorderFrac = 0.575f;
         public static Sprite EdgeFog()
         {
@@ -249,7 +239,6 @@ namespace SpaceTaxi.UI
 
 
         // — внутреннее —
-        // (курсор-pointer убран: Н6.K8 — курсор системный всегда)
 
         private static Sprite LoadSingle(string name)
         {

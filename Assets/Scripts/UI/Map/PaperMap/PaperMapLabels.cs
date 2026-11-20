@@ -7,13 +7,9 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема «подписи» бумажной карты (Н11): раскладка подписей «иконка+имя»
-    // по 8 близким слотам, чернильные выноски, decluttering по тирaм зума,
-    // альфа-фейды и призраки, реестр честных размеров иконок тел —
-    // Выделена из MapScreenBinder (Н11): тела перенесены дословно. Читает зум
-    // у PaperMapProjection (константный экранный кегль = LabelScreenFontSize /
-    // zoom), легенду/заголовок/лист — у PaperMapChrome, край мира — через
-    // BindEdgeRoot; цель активного заказа — через хост.
+    // подсистема «подписи»: раскладка подписей «иконка+имя» по 8 близким слотам,
+    // чернильные выноски, decluttering по зуму, альфа-фейды; реестр честных
+    // размеров иконок тел
     internal sealed class PaperMapLabels
     {
         private readonly MapScreenBinder host;
@@ -27,19 +23,19 @@ namespace SpaceTaxi.UI.PaperMap
             this.chrome = chrome;
         }
 
-        // — шимы к хосту/виду/хрому (Н11): тела методов остаются дословными —
+        // шимы к хосту/виду/хрому
         private MapStyleConfig Style => host.Style;
         private LevelAsset level => host.Level;
         private float zoom => view.Zoom;
         private float scale => view.Scale;
-        private float MaxViewZoom => Style.maxViewZoom; // Н11: та же ручка стиля, что у PaperMapProjection
+        private float MaxViewZoom => Style.maxViewZoom; // та же ручка стиля, что у PaperMapProjection
         private int ActiveOrderTargetIndex() => host.ActiveOrderTargetIndex();
         private RectTransform sheetRect => view.SheetRect;
         private Vector2 WorldToMap(Vector2 world) => view.WorldToMap(world);
         private RectTransform legendRoot => chrome.LegendRoot;
         private RectTransform titleRoot => chrome.TitleRoot;
 
-        // хелперы PaperMapUi (Н11)
+        // хелперы PaperMapUi
         private static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 offsetMin, Vector2 offsetMax)
             => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax);
@@ -64,15 +60,14 @@ namespace SpaceTaxi.UI.PaperMap
 
         // подписи тел (заполняются в PlaceAllLabels; читаются ореолом цели)
         private readonly Dictionary<CelestialBodyData, TMP_Text> bodyLabels = new Dictionary<CelestialBodyData, TMP_Text>();
-        // выноски подписей — toggl вместе со своей подписью (decluttering, ореол цели)
+        // выноски подписей — включаются/выключаются вместе со своей подписью (decluttering, ореол цели)
         private readonly Dictionary<CelestialBodyData, RectTransform> labelLeaders = new Dictionary<CelestialBodyData, RectTransform>();
         private int labelTierState = -1; // максимальный видимый тир подписей при текущем зуме
-        private float labelPlacedZoom = 1f; // зум, под который разложены подписи (M7.5)
+        private float labelPlacedZoom = 1f; // зум, под который разложены подписи
 
-        // M7.5: альфа-фейд подписей на смене тира — новые подписи проявляются,
-        // исчезающие доигрывают призраками (0.12с), вместо мгновенного popping.
-        // TMP_Text.alpha — это альфа цвета шрифта (множителя нет): фейд пишет
-        // в цвет BaseColor.a * K
+        // альфа-фейд подписей на смене тира: новые проявляются, исчезающие
+        // доигрывают призраками. TMP_Text.alpha — это альфа цвета шрифта:
+        // фейд пишет в цвет BaseColor.a * K
         private sealed class LabelFade
         {
             public TMP_Text Label;    // живая подпись или призрак
@@ -101,37 +96,26 @@ namespace SpaceTaxi.UI.PaperMap
             public Color LeaderColor;
         }
 
-        // ————— подписи «блок иконка+имя» (Н6.HF4): 8 близких слотов вокруг иконки —————
-        // Подпись живёт ПРИ иконке на фиксированном близком расстоянии — «далеко от
-        // своей планеты» невозможно по построению: иконка всегда на своём мировом
-        // месте, двигается только подпись. Порядок размещения: хаб, затем тела по
-        // убыванию радиуса, пояса последними; уже размещённые подписи занимают
-        // слоты и блокируют их для следующих. Кандидат свободен, если его rect
-        // (preferred-размер текста) не задевает чужие подписи, чужие иконки и
-        // статичный хром (районы, край мира, легенда, заголовок). Если заняты все
-        // 8 близких слотов — один шаг дальше в направлении с минимальной коллизией
-        // и тонкая чернильная выноска от края иконки до подписи (не более одной на
-        // тело); если и там коллизия — наименее коллизирующий слот (best effort).
+        // ————— подписи «блок иконка+имя»: 8 близких слотов вокруг иконки —————
+        // Подпись живёт при иконке на фиксированном близком расстоянии; иконка
+        // всегда на своём мировом месте, двигается только подпись. Порядок
+        // размещения: хаб, затем тела по убыванию радиуса, пояса последними;
+        // размещённые подписи блокируют слоты. Кандидат свободен, если не
+        // задевает чужие подписи, чужие иконки и статичный хром. Заняты все 8 —
+        // шаг дальше + тонкая выноска (не более одной на тело); и там коллизия —
+        // наименее коллизирующий слот.
 
-        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // альфа-фейд подписей на смене тира (M7.5) — общий темп в PaperMapUi (Н11)
+        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // общий темп фейдов — PaperMapUi
 
         private const float LabelSlotGap = 3f;      // зазор края подписи от края иконки, px контента
         private const float LeaderThickness = 1.6f; // толщина чернильной выноски
-        // — decluttering по зуму (Н6.HF4.1) — с ХОТФИКСА владельца («не у всех планет
-        // есть надписи») тиры видимости для тел ВЫКЛЮЧЕНЫ (LabelTierOf всегда 0):
-        // подпись у каждого тела на любом зуме. Пороги contentScale остались
-        // триггерами ПЕРЕРАЗМЕЩЕНИЯ подписей при пересечении (дрейф разложенных) —
-        // contentScale = zoom / MaxViewZoom (1.0 — максимальное приближение,
-        // полный отъезд ≈ 0.16); скрытые подписи не блокируют слоты видимым
+        // пороги contentScale — триггеры переразмещения подписей (тиры видимости
+        // тел выключены, подпись у каждого тела на любом зуме);
+        // contentScale = zoom / MaxViewZoom
         private const float LabelTier1ZoomFraction = 0.20f; // порог переразмещения
         private const float LabelTier2ZoomFraction = 0.32f; // порог переразмещения
-        // M7.5: подписи тел — константного ЭКРАННОГО размера (скайрим-урок, как
-        // маркеры M7.1): контентный кегль = LabelScreenFontSize / zoom, иначе
-        // на приближении имена разрастаются (16px × zoom9 = 144px — «куча мала»).
-        // Солвер не тронут: работает с тем же кеглем через GetPreferredValues;
-        // при дрейфе зума подписи переразмещаются (SyncLabelVisibility)
-        // ХОТФИКС владельца (день после Н8): 15px мелковато — искать планету по
-        // названию тяжело; 18px на любом зуме (константный экранный кегль M7.5)
+        // подписи тел — константного экранного размера: контентный кегль =
+        // LabelScreenFontSize / zoom, иначе на приближении имена разрастаются
         private float LabelScreenFontSize => Style.labelFontSize;
         private const float LabelRezoomGrow = 1.20f;  // зум вырос на 20% — переразместить (кегль вырос)
         private const float LabelRezoomShrink = 0.55f; // зум упал сильнее — переразместить (кегль отстал)
@@ -148,8 +132,8 @@ namespace SpaceTaxi.UI.PaperMap
         // ПОСЛЕ построения всех иконок: их rects известны сразу
         internal void PlaceAllLabels()
         {
-            // переразмещение при смене тира зума: старые подписи и выноски сносятся;
-            // исчезающие на новом тире доигрывают призраками (M7.5)
+            // переразмещение: старые подписи и выноски сносятся;
+            // исчезающие доигрывают призраками
             List<GhostLabel> ghosts = CaptureGhostLabels();
             ClearChildren(labelsRoot);
             bodyLabels.Clear();
@@ -164,8 +148,8 @@ namespace SpaceTaxi.UI.PaperMap
             }
 
             var placed = new List<Rect>(); // блокеры — только подписи, видимые на текущем тире
-            // Н10.5: подпись планеты-цели отодвигается ЗА внешний радиус жёлтого
-            // кольца (диаметр 1.95× иконки) — имя не тонет под ореолом
+            // подпись планеты-цели отодвигается за внешний радиус жёлтого
+            // кольца — имя не тонет под ореолом
             int ringTargetIdx = ActiveOrderTargetIndex();
             CelestialBodyData ringTarget = ringTargetIdx >= 0 && ringTargetIdx < level.Bodies.Count
                 ? level.Bodies[ringTargetIdx]
@@ -177,7 +161,7 @@ namespace SpaceTaxi.UI.PaperMap
                     continue; // безымянное тело не подписываем
                 bool visible = LabelVisible(body);
                 TMP_Text label = MakeLabel("Label_" + body.DisplayName, labelsRoot, text,
-                    LabelScreenFontSize / Mathf.Max(zoom, 0.001f), // M7.5: константный экранный размер
+                    LabelScreenFontSize / Mathf.Max(zoom, 0.001f), // константный экранный размер
                     body.Type == BodyType.AsteroidBelt ? WithAlpha(PaperMapArt.Ink, 0.85f) : WithAlpha(PaperMapArt.Ink, 0.95f));
                 label.raycastTarget = false; // подпись не ловит клики — чистая графика
                 Vector2 labelSize = label.GetPreferredValues();
@@ -190,13 +174,10 @@ namespace SpaceTaxi.UI.PaperMap
                 Vector2 labelHalf = labelSize * 0.5f;
 
                 int slot = -1;
-                // Н10.5: у планеты-цели зазор слота отодвигает подпись за кольцо
+                // у планеты-цели зазор слота отодвигает подпись за кольцо
                 float slotGap = body == ringTarget ? RingClearGap(body, iconHalf) : LabelSlotGap;
-                // ХОТФИКС владельца («чупа-чупсы — палочки странные»): близкий слот
-                // разрешает перекрыть ЧУЖУЮ иконку (мелькающая под чернилами мелочь) —
-                // жёсткие блокеры только чужие подписи и хром; ярлык сидит при своей
-                // планете, палочка-выноска не нужна. Иконки учитывает лишь дальний
-                // проход (все близкие заняты подписями/хромом)
+                // близкий слот разрешает перекрыть чужую иконку — жёсткие блокеры
+                // только чужие подписи и хром; иконки учитывает лишь дальний проход
                 for (int i = 0; i < 8 && slot < 0; i++) // низ → верх → право → лево → диагонали
                 {
                     Rect candidate = CenteredRect(center + SlotOffset(i, iconHalf, slotGap, labelHalf), labelSize);
@@ -230,11 +211,9 @@ namespace SpaceTaxi.UI.PaperMap
                     labelLeaders[body] = leader;
                 }
 
-                // decluttering (M7.5): вместо мгновенного enabled — альфа-фейд;
-                // скрытая подпись позицию держит (при появлении не «переезжает»
-                // с нуля), но слоты видимым не занимает.
-                // ВАЖНО: TMP_Text.alpha пишет прямо в color.a — полный цвет
-                // захватываем ДО гашения, иначе фейд гонит ноль к нулю
+                // вместо мгновенного enabled — альфа-фейд; скрытая подпись
+                // позицию держит, но слоты видимым не занимает. Полный цвет
+                // захватываем ДО гашения — TMP_Text.alpha пишет прямо в color.a
                 Color fullColor = label.color;
                 label.alpha = 0f; // старт фейда: видимая проявится к 1, скрытая остаётся прозрачной
                 if (leader != null)
@@ -256,7 +235,7 @@ namespace SpaceTaxi.UI.PaperMap
 
             SpawnGhostLabels(ghosts);
             labelTierState = LabelTierState(); // состояние синхронно с выполненным размещением
-            labelPlacedZoom = zoom;            // кегль разложен под этот зум (M7.5)
+            labelPlacedZoom = zoom;            // кегль разложен под этот зум
         }
 
         // снимок подписей, исчезающих на новом тире (старое состояние живо в
@@ -364,7 +343,7 @@ namespace SpaceTaxi.UI.PaperMap
                 if (fade.K == fade.TargetK)
                 {
                     if (fade.Ghost)
-                        Object.Destroy(fade.Label.gameObject); // static-класс: не MonoBehaviour (Н11)
+                        Object.Destroy(fade.Label.gameObject); // static-класс: не MonoBehaviour
                     labelFades.RemoveAt(i);
                 }
             }
@@ -372,11 +351,8 @@ namespace SpaceTaxi.UI.PaperMap
 
         // статичный хром блок-листа: край мира (буи, «потеря связи», кометная
         // зона) — в координатах контента; легенда и заголовок лежат на листе —
-        // их rect переводится в координаты контента.
-        // M7.5: районы в хром НЕ собираются — их 560×56-rects в контент-px
-        // накрывали почти весь лист (вид на zoom9 ≈ 100×61 px) и гнали все
-        // подписи в дальние слоты с выносками-«палками». Район — фоновый
-        // водяной знак (alpha ~0.35): мелкая подпись поверх него читается
+        // их rect переводится в координаты контента. Районы НЕ собираются:
+        // это фоновый водяной знак, мелкая подпись поверх него читается
         private List<Rect> CollectStaticChrome()
         {
             var chrome = new List<Rect>();
@@ -412,11 +388,7 @@ namespace SpaceTaxi.UI.PaperMap
                 : IconSizeOf(body) * 0.5f;
         }
 
-        // ХОТФИКС владельца («не у всех планет есть надписи»): decluttering тиров
-        // для тел выключен — подпись теперь у КАЖДОГО тела на любом зуме (кегль
-        // константный экранный, солвер разводит с выносками; на полном отъезде
-        // прежде планеты молчали до приближения). Механика переразмещения при
-        // зуме (дрейф разложенных подписей) осталась
+        // тиры видимости тел выключены — подпись у каждого тела на любом зуме
         private static int LabelTierOf(CelestialBodyData body)
         {
             return 0;
@@ -438,10 +410,8 @@ namespace SpaceTaxi.UI.PaperMap
             return LabelTierOf(body) <= labelTierState;
         }
 
-        // decluttering: при пересечении порога тира подписи переразмещаются —
-        // дешёвый полл ловит любую смену зума (колесо, кнопки, анимация,
-        // следование); M7.5: переразмещение и при дрейфе зума от разложенного —
-        // кегль подписей константного экранного размера (LabelScreenFontSize/zoom)
+        // при пересечении порога тира или дрейфе зума подписи переразмещаются —
+        // кегль экранный (LabelScreenFontSize/zoom)
         internal void SyncLabelVisibility()
         {
             if (labelsRoot == null)
@@ -510,11 +480,10 @@ namespace SpaceTaxi.UI.PaperMap
             return new Vector2(sx * (iconHalf + gap + labelHalf.x), sy * (iconHalf + gap + labelHalf.y));
         }
 
-        // Н10.5: зазор слота, отодвигающий подпись планеты-цели за внешний
-        // радиус широкого кольца (диаметр 1.95× иконки) — имя планеты не
-        // прячется под ореолом (подавление подписи снято). Контент-единицы:
-        // и кольцо (localScale 1/zoom), и подписи (шрифт /zoom) в контенте
-        // имеют радиус IconSizeOf×0.975 независимо от зума
+        // зазор слота планеты-цели: подпись за внешним радиусом широкого
+        // кольца — имя не прячется под ореолом. Кольцо (localScale 1/zoom) и
+        // подпись (шрифт /zoom) в контенте имеют радиус IconSizeOf×0.975
+        // независимо от зума
         private float RingClearGap(CelestialBodyData body, float iconHalf)
         {
             return Mathf.Max(LabelSlotGap, IconSizeOf(body) * 0.975f + 2f - iconHalf);
@@ -530,7 +499,6 @@ namespace SpaceTaxi.UI.PaperMap
                 if (candidate.Overlaps(rect))
                     count++;
             // iconRects == null — близкий проход: чужие иконки не блокируют
-            // (ХОТФИКС «чупа-чупсы»); дальний проход считает их как прежде
             if (iconRects != null)
                 foreach (var pair in iconRects)
                     if (pair.Key != self && candidate.Overlaps(pair.Value))
@@ -541,9 +509,8 @@ namespace SpaceTaxi.UI.PaperMap
             return count;
         }
 
-        // тонкая чернильная линия-выноска от края иконки до края подписи —
-        // функциональный элемент: связывает отошедшую подпись с телом.
-        // Rect возвращается вызывающему: toggl вместе со своей подписью
+        // тонкая чернильная выноска от края иконки до края подписи —
+        // связывает отошедшую подпись с телом; включается вместе с ней
         private RectTransform MakeLeaderLine(int slot, Vector2 center, float iconHalf, Rect labelRect)
         {
             const float diag = 0.70710678f;
@@ -562,38 +529,38 @@ namespace SpaceTaxi.UI.PaperMap
             return MakeSegment(labelsRoot, a, b, WithAlpha(PaperMapArt.Ink, 0.5f), LeaderThickness);
         }
 
-        // (из BuildMap, Н11): слой подписей — ниже иконок тел, выше поясов
+        // слой подписей — ниже иконок тел, выше поясов
         internal void CreateLabelsRoot(RectTransform content)
         {
             labelsRoot = MakeRect("Labels", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         }
 
-        // (Н11): слой края мира (буи/«потеря связи») — блокирует слоты подписей;
+        // слой края мира (буи/«потеря связи») — блокирует слоты подписей;
         // ссылку отдаёт хост после BuildWorldEdge
         internal void BindEdgeRoot(RectTransform edgeRoot)
         {
             this.edgeRoot = edgeRoot;
         }
 
-        // (Н11): хост-строитель иконок пишет честный диаметр по иконке/поясу
+        // хост-строитель иконок пишет честный диаметр по иконке/поясу
         internal void SetIconSize(CelestialBodyData body, float diameter)
         {
             bodySizes[body] = diameter;
         }
 
-        // пересборка карты: подписи/размеры иконок гаснут (часть RebuildAll хоста, Н11)
+        // пересборка карты: подписи/размеры иконок гаснут
         internal void Reset()
         {
             bodySizes.Clear();
             bodyLabels.Clear();
             labelLeaders.Clear();
             labelTierState = -1;
-            labelFades.Clear(); // M7.5: фейд-состояния пересборки не переживают
+            labelFades.Clear(); // фейд-состояния пересборки не переживают
             labelsRoot = null;
             targetIndex = -1;
         }
 
-        // наружу подсистемам/хосту (Н11): кольца цели/метки читают честный диаметр,
+        // наружу подсистемам/хосту: кольца цели/метки читают честный диаметр,
         // тир цели сбрасывается при переразмещении
         internal int TargetIndex
         {
@@ -606,7 +573,5 @@ namespace SpaceTaxi.UI.PaperMap
         {
             return bodySizes.TryGetValue(body, out float size) ? size : 22f;
         }
-
-        // (Н11-step4-labels-applied)
     }
 }

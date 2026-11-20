@@ -11,36 +11,20 @@ using SpaceTaxi.Orders;
 
 namespace SpaceTaxi.UI
 {
-    // Экран завершения заказа (П4.3): модальная разбивка последней выплаты.
-    // Данные — PayoutService.LastResult (null — экран не открывать) и дельта
-    // рейтинга RatingService.LastDelta. Мир ставится на паузу (timeScale = 0)
-    // на время экрана; закрытие ЛЮБЫМ путём (кнопка/ESC/Enter) возвращает 1.
-    // ПРОБЕЛ закрывать НЕ МОЖЕТ: в мапе Ship это Thrust — закрытие по Space
-    // взлетало тем же кадром, и камера «улетала» с места доставки (Н-9).
-    // ESC уступается паузой по договорённости карты/станции
-    // (NotifyOrderCompleteOpened/Closed + EscJustClosed): при открытом экране
-    // завершения ESC закрывает его, пауза не открывается. Контроллера в сценах
-    // нет — появляется сам (стиль DismissalScreenController), панель строится
-    // кодом при первом показе (паттерн StationScreen П3.1).
-    // Н-9: строки разбивки появляются по одной (выезд слева + фейд 0.2 с,
-    // интервал 0.15 с). Вся анимация — по unscaledTime: модал живёт при
-    // timeScale = 0. Н4.4: суммы в валюте борткомпа (UiFormat + компактный формат
-    // UiFormat.FormatCredits) и каждая денежная строка прокатывается
-    // счётчиком — паттерн AnimateMoney: значение догоняет целевое по
-    // unscaledDeltaTime, старт в момент появления строки. Цвета по знаку:
-    // приход (+) — яркий борткомпа, убытки (−) — красный, долг — «спокойный»
-    // DebtCalmColor, дельта рейтинга — зелень/красный по знаку.
-    public class OrderCompleteScreenController : ModalScreenControllerBase // Н10.13: общий каркас модалок
+    // Экран завершения заказа: модальная разбивка выплаты (PayoutService.
+    // LastResult). Мир на паузе; строки появляются по одной (выезд + фейд),
+    // суммы прокатываются счётчиками. ПРОБЕЛ не закрывает: в мапе это тяга —
+    // закрытие взлетало бы тем же кадром. ESC — по общей договорённости
+    // (EscJustClosed). Панель строится кодом при первом показе; анимации —
+    // unscaledTime
+    public class OrderCompleteScreenController : ModalScreenControllerBase
     {
         private const int SortingOrder = 110; // поверх станции (100), ниже увольнения (200)
 
         private const float RowSlideSeconds = 0.2f;    // выезд/фейд одной строки
         private const float RowInterval = 0.15f;       // между стартами строк
         private const float RowSlideFrom = -32f;       // стартовый сдвиг текста влево, px
-        private const float CloseGuardSeconds = 0.25f; // кадр открытия не закрывает экран
-
-        // валюта борткомпа (как OnboardBinder); минус в суммах — U+2212,
-        // как в подписях кнопок панели («Отменить · −Đ N»)
+        private const float CloseGuardSeconds = 0.25f; // экран не закрывается в кадр открытия
 
         // строка разбивки: группа (альфа) + внутренний текст (слайд). Текст —
         // ребёнок строки, а не прямой элемент layout-группы: та двигает только
@@ -52,9 +36,8 @@ namespace SpaceTaxi.UI
             public RectTransform Slide;
             public float StartAt; // unscaledTime начала появления
 
-            // прокатка числа (Н4.4, паттерн AnimateMoney OnboardBinder):
-            // Shown догоняет Target по unscaledDeltaTime — экран живёт при
-            // timeScale = 0; старт — в момент появления строки
+            // прокатка числа: Shown догоняет Target по unscaledDeltaTime
+            // (экран живёт при timeScale = 0), старт — при появлении строки
             public bool Rolling;
             public int Target;    // итоговая сумма со знаком (+приход / −убыток)
             public float Shown;   // текущее прокатанное значение
@@ -83,7 +66,7 @@ namespace SpaceTaxi.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            ModalBootstrap<OrderCompleteScreenController>.Ensure(); // Н10.13: каркас в базе
+            ModalBootstrap<OrderCompleteScreenController>.Ensure();
         }
 
         private void Update()
@@ -93,11 +76,11 @@ namespace SpaceTaxi.UI
                 return;
 
             Animate();
-            HandleModalKeys(); // Н10.13: ESC/Enter + гвард кадра открытия — в базе
+            HandleModalKeys(); // ESC/Enter + гвард кадра открытия — в базе
         }
 
 
-        // лениво, пока сессия не соберётся (стиль биндеров)
+        // лениво, пока сессия не соберётся
         private void BindSession()
         {
             if (bound)
@@ -108,8 +91,7 @@ namespace SpaceTaxi.UI
             bound = true;
         }
 
-        // открытие: GameSession зовёт после выплаты и тостов; offer даёт имя
-        // пассажира для подзаголовка (может быть null)
+        // открытие: GameSession зовёт после выплаты; offer даёт имя пассажира
         public void Show(OrderOffer offer = null)
         {
             if (opened)
@@ -119,7 +101,7 @@ namespace SpaceTaxi.UI
             if (session == null || session.Payout == null || session.Payout.LastResult == null)
                 return; // выплаты не было — показывать нечего
 
-            EnsureScreen(); // Н10.13: каркас в базе
+            EnsureScreen();
             Refresh(offer);
             ActivateModal();
 
@@ -128,7 +110,7 @@ namespace SpaceTaxi.UI
                 pauseController.NotifyOrderCompleteOpened();
         }
 
-        // Н10.13: само закрытие (timeScale/скрытие) — в базе; хвост — уведомить паузу
+        // закрытие (timeScale/скрытие) — в базе; хвост — уведомить паузу
         protected override void OnClosed()
         {
             if (pauseController == null) pauseController = FindAnyObjectByType<PauseScreenController>();
@@ -145,18 +127,9 @@ namespace SpaceTaxi.UI
                 ? offer.Passenger.DisplayName + " доставлен"
                 : "");
 
-            // разбивка Н4.4: приход со «+», убытки с «−», суммы в формате
-            // борткомпа (Đ + компактные числа); каждая строка прокатывается.
-            // Порядок: Перевозка → Чаевые → Штраф → Комиссия аренды → Долг → ИТОГО
-            // «Перевозка» — цена карточки ЦЕЛИКОМ: наценка рейтинга ×1.1
-            // добавляется при спавне карточки (OrderService.PriceWithRatingBonus)
-            // и запекается в offer.Price — базовая цена нигде не сохраняется.
-            // Разделить на «база + бонус» в UI честно нельзя: текущий рейтинг не
-            // равен рейтингу на момент спавна (доставка сама двигает его на
-            // ±0.1–0.15, порог 4.0 в середине шкалы), а заказы из сейва вообще
-            // не имеют контекста спавна — строка бонуса могла бы показывать
-            // несуществующую надбавку. Чистое разделение требует одного поля
-            // в OrderOffer (OrderService — вне скоупа правок этого экрана)
+            // приход со «+», убытки с «−». «Перевозка» — цена карточки целиком:
+            // бонус рейтинга запекается при спавне (PriceWithRatingBonus),
+            // базовой цены в offer нет — разделить честно нельзя
             SetMoneyRow(priceRow, true, "Перевозка: ", result.Price);
             SetMoneyRow(tipsRow, result.Tips > 0, "Чаевые: ", result.Tips);
             SetMoneyRow(penaltyRow, result.Penalty > 0, "Штраф: ", -result.Penalty,
@@ -167,14 +140,13 @@ namespace SpaceTaxi.UI
 
             float delta = session.Rating != null ? session.Rating.LastDelta : 0f;
             SetRow(ratingRow, true, "Рейтинг " + delta.ToString("+0.00;-0.00", CultureInfo.InvariantCulture));
-            // тон по знаку дельты: плюс — зелень рейтинга шапки, минус — тревожный
+            // тон по знаку дельты
             ratingRow.Text.color = delta >= 0f
                 ? OnboardComputerFactory.RatingGreen
                 : OnboardComputerFactory.DangerColor;
 
-            // статус задания (П8.2) читается напрямую из task (UI-слой), в LastResult не пишется.
-            // Н10.8 (аудит §5): строка провала не было ВООБЩЕ — жалоба невидима
-            // (−0.10 маскировался бонусом доставки в общей дельте рейтинга)
+            // статус задания читается напрямую из task (в LastResult не пишется);
+            // у точек интереса незавершённое к доставке = провал
             bool taskDone = hasPassenger && offer.Task != null && offer.Task.Succeeded;
             bool taskFailed = hasPassenger && offer.Task != null
                 && (offer.Task.Failed
@@ -193,9 +165,8 @@ namespace SpaceTaxi.UI
                 row.Text.text = text;
         }
 
-        // денежная строка: финальный текст пишется сразу (страховка на случай
-        // сбоя анимации), ScheduleRows обнуляет показ — с момента появления
-        // строки число прокатывается до Target
+        // денежная строка: финальный текст пишется сразу (страховка от сбоя
+        // анимации), прокатку стартует ScheduleRows
         private static void SetMoneyRow(PayoutRow row, bool visible, string prefix, int amount,
             string suffix = "")
         {
@@ -208,8 +179,7 @@ namespace SpaceTaxi.UI
                 row.Text.text = prefix + FormatSigned(amount) + suffix;
         }
 
-        // сумма со знаком и валютой борткомпа: «+Đ 850» / «−Đ 1.2k» — формат
-        // тот же, что у денег в шапке (предсказуемая ширина строки под «…»)
+        // «+Đ 850» / «−Đ 1.2k» — как деньги в шапке борткомпа
         private static string FormatSigned(int value)
         {
             return (value < 0 ? "−" : "+") + UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.Abs(value));
@@ -230,8 +200,7 @@ namespace SpaceTaxi.UI
                 Vector2 pos = row.Slide.anchoredPosition;
                 pos.x = RowSlideFrom;
                 row.Slide.anchoredPosition = pos;
-                // прокатка всегда стартует с нуля в момент появления строки —
-                // повторное открытие экрана не наследует прошлое состояние
+                // прокатка стартует с нуля — повторное открытие не наследует прошлое
                 row.Shown = 0f;
                 if (row.Rolling)
                     row.Text.text = row.Prefix + FormatSigned(0) + row.Suffix;
@@ -257,9 +226,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // прокатка числа строки (паттерн AnimateMoney OnboardBinder): скорость
-        // пропорциональна остатку с нижним порогом, дойдя до цели — стоп и
-        // финальный текст. Стартует вместе с появлением строки, не заранее
+        // скорость пропорциональна остатку; дойдя до цели — финальный текст
         private static void AnimateRowValue(PayoutRow row, float now)
         {
             if (!row.Rolling || now < row.StartAt || Mathf.Approximately(row.Shown, row.Target))
@@ -271,7 +238,7 @@ namespace SpaceTaxi.UI
             row.Text.text = row.Prefix + FormatSigned(Mathf.RoundToInt(row.Shown)) + row.Suffix;
         }
 
-        // каркас экрана строится кодом при первом показе (стиль OnboardComputerFactory)
+        // каркас строится кодом при первом показе
         protected override GameObject BuildScreen()
         {
             var root = new GameObject("OrderCompleteScreen", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
@@ -279,8 +246,7 @@ namespace SpaceTaxi.UI
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
-            // Масштаб как у сценического канваса (1920x1080, match 0.5) —
-            // иначе на не-1080p разрешениях экран расходится с HUD
+            // масштаб как у канваса сцены — иначе экран расходится с HUD
             var scaler = root.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);

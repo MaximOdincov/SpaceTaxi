@@ -73,12 +73,10 @@ namespace SpaceTaxi.Physics
             if (ship == null || ship.State == ShipState.Respawning) // уже респавнится
                 return;
             ShipLost?.Invoke(reason); // сообщить причину
-            ship.SetState(ShipState.Respawning); // окно респавна (Н10.14: записи через Set-методы)
+            ship.SetState(ShipState.Respawning); // окно респавна
             ship.Body.linearVelocity = Vector2.zero; // стоп
-            // Н9.14 (владелец: «сразу после отключения на том же месте появляется
-            // второй»): старый корпус прячется МГНОВЕННО — до телепорта он висел
-            // видимым 0.6с рядом с обломком-призраком (наследие «оператор остаётся
-            // в борту»); на месте потери остаётся только обломок
+            // старый корпус прячется мгновенно: до телепорта на месте потери
+            // остаётся только обломок
             HideVisuals(); // старый корпус исчезает сразу
             StartCoroutine(RespawnAfter(0.6f)); // короткая пауза
         }
@@ -94,7 +92,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.Hp <= 0f) // нечего наносить
                 return;
-            ship.SetHp(ship.Hp - amount); // вычесть (кламп в SetHp — Н10.14)
+            ship.SetHp(ship.Hp - amount); // вычесть (кламп в SetHp)
             HpChanged?.Invoke(); // HUD обновить
             if (ship.Hp <= 0f) // корпус кончился
                 Die();
@@ -113,7 +111,7 @@ namespace SpaceTaxi.Physics
         {
             if (amount <= 0f || ship == null || ship.ShipConfig == null) // нечего чинить
                 return;
-            ship.SetHp(ship.Hp + amount); // починить (кламп в SetHp — Н10.14)
+            ship.SetHp(ship.Hp + amount); // починить (кламп в SetHp)
             HpChanged?.Invoke(); // HUD
         }
 
@@ -130,7 +128,7 @@ namespace SpaceTaxi.Physics
                 float d = Vector2.Distance(star.transform.position, pos); // дистанция до звезды
                 if (d >= star.HeatRadius) // вне зоны жара
                     continue;
-                float k = star.HeatDepth(pos); // глубина зоны — общая формула с HeatAudio (Н10.11)
+                float k = star.HeatDepth(pos); // глубина зоны — общая формула с HeatAudio
                 ApplyDamage(k * star.HeatDamagePerSecond * dt * ship.Eff.HeatMul); // жар-защита корпуса
             }
         }
@@ -202,7 +200,6 @@ namespace SpaceTaxi.Physics
             transform.localScale = initialScale; // сжатие дырой не переносится на новый корпус
             ship.LandedOn = respawnPlanet; // стоит на стартовой
             ship.SetState(ShipState.Landed); // состояние «стоит»
-            // Н9.14 (владелец: «спавнишь корабль ещё до начала пролёта камеры»):
             // корпус невидим, пока камера летит от места смерти к планете старта;
             // появляется в момент прилёта (кап 2.5с — на случай застрявшей камеры)
             float waited = 0f; // сколько ждём прилёта

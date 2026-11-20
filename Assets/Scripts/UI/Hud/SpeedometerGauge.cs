@@ -3,9 +3,8 @@ using UnityEngine;
 namespace SpaceTaxi.UI
 {
     // Спидометр: полукруглая шкала speed.png поверх стрелки arrow.png; стрелка
-    // вращается вокруг центра шкалы, цифры — TMP внутри шкалы. Каркас строит
-    // HudBinder кодом (битый префаб UI/Speedometer удалён, Н4.2.1), углы задаёт
-    // он же при Setup.
+    // вращается вокруг центра шкалы, цифры — TMP внутри шкалы. Каркас и углы
+    // задаёт HudBinder при Setup.
     public class SpeedometerGauge : MonoBehaviour
     {
         private RectTransform needle;
@@ -13,7 +12,7 @@ namespace SpaceTaxi.UI
         private float sweepDegrees;
 
         // angleAtZero — локальный поворот стрелки при скорости 0 (остриё на
-        // отметке «0» шкалы, Н6 U5), sweepDegrees — полный ход стрелки до MaxV.
+        // отметке «0» шкалы), sweepDegrees — полный ход стрелки до MaxV.
         // Ход по часовой (в Unity +z — против часовой, поэтому вычитаем).
         public void Setup(RectTransform needleRect, float angleAtZero, float sweepDegrees)
         {

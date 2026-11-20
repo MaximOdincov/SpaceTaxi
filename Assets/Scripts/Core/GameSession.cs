@@ -33,11 +33,11 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
         public PhysicsConfig Config => physicsConfig; // доступ систем к балансу физики
         // ассет ввода сцены: контроллерам вне сцены (экран станции строится кодом)
         public InputActionAsset Input => input;
-        // каталог пассажиров: восстановление пассажира активного заказа из сейва (П10.1)
+        // каталог пассажиров: восстановление пассажира активного заказа из сейва
         public PassengerCatalog Passengers => passengerCatalog;
 
         private bool accidentRegistered; // один инцидент = один долг
-        private bool passengerAboardAtLoss; // пассажир был на борту при потере корабля (Н7 Q7.5)
+        private bool passengerAboardAtLoss; // пассажир был на борту при потере корабля
         private OrderCompleteScreenController orderComplete; // спавнится сам (стиль Dismissal)
 
         private void Awake() // ранняя сборка чистых сервисов (до Start мира)
@@ -83,15 +83,15 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             Orders = gameObject.AddComponent<OrderService>(); // домен заказов — компонент сессии
             Orders.Init(level, passengerCatalog, Ship); // initData: уровень, пассажиры, борт
             Orders.Bind(Rating); // заказам нужен рейтинг
-            // Н7 Q7.8: порог увольнения по сумме долга — константа прайс-конфига
+            // порог увольнения по сумме долга — константа прайс-конфига
             // (те же числа, что считают цену карточек); DebtService проверяет
             // его после каждого роста долга
             Debt.ConfigureDismissalDebtThreshold(Orders.Pricing.DebtDismissalThreshold); // порог из прайса
-            // доставка платит (16_BETA_PLAN §3.5): цена с карточки, штраф по
+            // доставка платит: цена с карточки, штраф по
             // столкновениям заказа, комиссия на аренде; оффер приходит в аргументе
             // события (Active уже обнулён) — отдельный доступ не нужен
             Orders.OrderDelivered += OnOrderDelivered; // обработчик выплаты
-            // дельты рейтинга (§3.7): отказ и гибель; доставка — внутри OnOrderDelivered.
+            // дельты рейтинга: отказ и гибель; доставка — внутри OnOrderDelivered.
             // Отказ от заказа, пока пассажир не на борту, — без штрафа рейтингу;
             // отмена оператором — деньгами: 25% цены (ChargeCancelPenalty)
             Orders.OrderCancelled += offer => // отмена заказа оператором
@@ -106,7 +106,7 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             // два независимых потребителя одного события
             ship.GetComponent<LandingSystem>().CrashImpact += OnCrashImpact; // удар с уроном
 
-            // звуковые хуки заказов/экономики (П9.3): системные события, не UI.
+            // звуковые хуки заказов/экономики: системные события, не UI.
             // «новый заказ» — реюз ComputerPing (отдельный OrderPing не заводили)
             Orders.OfferAdded += () => Sound.Play(SoundId.ComputerPing); // новая карточка
             Orders.PassengerBoarded += _ => Sound.Play(SoundId.BoardBip); // пассажир сел
@@ -114,11 +114,11 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             Orders.TaskSucceeded += _ => Sound.Play(SoundId.TaskSuccess); // задание выполнено
             Orders.TaskFailed += _ => Sound.Play(SoundId.TaskFail); // задание провалено
 
-            // продолжение забега (П10.1): мир построен по умолчанию — поверх
+            // продолжение забега: мир построен по умолчанию — поверх
             // применяется состояние сейва (без флага «продолжить» — тихий выход)
             SaveSystem.ApplyTo(this); // восстановить кошелёк/флот/заказ из сейва
 
-            // Н-8: waypoint с карты в мире (скобка-луч+подпись) и краевые стрелки
+            // waypoint с карты в мире (скобка-луч+подпись) и краевые стрелки
             // (waypoint янтарный, цель заказа зелёная)
             gameObject.AddComponent<WaypointIndicator>(); // маркеры в мире
 
@@ -139,17 +139,17 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             // сначала дельта рейтинга — экран завершения показывает её же
             Rating.AddDelivery(); // плюс к рейтингу за доставку
             // выплата: тосты уходят синхронно внутри Paid, экран открываем после них.
-            // Чаевые (Н-14): случайная доля 10–25%, брошенная при спавне карточки;
+            // Чаевые: случайная доля 10–25%, брошенная при спавне карточки;
             // перк «Меридианы» домножается в выплате.
-            // v5.3 (владелец: «мимо бездны стоит очень хорошо»): бонус задания —
-            // сложение с ценой (строка «Перевозка» на экране завершения)
+            // бонус задания — сложение с ценой (строка «Перевозка» на экране
+            // завершения)
             int taskBonus = offer.Task != null && offer.Task.Succeeded // задание было и выполнено
                 && offer.Task.Kind == PassengerTaskKind.HoleFlyby // только «мимо бездны»
                     ? PassengerTasks.HoleFlybyBonus // +150 к выплате
                     : 0; // без бонуса
             Payout.Pay(Orders.Pricing, offer.Price + taskBonus, Fleet.Current.IsRental, // выплата с ценой+бонусом
                 Orders.CollisionsOfActive, offer.TipsFraction, IsMeridian); // штрафы/комиссия/чаевые/перк
-            // автосейв §3.9 (П10.1): сразу после выплаты — счётчики/рейтинг/долг
+            // автосейв: сразу после выплаты — счётчики/рейтинг/долг
             // уже консистентны, экран завершения данных не меняет
             SaveSystem.Save(this); // сохранить состояние
             if (orderComplete == null) // экран ещё не искали
@@ -157,7 +157,7 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             orderComplete?.Show(offer); // показать модал выплаты
         }
 
-        // перк «комфорт-салон» (16 §3.3) — только у «Меридиана»
+        // перк «комфорт-салон» — только у «Меридиана»
         private bool IsMeridian => // признак корабля с перком
             Fleet.Current != null && Fleet.Current.Id == PayoutService.MeridianShipId; // совпадение id
 
@@ -167,9 +167,9 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
                 Rating.AddCollisionPenalty(); // минус рейтинга
         }
 
-        // единый путь штрафов (Н7 Q7.5): сколько есть — с кошелька (Wallet.TrySpend —
+        // единый путь штрафов: сколько есть — с кошелька (Wallet.TrySpend —
         // единственная точка списания), недостача — в долг (DebtService.AddCharge —
-        // не авария, счётчик аварий не растёт); тон тостов — Danger (Н6 U4)
+        // не авария, счётчик аварий не растёт); тон тостов — Danger
         private void ChargePenalty(int penalty, string reason, bool emphasized = false) // штраф деньгами
         {
             if (penalty <= 0) // нечего списывать
@@ -205,7 +205,7 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             accidentRegistered = true; // фиксируем инцидент
             // пассажир на борту в момент гибели/отключения корпуса: FailActive
             // (OrderService) подписан позже и обнулит Active — состояние
-            // ловим только здесь (Н7 Q7.5)
+            // ловим только здесь
             passengerAboardAtLoss = Orders != null && Orders.Active != null // заказ был
                 && Orders.Active.State == SpaceTaxi.Orders.OrderState.Aboard; // пассажир сидел
         }
@@ -217,7 +217,7 @@ namespace SpaceTaxi.Core // корневой слой: сборка игры
             if (!Fleet.IsOwned(Fleet.Current)) // борт был арендный
                 Debt.RegisterAccident(); // долг за аварию аренды
             // пассажир погиб или оставлен вместе с корпусом — штраф сверх долга
-            // за аренду, на своём корабле тоже (Н7 Q7.5); списание после
+            // за аренду, на своём корабле тоже; списание после
             // респавна — как и долг за аренду, чтобы тосты не сыпались в момент взрыва
             if (passengerAboardAtLoss) // пассажир был на борту
                 ChargePenalty(PenaltyPricing.PassengerLossPenalty, // штраф за пассажира

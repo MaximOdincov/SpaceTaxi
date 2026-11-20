@@ -3,13 +3,13 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Economy
 {
-    // Числа модели цены заказа (22_BALANCE_REWORK §1.1 — тарифные классы):
+    // Числа модели цены заказа (тарифные классы):
     // цена = (посадка_класса + ставка_класса × d_смягч) × множитель сектора назначения;
     // d_смягч = min(d, SoftCapDistance) + SoftCapTailFactor × max(0, d − SoftCapDistance)
     [CreateAssetMenu(fileName = "PricingConfig", menuName = "Space Taxi/Pricing Config")]
     public sealed class PricingConfig : ScriptableObject
     {
-        [Header("Тарифы классов (§1.1): индекс = ServiceClass корабля (0..3)")]
+        [Header("Тарифы классов: индекс = ServiceClass корабля (0..3)")]
         [Tooltip("Посадка по классам эконом/комфорт/комфорт+/бизнес, кр")]
         public float[] ClassBaseFare = { 15f, 30f, 55f, 90f };
         [Tooltip("Ставка кр/юн по классам эконом/комфорт/комфорт+/бизнес")]
@@ -26,7 +26,7 @@ namespace SpaceTaxi.Economy
         public float SectorMid2Mul = 1.6f;
         public float SectorFarMul = 2.0f;
 
-        [Header("Выплата (§3.5): штраф, комиссия аренды, доля в долг")]
+        [Header("Выплата: штраф, комиссия аренды, доля в долг")]
         [Tooltip("% от цены за одно столкновение (урон от контакта; жар не считается)")]
         public int PenaltyPerCollisionPct = 15;
         [Tooltip("Потолок суммарного штрафа, % от цены")]
@@ -36,13 +36,13 @@ namespace SpaceTaxi.Economy
         [Tooltip("% выплаты, автоматически уходящий в счёт долга (пока долг > 0)")]
         public int DebtRepaySharePct = 50;
 
-        [Header("Штрафы происшествий и увольнение (Н7 Q7.5/Q7.8): списание — кошелёк, недостача — в долг")]
+        [Header("Штрафы происшествий и увольнение: списание — кошелёк, недостача — в долг")]
         [Tooltip("Пассажир погиб или оставлен вместе с кораблём (гибель корпуса/отключение с пассажиром на борту); платится сверх долга за аренду")]
         public int PassengerLossPenalty = 300;
         [Tooltip("Долг свыше этой суммы — увольнение (экран «УВОЛЕН», забег сбрасывается)")]
         public int DebtDismissalThreshold = 2000;
 
-        [Header("Эффекты рейтинга (§3.7)")]
+        [Header("Эффекты рейтинга")]
         [Tooltip("Рейтинг ≥ порога — наценка к цене предложения")]
         public float RatingPriceBonusThreshold = 4.0f;
         [Tooltip("Множитель цены предложения при рейтинге ≥ порога")]
@@ -52,29 +52,29 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель задержек спавна карточек при рейтинге < порога")]
         public float LowRatingSpawnSlowdown = 1.3f;
 
-        [Header("Чаевые (§3.5, П8.2)")]
-        [Tooltip("Множитель чаевых на «Меридиане» — перк «комфорт-салон» (16 §3.3)")]
+        [Header("Чаевые")]
+        [Tooltip("Множитель чаевых на «Меридиане» — перк «комфорт-салон»")]
         public float MeridianTipsBonusMul = 1.1f;
 
-        [Header("Топливные сети (21 §3.7): индекс = тир сети − 1")]
+        [Header("Топливные сети: индекс = тир сети − 1")]
         [Tooltip("Цена Đ/ед по тиру сети: 1 — дёшево и меньше всех, 4 — люкс (полный бак, оверпрайс)")]
         public float[] FuelPricePerUnitByTier = { 0.6f, 0.8f, 1f, 1.3f };
         [Tooltip("Запас топлива сети за один визит, доля бака корабля: бедная сеть продаёт меньше всех, но не ноль")]
         public float[] FuelStockFractionByTier = { 0.75f, 1f, 1f, 1f };
 
-        [Header("Топливо и районы (Н4.5): индекс = Sector (Hub..Far)")]
+        [Header("Топливо и районы: индекс = Sector (Hub..Far)")]
         [Tooltip("Множитель цены топлива по классу района: богатый центр — дешевле, бедные окраины — дороже")]
         public float[] FuelPriceSectorMul = { 0.9f, 1f, 1.1f, 1.25f, 1.45f };
         [Tooltip("Шанс пустой сети на заправке, % (редкое исключение: детерминирован именем станции, хаб не пустеет, у двух соседних топлива не бывает одновременно)")]
         [Range(0, 100)] public int FuelOutageChancePct = 12;
 
-        [Header("Пакеты ремонта (Н-5): индекс = пакет − 1 (мелкий/средний/полный)")]
+        [Header("Пакеты ремонта: индекс = пакет − 1 (мелкий/средний/полный)")]
         [Tooltip("Доля недостающего HP, которую восстанавливает пакет")]
         public float[] RepairPackFraction = { 0.25f, 0.6f, 1f };
         [Tooltip("Множитель базовой цены 1 Đ/HP для пакета")]
         public float[] RepairPackPriceMul = { 0.8f, 1f, 1.2f };
 
-        [Header("Сеть ремонта (Н-5): индекс = тир сети − 1")]
+        [Header("Сеть ремонта: индекс = тир сети − 1")]
         [Tooltip("Потолок ремонта за визит, доля НУЖНОГО (недостающего) HP: бедная станция может взять не весь пакет")]
         public float[] RepairTierCapByTier = { 0.3f, 0.7f, 1f };
 
@@ -82,7 +82,7 @@ namespace SpaceTaxi.Economy
         [Tooltip("Множитель базовой цены ремонта: бедные мастерские дешевле, лучшие берут дороже (наценка выше в лучших мастерских)")]
         public float[] RepairTierSurchargeMul = { 0.9f, 1f, 1.25f };
 
-        [Header("Престиж-фильтр заказов (§1.2): индекс = Sector (Hub..Far)")]
+        [Header("Престиж-фильтр заказов: индекс = Sector (Hub..Far)")]
         [Tooltip("Класс пассажиров сектора: ХАБ/БЛИЖНИЙ — эконом, МИД-1 — комфорт, МИД-2 — комфорт+, ДАЛЬНИЙ — бизнес; кораблю ниже класса дропофф в секторе не виден (кроме нетребовательных)")]
         public int[] SectorRequiredClass = { 0, 0, 1, 2, 3 };
         [Tooltip("Доля нетребовательных пассажиров, %: согласны на класс ниже — дропофф без гейта")]
@@ -112,7 +112,7 @@ namespace SpaceTaxi.Economy
 
         // базовая сеть: планеты без проставленного FuelTier и старые ассеты карт
         public const int BaseFuelTier = 2;
-        // незаданный тир ремонта — мастерская чинит полностью (как до Н-5)
+        // незаданный тир ремонта — мастерская чинит полностью
         public const int BaseRepairTier = 3;
 
         public float GetSectorMultiplier(Sector sector)
@@ -173,7 +173,7 @@ namespace SpaceTaxi.Economy
             return muls[Mathf.Clamp((int)sector, 0, muls.Length - 1)];
         }
 
-        // класс пассажиров сектора (§1.2); кривой/пустой массив — эконом
+        // класс пассажиров сектора; кривой/пустой массив — эконом
         // (гейт не закрывает спавн наглухо, сектор открывается всем)
         public int GetSectorRequiredClass(Sector sector)
         {
@@ -215,7 +215,7 @@ namespace SpaceTaxi.Economy
             return ArrayAt(RepairPackPriceMul, packIndex, 1f);
         }
 
-        // наценка мастерской по тиру сети (С4); кривой/пустой массив — без наценки,
+        // наценка мастерской по тиру сети; кривой/пустой массив — без наценки,
         // тир 0/некорректный — базовая сеть (средняя)
         public float GetRepairTierSurcharge(int tier)
         {

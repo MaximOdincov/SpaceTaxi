@@ -6,7 +6,7 @@ namespace SpaceTaxi.Physics
 {
     // Шлейфы корабля: конфигурация из ShipTrailSetup на префабе модели
     // (несколько шлейфов, своя ширина/цвет/длина/порог скорости у каждого);
-    // setup нет — одиночный шлейф за кормой, как раньше. Пересобирается при
+    // setup нет — одиночный шлейф за кормой. Пересобирается при
     // смене модели (ShipModelVisual.Apply → Rebuild).
     public class SpeedTrail : MonoBehaviour
     {

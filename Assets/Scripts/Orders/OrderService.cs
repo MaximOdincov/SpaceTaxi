@@ -24,11 +24,11 @@ namespace SpaceTaxi.Orders
         public int DropoffIndex;   // планета Б
         public float ExpiresAt;    // время смерти карточки (Time.time)
         public int Price;          // цена предложения, считается при спавне
-        public float TipsFraction; // доля чаевых заказа (Н-14): случайные 10–25%, бросок при спавне
-        public PassengerTask Task; // задание пассажира (П5.3); null — задания нет
+        public float TipsFraction; // доля чаевых заказа: случайные 10–25%, бросок при спавне
+        public PassengerTask Task; // задание пассажира; null — задания нет
         public OrderState State = OrderState.Offered;
 
-        // таймер «паникёра» (Н7 Q7.1): жёсткий дедлайн заказа, время вышло —
+        // таймер «паникёра»: жёсткий дедлайн заказа, время вышло —
         // срыв (FailActive, штрафа деньгами нет). 0 — пассажир не торопится
         public float HurrySeconds;
         public float HurryStartedAt = -1f; // Time.time в момент Accept; < 0 — не запущен
@@ -57,15 +57,15 @@ namespace SpaceTaxi.Orders
     public sealed class OrderService : MonoBehaviour
     {
         [Header("Поток карточек")]
-        [Tooltip("Сколько секунд живёт карточка входящих (v5.3, владелец: 120→90)")]
+        [Tooltip("Сколько секунд живёт карточка входящих")]
         public float offerLifetime = 90f;
-        [Tooltip("Новая карточка: минимум через (v5.3, владелец: 10→20)")]
+        [Tooltip("Новая карточка: минимум через (сек)")]
         public float spawnMin = 20f;
-        [Tooltip("Новая карточка: максимум через (v5.3, владелец: 18→35)")]
+        [Tooltip("Новая карточка: максимум через (сек)")]
         public float spawnMax = 35f;
         [Tooltip("Максимум карточек одновременно (лишние старейшие вытесняются)")]
         public int maxOffers = 4;
-        [Tooltip("Карточек при старте сессии (v5.3, владелец: 4→2)")]
+        [Tooltip("Карточек при старте сессии")]
         public int initialOffers = 2;
 
         [Header("Ценообразование")]
@@ -76,8 +76,8 @@ namespace SpaceTaxi.Orders
         private const int FatTaskRolls = 8; // бросков на обязательное задание «жирного» (шанс null 50% за бросок)
         private LevelAsset level;
         private PassengerCatalog catalog;
-        private RatingService rating; // эффекты рейтинга (§3.7) — приходит Bind-ом из GameSession
-        private Ship ship;            // для трекинга задания «тише едем» (П5.3)
+        private RatingService rating; // эффекты рейтинга — приходит Bind-ом из GameSession
+        private Ship ship;            // для трекинга задания «тише едем»
         private float nextSpawnAt;
 
         public OrderOffer Active { get; private set; }
@@ -110,7 +110,7 @@ namespace SpaceTaxi.Orders
 
         private PricingConfig resourcesPricing; // кэш попытки Resources.Load
 
-        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты П4.2).
+        // конфиг ценообразования: тот же, что считает цену на карточке (для выплаты).
         // Цепочка: поле сцены → ассет из Resources (инспектор правит числа) → кодовый дефолт
         public PricingConfig Pricing
         {
@@ -124,7 +124,7 @@ namespace SpaceTaxi.Orders
             }
         }
 
-        // рейтинг таксиста (П4.3): наценка к цене и замедление спавна — без FindAnyObjectByType
+        // рейтинг таксиста: наценка к цене и замедление спавна — без FindAnyObjectByType
         public void Bind(RatingService ratingService)
         {
             rating = ratingService;
@@ -132,21 +132,20 @@ namespace SpaceTaxi.Orders
 
         // события для UI
         public event Action OffersChanged;
-        public event Action OfferAdded; // новая карточка (П9.3) — пинг заказа; OffersChanged не годится: он и на протухание
+        public event Action OfferAdded; // новая карточка — пинг заказа; OffersChanged не годится: он и на протухание
         public event Action ActiveOrderChanged;
         public event Action<OrderOffer> PassengerBoarded;
         public event Action<OrderOffer> OrderDelivered;
         public event Action<OrderOffer> OrderFailed;
         public event Action<OrderOffer> OrderCancelled;
-        public event Action<OrderOffer> TaskSucceeded; // задание выполнено (П5.3)
+        public event Action<OrderOffer> TaskSucceeded; // задание выполнено
         public event Action<OrderOffer> TaskFailed;    // задание провалено — жалоба
-        // v5.2 (владелец: «нет какого-то отклика, когда задание выполняется»):
-        // тост-момент — свершение точки интереса/ожидания и срыв условия
-        // в момент события (итог и так тостится при доставке)
+        // тост-момент: свершение точки интереса/ожидания и срыв условия
+        // тостятся в момент события (итог и так показывается при доставке)
         public event Action<string> TaskMomentSuccess;
         public event Action<string> TaskMomentFail;
-        public event Action<OrderOffer> OrderAccepted; // принят игроком (тост Н7 Q7.3); RestoreActive не зовёт
-        public event Action<string> OrderWarning;      // промежуточное предупреждение задания (Н7 Q7.4) — тост Danger
+        public event Action<OrderOffer> OrderAccepted; // принят игроком (тост); RestoreActive не зовёт
+        public event Action<string> OrderWarning;      // промежуточное предупреждение задания — тост Danger
 
         // первичная привязка домена к миру: уровень, каталог пассажиров, борт
         public void Init(LevelAsset levelAsset, PassengerCatalog catalog, Ship ship)
@@ -204,7 +203,7 @@ namespace SpaceTaxi.Orders
 
         private GravityField gravityField; // реестр тел: трекинг заданий (заполняется лениво)
 
-        // Н10.12: подсветка планеты назначения — презентация (TargetGlowPresenter);
+        // подсветка планеты назначения — презентация (TargetGlowPresenter);
         // домен только сообщает смену цели (А — пока ждёт, Б — на борту)
         private TargetGlowPresenter glowPresenter;
 
@@ -231,15 +230,15 @@ namespace SpaceTaxi.Orders
             offer.State = OrderState.Active;
             Active = offer;
             CollisionsOfActive = 0; // новый заказ — счёт с нуля
-            offer.Task?.StartDeadline(Time.time); // дедлайн пошёл (П5.3)
-            offer.StartHurry(Time.time);          // таймер «паникёра» пошёл (Н7 Q7.1)
+            offer.Task?.StartDeadline(Time.time); // дедлайн пошёл
+            offer.StartHurry(Time.time);          // таймер «паникёра» пошёл
             OffersChanged?.Invoke();
             ActiveOrderChanged?.Invoke();
             Debug.Log($"[Orders] принят: {offer.Passenger.DisplayName}, {PlanetName(offer.PickupIndex)} → {PlanetName(offer.DropoffIndex)}");
-            OrderAccepted?.Invoke(offer); // тост принятия (Н7 Q7.3); RestoreActive его минует
+            OrderAccepted?.Invoke(offer); // тост принятия; RestoreActive его минует
 
             // корабль уже стоит на планете пикапа — пассажир сразу на борт,
-            // без требования взлететь и сесть повторно (A6)
+            // без требования взлететь и сесть повторно
             if (ship != null && ship.State == ShipState.Landed && ship.LandedOn != null
                 && PlanetIndexByName(ship.LandedOn.DisplayName) == offer.PickupIndex)
             {
@@ -287,14 +286,14 @@ namespace SpaceTaxi.Orders
             return true;
         }
 
-        // восстановление счётчиков из сейва (П10.1)
+        // восстановление счётчиков из сейва
         public void RestoreCounters(int restoredDeliveries, int restoredFailures)
         {
             Deliveries = Math.Max(0, restoredDeliveries);
             Failures = Math.Max(0, restoredFailures);
         }
 
-        // восстановление активного заказа из сейва (П10.1): оффер построен
+        // восстановление активного заказа из сейва: оффер построен
         // вызывающим (пассажир и задание уже собраны, дедлайн стартует у него же).
         // Минует Accept — тосты/звук принятия при загрузке не нужны
         public void RestoreActive(OrderOffer restored)
@@ -314,7 +313,7 @@ namespace SpaceTaxi.Orders
         }
 
         // жёсткое касание с уроном; жар звезды до сюда не доходит.
-        // Один обработчик на оба потребителя CrashImpact: счётчик выплаты (П4.2)
+        // Один обработчик на оба потребителя CrashImpact: счётчик выплаты
         // считает удары в Active И Aboard, задание «без столкновений» — только Aboard
         private void OnCrashImpact()
         {
@@ -327,10 +326,8 @@ namespace SpaceTaxi.Orders
                 Active.Task.Failed = true;
                 TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(Active.Task));
             }
-            // хрупкая посылка (Н7 Q7.4): CrashImpact приходит только на удар
-            // с уроном (скорость выше посадочной) — это и есть «сильный удар»
-            // v5.3: хрупкий груз убран как отдельное задание (владелец) — «хрупкий»
-            // вкус теперь у «без столкновений» (любой удар с уроном = провал)
+            // CrashImpact приходит только на удар с уроном (скорость выше
+            // посадочной) — это и есть «сильный удар»
         }
 
         // платный сервис (заправка/ремонт) на станции при пассажире — задание
@@ -345,7 +342,7 @@ namespace SpaceTaxi.Orders
             }
         }
 
-        // покадровый трекинг задания активного заказа (П5.3)
+        // покадровый трекинг задания активного заказа
         private void TrackTask()
         {
             OrderOffer active = Active;
@@ -373,9 +370,8 @@ namespace SpaceTaxi.Orders
                 TaskMomentFail?.Invoke(PassengerTasks.FailMomentText(task));
             }
 
-            // v5.3 (владелец): избегания-условия с эпизодами — жар звёзд и пояса
-            // («боязнь жара», «с детства боюсь, что врежется астероид»): 2 эпизода
-            // = жалоба при доставке
+            // избегания-условия с эпизодами — жар звёзд и пояса:
+            // превышение лимита замечаний = жалоба при доставке
             if (active.State == OrderState.Aboard && task.Kind == PassengerTaskKind.NoHeat
                 && !task.Failed && ship != null && ship.Body != null)
                 TrackAvoidEpisode(task, TrackKind.Heat);
@@ -383,14 +379,14 @@ namespace SpaceTaxi.Orders
                 && !task.Failed && ship != null && ship.Body != null)
                 TrackAvoidEpisode(task, TrackKind.Belt);
 
-            // точки интереса (П8.1): трекинг в тот же период Aboard→доставка,
+            // точки интереса: трекинг в тот же период Aboard→доставка,
             // успех фиксируется один раз — провалить задание может только гибель заказа
             if (active.State == OrderState.Aboard
                 && PassengerTasks.IsInterestPoint(task.Kind) && !task.Succeeded && !task.Failed)
                 TrackInterestPoint(task);
         }
 
-        // v5.3: эпизоды избегания (жар/пояса) — одно замечание на эпизод
+        // эпизоды избегания (жар/пояса) — одно замечание на эпизод
         // (гистерезис: «висеть» внутри зоны == один эпизод); предел — жалоба
         // при доставке; заказ не срывается
         private enum TrackKind { Heat, Belt }
@@ -455,7 +451,7 @@ namespace SpaceTaxi.Orders
             return false;
         }
 
-        // срыв заказа «паникёра» (Н7 Q7.1): время вышло — заказ провален
+        // срыв заказа «паникёра»: время вышло — заказ провален
         // (FailActive тостит через OrderFailed, рейтинг-штраф — обычный путь);
         // штрафа деньгами нет
         private void CheckHurry()
@@ -471,7 +467,7 @@ namespace SpaceTaxi.Orders
             FailActive();
         }
 
-        // трекинг точек интереса (П8.1, §3.6): комета/кольцо/тыл звезды/дыра/ожидание
+        // трекинг точек интереса: комета/кольцо/тыл звезды/дыра/ожидание
         private void TrackInterestPoint(PassengerTask task)
         {
             if (ship == null || ship.Body == null)
@@ -506,7 +502,7 @@ namespace SpaceTaxi.Orders
 
                 case PassengerTaskKind.StarNearby:
                 {
-                    // v5.3 (владелец: «пролетим рядом со звездой»): близость, а не тыл
+                    // близость, а не тыл
                     CelestialBody star = BodyByIndex(task.TargetBodyIndex);
                     if (star != null
                         && Vector2.Distance(shipPos, star.transform.position) <= task.DistanceThreshold)
@@ -515,7 +511,7 @@ namespace SpaceTaxi.Orders
                 }
             }
 
-            // v5.2: момент свершения — тост сразу, а не только при доставке
+            // момент свершения — тост сразу, а не только при доставке
             if (task.Succeeded && !task.MomentFired)
             {
                 task.MomentFired = true;
@@ -567,7 +563,7 @@ namespace SpaceTaxi.Orders
                 Active.State = OrderState.Delivered;
                 Deliveries++;
                 OrderOffer done = Active;
-                SettleTask(done); // итог задания (П5.3) до события: экран завершения продолжает показывать дельту доставки
+                SettleTask(done); // итог задания до события: экран завершения продолжает показывать дельту доставки
                 Active = null;
                 OrderDelivered?.Invoke(done); // выплата внутри читает CollisionsOfActive
                 CollisionsOfActive = 0;
@@ -576,9 +572,9 @@ namespace SpaceTaxi.Orders
             }
         }
 
-        // исход задания при доставке (П5.3): успех — +0.10 рейтинга и тост с
+        // исход задания при доставке: успех — +0.10 рейтинга и тост с
         // благодарностью, провал — жалоба (−0.10); заказ при провале задания
-        // НЕ проваливается. Точка интереса (П8.1) требует заработанного
+        // НЕ проваливается. Точка интереса требует заработанного
         // трекингом успеха — довёз, не выполнив, = жалоба
         private void SettleTask(OrderOffer delivered)
         {
@@ -619,7 +615,7 @@ namespace SpaceTaxi.Orders
         {
             if (catalog == null || level == null)
                 return;
-            // П5.2: свежий профиль из пулов; пулов нет — старые профили каталога
+            // свежий профиль из пулов; пулов нет — профили из каталога
             PassengerProfile passenger = catalog.Generate();
             if (passenger == null)
                 passenger = catalog.Pick();
@@ -630,14 +626,14 @@ namespace SpaceTaxi.Orders
             int serviceClass = ShipServiceClass();
             float ratingValue = CurrentRating();
 
-            // D2 §3: редкий «жирный» заказ — дальний, с заданием и наценкой;
+            // редкий «жирный» заказ — дальний, с заданием и наценкой;
             // шанс растёт с рейтингом
             bool fat = UnityEngine.Random.value * 100f < FatOrderChancePct(pricing, ratingValue);
-            // D2 §1: жирный изредка пренебрегает гейтом районов — «вкус» закрытых
+            // жирный изредка пренебрегает гейтом районов — «вкус» закрытых
             // секторов; отказаться можно бесплатно (Decline без штрафа)
             bool ignoreGate = fat && UnityEngine.Random.value * 100f < pricing.FatOrderLockedSectorChancePct;
 
-            // §1.2 (престиж-фильтр): пикап — любая планета; дропофф — только
+            // престиж-фильтр: пикап — любая планета; дропофф — только
             // сектора, чей класс пассажира по силам кораблю. Нетребовательный
             // пассажир (один бросок на заказ) согласен на класс ниже — дропофф
             // без гейта; жирный заказ — без гейта и без броска
@@ -649,7 +645,7 @@ namespace SpaceTaxi.Orders
                 : OfferPlanets(serviceClass);
             if (dropoffPool.Count < 2)
             {
-                // D2 §4: пустая доска хуже дальнего заказа — гейт ослабляется
+                // пустая доска хуже дальнего заказа — гейт ослабляется
                 Debug.LogWarning("[Orders] гейт районов отсеял почти все планеты — ослабляю фильтр");
                 dropoffPool = pickupPool;
             }
@@ -667,22 +663,22 @@ namespace SpaceTaxi.Orders
                 ExpiresAt = Time.time + offerLifetime,
             };
             // цена фиксируется в момент спавна карточки и дальше не меняется;
-            // тариф — по классу обслуживания корабля-таксиста (§1.1),
+            // тариф — по классу обслуживания корабля-таксиста,
             // без корабля — эконом (аренда «Яйца»)
             int basePrice = OrderPricing.ComputePrice(pricing,
                 RouteDistance(offer), SectorOf(offer.DropoffIndex), serviceClass);
             if (fat)
                 basePrice = (int)Math.Round(basePrice * pricing.FatOrderPriceMul, MidpointRounding.AwayFromZero);
             offer.Price = PriceWithRatingBonus(basePrice);
-            // чаевые (Н-14): случайные 10–25% на заказ, бросок один раз при спавне —
+            // чаевые: случайные 10–25% на заказ, бросок один раз при спавне —
             // число живёт до выплаты и не «перебрасывается»
             offer.TipsFraction = UnityEngine.Random.Range(0.10f, 0.25f);
-            // «паникёр» (Н7 Q7.1): пассажир торопится — жёсткий таймер на весь заказ
+            // «паникёр»: пассажир торопится — жёсткий таймер на весь заказ
             if (passenger.Hurries)
                 offer.HurrySeconds = PassengerTasks.HurrySecondsFor(RouteDistance(offer));
-            // задание пассажира (П5.3): случайный тип с шансом 50% (Н-14); дедлайну
-            // нужна дальность маршрута, точкам интереса (П8.1) — концы маршрута
-            // и контекст уровня. У «жирного» задание обязательно (D2 §3) — добрасываем
+            // задание пассажира: случайный тип с шансом 50%; дедлайну
+            // нужна дальность маршрута, точкам интереса — концы маршрута
+            // и контекст уровня. У «жирного» задание обязательно — добрасываем
             int taskRolls = fat ? FatTaskRolls : 1;
             for (int i = 0; i < taskRolls && offer.Task == null; i++)
                 offer.Task = PassengerTasks.CreateRandom(RouteDistance(offer),
@@ -695,8 +691,8 @@ namespace SpaceTaxi.Orders
                       (fat ? " [жирный]" : ""));
         }
 
-        // класс обслуживания корабля-таксиста (§1.1); без корабля — эконом
-        // (аренда «Яйца» всегда эконом, §1.3)
+        // класс обслуживания корабля-таксиста; без корабля — эконом
+        // (аренда «Яйца» всегда эконом)
         private int ShipServiceClass()
         {
             return ship != null && ship.ShipConfig != null ? (int)ship.ShipConfig.ServiceClass : 0;
@@ -709,14 +705,14 @@ namespace SpaceTaxi.Orders
             return rating != null ? rating.Value : 3f;
         }
 
-        // D2 §3: шанс «жирного» заказа, % — база + прибавка за рейтинг, кламп потолком
+        // шанс «жирного» заказа, % — база + прибавка за рейтинг, кламп потолком
         private static float FatOrderChancePct(PricingConfig pricing, float ratingValue)
         {
             return Mathf.Clamp(pricing.FatOrderBaseChancePct + pricing.FatOrderChancePerRatingPct * ratingValue,
                 0f, pricing.FatOrderMaxChancePct);
         }
 
-        // §1.2: пул всех планет уровня — пикап возможен в любом секторе
+        // пул всех планет уровня — пикап возможен в любом секторе
         private List<int> OfferPlanets()
         {
             var pool = new List<int>();
@@ -729,7 +725,7 @@ namespace SpaceTaxi.Orders
             return pool;
         }
 
-        // §1.2: пул дропоффов по классу корабля — сектор даёт пассажиров
+        // пул дропоффов по классу корабля — сектор даёт пассажиров
         // своего класса (класс пассажира = SectorRequiredClass сектора),
         // кораблю ниже класса сектор не виден. Нетребовательные пассажиры
         // и жирные заказы идут мимо этого фильтра (общий пул)
@@ -747,10 +743,10 @@ namespace SpaceTaxi.Orders
             return pool;
         }
 
-        // D2 §2: пикап со сдвигом «к игроку». Вес планеты = nearShare × близость
+        // пикап со сдвигом «к игроку». Вес планеты = nearShare × близость
         // (линейный спад до нуля к PickupProximityRange) + остаток равномерно;
         // nearShare тает с рейтингом — доля дальних пикапов растёт с прокачкой.
-        // Кривая от «низкого рейтинга» (тот же порог, что замедляет спавн §3.7)
+        // Кривая от «низкого рейтинга» (тот же порог, что замедляет спавн)
         // до рейтинга 5: игра стартует с 3.0 — точка уже на спаде кривой
         private int PickPickup(List<int> pool, PricingConfig pricing)
         {
@@ -782,8 +778,8 @@ namespace SpaceTaxi.Orders
             return pool[pool.Count - 1];
         }
 
-        // цель: обычный заказ — равномерно по пулу (как было); «жирный» — дальняя
-        // пара: планеты дальше FatOrderMinRouteDistance, иначе самая дальняя (D2 §3)
+        // цель: обычный заказ — равномерно по пулу; «жирный» — дальняя
+        // пара: планеты дальше FatOrderMinRouteDistance, иначе самая дальняя
         private int PickDropoff(List<int> pool, int pickup, bool fat, PricingConfig pricing)
         {
             if (pickup < 0 || pickup >= level.Bodies.Count)
@@ -834,7 +830,7 @@ namespace SpaceTaxi.Orders
                 : Sector.Near;
         }
 
-        // §3.7: рейтинг ≥ порога — наценка к цене предложения («популярного
+        // рейтинг ≥ порога — наценка к цене предложения («популярного
         // водителя видно»); без рейтинга или ниже порога — базовая цена
         private int PriceWithRatingBonus(int basePrice)
         {
@@ -846,7 +842,7 @@ namespace SpaceTaxi.Orders
             return (int)Math.Round(basePrice * pricing.RatingPriceBonusMul, MidpointRounding.AwayFromZero);
         }
 
-        // §3.7: рейтинг < порога — карточки появляются медленнее; spawnMin/spawnMax
+        // рейтинг < порога — карточки появляются медленнее; spawnMin/spawnMax
         // остаются базой, сами поля не трогаем
         private float SpawnDelay()
         {

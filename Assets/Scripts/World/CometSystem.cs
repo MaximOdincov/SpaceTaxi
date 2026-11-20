@@ -11,7 +11,7 @@ namespace SpaceTaxi.World
     // Столкновение = гибель, считает LandingSystem; система про UI и урон не знает.
     public class CometSystem : MonoBehaviour
     {
-        // числа §3.8 — не менять
+        // числа — не менять
         public int MaxRoutes = 3;
         public float CometSpeed = 400f;
         public float SpawnIntervalMin = 90f;
@@ -27,7 +27,7 @@ namespace SpaceTaxi.World
         public event Action<Vector2, Vector2> CometIncoming;
         public event Action CometSpawned;
 
-        // живые кометы (П8.1): заданию «покажите комету» нужен перебор целей;
+        // живые кометы: заданию «покажите комету» нужен перебор целей;
         // уничтоженные вычищаются в Update — между тиками в списке могут быть null
         public IReadOnlyList<Comet> ActiveComets => active;
 
@@ -36,7 +36,7 @@ namespace SpaceTaxi.World
         private bool warned;
         private Vector2 entryPoint;
         private Vector2 entryDirection;
-        private Vector2 areaCenter;   // зона комет (П7.2): радиус 0 — хорды по всему миру
+        private Vector2 areaCenter;   // зона комет: радиус 0 — хорды по всему миру
         private float areaRadius;
         private readonly List<Comet> active = new List<Comet>();
 

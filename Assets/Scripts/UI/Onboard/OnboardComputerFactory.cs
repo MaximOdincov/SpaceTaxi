@@ -12,7 +12,7 @@ namespace SpaceTaxi.UI
         public TMP_Text Clock, MoneyValue, RatingValue;
         public GameObject DebtRow;         // строка долга под шапкой — скрыта при нуле
         public TMP_Text DebtValue;
-        public Button DebtRepayButton;     // «ПОГАСИТЬ · Đ N» в строке долга (Н7 Q7.6)
+        public Button DebtRepayButton;     // «ПОГАСИТЬ · Đ N» в строке долга
         public GameObject ActiveSection;   // секция целиком — скрывается без активного заказа
         public RectTransform ActiveArea;   // карточка активного заказа (ведёт биндер)
         public RectTransform OrderArea;    // контент скролла входящих карточек (ведёт биндер)
@@ -25,25 +25,20 @@ namespace SpaceTaxi.UI
         public TMP_FontAsset Font;
     }
 
-    // Строит каркас бортового компьютера: [СОСТОЯНИЕ: часы · кредиты · ★ рейтинг]
-    // → [строка долга] → [активный заказ (всегда детальный)] → [входящие со скроллом:
-    // карточки раскрываются IN PLACE] → [статистика] → [эфир] → [отключить корабль].
-    // Высоты секций фиксированные, скролл только в списке входящих (паттерн
-    // StationScreenController). Политика переполнения: все тексты однолинейные с
-    // обрезкой «…», высоты узлов фиксированные — контент никогда не двигает layout
-    // (исключения — «Пожелание клиента» в сводке: 2 строки). Из редактора результат
-    // сериализуется в сцену; в рантайме биндер строит каркас этим же методом поверх
-    // старого мокапа (Frame/Background сохраняются, остальное сносится).
+    // Строит каркас бортового компьютера: [шапка: часы · деньги · ★ рейтинг]
+    // → [строка долга] → [активный заказ] → [входящие со скроллом] → [эфир]
+    // → [отключить корабль]. Возвращает OnboardRefs — ссылки на построенные
+    // узлы, по ним биндер заполняет живые данные. Высоты фиксированные,
+    // скролл только в списке входящих; все тексты однолинейные с «…» —
+    // контент никогда не двигает layout
     public static class OnboardComputerFactory
     {
-        // используется и рантайм-карточками
+        // шрифт, которым строился последний каркас (используется и карточками)
         private static TMP_FontAsset currentFont;
 
-        // --- Геометрия карточек (контракт с биндером: анимация раскрытия) ---
-        // карточка имеет два взаимоисключающих контейнера: Compact и Expanded.
-        // Раскрытие гасит Compact, включает Expanded и анимирует preferredHeight
-        // карточки OfferCompactHeight ↔ OfferExpandedHeight; RectMask2D на карточке
-        // срезает контент, пока анимация не отдала высоту — ничего не вылезает
+        // --- Геометрия карточек: Compact и Expanded — взаимоисключающие
+        // контейнеры; раскрытие анимирует preferredHeight карточки между
+        // константами, RectMask2D срезает контент на время анимации ---
         public const float CardSpacing = 4f;
         public const float AcceptHeight = 40f;
         public const float OfferCompactHeight = 124f;   // рамка 16 + Compact 108
@@ -51,28 +46,28 @@ namespace SpaceTaxi.UI
         public const float SummaryHeight = 170f;        // Имя 30 + Откуда/Куда/Маршрут 26×3 + Пожелание 54 + зазоры
         public const float ExpandedContentHeight = DetailAvatarHeight + CardSpacing + SummaryHeight + CardSpacing + AcceptHeight;
         public const float OfferExpandedHeight = 16f + ExpandedContentHeight;
-        // активный заказ — тот же Expanded всегда (строка статуса задания
-        // Н10.4 есть, тоггла нет); +28 = строка статуса 26 + зазор 2
+        // активный заказ — тот же Expanded всегда (строка статуса есть,
+        // тоггла нет); +28 = строка статуса 26 + зазор 2
         public const float ActiveSummaryHeight = SummaryHeight + 28f;
         public const float ActiveExpandedContentHeight = DetailAvatarHeight + CardSpacing + ActiveSummaryHeight + CardSpacing + AcceptHeight;
         public const float ActiveCardHeight = 16f + ActiveExpandedContentHeight;
 
-        // приглушённая зелень рамки аватара: яркая LabelColor спорила с портретом
-        public static readonly Color AvatarFrameColor = new Color(0.27f, 0.54f, 0.39f, 0.9f);
-
-        public static readonly Color RatingGreen = new Color(0.357f, 0.9f, 0.56f);
-
-        public static readonly Color LabelColor = new Color(0.357f, 0.788f, 0.561f);
-        public static readonly Color BrightColor = new Color(0.659f, 1f, 0.796f);
-        public static readonly Color TaxiColor = new Color(1f, 0.831f, 0.302f);
-        public static readonly Color PanelColor = new Color(0.031f, 0.078f, 0.047f, 0.92f);
-        public static readonly Color DangerColor = new Color(1f, 0.32f, 0.24f);
-        public static readonly Color DangerDark = new Color(0.05f, 0.02f, 0.03f);
-        // текст на ярких кнопках действия (жёлтая «взять», красная «отменить») — чёрный
-        public static readonly Color ActionTextColor = Color.black;
+        // палитра борткомпа: роли UiTheme под прежними именами
+        // (LabelColor == UiTheme.Ink и т.д.)
+        public static readonly Color LabelColor = UiTheme.Ink;        // приглушённый текст/лейблы
+        public static readonly Color BrightColor = UiTheme.Bright;    // яркий текст/значения
+        public static readonly Color TaxiColor = UiTheme.Accent;      // янтарь (валюта/акцент)
+        public static readonly Color RatingGreen = UiTheme.Positive;  // рейтинг в шапке
+        public static readonly Color DangerColor = UiTheme.Danger;    // провал/тревога
+        public static readonly Color DangerDark = UiTheme.DangerDark; // фон тревожной кнопки
         // «спокойный» красный долга: платится по графику или докатывается вниз
-        public static readonly Color DebtCalmColor = new Color(0.86f, 0.46f, 0.42f);
-        public static readonly Color ButtonColor = new Color(0.06f, 0.2f, 0.13f, 0.9f);
+        public static readonly Color DebtCalmColor = UiTheme.Calm;
+        public static readonly Color PanelColor = UiTheme.Panel;      // фон панели/карточки
+        public static readonly Color ButtonColor = UiTheme.Button;    // фон каркасной кнопки
+        // текст на ярких кнопках действия (жёлтая «взять», красная «отменить») — чёрный
+        public static readonly Color ActionTextColor = UiTheme.OnAccent;
+        // приглушённая зелень рамки аватара: яркая LabelColor спорила с портретом
+        public static readonly Color AvatarFrameColor = UiTheme.Frame;
 
         public static OnboardRefs Build(Transform panel, bool destroyImmediate = false, TMP_FontAsset fontOverride = null)
         {
@@ -92,7 +87,7 @@ namespace SpaceTaxi.UI
             return refs;
         }
 
-        // шрифт: явный override от биндера → старый мокап-титул → дефолт TMP
+        // шрифт: override биндера → узел Title старого каркаса → дефолт TMP
         private static void ResolveFont(Transform panel, TMP_FontAsset fontOverride)
         {
             TMP_FontAsset font = fontOverride;
@@ -139,11 +134,11 @@ namespace SpaceTaxi.UI
             return root;
         }
 
-        // --- СОСТОЯНИЕ: время у левого края · деньги строго по центру панели · ★ рейтинг у правого края ---
+        // --- Шапка: часы слева · деньги строго по центру панели · ★ рейтинг справа ---
         private static void BuildHeader(Transform root, OnboardRefs refs)
         {
-            // якоря вручную (ignoreLayout): равные трети дают центр «своей» ячейки,
-            // а не панели; деньги ставим якорем в середину ширины Header
+            // якоря вручную (ignoreLayout): равные трети дали бы центр «своей»
+            // ячейки, а не панели — деньги ставим якорем в середину ширины
             var header = H("Header", root);
             FixedHeight(header, 44f);
             var headerRect = (RectTransform)header.transform;
@@ -156,27 +151,24 @@ namespace SpaceTaxi.UI
             refs.MoneyValue = Text(header, "Đ 0", 36f, BrightColor, "MoneyValue");
             AnchorHeaderCenter(refs.MoneyValue.transform as RectTransform);
             refs.MoneyValue.alignment = TextAlignmentOptions.Center;
-            // рейтинг — текст «★ 3.0»: глиф звезды испечён в атласы JetBrainsMono;
-            // без глифа (сброс dynamic-атласа в билде) биндер пишет просто «3.0»
+            // «★» есть не в каждом атласе — без глифа биндер пишет просто «3.0»
             bool starGlyph = currentFont.HasCharacter('★');
             refs.RatingValue = Text(header, starGlyph ? "★ 3.0" : "3.0", 36f, RatingGreen, "RatingValue");
             AnchorHeaderEdge(refs.RatingValue.transform as RectTransform, isLeft: false);
             refs.RatingValue.alignment = TextAlignmentOptions.Right;
         }
 
-        // --- Строка долга: значение слева + кнопка досрочного гашения (Н7 Q7.6);
-        // пустая → скрыта, секции ниже поднимаются ---
+        // --- Строка долга: значение + кнопка досрочного гашения; при нуле
+        // скрыта, секции ниже поднимаются ---
         private static void BuildDebtRow(Transform root, OnboardRefs refs)
         {
             var debtRow = H("DebtRow", root);
             FixedHeight(debtRow, 30f);
-            // forceExpandWidth делил бы излишек поровну и «плыл» бы шириной кнопки —
-            // как в PlayerRow: текст забирает всё лишнее, кнопка строго своя
+            // кнопка строго своей ширины: текст забирает всё лишнее
             debtRow.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
             refs.DebtValue = Text(debtRow, "Текущий долг: Đ 0", 22f, DebtCalmColor, "DebtValue");
             Flexible(refs.DebtValue.gameObject);
-            // сумма на кнопке ставит биндер: min(долг, кошелёк) — списывает
-            // сколько есть, остаток остаётся долгом; без денег гаснет (С4)
+            // сумму ставит биндер: min(долг, кошелёк)
             var debtRepay = Button(debtRow.transform, "ПОГАСИТЬ · Đ 0", ButtonColor, BrightColor, 16f, "DebtRepayButton");
             FixedSize(debtRepay, 176f, 30f);
             refs.DebtRepayButton = debtRepay.GetComponent<Button>();
@@ -189,14 +181,7 @@ namespace SpaceTaxi.UI
         {
             var active = Section(root, "// АКТИВНЫЙ ЗАКАЗ", "ActiveSection");
             refs.ActiveSection = active;
-            var activeArea = new GameObject("ActiveArea", typeof(RectTransform));
-            activeArea.transform.SetParent(active.transform, false);
-            var activeLayout = activeArea.AddComponent<VerticalLayoutGroup>();
-            activeLayout.spacing = 4;
-            activeLayout.childControlWidth = true;
-            activeLayout.childControlHeight = true;
-            activeLayout.childForceExpandWidth = true;
-            activeLayout.childForceExpandHeight = false;
+            var activeArea = Ui.Column(active.transform, "ActiveArea", 4f); // UiKit
             refs.ActiveArea = (RectTransform)activeArea.transform;
         }
 
@@ -217,21 +202,14 @@ namespace SpaceTaxi.UI
             // прозрачный фон — raycast-цель под курсором, иначе колесо мыши не скроллит
             viewport.GetComponent<Image>().color = Color.clear;
 
-            var content = new GameObject("OrderArea", typeof(RectTransform));
-            content.transform.SetParent(viewport.transform, false);
-            var contentRect = (RectTransform)content.transform;
             // контент растёт вниз от верхней кромки вьюпорта — стандартная схема ScrollRect
+            var content = Ui.Column(viewport.transform, "OrderArea", 6f); // UiKit
+            var contentRect = (RectTransform)content.transform;
             contentRect.anchorMin = new Vector2(0f, 1f);
             contentRect.anchorMax = new Vector2(1f, 1f);
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.offsetMin = Vector2.zero;
             contentRect.offsetMax = Vector2.zero;
-            var contentLayout = content.AddComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 6;
-            contentLayout.childControlWidth = true;
-            contentLayout.childControlHeight = true;
-            contentLayout.childForceExpandWidth = true;
-            contentLayout.childForceExpandHeight = false;
             content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             var scroll = scrollWrap.GetComponent<ScrollRect>();
@@ -244,7 +222,7 @@ namespace SpaceTaxi.UI
             refs.OrderArea = contentRect;
         }
 
-        // --- ЭФИР: заголовок секции, плеер, прогресс, мьют ---
+        // --- ЭФИР: плеер, прогресс, мьют ---
         private static void BuildRadio(Transform root, OnboardRefs refs)
         {
             var radio = Section(root, "// ЭФИР", "RadioSection");
@@ -252,7 +230,7 @@ namespace SpaceTaxi.UI
             FixedHeight(playerRow, 44f);
             var playerRowLayout = playerRow.GetComponent<HorizontalLayoutGroup>();
             playerRowLayout.childForceExpandWidth = false; // кнопки строго 44×44, трек — flexible
-            // паузу убрали по просьбе владельца: радио всегда играет, мьют ниже плеера
+            // радио всегда играет; мьют ниже плеера
             refs.PlayerPrev = PlayerButton(playerRow.transform, "|<", "PlayerPrev");
             refs.TrackTitle = Text(playerRow, "—", 20f, BrightColor, "Track");
             refs.TrackTitle.alignment = TextAlignmentOptions.Center;
@@ -262,7 +240,7 @@ namespace SpaceTaxi.UI
             progress.transform.SetParent(radio.transform, false);
             progress.GetComponent<Image>().color = new Color(0.06f, 0.2f, 0.13f);
             FixedHeight(progress, 6f);
-            // заливка прогресса: ширина = доля clip position/length (ведёт OnboardBinder)
+            // заливка прогресса: доля clip position/length (ведёт биндер)
             var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fill.transform.SetParent(progress.transform, false);
             Image fillImage = fill.GetComponent<Image>();
@@ -281,8 +259,8 @@ namespace SpaceTaxi.UI
             refs.RadioMute = muteGo.GetComponent<Button>();
         }
 
-        // --- ОТКЛЮЧИТЬ КОРАБЛЬ: тревожная красная, клик сразу запускает
-        // штатный пайплайн потери (HullSystem.Abandon → респавн/долг/парк)
+        // --- ОТКЛЮЧИТЬ КОРАБЛЬ: красная кнопка, клик запускает штатную
+        // потерю корабля (HullSystem.Abandon → респавн/долг) ---
         private static void BuildAbandonButton(Transform root, OnboardRefs refs)
         {
             var abandon = Button(root, "ОТКЛЮЧИТЬ КОРАБЛЬ", DangerColor * 0.9f,
@@ -297,34 +275,33 @@ namespace SpaceTaxi.UI
 
         private static GameObject Section(Transform parent, string title, string name)
         {
-            var section = Ui.Column(parent.transform, name, 4f); // Н11: UiKit
+            var section = Ui.Column(parent.transform, name, 4f); // UiKit
 
             var heading = Text(section, title, 21f, LabelColor, "Heading");
             // 28, не 26: строка 21pt ≈ 27.7 — Ellipsis при меньшей высоте
             // обрезает заголовок до нуля видимых символов
             FixedHeight(heading.gameObject, 28f);
-            var line = Ui.Image(section.transform, null, UiTheme.Divider, "Line"); // Н11: UiKit
+            var line = Ui.Image(section.transform, null, UiTheme.Divider, "Line"); // UiKit
             FixedHeight(line.gameObject, 2f);
             return section;
         }
 
         // --- Карточки заказов ---
 
-        // Пути узлов (контракт для OnboardBinder):
-        //   Compact/Avatar, Compact/Info/Name, Compact/Info/Route, Compact/Info/Dist,
+        // Пути узлов — контракт с OnboardBinder (биндер находит их через Find):
+        //   Compact/Avatar, Compact/Info/{Name,Route,Dist},
         //   Expanded/DetailAvatar, Expanded/Summary/{Name,From,To,RouteLen,Wish},
-        //   Expanded/Accept, ExpandToggle
-        // Карточка входящего: Compact = [аватар по аспекту | имя / маршрут / расстояние],
-        // Expanded = портрет на всю ширину + сводка + «Взять заказ». Контейнеры
-        // взаимоисключающие; раскрытие анимирует preferredHeight карточки.
+        //   Expanded/Accept, ExpandToggle.
+        // Compact = [аватар | имя/маршрут/расстояние], Expanded = портрет на
+        // всю ширину + сводка + «Взять заказ»
         public static GameObject BuildOfferCard()
         {
             var card = new GameObject("OfferCard", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             var layout = card.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(8, 8, 8, 8);
             layout.spacing = CardSpacing;
-            // высоты детей фиксированные (LE preferred): во время анимации сумма детей
-            // больше карточки — маска срезает, ничего не наезжает и не сплющивается
+            // высоты детей фиксированные: во время анимации суммы высот больше
+            // карточки — маска срезает, ничего не наезжает
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -342,8 +319,7 @@ namespace SpaceTaxi.UI
 
             BuildExpandedBlock(card.transform, SummaryHeight, false, "Accept", "Взять заказ · Đ 0", TaxiColor, bold: true, visible: false);
 
-            // «+»/«−»: аккуратный квадратик 34×34 в правом верхнем углу поверх рамки,
-            // позиция не зависит от текстов и состояния
+            // «+»/«−»: квадратик 34×34 в правом верхнем углу поверх рамки
             var expand = Button(card.transform, "+", ButtonColor, BrightColor, 18f, "ExpandToggle", framed: false);
             FixedSize(expand, 34f, 34f);
             var expandRect = (RectTransform)expand.transform;
@@ -359,10 +335,9 @@ namespace SpaceTaxi.UI
             return card;
         }
 
-        // Пути узлов (контракт для OnboardBinder):
-        //   Expanded/DetailAvatar, Expanded/Summary/{Name,From,To,RouteLen,Status,Wish}, Cancel
-        // Карточка активного заказа: ТОТ ЖЕ Expanded всегда (компакта и тоггла нет),
-        // внизу — красная «Отменить · −Đ N» со штрафом (сумму ставит биндер).
+        // Активный заказ: тот же Expanded всегда (компакта и тоггла нет),
+        // внизу красная «Отменить · −Đ N» со штрафом (сумму ставит биндер).
+        // Пути узлов: Expanded/Summary/{Name,From,To,RouteLen,Status,Wish}, Cancel
         public static GameObject BuildActiveOrderCard()
         {
             var card = new GameObject("ActiveOrder", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
@@ -382,7 +357,7 @@ namespace SpaceTaxi.UI
             cardLe.flexibleWidth = 1f;
             ((RectTransform)card.transform).sizeDelta = new Vector2(440f, ActiveCardHeight);
 
-            BuildExpandedBlock(card.transform, ActiveSummaryHeight, true, "Cancel", "Отменить · −Đ 0", DangerColor * 0.9f, bold: false, visible: true); // withStatus: строка статуса задания Н10.4
+            BuildExpandedBlock(card.transform, ActiveSummaryHeight, true, "Cancel", "Отменить · −Đ 0", DangerColor * 0.9f, bold: false, visible: true); // withStatus: строка статуса задания
 
             return card;
         }
@@ -414,14 +389,7 @@ namespace SpaceTaxi.UI
             pictureRect.offsetMin = new Vector2(7f, 7f);
             pictureRect.offsetMax = new Vector2(-7f, -7f);
 
-            var column = new GameObject("Info", typeof(RectTransform));
-            column.transform.SetParent(compact.transform, false);
-            var columnLayout = column.AddComponent<VerticalLayoutGroup>();
-            columnLayout.spacing = 2;
-            columnLayout.childControlWidth = true;
-            columnLayout.childControlHeight = true;
-            columnLayout.childForceExpandWidth = true;
-            columnLayout.childForceExpandHeight = false;
+            var column = Ui.Column(compact.transform, "Info", 2f); // UiKit
             var columnLe = column.AddComponent<LayoutElement>();
             columnLe.flexibleWidth = 1f;
             columnLe.minWidth = 100f;
@@ -444,14 +412,7 @@ namespace SpaceTaxi.UI
         private static void BuildExpandedBlock(Transform parent, float summaryHeight, bool withStatus,
             string actionName, string actionLabel, Color actionBackground, bool bold, bool visible)
         {
-            var expanded = new GameObject("Expanded", typeof(RectTransform));
-            expanded.transform.SetParent(parent, false);
-            var layout = expanded.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = CardSpacing;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            var expanded = Ui.Column(parent, "Expanded", CardSpacing); // UiKit
             var expandedLe = expanded.AddComponent<LayoutElement>();
             expandedLe.flexibleWidth = 1f;
             expanded.SetActive(visible); // карточка входящего стартует свёрнутой, активная — раскрытой
@@ -476,14 +437,7 @@ namespace SpaceTaxi.UI
             avatarLe.flexibleHeight = 0f;
 
             // сводка: строки фиксированной высоты, лейблы LabelColor / значения Bright — биндер
-            var summary = new GameObject("Summary", typeof(RectTransform));
-            summary.transform.SetParent(expanded.transform, false);
-            var summaryLayout = summary.AddComponent<VerticalLayoutGroup>();
-            summaryLayout.spacing = 2;
-            summaryLayout.childControlWidth = true;
-            summaryLayout.childControlHeight = true;
-            summaryLayout.childForceExpandWidth = true;
-            summaryLayout.childForceExpandHeight = false;
+            var summary = Ui.Column(expanded.transform, "Summary", 2f); // UiKit
             var summaryLe = summary.AddComponent<LayoutElement>();
             summaryLe.flexibleWidth = 1f;
             summaryLe.minWidth = 100f;
@@ -528,27 +482,33 @@ namespace SpaceTaxi.UI
 
         public static void Stretch(RectTransform rect)
         {
-            Ui.Stretch(rect); // Н11: UiKit
+            Ui.Stretch(rect); // UiKit
         }
 
         // --- Общие помощники ---
 
-        public static GameObject H(string name, Transform parent)
+        public static GameObject H(string name, Transform parent, float spacing = 8f)
         {
-            return Ui.Row(parent, name); // Н11: примитив в UiKit
+            return Ui.Row(parent, name, spacing); // примитив UiKit
+        }
+
+        // вертикальная колонка тем же примитивом
+        public static GameObject V(string name, Transform parent, float spacing = 4f)
+        {
+            return Ui.Column(parent, name, spacing);
         }
 
         // зелёная рамка по контуру узла (карточка/аватар) — UI.Outline, цвет лейблов
         public static void Frame(GameObject go, float thickness = 2f)
         {
-            Ui.Frame(go, LabelColor, thickness); // Н11: UiKit
+            Ui.Frame(go, LabelColor, thickness); // UiKit
         }
 
         // рамка прямоугольником из 4 тонких полосок — для узлов с прозрачной
         // картинкой: UI.Outline продублировал бы сам портрет 4 раза со смещением
         public static void RectBorder(GameObject go, float thickness = 2f, Color? color = null)
         {
-            Ui.RectBorder(go, color ?? LabelColor, thickness); // Н11: UiKit
+            Ui.RectBorder(go, color ?? LabelColor, thickness); // UiKit
         }
 
         // элемент шапки, прижатый к левому/правому краю строки; вне лейаута.
@@ -566,7 +526,7 @@ namespace SpaceTaxi.UI
             rect.pivot = new Vector2(edge, 0.5f);
             rect.sizeDelta = new Vector2(240f, 48f);
             rect.anchoredPosition = new Vector2(isLeft ? 12f : -12f, 0f);
-            Ui.IgnoreLayout(rect.gameObject); // Н11: UiKit
+            Ui.IgnoreLayout(rect.gameObject); // UiKit
         }
 
         // деньги: ровно по центру ширины панели, независимо от соседних текстов
@@ -577,7 +537,7 @@ namespace SpaceTaxi.UI
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(260f, 48f);
             rect.anchoredPosition = Vector2.zero;
-            Ui.IgnoreLayout(rect.gameObject); // Н11: UiKit
+            Ui.IgnoreLayout(rect.gameObject); // UiKit
         }
 
         // однолинейный текст с обрезкой «…»: базовая политика панели.
@@ -586,13 +546,13 @@ namespace SpaceTaxi.UI
         // 23pt ≈ 30.4), иначе текст «есть, но невидим» (ноль видимых символов)
         public static TMP_Text Text(GameObject parent, string content, float size, Color color, string name = "Text")
         {
-            return Ui.Label(parent.transform, content, size, color, currentFont, name); // Н11: примитив в UiKit
+            return Ui.Label(parent.transform, content, size, color, currentFont, name); // примитив UiKit
         }
 
         public static GameObject Button(Transform parent, string label, Color background, Color textColor, float size,
             string name = null, bool framed = true)
         {
-            var button = Ui.Button(parent, label, background, textColor, size, currentFont, name, framed); // Н11: UiKit
+            var button = Ui.Button(parent, label, background, textColor, size, currentFont, name, framed); // UiKit
             // хук первым — щелчок звучит до обработчиков, добавленных вызывателем
             UiSfx.Hook(button);
             return button.gameObject;
@@ -613,7 +573,7 @@ namespace SpaceTaxi.UI
             return button;
         }
 
-        // Н11: размеры/лейаут-элемент — в UiKit (Fixed*/Flexible/IgnoreLayout)
+        // размеры/лейаут-элемент — в UiKit
         private static LayoutElement Le(GameObject go)
         {
             var le = go.GetComponent<LayoutElement>();

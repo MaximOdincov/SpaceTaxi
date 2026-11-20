@@ -34,7 +34,7 @@ namespace SpaceTaxi.World
             Init(flightDirection, flightSpeed, Vector2.zero, worldRadius);
         }
 
-        // вариант для кометной зоны (П7.2): маршрут не покидает окружность зоны,
+        // вариант для кометной зоны: маршрут не покидает окружность зоны,
         // деспавн — при выходе из неё
         public void Init(Vector2 flightDirection, float flightSpeed, Vector2 despawnCenter, float despawnRadius)
         {

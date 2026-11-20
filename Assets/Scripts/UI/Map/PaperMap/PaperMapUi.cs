@@ -5,20 +5,17 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема хелперов бумажной карты (Н11): общий слой «чернил и ректов» —
-    // Статические утилиты, которыми пользовались все разделы построения карты:
-    // хром листа, подписи, кольца, аннотации. Тела перенесены из MapScreenBinder
-    // дословно (Н11); MakeLabel требует шрифт карты — передаётся явно
-    // (ResolveFont живёт в хосте).
+    // подсистема хелперов бумажной карты: общий слой «чернил и ректов» —
+    // статические утилиты построения карты. MakeLabel требует шрифт карты —
+    // передаётся явно (ResolveFont живёт в хосте).
     internal static class PaperMapUi
     {
-        // — лист и бортовой компьютер (Н5.21) — геометрия окна, общая для хрома
-        // (BuildChrome/LayoutSheet) и вида (SheetClampView) — Н11
+        // геометрия листа, общая для хрома (BuildChrome/LayoutSheet)
+        // и вида (SheetClampView)
         internal const float SheetMargin = 0f;   // поля листа от краёв доступной области
         internal const float ContentMargin = 0f; // окно вида внутри листа (маска клипует всё внутри)
 
-        // альфа-фейд подписей на смене тира (M7.5) — общий темп для подписей,
-        // линейки и районов — Н11
+        // общий темп альфа-фейдов подписей, линейки и районов
         internal const float LabelFadeSeconds = 0.12f;
 
         // отрезок чернил: капсула StubSprites.Line между двумя точками
@@ -39,7 +36,7 @@ namespace SpaceTaxi.UI.PaperMap
             return rect;
         }
 
-        // Н12.4: один FNV-1a на проект — Economy.DeterministicHash
+        // один FNV-1a на проект — Economy.DeterministicHash
         internal static int StableHash(string text) => SpaceTaxi.Economy.DeterministicHash.StableHash(text);
 
         internal static Rect CenteredRect(Vector2 center, Vector2 size)
@@ -50,7 +47,7 @@ namespace SpaceTaxi.UI.PaperMap
         internal static void ClearChildren(Transform t)
         {
             for (int i = t.childCount - 1; i >= 0; i--)
-                Object.Destroy(t.GetChild(i).gameObject); // static-класс: не MonoBehaviour (Н11)
+                Object.Destroy(t.GetChild(i).gameObject); // static-класс: не MonoBehaviour
         }
 
         internal static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
@@ -79,8 +76,8 @@ namespace SpaceTaxi.UI.PaperMap
             return rect;
         }
 
-        // все подписи карты одним рукописным шрифтом (Н5.21-3 — только Excalifont);
-        // высоты узлов ≥ fontSize*1.32 (урок ночи 4)
+        // все подписи карты одним рукописным шрифтом;
+        // высоты узлов ≥ fontSize*1.32
         internal static TMP_Text MakeLabel(TMP_FontAsset font, string name, Transform parent, string text, float size, Color color,
             TextAlignmentOptions align = TextAlignmentOptions.Center)
         {
@@ -103,7 +100,5 @@ namespace SpaceTaxi.UI.PaperMap
         {
             return new Color(color.r, color.g, color.b, alpha);
         }
-
-        // (Н11-step1-papermapui-applied)
     }
 }

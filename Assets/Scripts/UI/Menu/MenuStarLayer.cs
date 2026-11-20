@@ -3,10 +3,8 @@ using UnityEngine;
 
 namespace SpaceTaxi.UI
 {
-    // Один слой звёздного фона меню (бриф E.1): рассыпает звёзды по своей
-    // площади, мерцает ими (MenuTwinkle) и дрейфует автономно (E8.3: мышиный
-    // параллакс убран — sway + медленное плавание, глубина — из фаз/амплитуд).
-    // Слои строятся кодом контроллером MenuBackdropController; сцена не правится.
+    // Один слой звёздного фона меню: рассыпает звёзды по своей площади и мерцает
+    // ими (MenuTwinkle). Строится контроллером MenuBackdropController кодом.
     public sealed class MenuStarLayer : MonoBehaviour
     {
         public struct Config
@@ -20,8 +18,8 @@ namespace SpaceTaxi.UI
             public float SoftCore;              // доля радиуса с полной альфой (0 — туманность, 0.45 — звезда)
             public float SwayAmplitude;         // px автономного дрейфа
             public float SwaySpeed;             // рад/с автономного дрейфа
-            public float PhaseShift;            // сдвиг фазы мерцания слоя — слои сверкают в противофазе (E4)
-            public float DriftAmplitude;        // px медленного «плавания» слоя (E4)
+            public float PhaseShift;            // сдвиг фазы мерцания слоя — слои сверкают в противофазе
+            public float DriftAmplitude;        // px медленного «плавания» слоя
             public float DriftSpeed;            // рад/с медленного плавания (период ~минута)
             public float DriftAngleDeg;         // направление плавания, градусы (у слоёв встречные)
             public Color[] Palette;

@@ -7,16 +7,13 @@ namespace SpaceTaxi.UI
 {
     public class SceneFlowButtons : MonoBehaviour
     {
-        // затемнение неактивного «Продолжить» (§3.9, П10.2): фон кнопки гасит
-        // DisabledColor-переход, CanvasGroup добавно гасит и подпись
+        // альфа неактивной кнопки «Продолжить»: гасим и фон, и подпись
         private const float DisabledAlpha = 0.4f;
 
         public void StartNewGame() => Load("GameScene");
 
-        // продолжение (П10.1): флаг ставится ДО загрузки сцены — GameSession.Start
-        // применит сейв после сборки мира; новая игра флаг не ставит и сейв
-        // игнорирует (но не удаляет). Сейва нет — no-op: страховка, кнопка
-        // и так погашена
+        // флаг ставится ДО загрузки сцены: GameSession применит сейв после
+        // сборки мира; новой игрой сейв игнорируется, но не удаляется
         public void ContinueGame()
         {
             if (!SaveSystem.HasSave())
@@ -27,13 +24,13 @@ namespace SpaceTaxi.UI
 
         public void LoadMainMenu()
         {
-            SaveIfAlive(); // автосейв §3.9: выход в меню
+            SaveIfAlive(); // автосейв при выходе в меню
             Load("MainMenu");
         }
 
         public void QuitGame()
         {
-            SaveIfAlive(); // автосейв §3.9: выход из игры
+            SaveIfAlive(); // автосейв при выходе из игры
             Time.timeScale = 1f;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
@@ -42,10 +39,8 @@ namespace SpaceTaxi.UI
 #endif
         }
 
-        // «Продолжить» активно только при наличии сейва (§3.9). Меню входит
-        // полной загрузкой сцены, так что OnEnable срабатывает на каждый показ;
-        // состояние после увольнения (DeleteSave на экране увольнения)
-        // подхватывается само
+        // «Продолжить» активно только при наличии сейва; меню каждый раз
+        // грузится целиком, так что OnEnable хватает каждый показ
         private void OnEnable()
         {
             var go = GameObject.Find("Button_Continue"); // бинд по имени; в GameScene её нет
@@ -62,8 +57,7 @@ namespace SpaceTaxi.UI
             dim.alpha = hasSave ? 1f : DisabledAlpha;
         }
 
-        // сейвим только живую сессию (в меню её нет); увольнённый забег Save
-        // не перезапишет — терминальное состояние (3 аварии) он пропускает
+        // сейвим только живую сессию; терминальное состояние (уволен) Save пропускает
         private static void SaveIfAlive()
         {
             var session = FindAnyObjectByType<GameSession>();

@@ -36,7 +36,7 @@ namespace SpaceTaxi.World
         {
             gravity = new GameObject("GravityField").AddComponent<GravityField>(); // реестр гравитации
 
-            // пустые топливные сети (Н4.5): один проход ДО создания тел — правило
+            // пустые топливные сети: один проход ДО создания тел — правило
             // «не двух соседних сразу» видит все заправки уровня сразу
             var fuelOutage = FuelNetwork.OutageStations(level.Bodies, Pricing()); // какие станции «сухие»
 
@@ -44,7 +44,7 @@ namespace SpaceTaxi.World
             for (int i = 0; i < level.Bodies.Count; i++) // по данным уровня
                 bodies.Add(CreateBody(level.Bodies[i], i, fuelOutage.Contains(level.Bodies[i].DisplayName))); // создать тело
 
-            // кометы (П6.3): одна система на уровень, маршруты по таймеру, не тело гравитации
+            // кометы: одна система на уровень, маршруты по таймеру, не тело гравитации
             var cometGo = new GameObject("CometSystem"); // объект системы комет
             cometGo.AddComponent<CometSystem>().Init(level); // инициализировать
 
@@ -67,7 +67,7 @@ namespace SpaceTaxi.World
             return planetsForBelts;
         }
 
-        // конфиг цен (Н4.5): нужна билдеру ради шанса пустой сети — та же цепочка,
+        // конфиг цен: нужна билдеру ради шанса пустой сети — та же цепочка,
         // что у OrderService.Pricing (Resources → кодовый дефолт); поля сцены нет.
         // ИНВАРИАНТ: сериализованное pricingConfig-поле OrderService в сцене
         // НЕ назначать — иначе мир (сухие сети) и заказы разойдутся по конфигам;
@@ -280,7 +280,7 @@ namespace SpaceTaxi.World
                 level.SpawnAngleDeg - nose); // поза носом наружу
 
             ship.Init(config, shipConfig); // инициализация модели
-            ship.SetState(ShipState.Landed); // стартует на планете (Н10.14)
+            ship.SetState(ShipState.Landed); // стартует на планете
             ship.LandedOn = bodies[level.StartPlanetIndex] as Planet; // планета стоянки
 
             if (controller != null) // контроллер есть

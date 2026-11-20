@@ -17,7 +17,7 @@ namespace SpaceTaxi.Physics
         public const string MainSlotName = "ExhaustMain";
         public const string RetroSlotName = "ExhaustRetro";
 
-        // ---- дефолтный выхлоп: числа на глаз, владелец подвинет в Play Mode ----
+        // ---- дефолтный выхлоп: стартовые числа, тюнинг в Play Mode ----
 
         // главный луч: скорость × жизнь = длина пламени, размер = толщина
         private const float MainSpeedMin = 55f;
@@ -26,7 +26,7 @@ namespace SpaceTaxi.Physics
         private const float MainLifeMax = 0.4f;
         private const float MainSizeMin = 2.6f;
         private const float MainSizeMax = 4.4f;
-        private const float MainConeAngle = 13f;      // конус сопла (было 10)
+        private const float MainConeAngle = 13f;      // конус сопла
         private const float MainConeRadius = 0.45f;
         private const float MainRate = 150f;          // эмиссия, частиц/с
         private const int MainMaxParticles = 300;
@@ -138,7 +138,7 @@ namespace SpaceTaxi.Physics
 
             Vector2 nose = NoseDir();
 
-            // все слоты ExhaustMain* — владелец вешает несколько сопел, каждое
+            // все слоты ExhaustMain* — на модели может быть несколько сопел, каждое
             // со своим пламенем; первое — главный, остальные в extraMains
             bool first = true;
             foreach (Transform slot in SlotsNamed(root, MainSlotName, dying))
@@ -158,7 +158,7 @@ namespace SpaceTaxi.Physics
                     mainAuthored = false; // сброс для следующего слота
                 }
             }
-            if (mainJet == null) // слотов нет вовсе — корневой фолбэк, как раньше
+            if (mainJet == null) // слотов нет вовсе — корневой фолбэк
                 mainJet = BuildRootSlot(root, MainSlotName, -nose * 6f, -nose, isMain: true, allowDefault: true);
             // ретро: только авторский PS; дефолтного «пламени из носа» больше нет
             foreach (Transform slot in SlotsNamed(root, RetroSlotName, dying))
@@ -181,7 +181,7 @@ namespace SpaceTaxi.Physics
         }
 
         // пара RCS у хвоста: точка подключения — слот главного сопла (позиция
-        // сопла уже выверена владельцем), струйки вбок-вперёд
+        // сопла уже выверена в префабе), струйки вбок-вперёд
         private void ResolveRcs(ParticleSystem main)
         {
             if (main == null)
@@ -255,7 +255,7 @@ namespace SpaceTaxi.Physics
             }
 
             // пустой слот префаба: главный — дефолтное пламя ребёнком, ретро —
-            // пустой резерв (владелец добавит свой PS). Слоты префаба в
+            // пустой резерв под авторский PS. Слоты префаба в
             // createdSlots НЕ попадают — они не «созданы кодом»
             if (!allowDefault)
                 return null;

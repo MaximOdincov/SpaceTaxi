@@ -4,10 +4,9 @@ using TMPro;
 
 namespace UiKit
 {
-    // Примитивы построения uGUI (Н11, сборка UiKit): вся рутина создания
-    // RectTransform/Image/TMP/LayoutGroup живёт здесь, игровые экраны вызывают
-    // короткие методы или fluent-бокс (Ui.Box). Ни один метод не зависит от
-    // игрового кода: шрифт и цвета передаются параметрами
+    // Примитивы построения uGUI: создание RectTransform/Image/TMP/лейаутов
+    // живёт здесь, экраны зовут короткие методы или fluent UiBox.Box(...).
+    // Тулкит не зависит от игрового кода: шрифт и цвета передаются параметрами
     public static class Ui
     {
         // --- контейнеры ---
@@ -29,8 +28,13 @@ namespace UiKit
             rect.offsetMax = Vector2.zero;
         }
 
-        // горизонтальная строка-лейаут (значения по умолчанию — как у карточек:
-        // ширина управляется лейаутом, дети растягиваются по обеим осям)
+        // тот же цвет с другой альфой — для приглушённых фонов и треков
+        public static Color WithAlpha(Color color, float alpha)
+        {
+            return new Color(color.r, color.g, color.b, alpha);
+        }
+
+        // горизонтальная строка-лейаут (ширина детей управляется лейаутом)
         public static GameObject Row(Transform parent, string name, float spacing = 8f,
             TextAnchor alignment = TextAnchor.MiddleLeft, bool expandHeight = true)
         {
@@ -65,8 +69,8 @@ namespace UiKit
         // --- содержимое ---
 
         // однолинейный текст с обрезкой «…». ВАЖНО: Ellipsis режет и по вертикали —
-        // узел обязан иметь высоту ≥ preferredHeight строки, иначе текст
-        // «есть, но невидим» (36pt ≈ 47.5, 21pt ≈ 27.7, 17pt ≈ 22.6)
+        // высота узла должна быть ≥ высоты строки (36pt ≈ 47.5, 21pt ≈ 27.7),
+        // иначе текст «есть, но невидим»
         public static TMP_Text Label(Transform parent, string text, float size, Color color,
             TMP_FontAsset font = null, string name = "Text")
         {
@@ -83,9 +87,8 @@ namespace UiKit
             return tmp;
         }
 
-        // кнопка: фон + опциональный светлый контур + центрированная подпись.
-        // Звуковой хук НЕ навешивается (игра зовёт свой UiSfx.Hook после вызова,
-        // чтобы щелчок звучал раньше её собственных обработчиков)
+        // кнопка: фон + светлый контур + подпись по центру. Звуковой хук навешивает
+        // вызывающий (UiSfx.Hook) — щелчок должен звучать раньше его обработчиков
         public static Button Button(Transform parent, string label, Color background, Color textColor,
             float size, TMP_FontAsset font = null, string name = null, bool framed = true)
         {
@@ -117,8 +120,7 @@ namespace UiKit
             return img;
         }
 
-        // --- слайдер (Н13.6): трек + Fill + Handle; геометрия тулкита —
-        // игровые экраны не подгоняют внутренние rect'ы ---
+        // слайдер: трек + Fill + Handle; внутренние rect'ы экраны не подгоняют
         public static Slider Slider(Transform parent, string name, Color track, Color fill, Color handleColor)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Slider));
@@ -230,8 +232,8 @@ namespace UiKit
             outline.effectDistance = new Vector2(thickness, -thickness);
         }
 
-        // рамка-прямоугольник из 4 полосок — для узлов с прозрачной картинкой:
-        // Outline продублировал бы картинку 4 раза со смещением
+        // рамка из 4 полосок — для прозрачных картинок: Outline продублировал
+        // бы спрайт 4 раза со смещением
         public static void RectBorder(GameObject go, Color color, float thickness = 2f)
         {
             var parent = (RectTransform)go.transform;

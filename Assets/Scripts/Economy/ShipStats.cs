@@ -19,7 +19,7 @@ namespace SpaceTaxi.Economy
 
     // Уровни улучшений -> статы. Чистая функция без состояния: ур.1 = 1/3,
     // ур.2 = 2/3, ур.3 = максимум; нулевые уровни = базовые статы.
-    // MaxV улучшениями не меняется (16_BETA_PLAN §3.4)
+    // MaxV улучшениями не меняется
     public static class ShipStats
     {
         public const int LineCount = 4; // Engine, Tank, Hull, Maneuver
@@ -40,7 +40,7 @@ namespace SpaceTaxi.Economy
                     ? ship.Retro
                     : physics != null ? physics.Retro : 80f,
             };
-            // §1.4: расход — поле корабля (по классу обслуживания);
+            // расход — поле корабля (по классу обслуживания);
             // 0/нет конфига — глобальный PhysicsConfig.FuelDrainPerSecond (фолбэк)
             stats.FuelDrain = ship != null && ship.FuelDrainPerSecond > 0f
                 ? ship.FuelDrainPerSecond

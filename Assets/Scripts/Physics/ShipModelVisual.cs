@@ -7,7 +7,7 @@ namespace SpaceTaxi.Physics
 {
     // Визуал модели корабля: префаб из Resources/Ships/<Id> — SpriteRenderer со
     // спрайтом покраски + пустые child-слоты ExhaustMain/ExhaustRetro, позиции
-    // которых правит владелец в префабе модели (EngineEffects подхватывает).
+    // их позиции задаются в префабе модели (EngineEffects подхватывает).
     // Префаба нет — спрайт рисует корневой SpriteRenderer (старое поведение).
     public class ShipModelVisual : MonoBehaviour
     {
@@ -18,7 +18,7 @@ namespace SpaceTaxi.Physics
         // публично — посадочный отступ ShipPlacement считается от неё же
         public const float CapsuleHeightFraction = 0.96f;
         private const float CapsuleWidthFraction = 0.9f;
-        // половина высоты контента без визуала — прежний снап посадки/спавна
+        // половина высоты контента без визуала — для снапа посадки/спавна
         private const float FallbackHalfExtent = 17.5f;
 
         private static readonly Dictionary<string, GameObject> prefabCache =
@@ -26,10 +26,10 @@ namespace SpaceTaxi.Physics
 
         private Transform visual;
         private float contentHeight; // высота контента в юнитах корня (после масштаба визуала)
-        // Н6 хотфикс: у артов есть прозрачный отступ снизу — в позе Landed корабль
-        // «парит» над поверхностью. Топим ТОЛЬКО визуал (в мировых юнитах): капсула,
-        // поза физики и предиктивная посадка (G1) не тронуты; на взлёте — обратно.
-        private const float LandedSinkWorld = 5f; // (владелец: «стоит на воздухе чуть выше планет» — 2.5 → 5, посадка ниже)
+        // у артов есть прозрачный отступ снизу — в позе Landed корабль «парит»
+        // над поверхностью. Топим ТОЛЬКО визуал (в мировых юнитах): капсула,
+        // поза физики и предиктивная посадка не тронуты; на взлёте — обратно.
+        private const float LandedSinkWorld = 5f; // посадка визуально ниже, к поверхности
 
         private Ship ship;
         private Vector3 baseVisualLocalPos; // центрирование контента из Apply

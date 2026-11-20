@@ -8,12 +8,8 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема «кольца и маркеры» бумажной карты (Н11): жёлтая цель заказа,
-    // зелёная метка игрока (waypoint), маркер ракеты и кольцо стоянки, край мира
-    // (туманная кромка, буи, «за кругом — потеря связи»), живые кометы —
-    // Выделена из MapScreenBinder (Н11): тела перенесены дословно. Кольца
-    // обнимают планету (IconSizeOf — PaperMapLabels), counter-scale 1/zoom —
-    // PaperMapProjection; состояние метки (Waypoint) живёт в хосте.
+    // подсистема «кольца и маркеры»: жёлтая цель заказа, зелёная метка игрока,
+    // маркер ракеты и кольцо стоянки, край мира (туманная кромка, буи), кометы.
     internal sealed class PaperMapRings
     {
         private readonly MapScreenBinder host;
@@ -27,7 +23,7 @@ namespace SpaceTaxi.UI.PaperMap
             this.labels = labels;
         }
 
-        // — шимы к хосту/виду/подписям (Н11): тела методов остаются дословными —
+        // шимы к хосту/виду/подписям
         private MapStyleConfig Style => host.Style;
         private LevelAsset level => host.Level;
         private float zoom => view.Zoom;
@@ -51,16 +47,16 @@ namespace SpaceTaxi.UI.PaperMap
             set => labels.TargetIndex = value;
         }
 
-        // наружу подсистемам (Н11): кляксы смерти клампятся как маркер ракеты
+        // наружу подсистемам: кляксы смерти клампятся как маркер ракеты
         internal RectTransform PlayerMarker => playerMarker;
-        internal RectTransform EdgeRoot => edgeRoot; // Н11: слоты подписей читают буи/пометки
+        internal RectTransform EdgeRoot => edgeRoot; // слоты подписей читают буи/пометки
         internal float PlayerHeading
         {
             get => playerHeading;
             set => playerHeading = value;
         }
 
-        // хелперы PaperMapUi (Н11)
+        // хелперы PaperMapUi
         private static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 offsetMin, Vector2 offsetMax)
             => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax);
@@ -74,34 +70,31 @@ namespace SpaceTaxi.UI.PaperMap
             TextAlignmentOptions align = TextAlignmentOptions.Center)
             => PaperMapUi.MakeLabel(host.Font, name, parent, text, size, color, align);
 
-        // M7.1: маркеры цели/метки — константный ЭКРАННЫЙ размер (скайрим-урок):
-        // рут в зум-контенте несёт counter-scale 1/zoom (как кометы), дети
-        // заданы в экранных px и не растут при приближении
+        // маркеры цели/метки — константный экранный размер: рут в зум-контенте
+        // несёт counter-scale 1/zoom, дети заданы в экранных px
         private float TargetRingPx => Style.targetRingPx;
         private float TargetRingWidePx => Style.targetRingWidePx;
-        // M8.8: своя метка — зелёный аналог жёлтой цели заказа (кольца того же
-        // калибра) + булавка
+        // своя метка — зелёный аналог жёлтой цели (кольца того же калибра) + булавка
         private float WaypointHaloPx => Style.waypointHaloPx;
         private float WaypointWidePx => Style.waypointWidePx;
         private float WaypointPinPx => Style.waypointPinPx;
 
-        // M8.7: жёлтый полупрозрачный ореол/кольцо цели (жёлтый = цель заказа,
-        // Н5.28; янтарный Accent отменён владельцем). Тот же тон, что в игре
-        // (OrderService.UpdateTargetGlow)
+        // жёлтый полупрозрачный ореол цели (жёлтый = цель заказа); тон как
+        // в игре (OrderService.UpdateTargetGlow)
         private Color TargetRingColor => Style.targetColor;
 
-        // M8.8: своя метка — зелёный (зелёный = метка игрока), единый цвет с
-        // червоном радара (MinimapBinder.WaypointColor) и скобкой в мире
+        // своя метка — зелёный, единый цвет с червоном радара
+        // (MinimapBinder.WaypointColor)
         private Color WaypointMarkColor => Style.waypointColor;
 
-        // «нос» арт-спрайтов при localRotation = 0, градусов от +X (замер по пикселям):
-        // ракета летит остриём в правый-верхний угол, комета — головой в левый-низ
+        // «нос» арт-спрайтов при localRotation = 0, градусов от +X:
+        // ракета — остриё в правый-верхний угол, комета — голова в левый-низ
         private const float RocketNoseDeg = 55f;
         private const float CometHeadDeg = 226f;
 
-        private const float RocketMarkerPx = 64f;  // маркер ракеты (Н6.K6: 48 → +33%)
+        private const float RocketMarkerPx = 64f;  // размер маркера ракеты, px
 
-        private RectTransform edgeFogRoot; // M7.5: туманная кромка — вне блокирующего хрома (гигантский rect)
+        private RectTransform edgeFogRoot; // туманная кромка — вне блокирующего хрома (гигантский rect)
         private RectTransform edgeRoot;    // буи границы мира, тревожные пометки
 
         private RectTransform cometsRoot;  // живые кометы
@@ -130,11 +123,10 @@ namespace SpaceTaxi.UI.PaperMap
 
         private RectTransform landedPad;
         private Image landedPadImage;
-        private RectTransform landedRing;       // M7.3: чернильное кольцо «припаркованы здесь»
+        private RectTransform landedRing;       // чернильное кольцо «припаркованы здесь»
         private RectTransform landedRingNote;   // подпись под кольцом — константного экранного размера
         private CelestialBody landedRingBody;   // вокруг какого тела построено
-        // (из BuildMap, Н11): слои края мира — туманная кромка (вне блокирующего
-        // хрома) + буи/пометки
+        // слои края мира — туманная кромка + буи/пометки
         internal void BuildEdgeLayers(RectTransform content)
         {
             edgeFogRoot = MakeRect("EdgeFogRoot", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -158,22 +150,15 @@ namespace SpaceTaxi.UI.PaperMap
             ((RectTransform)label.transform).anchoredPosition = pos + Vector2.up * (level.CometAreaRadius * scale + 16f);
         }
 
-        // граница мира (M7.5): туманная кромка — чернильный крап, нарастающий за
-        // границей («дальше бумаги нет»), буи-звёздочки и пометки «за кругом —
-        // потеря связи» (красный больше не здесь — только смерть).
-        // M8.2: рамка-обод по краю удалена (вкус владельца), туман — мягкий:
-        // растворение начинается глубже (0.65×R) и тянется шире — без резкой
-        // внутренней границы
+        // граница мира: туманная кромка («дальше бумаги нет»), буи-звёздочки и
+        // пометки «за кругом — потеря связи»
         internal void BuildWorldEdge()
         {
             float borderPx = mapRadius * scale;
 
-            // крап-туман: растворение начинается от ФАКТИЧЕСКОГО края тел
-            // (bodyEdgeRadius, M8.3 — прежде 0.65×mapRadius, что при плотной
-            // компоновке с WorldRadius 4600 накрыло бы Дальний район) и густеет
-            // за кольцом буёв; живёт в edgeFogRoot — не блокирует слоты
-            // подписей (см. BuildMap). Максимум с прежним поведением: у старого
-            // мира 0.65×6000 ≈ 3936 — край тел, вид не меняется
+            // крап-туман: растворение начинается от фактического края тел
+            // (bodyEdgeRadius) и густеет за кольцом буёв; живёт в edgeFogRoot —
+            // не блокирует слоты подписей
             float fogInnerPx = Mathf.Max(bodyEdgeRadius, mapRadius * Style.fogInnerFrac) * scale;
             RectTransform fog = MakeImage("EdgeFog", edgeFogRoot, PaperMapArt.EdgeFog(),
                 WithAlpha(PaperMapArt.Ink, 0.75f),
@@ -192,9 +177,8 @@ namespace SpaceTaxi.UI.PaperMap
                 buoy.localRotation = Quaternion.Euler(0f, 0f, i * 17f);
             }
 
-            // Граница связи — окружность из дуговых сегментов (владелец Н9.2:
-            // «полноценный круг без углов» — TargetRing 256px, растянутый до
-            // тысяч px, читался многоугольником) с тем же трёхлепестковым воблом
+            // граница связи — окружность из дуговых сегментов
+            // с трёхлепестковым воблом
             const int boundarySegments = 180;
             Vector2 prev = new Vector2(borderPx, 0f);
             for (int i = 1; i <= boundarySegments; i++)
@@ -232,10 +216,8 @@ namespace SpaceTaxi.UI.PaperMap
 
         internal void BuildWaypoint()
         {
-            // M7.1: константный экранный размер — рут несёт counter-scale 1/zoom,
-            // дети заданы в экранных px и больше не растут от IconSizeOf×zoom.
-            // M8.8: своя метка ЗЕЛЁНАЯ (зелёный = метка игрока) — ореол-кольца
-            // того же калибра, что у жёлтой цели заказа, булавка над кольцом
+            // константный экранный размер — рут несёт counter-scale 1/zoom;
+            // кольца того же калибра, что у жёлтой цели, булавка над кольцом
             waypointRoot = MakeRect("WaypointRoot", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             waypointWide = MakeImage("Wide", waypointRoot, PaperMapArt.TargetRing(),
                 WithAlpha(WaypointMarkColor, 0.5f), Vector2.one * WaypointWidePx, false);
@@ -267,11 +249,8 @@ namespace SpaceTaxi.UI.PaperMap
             waypointRoot.anchoredPosition = WorldToMap(Waypoint.Position);
             waypointRoot.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранный px постоянны
 
-            // ХОТФИКС владельца v2: ореол метки ОБНИМАЕТ планету на любом зуме —
-            // кольца = экранный диаметр иконки ×1.25/×1.75 (как у жёлтой цели;
-            // прежде кольца были постоянного экранного размера и «менялись»
-            // относительно планеты: на отъезде больше неё, вблизи терялись внутри).
-            // Пульс остался, в фазе (Н8.23); булавка — над кольцом
+            // ореол обнимает планету на любом зуме: кольца = экранный диаметр
+            // иконки ×1.25/×1.75; булавка — над кольцом
             float planetPx = IconSizeOf(Waypoint) * zoom;
             waypointHalo.sizeDelta = Vector2.one * (planetPx * 1.25f);
             waypointWide.sizeDelta = Vector2.one * (planetPx * 1.75f);
@@ -289,8 +268,8 @@ namespace SpaceTaxi.UI.PaperMap
 
         internal void BuildTargetRing()
         {
-            // M7.1: константный экранный размер (руту ставит counter-scale в Update);
-            // M8.7: единственный насыщенный цвет карты — жёлтый ореол цели
+            // константный экранный размер (counter-scale в Update);
+            // жёлтый — единственный насыщенный цвет карты
             targetRing = MakeRect("TargetRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             targetRingPulse = MakeImage("Ring", targetRing, PaperMapArt.TargetRing(),
                 TargetRingColor, Vector2.one * TargetRingPx, false);
@@ -298,16 +277,13 @@ namespace SpaceTaxi.UI.PaperMap
                 WithAlpha(TargetRingColor, 0.7f), Vector2.one * TargetRingWidePx, false);
             targetRingPulseImage = targetRingPulse.GetComponent<Image>(); // кэш для кадра
             targetRingWideImage = targetRingWide.GetComponent<Image>();
-            // Н10.5 (владелец: «куда-то пропадает имя планеты, когда взят заказ»):
-            // подпись цели больше не прячется — кольцо-ореол маркирует цель,
-            // имя планеты видно всегда (PlaceAllLabels отодвигает подпись
-            // цели за внешний радиус кольца зазором слота)
+            // подпись цели не прячется: PlaceAllLabels отодвигает её
+            // за внешний радиус кольца
             targetRing.gameObject.SetActive(false);
             targetIndex = -1;
         }
 
-        // цель активного заказа — жёлтый пульс (заметный издалека); имя планеты
-        // цели видно всегда (Н10.5 — подавление подписи снято)
+        // цель активного заказа — жёлтый пульс, заметный издалека
         internal void UpdateTargetRing()
         {
             int index = ActiveOrderTargetIndex();
@@ -320,19 +296,15 @@ namespace SpaceTaxi.UI.PaperMap
 
             CelestialBodyData body = level.Bodies[index];
             targetRing.gameObject.SetActive(true);
-            targetIndex = index; // Н10.5: подпись цели не прячется — кольцо и имя живут вместе
+            targetIndex = index; // кольцо и имя цели живут вместе
             targetRing.anchoredPosition = WorldToMap(body.Position);
-            targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // M7.1: экранные px постоянны
-            // ХОТФИКС владельца: ореол цели ОБНИМАЕТ планету на любом зуме (прежде
-            // кольцо было постоянным экранного размера — на отъезде «больше» планеты,
-            // при приближении терялось внутри диска). Диаметры = экранный диаметр
-            // иконки цели × 1.25 / ×1.75 — тот же принцип, что у жёлтого ореола в игре
+            targetRing.localScale = Vector3.one / Mathf.Max(zoom, 0.001f); // экранные px постоянны
+            // ореол обнимает планету на любом зуме: диаметры = экранный диаметр
+            // иконки цели × 1.35 / ×1.95
             float planetPx = IconSizeOf(body) * zoom;
-            // Н10.5 вкусовое (владелец: «подсветку сильнее на жёлтых планетах»):
-            // было 1.25/1.75×, альфы 0.62/0.35, пульс 4.2/3.4
             targetRingPulse.sizeDelta = Vector2.one * (planetPx * 1.35f);
             targetRingWide.sizeDelta = Vector2.one * (planetPx * 1.95f);
-            // пульс: кольца дышат размером и альфой (чуть быстрее прежнего)
+            // пульс: кольца дышат размером и альфой
             float t = Time.unscaledTime;
             targetRingPulse.localScale = Vector3.one * (1f + 0.09f * Mathf.Sin(t * 5.5f));
             if (targetRingPulseImage != null)
@@ -343,13 +315,13 @@ namespace SpaceTaxi.UI.PaperMap
 
         internal void BuildPlayerMarker()
         {
-            // маркер живёт на ЛИСТЕ, не в зум-контенте: RectMask2D контента (инсет 26 px
-            // от края листа) резал ракету и подпись «ВЫ» у краёв; позицию считаем сами
+            // маркер живёт на листе, не в зум-контенте — размер постоянен,
+            // позицию считаем сами
             playerMarker = MakeRect("PlayerMarker", sheetRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             playerMarker.SetAsLastSibling(); // поверх рамки листа, под экранным (легенда/записка)
             playerMarker.sizeDelta = Vector2.one * RocketMarkerPx;
 
-            // тень-подставка на стоянке (Н6.K7): мягкое чернильное пятно под ракетой,
+            // тень-подставка на стоянке: мягкое чернильное пятно под ракетой,
             // когда корабль Landed — скромный индикатор «припаркован»
             landedPad = MakeImage("LandedPad", playerMarker, PaperMapArt.InkDot(),
                 WithAlpha(PaperMapArt.Ink, 0f), new Vector2(RocketMarkerPx * 1.7f, RocketMarkerPx * 0.55f), false);
@@ -361,12 +333,10 @@ namespace SpaceTaxi.UI.PaperMap
             Vector2 size;
             if (rocket != null)
             {
-                // Н6.K6: ракета крупнее (+33% к прежним 36×48)
                 size = rocket.rect.height > rocket.rect.width
                     ? new Vector2(48f, RocketMarkerPx)
                     : new Vector2(RocketMarkerPx, 48f);
-                // M8.1: родной цвет арта ракеты — «вы здесь» держат размер,
-                // подпись и движение маркера
+                // родной цвет арта ракеты; опознают маркер размер, подпись и движение
                 MakeImage("Rocket", playerArrowRoot, rocket, Color.white, size, false);
             }
             else
@@ -390,9 +360,8 @@ namespace SpaceTaxi.UI.PaperMap
 
             if (ship != null && ship.State == ShipState.Landed)
             {
-                // M8.5: поза посадки — нос маркера по ориентации КОРПУСА
-                // (SpriteNoseAngle, как на радаре Н7 G7.2), а не по последнему
-                // вектору полёта: прежде ракета на карте «падала» носом вниз
+                // поза посадки — нос маркера по ориентации корпуса
+                // (SpriteNoseAngle), а не по последнему вектору полёта
                 playerHeading = HullHeadingDeg();
             }
             else if (ship != null && ship.State == ShipState.Flying && ship.Body != null
@@ -402,7 +371,7 @@ namespace SpaceTaxi.UI.PaperMap
                 playerHeading = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
             }
 
-            // тень-подставка: корабль стоит на планете (Н6.K7) — мягкий пульс альфы
+            // тень-подставка: корабль стоит на планете — мягкий пульс альфы
             if (landedPadImage == null && landedPad != null)
                 landedPadImage = landedPad.GetComponent<Image>();
             if (landedPadImage != null)
@@ -436,12 +405,10 @@ namespace SpaceTaxi.UI.PaperMap
                 playerArrowRoot.localRotation = Quaternion.Euler(0f, 0f, angle);
         }
 
-        // M7.3: фиксация при посадке — чернильное кольцо «вы припаркованы здесь»
-        // вокруг планеты стоянки (в content-координатах: «территория», скейлится
-        // зумом честно, как иконка). Пересоздаётся на смену LandedOn; стоялка
-        // читается поллом — событие взлёта не существует.
-        // v5.2 (владелец: «убери обводку на карте у центральной планеты МТО»):
-        // на хабе кольцо не рисуется — ракета-маркер и так стоит на планете
+        // кольцо «припаркованы здесь» вокруг планеты стоянки (в контент-
+        // координатах, скейлится зумом как иконка). Пересоздаётся на смену
+        // LandedOn; стоянка читается поллом — события взлёта нет.
+        // На хабе не рисуется — ракета и так стоит на планете
         internal void UpdateLandedRing()
         {
             if (content == null)
@@ -463,7 +430,7 @@ namespace SpaceTaxi.UI.PaperMap
                 landedRing = MakeRect("LandedRing", content, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
                 Image ring = landedRing.gameObject.AddComponent<Image>();
                 ring.sprite = PaperMapArt.TargetRing(); // кольцо «от руки»
-                ring.color = WithAlpha(PaperMapArt.Ink, 0.85f); // M7.5: чернила, без второго цвета «ВЫ»
+                ring.color = WithAlpha(PaperMapArt.Ink, 0.85f); // чернила, без второго цвета
                 ring.raycastTarget = false;
                 TMP_Text note = MakeLabel("ParkNote", landedRing, "припаркованы", 14f,
                     WithAlpha(PaperMapArt.Ink, 0.9f));
@@ -471,8 +438,8 @@ namespace SpaceTaxi.UI.PaperMap
                 landedRingNote.sizeDelta = new Vector2(150f, 20f);
             }
 
-            // кольцо — «территория» (честно скейлится зумом, как иконка планеты),
-            // подпись — константный экранный размер (counter-scale, как маркеры M7.1)
+            // кольцо скейлится зумом как иконка планеты, подпись —
+            // константный экранный размер (counter-scale)
             if (landedRingNote != null)
                 landedRingNote.localScale = Vector3.one / Mathf.Max(zoom, 0.001f);
 
@@ -531,8 +498,8 @@ namespace SpaceTaxi.UI.PaperMap
                 if (comet == null || cometIcons.ContainsKey(comet))
                     continue;
                 Sprite art = PaperMapArt.MapSprite("map_cometa");
-                // M8.1: арту кометы — родной цвет; процедурный фолбэк (белая
-                // маска) тонируется чернилами, иначе не виден на бумаге
+                // арту кометы — родной цвет; процедурный фолбэк тонируется
+                // чернилами, иначе не виден на бумаге
                 bool hasArt = art != null;
                 if (!hasArt)
                     art = PaperMapArt.CometIcon();
@@ -548,7 +515,6 @@ namespace SpaceTaxi.UI.PaperMap
         }
 
         // пересборка карты: кольца/маркеры/край мира гаснут, кометы перерисуются
-        // (часть RebuildAll хоста, Н11); тир цели сбрасывает PaperMapLabels.Reset
         internal void Reset()
         {
             edgeFogRoot = null;
@@ -576,7 +542,5 @@ namespace SpaceTaxi.UI.PaperMap
             waypointWideImage = null;
             waypointPinImage = null;
         }
-
-        // (Н11-step5-rings-applied)
     }
 }

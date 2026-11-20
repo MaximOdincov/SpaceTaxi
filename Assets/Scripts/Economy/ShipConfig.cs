@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Economy
 {
-    // Класс обслуживания корабля (22_BALANCE_REWORK §1.1): тариф заказа,
+    // Класс обслуживания корабля: тариф заказа,
     // фильтр пассажиров, цены улучшений. Индекс = позиция в массивах
     // PricingConfig (ClassBaseFare/ClassRatePerUnit/SectorRequiredClass)
     // и UpgradeConfig (ClassLevelPrices)
@@ -45,7 +45,7 @@ namespace SpaceTaxi.Economy
         [Tooltip("Спрайт модели (арт А1/А2, 512×512 PPU 32, нос вправо); пусто — заглушка")]
         public Sprite ShipSprite;
 
-        [Tooltip("Покрашенные варианты модели (владелец кладёт отдельные PNG); индекс покраски 0 — базовый ShipSprite, i — PaintVariants[i-1]")]
+        [Tooltip("Покрашенные варианты модели (отдельные PNG); индекс покраски 0 — базовый ShipSprite, i — PaintVariants[i-1]")]
         public Sprite[] PaintVariants;
 
         [Tooltip("Видимая длина корабля в мировых юнитах; масштаб визуала подгоняется по контенту арта")]
@@ -80,7 +80,7 @@ namespace SpaceTaxi.Economy
         }
 
         // Фолбэк на арендное «Яйцо», если ShipConfig в GameSession отключён:
-        // сначала настоящий ассет (баланс правит статы в одном месте — Н5.13),
+        // сначала настоящий ассет (баланс правит статы в одном месте),
         // кодовые статы ниже — только если ассет не найден
         public static ShipConfig EggRentalFallback
         {
@@ -108,8 +108,8 @@ namespace SpaceTaxi.Economy
                 eggRentalFallback.HpMax = 100f;
                 eggRentalFallback.Price = 0;
                 eggRentalFallback.IsRental = true;
-                eggRentalFallback.VisualLength = 48.4f; // = egg_rental.asset (один корпус, см. VisualLength; 44 × 1.1 — размеры кораблей +10%, кроме Барина, 2026-11-15)
-                eggRentalFallback.Retro = 120f; // числа держим равными egg_rental.asset (Н3.1)
+                eggRentalFallback.VisualLength = 48.4f; // = egg_rental.asset (44 × 1.1: размеры кораблей +10%, кроме Барина)
+                eggRentalFallback.Retro = 120f; // числа держим равными egg_rental.asset
                 eggRentalFallback.Description = "Арендный корабль компании, всегда сток";
                 return eggRentalFallback;
             }

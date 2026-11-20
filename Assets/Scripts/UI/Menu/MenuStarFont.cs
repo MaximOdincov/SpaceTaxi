@@ -2,12 +2,10 @@ using System.Collections.Generic;
 
 namespace SpaceTaxi.UI
 {
-    // Пиксельные маски 5x7 для звёздного текста (бриф E3): каждая буква —
-    // 7 строк по 5 символов, 'X' — ячейка, в которой ставится звезда.
-    // Набор — только то, что реально встречается в меню: латиница названия
-    // (SPACE TAXI) и кириллица актуальных кнопок (НОВАЯ ИГРА / ПРОДОЛЖИТЬ /
-    // НАСТРОЙКИ / ВЫХОД). Одинаковые по форме буквы латиницы и кириллицы
-    // (A/А, B/В, C/С, E, H/Н, K/К, O/О, P/Р, T/Т, X/Х) ссылаются на одну маску.
+    // Пиксельные маски 5x7 для звёздного текста: буква — 7 строк по 5 символов,
+    // 'X' — ячейка, в которой ставится звезда. Набор — только буквы меню
+    // (SPACE TAXI и надписи кнопок); совпадающие по форме латиница и
+    // кириллица (A/А, O/О, ...) ссылаются на одну маску.
     public static class MenuStarFont
     {
         private const string A = ".XXX.|X...X|X...X|XXXXX|X...X|X...X|X...X";
@@ -20,10 +18,7 @@ namespace SpaceTaxi.UI
         private const string T = "XXXXX|..X..|..X..|..X..|..X..|..X..|..X..";
         private const string X = "X...X|X...X|.X.X.|..X..|.X.X.|X...X|X...X";
         private const string Gcyr = "XXXXX|X....|X....|X....|X....|X....|X....";     // Г
-        // Д: симметричный «шалашик» (2026-11-15: прежний корпус по cols 1-4 при
-        // ногах 0/4 давал асимметрию — левая нога выходила вбок, правая шла
-        // вертикально под стеной; теперь корпус cols 1-3, обе ноги выходят
-        // наружу на 1 клетку)
+        // Д: корпус в cols 1-3, обе ноги выходят наружу на 1 клетку — симметрия
         private const string Dcyr = ".XXX.|.X.X.|.X.X.|.X.X.|.X.X.|XXXXX|X...X"; // Д
         private const string Icyr = "X...X|X...X|X..XX|X.X.X|XX..X|X...X|X...X"; // И
         private const string Jcyr = ".X.X.|X...X|X..XX|X.X.X|XX..X|X...X|X...X"; // Й
@@ -32,10 +27,8 @@ namespace SpaceTaxi.UI
         private const string Hcyr = "X...X|X...X|X...X|XXXXX|X...X|X...X|X...X"; // Н
         private const string Ocyr = ".XXX.|X...X|X...X|X...X|X...X|X...X|.XXX."; // О
         private const string Pcyr = "XXXXX|X...X|X...X|X...X|X...X|X...X|X...X"; // П
-        // Ы = ь + ı — маска ВЛАДЕЛЬЦА, финал (2026-11-15, «извини — обманул —
-        // вот так надо»): кольцо «ь» на ряд выше — верх кольца ряд 3 (полная
-        // перекладина), правый край col 3 (ряды 4-6), низ cols 1-3; «ь» и «ı»
-        // ПОЛНОСТЬЮ раздельны — в базовой линии разрыв (col 4, ряд 7)
+        // Ы = ь + ı: кольцо «ь» поднято на ряд выше, «ь» и «ı» раздельны —
+        // в базовой линии разрыв (col 4)
         private const string Ycyr = "X...X|X...X|XXXXX|XXX.X|X.X.X|X.X.X|XXX.X"; // Ы
         private const string SoftSign = "X....|X....|X....|XXXX.|X...X|X...X|XXXX."; // Ь
         private const string Yacyr = ".XXXX|X...X|X...X|.XXXX|..X.X|.X..X|X...X"; // Я

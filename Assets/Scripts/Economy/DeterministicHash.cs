@@ -1,8 +1,8 @@
 namespace SpaceTaxi.Economy
 {
     // FNV-1a: строковый GetHashCode рандомизирован между сессиями Unity —
-    // детерминированный хэш «сухих» станций/витрины (Н10.11: одна копия вместо
-    // дубликата в FuelNetwork и ShopStockService, CODE_REVIEW_N9 §3.5)
+    // детерминированный хэш «сухих» станций/витрины — общая копия для
+    // FuelNetwork и ShopStockService
     public static class DeterministicHash
     {
         public static int StableHash(string id)

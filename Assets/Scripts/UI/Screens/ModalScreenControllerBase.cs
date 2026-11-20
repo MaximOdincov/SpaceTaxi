@@ -5,12 +5,8 @@ using UnityEngine.Events;
 
 namespace SpaceTaxi.UI
 {
-    // Помощник Bootstrap-каркаса модалок (Н10.13, Слой 2 — CODE_REVIEW_N9 §4
-    // «дубли каркаса: Bootstrap/OnSceneLoaded/Spawn в 4 модалках»): дженерик
-    // держит СВОЙ статический обработчик sceneLoaded на каждый T — старая
-    // подписка снимается так же, как прежде (домен редактора может не
-    // перезагружаться между запусками); контроллер появляется сам, если его
-    // ещё нет
+    // Самоспавн контроллера-модалки: своя подписка sceneLoaded на каждый T
+    // (снимается при перезагрузке домена), объект создаётся, если его ещё нет
     public static class ModalBootstrap<T> where T : MonoBehaviour
     {
         private static UnityAction<Scene, LoadSceneMode> handler;
@@ -34,15 +30,14 @@ namespace SpaceTaxi.UI
         }
     }
 
-    // Общий каркас модального экрана (Н10.13): открытие ставит мир на паузу
-    // (timeScale = 0), закрытие ЛЮБЫМ путём возвращает (OnDisable-страховка);
-    // ESC/Enter закрывают с гвардом кадра открытия (нажатие кадра посадки не
-    // должно закрыть экран в тот же кадр — Н-9) и флагом EscJustClosed —
-    // договорённость карты/станции: пауза под модалкой не открывается.
-    // Анимации внутри — по unscaledTime: модал живёт при timeScale = 0
+    // База модальных экранов: открытие ставит timeScale = 0, закрытие любым
+    // путём возвращает время (страховка в OnDisable). ESC/Enter закрывают
+    // с гвардом кадра открытия (нажатие кадра посадки не закрывает экран),
+    // EscJustClosed — флаг для паузы: «ESC только что закрыл этот экран»,
+    // пауза в том же кадре не открывается. Анимации — по unscaledTime
     public abstract class ModalScreenControllerBase : MonoBehaviour
     {
-        private const float CloseGuardSeconds = 0.25f; // кадр открытия не закрывает экран
+        private const float CloseGuardSeconds = 0.25f; // экран не закрывается в кадр открытия
 
         protected bool opened;
         protected GameObject screen;
@@ -58,8 +53,7 @@ namespace SpaceTaxi.UI
             var kb = Keyboard.current;
             if (kb == null)
                 return false;
-            // нажатие кадра открытия не закрывает экран — он не успел
-            // отрисоваться, владелец видит «только тост»
+            // гвард: экран ещё не успел отрисоваться
             if (Time.unscaledTime - openedAtRealtime < CloseGuardSeconds)
                 return false;
             if (kb.escapeKey.wasPressedThisFrame)
@@ -76,7 +70,7 @@ namespace SpaceTaxi.UI
             return false;
         }
 
-        // каркас строится при первом показе (панель — кодом, паттерн StationScreen П3.1)
+        // каркас строится при первом показе
         protected void EnsureScreen()
         {
             if (screen == null)

@@ -21,7 +21,7 @@ namespace SpaceTaxi.Audio
         private bool fuelCritWarned; // второй сигнал на пороге 10%
         private bool hullWarned;
 
-        // завершение ремонта станции (Н6/Z): флаг «HP выросли, пока стояли на
+        // завершение ремонта станции: флаг «HP выросли, пока стояли на
         // планете» — StationServiced приходит и после заправки, отличаем по нему
         private float lastHp = -1f;
         private bool serviceHpGain;
@@ -156,7 +156,7 @@ namespace SpaceTaxi.Audio
         private void OnStationServiced(string stationName)
         {
             if (serviceHpGain)
-                Sound.Play(SoundId.PurchaseCash); // «metal click» из repair/ (Н6/Z)
+                Sound.Play(SoundId.PurchaseCash); // «metal click» из repair/
             serviceHpGain = false;
         }
 

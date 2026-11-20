@@ -33,8 +33,7 @@ namespace SpaceTaxi.UI
             if (mapController != null && (mapController.IsOpened || mapController.EscJustClosed)) return;
             // ESC занят станцией
             if (stationController != null && (stationController.IsOpened || stationController.EscJustClosed)) return;
-            // ESC занят экраном завершения заказа: тот же кадр закрывает ЕГО,
-            // пауза не открывается
+            // ESC занят экраном завершения заказа — тот же кадр закрывает его
             if (orderCompleteController != null && (orderCompleteController.IsOpened || orderCompleteController.EscJustClosed)) return;
             SetPaused(!paused);
         }
@@ -85,7 +84,7 @@ namespace SpaceTaxi.UI
             if (paused) pauseScreen.SetActive(true);
         }
 
-        // экран завершения заказа (П4.3) — та же договорённость, что у станции
+        // экран завершения заказа — та же договорённость, что у станции
         public void NotifyOrderCompleteOpened()
         {
             if (paused) pauseScreen.SetActive(false);

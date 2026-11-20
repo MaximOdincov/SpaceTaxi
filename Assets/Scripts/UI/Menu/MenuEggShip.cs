@@ -4,20 +4,15 @@ using UnityEngine.UI;
 
 namespace SpaceTaxi.UI
 {
-    // Яйцо-такси на фоне меню (бриф E.2/E.3 + E5): дрейфует по плавной
-    // траектории (сумма двух синусоид — Лиссажу), по клику ЛЕНИВО летит в
-    // точку клика с easing smoothstep — скорость и доворот заметно ниже
-    // прежних; по прибытии медленно продолжает дрейф вокруг новой точки.
-    // E8.3: дрейф к курсору при наведении (E7.3) удалён — владельца
-    // «подташнивает»; яйцо живёт своим полётом и клик-полётом по кнопкам.
-    // Спрайт смотрит носом вверх — визуальный угол = atan2(velocity) − 90°,
-    // сглаживается LerpAngle.
+    // Яйцо-такси на фоне меню: дрейфует по фигуре Лиссажу (сумма двух синусоид),
+    // по клику неторопливо летит в точку (smoothstep) и дрейфует вокруг неё.
+    // Спрайт носом вверх: угол = atan2(velocity) − 90°, сглаженный LerpAngle.
     public sealed class MenuEggShip : MonoBehaviour
     {
-        private const float FlySpeed = 250f;        // px/с канваса (E5: было 620)
+        private const float FlySpeed = 250f;        // px/с канваса
         private const float FlySpeedMin = 0.9f;     // с — короче нет смысла
         private const float FlySpeedMax = 3.4f;     // с
-        private const float TurnResponsiveness = 2.0f; // скорость доворота (E5: было 5.5)
+        private const float TurnResponsiveness = 2.0f; // скорость доворота
         private const float DriftRampTime = 2.6f;   // разгон дрейфа после прибытия (ленивый)
         private const float FadeInTime = 1.2f;      // появление при входе в меню
         private const float BoundsMargin = 150f;    // запас от краёв канваса
@@ -32,7 +27,7 @@ namespace SpaceTaxi.UI
         private State state = State.Drift;
 
         // дрейф: позиция = центр + смещение(τ) * плавный разгон; частоты и
-        // размах занижены (E5) — медленное ленивое парение
+        // размах занижены — медленное ленивое парение
         private Vector2 driftCenter;
         private Vector2 driftAmplitude; // 10% ширины / 13% высоты канваса
         private readonly Vector2 driftFrequency = new(0.21f, 0.16f); // рад/с
@@ -117,7 +112,7 @@ namespace SpaceTaxi.UI
             {
                 flyTime += dt;
                 float k = Mathf.Clamp01(flyTime / flyDuration);
-                float eased = k * k * (3f - 2f * k); // smoothstep — бриф E.3
+                float eased = k * k * (3f - 2f * k); // smoothstep
                 position = Vector2.LerpUnclamped(flyFrom, flyTo, eased);
                 velocity = (flyTo - flyFrom); // направление постоянно, поворот предсказуем
                 if (k >= 1f)

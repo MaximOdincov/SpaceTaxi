@@ -39,7 +39,7 @@ namespace SpaceTaxi.Physics
         [Tooltip("Шлейфы модели")]
         public List<TrailPoint> trails = new List<TrailPoint> { new TrailPoint() };
 
-        // точка по умолчанию: старый одиночный шлейф за кормой (setup нет на префабе)
+        // точка по умолчанию: одиночный шлейф за кормой (setup нет на префабе)
         public static TrailPoint DefaultPoint()
         {
             return new TrailPoint { width = 1.2f, time = 0.38f, minSpeed = 65f };

@@ -10,52 +10,21 @@ using SpaceTaxi.Core;
 using SpaceTaxi.Economy;
 using SpaceTaxi.Physics;
 using SpaceTaxi.World;
+using UiKit;
 
 namespace SpaceTaxi.UI
 {
-    // Экран станции [B] (§3.3): вкладки по услугам планеты — хаб МТО даёт все
-    // четыре [МАГАЗИН][УЛУЧШЕНИЯ][ЗАПРАВКА][РЕМОНТ], обычная станция — по
-    // флагам (заправка/мастерская). Каркас попапа — StationUI (рамка С4):
-    // хедер «СТАНЦИЯ · …» с кредитами «Đ N» (обновляются по
-    // Wallet.CreditsChanged) и крестик закрытия в углу (Esc закрывает тем же
-    // Close()). Заправка (С1, механика Н-4 не тронута): ячейки бака на всю
-    // ширину панели, слайдер объёма, сумма «Đ», ОДНА кнопка подтверждения —
-    // по умолчанию выбран весь доступный объём («ЗАПРАВИТЬ ДО ПОЛНОГО»),
-    // пресеты убраны. Ремонт (С4): HP-бар и ОДНА кнопка «Починить» — полный
-    // пакет (S6: потолок визита убран, ремонт ограничен ТОЛЬКО деньгами);
-    // цена = HP × множитель пакета × наценка тира сети (RepairTierSurchargeMul).
-    // Правило тиров мастерских: T1 берёт
-    // корабли 1–2, T2 — 1–3, T3+ — 4–5 (RepairNetwork.ShipTierAccepted),
-    // чужой корабль — отказ с текстом борткомпа. Магазин (C2): слева таблица
-    // статов — полоска рассматриваемой модели с риской (засечкой) твоего
-    // текущего значения; отрезок между ними подкрашен (зелёный — модель
-    // лучше, красный — хуже); ВСЕ статы «больше = лучше», торможение —
-    // «Мощность торможения» по полю Retro (инверсий нет). Справа — большая
-    // модель в ВЫБРАННОЙ расцветке (свотчи под таблицей, механика бывшего
-    // FlipPaint; покупка берёт выбранный вариант), внизу — навигация
-    // [←] ИМЯ · ТИР N [→] и подпись статуса владения («ВАШ»/«В АРЕНДЕ ·
-    // СЕЙЧАС АКТИВЕН») вместо бейджа «ВЫ ЗДЕСЬ». Сортировка витрины по цене;
-    // базовые корабли всегда в наличии, показанный вариант покраски
-    // (ShipConfig.PaintVariants) ротирует ShopStockService раз в 2 игровых
-    // часа. Улучшения (§3.4, C3): строки линий «УР N → УР N+1», прибавка из
-    // процентов UpgradeConfig, цена «Đ» — по классу корабля
-    // (UpgradeConfig.GetPrice, 22_BALANCE_REWORK §1.9), полоска уровня из 3
-    // сегментов; только на СВОЙ корабль.
-    // Доступен ТОЛЬКО стоя
-    // (State == Landed) на планете с услугами; мир не ставится на паузу (как
-    // карта). Закрытие по B/Esc — ESC уступается по той же договорённости, что
-    // и карта (NotifyStationOpened/Closed + EscJustClosed). Контроллера в
-    // сценах нет — появляется сам (стиль DismissalScreenController), панель
-    // строится кодом при первом открытии.
+    // Экран станции (клавиша B): попап с вкладками МАГАЗИН / УЛУЧШЕНИЯ /
+    // ЗАПРАВКА / РЕМОНТ. Открывается только стоя (Landed) на планете с
+    // услугами, мир при этом НЕ ставится на паузу. Панель строится кодом при
+    // первом открытии, дальше значения перечитываются по событиям
+    // (деньги/топливо/корпус/парк). Секции магазина и улучшений вынесены в
+    // отдельные классы, этот контроллер — каркас: вкладки, заправка, ремонт.
     public class StationScreenController : MonoBehaviour, IStationSectionHost
     {
         private const int SortingOrder = 100; // поверх HUD/паузы, ниже увольнения (200)
         private const int SegmentCount = 10;  // как в HUD
-
-        // цвета сегментов — палитра в HudPalette (Н12.4); используются
-        // и секцией улучшений (полоски уровней), поэтому internal
-        internal static readonly Color SegmentOn = HudPalette.SegmentOn;
-        internal static readonly Color SegmentOff = HudPalette.SegmentOff;
+        // цвета сегментов и подсветка — StationUI (SegmentRow/SetSegments)
 
         private bool bound;
         private bool opened;
@@ -68,26 +37,25 @@ namespace SpaceTaxi.UI
         private MapScreenController mapController;
         private OrderCompleteScreenController orderComplete; // модал завершения выше станции
 
-        // ввод: действие Station мапы "UI" (binding B), привязка строками — стиль ShipController
+        // ввод: действие Station из action map "UI" (клавиша B)
         private InputActionAsset input;
         private InputAction stationAction;
 
         private TMP_Text stationTitle;
-        private TMP_Text creditsValue; // «Đ N» — рамка StationUI, перечитывается по Wallet.CreditsChanged
+        private TMP_Text creditsValue; // перечитывается по Wallet.CreditsChanged
         private TMP_Text fuelValue;
         private TMP_Text hullValue;
         private TMP_Text fuelStatus;
         private TMP_Text hullStatus;
-        private Image[] fuelSegments;   // ячейки бака на всю ширину панели (С1)
-        private RectTransform hpFill;   // заливка HP-бара ремонта (С4)
+        private Image[] fuelSegments;   // ячейки бака на всю ширину панели
+        private RectTransform hpFill;   // заливка HP-бара ремонта
         private Button fuelButton;
         private TMP_Text fuelButtonLabel;
-        // заправка (С1): слайдер объёма с живым предрасчётом; пресеты убраны —
-        // одна кнопка подтверждения (по умолчанию выбран весь доступный объём)
+        // заправка: слайдер с живым предрасчётом, по умолчанию весь объём
         private TMP_Text fuelStockLine;  // «Топлива на станции: N ед · цена M Đ/ед»
         private TMP_Text fuelOfferLabel; // «Заправить: X ед · Đ Y»
         private Slider fuelSlider;
-        // ремонт (С4): одна кнопка «Починить» вместо трёх пакетов
+        // ремонт: одна кнопка «Починить» вместо пакетов
         private TMP_Text repairTierLine; // «Мастерская тир N · наценка ×K»
         private TMP_Text repairOffer;    // «Починка: +N HP · Đ M» или отказ по тиру корабля
         private Button repairButton;
@@ -96,9 +64,9 @@ namespace SpaceTaxi.UI
         // окна-вкладки: видимость переключает SelectTab, состав — ApplyTabs
         private GameObject fuelWindow;
         private GameObject hullWindow;
-        private GameObject upgradeWindow; // улучшения + гашение долга (§3.4/§3.2)
+        private GameObject upgradeWindow; // улучшения + гашение долга
 
-        // вкладки услуг (§3.3): полный набор только у хаба МТО
+        // полный набор вкладок только у хаба МТО
         private enum StationTab { Shop, Upgrades, Fuel, Repair }
 
         private readonly Dictionary<StationTab, Button> tabButtons = new Dictionary<StationTab, Button>();
@@ -107,8 +75,7 @@ namespace SpaceTaxi.UI
         private StationTab activeTab = StationTab.Fuel;
         private Planet currentPlanet; // планета, под которую собраны вкладки
 
-        // секции экрана (шаг 7c): улучшения/долг и витрина — plain-классы,
-        // строят свой UI в переданных родителях (BuildScreen)
+        // секции экрана — обычные классы, строят UI в переданных родителях
         private StationUpgradesSection upgradesSection;
         private StationShowcaseSection showcaseSection;
         private ToastNotifier toast;
@@ -150,7 +117,7 @@ namespace SpaceTaxi.UI
 
             if (stationAction != null && stationAction.WasPressedThisFrame())
             {
-                // экран завершения заказа модален (sortingOrder выше) — B ему не подчиняется
+                // экран завершения заказа модален — B ему не подчиняется
                 if (orderComplete == null) orderComplete = FindAnyObjectByType<OrderCompleteScreenController>();
                 if (orderComplete != null && orderComplete.IsOpened)
                     return;
@@ -167,8 +134,8 @@ namespace SpaceTaxi.UI
             if (opened && !CanOpen())
                 Close();
 
-            // ротация витрины (Н-3а): слот сменился — витрина перерисовывается
-            // сама («за витриной интересно наблюдать»); проверка дешёвая — пара int
+            // ротация витрины: слот сменился — витрина перерисовывается сама
+            // (проверка дешёвая, можно звать каждый кадр)
             if (opened)
                 showcaseSection?.UpdateRotation();
         }
@@ -205,15 +172,14 @@ namespace SpaceTaxi.UI
             hull.HpChanged += OnShipValuesChanged;
             hull.Respawned += OnRespawned;
             session.Wallet.CreditsChanged += OnCreditsChanged;
-            // П3.3: блоки магазина перечитываются сами (сессия одна на сцену,
-            // отписок нет — стиль биндеров)
+            // блоки магазина перечитываются сами (сессия одна на сцену, отписки не нужны)
             session.Fleet.UpgradesChanged += OnShopChanged;
             session.Fleet.ShipChanged += OnShopChanged; // сменил корабль — блок перестроился
             session.Debt.DebtChanged += OnDebtChanged; // Action<int>: аргумент не нужен, блок перечитает сам
             bound = true;
         }
 
-        // привязка из OnEnable и лениво из Update — кто раньше (как у ShipController)
+        // привязка из OnEnable и лениво из Update — кто раньше
         private void BindInput()
         {
             if (stationAction != null)
@@ -227,7 +193,7 @@ namespace SpaceTaxi.UI
             map.Enable();
         }
 
-        // public: IStationSectionHost — покупки только стоя на планете с услугами
+        // покупки только стоя на планете с услугами
         public bool CanOpen()
         {
             return ship != null
@@ -254,8 +220,7 @@ namespace SpaceTaxi.UI
             fuelStatus.text = "";
             hullStatus.text = "";
             Refresh();
-            // С1: по умолчанию выбран весь доступный объём — кнопка сразу
-            // читается «ЗАПРАВИТЬ ДО ПОЛНОГО»; onValueChanged перерисует суммы
+            // по умолчанию весь доступный объём — кнопка сразу «ЗАПРАВИТЬ ДО ПОЛНОГО»
             if (fuelSlider != null && FuelAvailable() > 0)
                 fuelSlider.value = FuelAvailable();
 
@@ -295,7 +260,7 @@ namespace SpaceTaxi.UI
                 Close(); // респавн мог унести на другую планету
         }
 
-        // --- Заправка (Н-4): слайдер объёма, цена/ед и запас — по тиру сети планеты ---
+        // --- Заправка: цена за единицу и запас — по тиру сети планеты ---
 
         // конфиг цен: из OrderService (ассет сцены / Resources) или кодовый фолбэк
         private PricingConfig Pricing =>
@@ -303,10 +268,10 @@ namespace SpaceTaxi.UI
 
         private int FuelTier => currentPlanet != null ? currentPlanet.FuelTier : PricingConfig.BaseFuelTier;
 
-        // район станции для цены топлива (Н4.5): у экрана без планеты — базовый Near
+        // район станции для цены топлива (без планеты — базовый Near)
         private Sector FuelSector => currentPlanet != null ? currentPlanet.Sector : Sector.Near;
 
-        // сеть станции пуста (Н4.5): заправка есть, топлива в ней нет
+        // сеть станции пуста: заправка есть, топлива в ней нет
         private bool FuelOutage => currentPlanet != null && currentPlanet.FuelOutage;
 
         private int RepairTier => currentPlanet != null ? currentPlanet.RepairTier : PricingConfig.BaseRepairTier;
@@ -318,8 +283,7 @@ namespace SpaceTaxi.UI
             return FuelNetwork.AvailableUnits(ship.Eff.FuelMax, ship.Fuel, FuelTier, Pricing);
         }
 
-        // подтверждение: оплата ровно за выбранное (Wallet.TrySpend → Ship.Fuel → ReportServiced);
-        // выбор слайдера по умолчанию — весь доступный объём («до полного»)
+        // оплата ровно за выбранное: Wallet.TrySpend → Ship.Fuel → ReportServiced
         private void ConfirmRefuel()
         {
             if (!CanOpen() || session == null || fuelSlider == null || FuelOutage)
@@ -333,15 +297,14 @@ namespace SpaceTaxi.UI
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
 
-        // запас сети и диапазон слайдера — при каждом Refresh: посадка, заправка
-        // и улучшение бака меняют Eff.FuelMax/топливо
+        // запас сети и диапазон слайдера — при каждом Refresh (бак меняется
+        // заправкой и улучшениями)
         private void UpdateFuelWindow()
         {
             int available = FuelAvailable();
             float perUnit = FuelNetwork.PricePerUnit(FuelTier, FuelSector, Pricing);
 
-            // 0 доступно: сеть станции пуста (Н4.5), бак полон — заправка не
-            // нужна, либо бак уже глубже запаса сети (тексты в стиле борткомпа)
+            // 0 доступно: сеть пуста / бак полон / запас сети ниже текущего топлива
             fuelStockLine.text = FuelOutage
                 ? "Сеть станции пуста — топлива нет"
                 : available > 0
@@ -358,8 +321,7 @@ namespace SpaceTaxi.UI
             UpdateFuelOffer();
         }
 
-        // живой предрасчёт: сумма «Đ» и ОДНА кнопка (С1) — подтверждает выбор
-        // слайдера; на полном выборе подпись «ЗАПРАВИТЬ ДО ПОЛНОГО»
+        // живой предрасчёт суммы при движении слайдера
         private void UpdateFuelOffer()
         {
             int available = FuelAvailable();
@@ -380,7 +342,7 @@ namespace SpaceTaxi.UI
                     : $"ЗАПРАВИТЬ · {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
         }
 
-        // слайдер объёма: дорожка/заполнение/ручка собираются кодом (схема UGUI Slider)
+        // слайдер собирается кодом по схеме UGUI Slider (трек + fill + ручка)
         private static Slider BuildFuelSlider(Transform parent)
         {
             var go = new GameObject("FuelSlider", typeof(RectTransform), typeof(Slider));
@@ -390,7 +352,7 @@ namespace SpaceTaxi.UI
             var track = new GameObject("Track", typeof(RectTransform), typeof(Image));
             track.transform.SetParent(go.transform, false);
             OnboardComputerFactory.Stretch((RectTransform)track.transform);
-            track.GetComponent<Image>().color = new Color(dim.r, dim.g, dim.b, 0.14f);
+            track.GetComponent<Image>().color = Ui.WithAlpha(dim, 0.14f);
 
             var fillArea = new GameObject("FillArea", typeof(RectTransform));
             fillArea.transform.SetParent(go.transform, false);
@@ -402,7 +364,7 @@ namespace SpaceTaxi.UI
             var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fill.transform.SetParent(fillArea.transform, false);
             OnboardComputerFactory.Stretch((RectTransform)fill.transform);
-            fill.GetComponent<Image>().color = new Color(dim.r, dim.g, dim.b, 0.7f);
+            fill.GetComponent<Image>().color = Ui.WithAlpha(dim, 0.7f);
 
             var handleArea = new GameObject("HandleArea", typeof(RectTransform));
             handleArea.transform.SetParent(go.transform, false);
@@ -426,42 +388,14 @@ namespace SpaceTaxi.UI
             return slider;
         }
 
-        // ячейки бака (С1): ряд сегментов НА ВСЮ ШИРИНУ панели — отдельная
-        // строка секции, без подписи и чисел в том же ряду (те — над ячейками).
-        // Цвета сегментов — как в HUD (SegmentOn/SegmentOff)
-        private static Image[] BuildTankCells(Transform parent)
-        {
-            var row = new GameObject("TankCells", typeof(RectTransform));
-            row.transform.SetParent(parent, false);
-            var layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 4f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = true;
-            OnboardComputerFactory.FixedHeight(row.gameObject, 34f);
+        // ячейки бака (StationUI.SegmentRow): ряд сегментов на всю ширину панели
 
-            var cells = new Image[SegmentCount];
-            for (int i = 0; i < SegmentCount; i++)
-            {
-                var cell = new GameObject("Cell_" + (i + 1).ToString("00"), typeof(RectTransform), typeof(Image));
-                cell.transform.SetParent(row.transform, false);
-                cell.AddComponent<LayoutElement>().flexibleWidth = 1f;
-                cells[i] = cell.GetComponent<Image>();
-                cells[i].color = SegmentOff;
-                cells[i].raycastTarget = false;
-            }
-            return cells;
-        }
+        // --- Ремонт: HP-бар + одна кнопка «Починить». Правило тиров мастерских:
+        // T1 берёт корабли 1–2, T2 — 1–3, T3+ — 4–5 (RepairNetwork.ShipTierAccepted);
+        // чужой корабль — отказ текстом. Ремонт — полный пакет от недостающего,
+        // ограничение только деньгами ---
 
-        // --- Ремонт (С4): HP-бар + ОДНА кнопка «Починить» вместо карточек
-        // пакетов. Правило тиров мастерских (RepairNetwork.ShipTierAccepted):
-        // T1 берёт корабли 1–2, T2 — 1–3, T3+ — 4–5; чужой корабль не чинится,
-        // на экране отказ текстом борткомпа. Кнопка = полный пакет (S6: потолок
-        // визита убран — ремонт ограничен ТОЛЬКО деньгами); цена = HP ×
-        // множитель пакета × наценка тира сети (RepairTierSurchargeMul, С4) ---
-
-        // тир корабля таксиста для правила тиров мастерских (FleetService.Current)
+        // тир корабля для правила тиров мастерской (FleetService.Current)
         private int ShipTier
         {
             get
@@ -471,8 +405,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // тир сети, круг тиров и предложение — при каждом Refresh:
-        // ремонт, урон, деньги
+        // предложение пересчитывается при каждом Refresh (ремонт, урон, деньги)
         private void UpdateRepairWindow()
         {
             int tier = RepairTier;
@@ -491,7 +424,7 @@ namespace SpaceTaxi.UI
                 return;
             }
 
-            // С4: корабль вне круга тиров станции — отказ, ремонта не будет
+            // корабль вне круга тиров станции — отказ
             if (!RepairNetwork.ShipTierAccepted(tier, ShipTier))
             {
                 repairOffer.text = ShipTier < RepairNetwork.MinShipTier(tier)
@@ -504,8 +437,7 @@ namespace SpaceTaxi.UI
                 return;
             }
 
-            // полный пакет от текущего недостающего (S6: потолок визита убран —
-            // ремонт ограничен ТОЛЬКО деньгами)
+            // полный пакет от текущего недостающего; ограничение — только деньги
             float amount = RepairNetwork.RepairAmount(ship.Eff.HpMax, ship.Hp,
                 RepairNetwork.PackCount - 1, tier, Pricing);
             int cost = RepairNetwork.CostOf(amount, RepairNetwork.PackCount - 1, tier, Pricing);
@@ -517,8 +449,7 @@ namespace SpaceTaxi.UI
             repairButtonLabel.text = canPay ? "ПОЧИНИТЬ" : "МАЛО КРЕДИТОВ";
         }
 
-        // подтверждение: существующий платёжный путь — TrySpend → HullSystem.Repair;
-        // наценка тира сети внутри RepairNetwork.CostOf (базовая формула не тронута)
+        // TrySpend → HullSystem.Repair; наценка тира сети — внутри RepairNetwork.CostOf
         private void ConfirmRepair()
         {
             if (!CanOpen() || session == null)
@@ -537,7 +468,7 @@ namespace SpaceTaxi.UI
             hull.Repair(amount); // HpChanged дойдёт до HUD и до Refresh — экран пересчитается
             int pct = Mathf.RoundToInt(amount / missing * 100f);
             hullStatus.text = $"Отремонтировано на {pct}% (+{Mathf.RoundToInt(amount)} HP) за {UiFormat.Currency} {UiFormat.FormatCredits(cost)}";
-            ShowToast($"Отремонтировано на {pct}%", tone: ToastTone.Danger); // Н6 U4: списание — красный
+            ShowToast($"Отремонтировано на {pct}%", tone: ToastTone.Danger); // списание — красный
             landing.ReportServiced(ship.LandedOn.DisplayName);
         }
 
@@ -545,8 +476,8 @@ namespace SpaceTaxi.UI
         {
             if (!opened || screen == null || ship == null || session == null)
                 return;
-            // Взлёт с открытым экраном (гонка FixedUpdate vs Update):
-            // LandedOn уже null — закрываемся до любых разыменований
+            // гонка FixedUpdate vs Update: взлёт с открытым экраном —
+            // закрываемся до любых разыменований LandedOn
             if (ship.LandedOn == null)
             {
                 Close();
@@ -563,7 +494,7 @@ namespace SpaceTaxi.UI
             stationTitle.text = "СТАНЦИЯ · " + ship.LandedOn.DisplayName.ToUpper();
             creditsValue.text = UiFormat.Currency + " " + UiFormat.FormatCredits(session.Wallet.Credits);
 
-            UpdateGauge(fuelSegments, ship.FuelFraction);
+            StationUI.SetSegments(fuelSegments, Mathf.CeilToInt(ship.FuelFraction * fuelSegments.Length));
             fuelValue.text = Mathf.RoundToInt(ship.Fuel) + "/" + Mathf.RoundToInt(ship.Eff.FuelMax);
             UpdateHpBar(ship.HpFraction);
             hullValue.text = Mathf.RoundToInt(ship.Hp) + "/" + Mathf.RoundToInt(ship.Eff.HpMax);
@@ -575,17 +506,9 @@ namespace SpaceTaxi.UI
             RefreshShop();
         }
 
-        private void UpdateGauge(Image[] segments, float fraction)
-        {
-            int lit = Mathf.CeilToInt(fraction * segments.Length);
-            for (int i = 0; i < segments.Length; i++)
-                segments[i].color = i < lit ? SegmentOn : SegmentOff;
-        }
+        // --- Вкладки ---
 
-        // --- Вкладки услуг (§3.3) ---
-
-        // состав вкладок по услугам планеты: хаб — все четыре, обычная станция —
-        // по флагам; вызывается при смене планеты (из Refresh)
+        // состав вкладок по услугам планеты; вызывается при смене планеты
         private void ApplyTabs()
         {
             SetTabVisible(StationTab.Shop, currentPlanet.IsHub);
@@ -635,8 +558,8 @@ namespace SpaceTaxi.UI
             foreach (var pair in tabButtons)
             {
                 bool active = pair.Key == tab;
-                var dim = OnboardComputerFactory.LabelColor;
-                tabBackgrounds[pair.Key].color = new Color(dim.r, dim.g, dim.b, active ? 0.45f : 0.18f);
+                tabBackgrounds[pair.Key].color =
+                    Ui.WithAlpha(OnboardComputerFactory.LabelColor, active ? 0.45f : 0.18f);
                 tabLabels[pair.Key].color = active ? OnboardComputerFactory.BrightColor : OnboardComputerFactory.LabelColor;
             }
         }
@@ -647,12 +570,11 @@ namespace SpaceTaxi.UI
                 button.gameObject.SetActive(visible);
         }
 
-        // кнопка вкладки в стиле BuildServiceButton, ширина равная (flexible)
+        // кнопка вкладки в стиле сервисных кнопок, ширина равная (flexible)
         private void AddTabButton(StationTab tab, Transform parent, string title)
         {
             var go = OnboardComputerFactory.Button(parent, title,
-                new Color(OnboardComputerFactory.LabelColor.r, OnboardComputerFactory.LabelColor.g,
-                    OnboardComputerFactory.LabelColor.b, 0.18f),
+                Ui.WithAlpha(OnboardComputerFactory.LabelColor, 0.18f),
                 OnboardComputerFactory.LabelColor, 18f, "Tab_" + tab);
             var le = go.AddComponent<LayoutElement>();
             le.flexibleWidth = 1f;
@@ -664,7 +586,7 @@ namespace SpaceTaxi.UI
             tabButtons[tab].onClick.AddListener(() => SelectTab(tab));
         }
 
-        // каркас экрана строится кодом при первом открытии (стиль OnboardComputerFactory)
+        // каркас экрана строится кодом при первом открытии
         private GameObject BuildScreen()
         {
             var root = new GameObject("StationScreen", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
@@ -672,8 +594,8 @@ namespace SpaceTaxi.UI
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
-            // Масштаб как у сценического канваса (1920x1080, match 0.5) — иначе
-            // на не-1080p разрешениях станция визуально расходится с HUD
+            // масштаб как у канваса сцены (1920x1080) — иначе на других
+            // разрешениях станция расходится с HUD
             var scaler = root.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -689,8 +611,7 @@ namespace SpaceTaxi.UI
             var panelRect = (RectTransform)panel.transform;
             panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            // C2: панель шире (700 → 800, S3 — витрина крупнее): слева статы,
-            // справа большая модель
+            // панель 800: слева статы витрины, справа большая модель
             panelRect.sizeDelta = new Vector2(800f, 0f); // высоту подберёт fitter
             panel.GetComponent<Image>().color = OnboardComputerFactory.PanelColor;
             var layout = panel.AddComponent<VerticalLayoutGroup>();
@@ -703,38 +624,25 @@ namespace SpaceTaxi.UI
             var fitter = panel.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // --- Шапка попапа (рамка С4): «СТАНЦИЯ · …» слева, кредиты «Đ N»
-            // справа (Refresh перечитывает по Wallet.CreditsChanged), крестик
-            // закрытия в правом верхнем углу — клик закрывает попап ---
+            // шапка: название, кредиты (перечитывает Refresh), крестик закрытия
             var header = StationUI.PopupHeader(panel.transform, "СТАНЦИЯ");
             stationTitle = header.Title;
             creditsValue = header.Credits;
             header.Close.onClick.AddListener(Close);
 
-            // --- Вкладки услуг (§3.3): кнопки создаём все четыре, видимость
-            // под флаги планеты ставит ApplyTabs при каждом открытии ---
-            var tabRow = new GameObject("TabRow", typeof(RectTransform));
-            tabRow.transform.SetParent(panel.transform, false);
-            var tabLayout = tabRow.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 8f;
-            tabLayout.childControlWidth = true;
-            tabLayout.childControlHeight = true;
-            tabLayout.childForceExpandWidth = true;
-            tabLayout.childForceExpandHeight = false;
-            var tabElement = tabRow.AddComponent<LayoutElement>();
-            tabElement.minHeight = 40f;
-            tabElement.preferredHeight = 40f;
+            // все четыре вкладки; видимость под планету ставит ApplyTabs
+            var tabRow = OnboardComputerFactory.H("TabRow", panel.transform);
+            tabRow.GetComponent<HorizontalLayoutGroup>().childForceExpandHeight = false;
+            OnboardComputerFactory.FixedHeight(tabRow, 40f);
             AddTabButton(StationTab.Shop, tabRow.transform, "МАГАЗИН");
             AddTabButton(StationTab.Upgrades, tabRow.transform, "УЛУЧШЕНИЯ");
             AddTabButton(StationTab.Fuel, tabRow.transform, "ЗАПРАВКА");
             AddTabButton(StationTab.Repair, tabRow.transform, "РЕМОНТ");
 
-            // --- Окно заправки (вкладка ЗАПРАВКА, С1): ячейки бака на всю
-            // ширину панели, слайдер объёма (механика Н-4 не тронута), сумма
-            // «Đ», одна кнопка подтверждения ---
+            // --- Окно заправки: ячейки бака, запас, слайдер, кнопка ---
             fuelWindow = StationUI.Section(panel.transform, "// ТОПЛИВО", "FuelWindow");
 
-            // шапка бака: метка слева, значение справа (правило 1.32: 17pt ≈ 22.4 → высота 24)
+            // шапка бака: метка слева, значение справа (17pt → высота 24)
             var fuelHead = OnboardComputerFactory.H("FuelHead", fuelWindow.transform);
             OnboardComputerFactory.FixedHeight(fuelHead.gameObject, 24f);
             var fuelCaption = OnboardComputerFactory.Text(fuelHead, "БАК", 17f, OnboardComputerFactory.LabelColor, "Caption");
@@ -743,7 +651,7 @@ namespace SpaceTaxi.UI
             OnboardComputerFactory.FixedWidth(fuelValue.gameObject, 110f);
             fuelValue.alignment = TextAlignmentOptions.Right;
 
-            fuelSegments = BuildTankCells(fuelWindow.transform);
+            fuelSegments = StationUI.SegmentRow(fuelWindow.transform, "TankCells", SegmentCount, 34f);
 
             fuelStockLine = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "StockLine");
             OnboardComputerFactory.FixedHeight(fuelStockLine.gameObject, 23f);
@@ -753,22 +661,14 @@ namespace SpaceTaxi.UI
             OnboardComputerFactory.FixedHeight(fuelSlider.gameObject, 30f);
             fuelSlider.onValueChanged.AddListener(_ => UpdateFuelOffer());
 
-            // ОДНА кнопка заправки (С1): пресеты убраны; каркасная кнопка —
-            // яркий текст, ColorTint, щелчок озвучен каркасом. Подтверждает
-            // выбор слайдера (по умолчанию — весь доступный объём)
-            var fuelButtonGo = StationUI.Button(fuelWindow.transform, "—", 20f, "FuelButton");
-            var fuelButtonLe = fuelButtonGo.AddComponent<LayoutElement>();
-            fuelButtonLe.minHeight = 44f;
-            fuelButtonLe.preferredHeight = 44f;
-            fuelButtonLe.flexibleWidth = 1f;
-            fuelButton = fuelButtonGo.GetComponent<Button>();
-            fuelButton.onClick.AddListener(ConfirmRefuel);
-            fuelButtonLabel = fuelButtonGo.GetComponentInChildren<TMP_Text>();
+            // кнопка заправки: подтверждает выбор слайдера
+            fuelButton = StationUI.ServiceButton(fuelWindow.transform, "FuelButton", ConfirmRefuel);
+            fuelButtonLabel = fuelButton.GetComponentInChildren<TMP_Text>();
 
             fuelStatus = OnboardComputerFactory.Text(fuelWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
             OnboardComputerFactory.FixedHeight(fuelStatus.gameObject, 23f);
 
-            // --- Окно ремонта (вкладка РЕМОНТ, С4): HP-бар, цена «Đ», кнопка «Починить» ---
+            // --- Окно ремонта: HP-бар, цена, кнопка ---
             hullWindow = StationUI.Section(panel.transform, "// РЕМОНТ", "HullWindow");
 
             var hullHead = OnboardComputerFactory.H("HullHead", hullWindow.transform);
@@ -786,50 +686,34 @@ namespace SpaceTaxi.UI
             repairOffer = OnboardComputerFactory.Text(hullWindow, "", 18f, OnboardComputerFactory.BrightColor, "OfferLine");
             OnboardComputerFactory.FixedHeight(repairOffer.gameObject, 24f);
 
-            var repairButtonGo = StationUI.Button(hullWindow.transform, "—", 20f, "RepairButton");
-            var repairButtonLe = repairButtonGo.AddComponent<LayoutElement>();
-            repairButtonLe.minHeight = 44f;
-            repairButtonLe.preferredHeight = 44f;
-            repairButtonLe.flexibleWidth = 1f;
-            repairButton = repairButtonGo.GetComponent<Button>();
-            repairButton.onClick.AddListener(ConfirmRepair);
-            repairButtonLabel = repairButtonGo.GetComponentInChildren<TMP_Text>();
+            repairButton = StationUI.ServiceButton(hullWindow.transform, "RepairButton", ConfirmRepair);
+            repairButtonLabel = repairButton.GetComponentInChildren<TMP_Text>();
 
             hullStatus = OnboardComputerFactory.Text(hullWindow, "", 17f, OnboardComputerFactory.LabelColor, "Status");
             OnboardComputerFactory.FixedHeight(hullStatus.gameObject, 23f);
 
-            // --- Окно улучшений: вкладка УЛУЧШЕНИЯ (хаб) или контент окна
-            // РЕМОНТА (обычная станция); гашение долга живёт здесь же (§3.2) ---
-            upgradeWindow = new GameObject("UpgradeWindow", typeof(RectTransform));
-            upgradeWindow.transform.SetParent(panel.transform, false);
-            var upgradeLayout = upgradeWindow.AddComponent<VerticalLayoutGroup>();
-            upgradeLayout.spacing = 12f;
-            upgradeLayout.childControlWidth = true;
-            upgradeLayout.childControlHeight = true;
-            upgradeLayout.childForceExpandWidth = true;
-            upgradeLayout.childForceExpandHeight = false;
+            // окно улучшений (+ блок долга); на не-хабе показывается внутри окна ремонта
+            upgradeWindow = OnboardComputerFactory.V("UpgradeWindow", panel.transform, 12f);
             upgradesSection = new StationUpgradesSection(this);
             upgradesSection.Build(upgradeWindow.transform);
 
-            // --- Вкладка МАГАЗИН: витрина (Н-3а) — большая модель на экране,
-            // листание стрелками, покупка показанного варианта покраски ---
+            // вкладка МАГАЗИН — витрина (StationShowcaseSection)
             showcaseSection = new StationShowcaseSection(this);
             showcaseSection.Build(panel.transform);
 
             var footer = OnboardComputerFactory.Text(panel, "B / ESC — закрыть", 16f, OnboardComputerFactory.LabelColor, "Footer");
-            // 22, не 20: строка 16pt ≈ 21.1 — Ellipsis при меньшей высоте режет по вертикали
+            // 22: строка 16pt ≈ 21.1 — запас против вертикального Ellipsis
             OnboardComputerFactory.FixedHeight(footer.gameObject, 22f);
 
             return root;
         }
 
-        // HP-бар (С4): ширина заливки = доля корпуса; цвет — яркий зелень,
-        // ниже четверти — тревожный красный (цвета борткомпа)
+        // HP-бар: заливка = доля корпуса; ниже четверти — тревожный красный
         private void UpdateHpBar(float fraction)
         {
             if (hpFill == null)
                 return;
-            SetFill(hpFill, fraction);
+            StationUI.SetFill(hpFill, fraction);
             var image = hpFill.GetComponent<Image>();
             if (image != null)
                 image.color = fraction < 0.25f
@@ -837,29 +721,7 @@ namespace SpaceTaxi.UI
                     : OnboardComputerFactory.BrightColor;
         }
 
-        // ширина fill-полоски по доле значения от максимума; internal —
-        // вызывается секцией витрины (шаг 7c)
-        internal static void SetFill(RectTransform fill, float fraction)
-        {
-            fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
-        }
-
-        // internal: вызывается секцией витрины (шаг 7c)
-        internal static Button BuildServiceButton(Transform parent, string name, UnityEngine.Events.UnityAction onClick, out TMP_Text label)
-        {
-            var go = StationUI.Button(parent, "—", 20f, name);
-            var le = go.AddComponent<LayoutElement>();
-            le.minHeight = 44f;
-            le.preferredHeight = 44f;
-            le.flexibleWidth = 1f;
-            var button = go.GetComponent<Button>();
-            button.onClick.AddListener(onClick);
-            label = go.GetComponentInChildren<TMP_Text>();
-            return button;
-        }
-
-        // магазинные перечитывания уходят в секции (шаг 7c):
-        // улучшения/долг — StationUpgradesSection, витрина — StationShowcaseSection
+        // перечитывание секций магазина (улучшения/долг + витрина)
         private void RefreshShop()
         {
             upgradesSection?.Refresh();

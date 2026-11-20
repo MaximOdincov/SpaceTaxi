@@ -27,12 +27,12 @@ namespace SpaceTaxi.UI
         private GravityField gravity;
         private ShipController controller;
         private HullSystem hullSystem; // для симметричной отписки в OnDestroy
-        private BlackHole hole;      // предупреждения дыры — ленивый бинд, как в самом BlackHole
+        private BlackHole hole;      // предупреждения дыры — ленивый бинд
         private bool bound;
         private Color speedBaseColor;
 
-        // гашение HUD при открытых панелях (П11.1): тост внутри HUD не гаснет —
-        // у него своя группа с ignoreParentGroups
+        // гашение HUD при открытых панелях; тост не гаснет — у него своя
+        // группа с ignoreParentGroups
         private const float DimmedAlpha = 0.35f;
         private const float DimFadeSeconds = 0.15f;
         private CanvasGroup dimGroup;
@@ -41,16 +41,16 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private float currentAlpha = 1f;
 
-        // горящий/погашенный сегмент бака — палитра в HudPalette (Н12.4)
+        // горящий/погашенный сегмент бака — палитра в HudPalette
         private static readonly Color SegmentOn = HudPalette.SegmentOn;
         private static readonly Color SegmentOff = HudPalette.SegmentOff;
         // безопасная/опасная скорость (жар звёзд красит стрелку)
         private static readonly Color SpeedSafe = new Color(0.235f, 1f, 0.557f, 1f);
         private static readonly Color SpeedDanger = new Color(1f, 0.35f, 0.3f, 1f);
-        // зелёный HUD-иконок — BrightColor каркаса борткомпа (принятый зелёный)
+        // зелёный иконок = BrightColor борткомпа
         private static readonly Color IconGreen = OnboardComputerFactory.BrightColor;
 
-        // каркас HUD собирается кодом + подписки на корпус/бак/рейтинг
+        // каркас HUD: узлы сцены + подписки на корпус/бак
         private void Awake()
         {
             dimGroup = GetComponent<CanvasGroup>();
@@ -87,10 +87,7 @@ namespace SpaceTaxi.UI
             if (bannerRect != null)
             {
                 bannerRect.sizeDelta = new Vector2(bannerRect.sizeDelta.x * 1.3f, bannerRect.sizeDelta.y * 1.25f);
-                // Н9.5: владелец вернул тревогу наверх («уведомления снизу —
-                // наверх, например о чёрной дыре»); №19 гнал её вниз из-за
-                // стопки тостов — теперь тост на экране один, баннер снова
-                // над ним. Текст, пульс, сирены и звук остаются как были
+                // баннер — над зоной тостов (тост один, но баннер важнее)
                 bannerRect.anchorMin = new Vector2(0.5f, 1f);
                 bannerRect.anchorMax = new Vector2(0.5f, 1f);
                 bannerRect.pivot = new Vector2(0.5f, 1f);
@@ -110,7 +107,7 @@ namespace SpaceTaxi.UI
             hintRect.anchorMin = new Vector2(0.5f, 1f);
             hintRect.anchorMax = new Vector2(0.5f, 1f);
             hintRect.sizeDelta = new Vector2(900f, 30f);
-            hintRect.anchoredPosition = new Vector2(0f, -156f); // ниже тоста
+            hintRect.anchoredPosition = new Vector2(0f, -156f); // под баннером
 
             AlignFuelBlock();
             BuildSpeedometer();
@@ -118,8 +115,7 @@ namespace SpaceTaxi.UI
             BuildSirens();
         }
 
-        // Н9.7 (конвенция OnboardBinder (Н12: partial-файлы)): издатели переживают подписчика
-        // при смене сцены — отписка симметрична подписке в Update
+        // отписка симметрична подписке (издатели переживают подписчика)
         private void OnDestroy()
         {
             if (ship != null)
@@ -164,8 +160,7 @@ namespace SpaceTaxi.UI
             UpdateDim();
         }
 
-        // опрос панелей каждый кадр, кэш контроллеров ленивый — стиль биндера;
-        // unscaledDeltaTime: панели открываются и в паузе
+        // опрос панелей каждый кадр; unscaledDeltaTime — панели открываются и в паузе
         private void UpdateDim()
         {
             if (mapScreen == null) mapScreen = FindAnyObjectByType<MapScreenController>();
@@ -196,7 +191,7 @@ namespace SpaceTaxi.UI
 
         private SpaceTaxi.Core.GameSession cachedSession; // кэш — поиск каждый кадр не нужен
 
-        // строка «ЗАКАЗ · забрать/вези …» над миром (кэш строк — без аллокаций)
+        // строка текущей цели над миром
         private void UpdateGoalHint()
         {
             if (cachedSession == null)
@@ -225,8 +220,7 @@ namespace SpaceTaxi.UI
                     + " (" + orders.DistanceToPlanet(index, ship.transform.position).ToString("0") + " юн)";
             }
 
-            // таймер «паникёра» (Н7 Q7.1): остаток mm:ss рядом с маршрутом,
-            // цвет плывёт к Danger по мере истечения; на нуле — срыв заказа
+            // таймер торопящегося пассажира: mm:ss, цвет плывёт к красному
             if (active.HurrySeconds > 0f && active.HurryStartedAt >= 0f)
             {
                 float remaining = active.HurryRemaining(Time.time);
@@ -251,11 +245,8 @@ namespace SpaceTaxi.UI
                 fuelSegments[i].color = i < lit ? SegmentOn : SegmentOff;
         }
 
-        // один баннер, приоритет: пустой бак > захват дыры > жар > зона дыры > мало топлива.
-        // Тревога: крупный пульсирующий текст + сирены по бокам + звук.
-        // v5 (2026-11-15, владелец: «предупреждения как с жаром, но не на весь
-        // экран как сейчас»): предупреждения чёрной дыры — здесь, фуллскрин-
-        // оверлей убран; в тексте захвата — отсчёт до потери связи и подсказка X
+        // один баннер, приоритет: пустой бак > захват дыры > жар > зона дыры >
+        // мало топлива. Крупный пульсирующий текст + сирены по бокам + звук
         private void UpdateWarning()
         {
             if (hole == null)
@@ -306,7 +297,7 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // луп сирены при тревоге (жар/сирены): старт/стоп один раз
+        // луп сирены при тревоге: старт/стоп один раз
         private void SetAlarm(bool on)
         {
             if (alarmOn == on)

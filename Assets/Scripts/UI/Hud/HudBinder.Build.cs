@@ -4,20 +4,13 @@ using UnityEngine.UI;
 
 namespace SpaceTaxi.UI
 {
-    // Build-часть HudBinder (Н10.24: каркас отдельно от живых данных):
-    // Awake-билд HUD — выравнивание топливного блока, геометрия спидометра
-    // (шкала + стрелка), иконки статов, сирены. Живые данные (Update,
-    // тревога, топливо/корпус) — в HudBinder.cs
+    // Построение каркаса HUD: выравнивание топливного блока, спидометр,
+    // иконки статов, сирены. Живые данные — в HudBinder.cs
     public partial class HudBinder
     {
-        // Н6 U2 + Н7 U7.1: высота ячеек откачена к прежней сцене (16px — высота
-        // FuelTrack; U1 ставил высоту иконки 55px, владелец: «стало хуже»).
-        // Позиция блока сохранена: левая колонна статов (центр шкалы и строка
-        // корпуса считаются от FuelIcon) поднимается, пока её верхняя кромка не
-        // совпадёт с верхней кромкой миникарты (замер сцены Н6: иконка уже на
-        // уровне верхней кромки миникарты — сдвиг вычисляется и сегодня равен
-        // нулю, формула страхует против будущих правок сцены). Вызывать ДО
-        // BuildSpeedometer: центр шкалы считается от уже выровненной иконки.
+        // поднимает блок топлива до верхней кромки миникарты (если он ниже)
+        // и центрирует ячейки по иконке. Вызывать до BuildSpeedometer —
+        // центр шкалы считается от уже выровненной иконки
         private void AlignFuelBlock()
         {
             var fuelIcon = transform.Find("FuelIcon") as RectTransform;
@@ -40,10 +33,8 @@ namespace SpaceTaxi.UI
                 }
             }
 
-            // ячейки: высота = высоте трека (в сцене 16px, прежнее значение до U1),
-            // вертикальный центр = центру иконки
-            // (anchoredPosition.y сегмента отсчитывается от центра FuelTrack:
-            // у сегментов якорь (0, 0.5) и пивот (0, 0.5))
+            // ячейки: высота = высоте трека, вертикальный центр = центру иконки
+            // (у сегментов якорь и пивот (0, 0.5) — отсчёт от центра FuelTrack)
             float iconCenterY = fuelIcon.anchoredPosition.y + (0.5f - fuelIcon.pivot.y) * fuelIcon.sizeDelta.y;
             float trackCenterY = fuelTrack.anchoredPosition.y + (0.5f - fuelTrack.pivot.y) * fuelTrack.sizeDelta.y;
             float cellHeight = fuelTrack.sizeDelta.y;
@@ -59,45 +50,35 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // ————— геометрия спидометра (каркас строится кодом, префаб удалён) —————
+        // ————— геометрия спидометра —————
 
-        private const float GaugeSize = 55f;      // слот как у соседних иконок статов (FuelIcon/HullIcon 55×55)
-        private const float NeedleScale = 0.85f;  // остриё 23.4 < радиуса шкалы 27.5 — не вылезает
-        private const float GaugeTopGap = 12f;    // зазор между шкалой и строкой топлива (опущена ниже по Н4.13)
+        private const float GaugeSize = 55f;      // слот как у иконок статов (55×55)
+        private const float NeedleScale = 0.85f;  // остриё не вылезает за шкалу
+        private const float GaugeTopGap = 12f;    // зазор между шкалой и строкой топлива
         private const float GaugeHullGap = 6f;    // зазор между стрелкой и строкой корпуса
-        // Ход стрелки — по отметкам шкалы (Н6 U5, PNG-анализ speed.png): спицы-
-        // деления на 166.1° / 132.4° / 90.2° / 48.6° / 11.9° (Unity, против
-        // часовой от +X, центр дуги — низ спрайта 184×92), подпись «0» у левого
-        // края (центроид 165.5°), максимум у правого (12.8°). Остриё arrow.png
-        // при повороте 0 смотрит на −17.5° (главная ось спрайта от хаба).
-        // Покой: остриё на «0» → поворот 166 − (−17.5) = 183.5; дальше по
-        // часовой (в Unity вычитаем) до отметки максимума: 166 − 12 = 154.
+        // ход стрелки замерен по делениям спрайта шкалы: покой — остриё на «0»
+        // (183.5°), размах до максимума — 154°
         private const float NeedleAngleAtZero = 183.5f;
         private const float NeedleSweep = 154f;
-        // Хаб стрелки (центр белого шара) в пикселях arrow.png 41×28 — вокруг
-        // него делаем пивот, шар сидит на оси шкалы
+        // хаб стрелки (центр белого шара) в пикселях arrow.png — вокруг него
+        // пивот, шар сидит на оси шкалы
         private static readonly Vector2 NeedleHubPx = new Vector2(13.5f, 13.5f);
         private static readonly Vector2 NeedleSpritePx = new Vector2(41f, 28f);
 
-        // спидометр: шкала speed.png (полукруг) + стрелка arrow.png ПОД ней,
-        // вращается по скорости; цифры — внутри шкалы. Место: слева между строкой
-        // топлива и строкой корпуса — корпус сдвигается вниз, старая иконка
-        // скорости прячется (Н4.2.1: код вместо битого префаба UI/Speedometer)
+        // шкала (полукруг) + стрелка под ней, вращается по скорости; цифры справа
         private void BuildSpeedometer()
         {
             var gaugeGo = new GameObject("Speedometer", typeof(RectTransform), typeof(SpeedometerGauge));
             gaugeGo.transform.SetParent(speedValue.transform.parent, false);
             var gaugeRect = (RectTransform)gaugeGo.transform;
             gaugeRect.localScale = Vector3.one;
-            // якоря как у соседей левой колонки (FuelTrack/FuelIcon — top-left):
-            // GaugeCenter() возвращает координаты именно в этой конвенции,
-            // центр-якорь сдвигал бы спидометр на пол-канваса (к центру экрана)
+            // якоря как у соседей левой колонки (top-left): GaugeCenter()
+            // возвращает координаты в этой конвенции
             gaugeRect.anchorMin = gaugeRect.anchorMax = new Vector2(0f, 1f);
             gaugeRect.pivot = new Vector2(0.5f, 0.5f);
             gaugeRect.sizeDelta = new Vector2(GaugeSize, GaugeSize);
-            // центр считается ОДИН раз до перепарентчивания SpeedValue внутрь
-            // шкалы: GaugeCenter() читает узлы в координатах родителя HUD, а
-            // повторный вызов после SetParent дал бы смешение пространств
+            // центр считается один раз ДО перепарентчивания SpeedValue внутрь
+            // шкалы — после SetParent координаты были бы уже локальными
             Vector2 gaugeCenter = GaugeCenter();
             gaugeRect.anchoredPosition = gaugeCenter;
 
@@ -109,7 +90,7 @@ namespace SpaceTaxi.UI
             if (arrow == null)
                 Debug.LogWarning("[Hud] Art/icons/arrow не найден — спидометр без стрелки");
             needleImage.sprite = arrow;
-            needleImage.color = IconGreen; // стрелка в зелёном HUD, как шкала и иконки (Н4.13)
+            needleImage.color = IconGreen; // зелёный HUD
             needleImage.raycastTarget = false;
             var needleRect = (RectTransform)needleGo.transform;
             needleRect.anchorMin = needleRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -122,7 +103,7 @@ namespace SpaceTaxi.UI
             dialGo.transform.SetParent(gaugeRect, false);
             var dialImage = dialGo.GetComponent<Image>();
             dialImage.sprite = Resources.Load<Sprite>("Art/icons/speed");
-            dialImage.color = IconGreen; // зелёный HUD, как иконки щита/топлива
+            dialImage.color = IconGreen;
             dialImage.raycastTarget = false;
             var dialRect = (RectTransform)dialGo.transform;
             dialRect.anchorMin = dialRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -130,9 +111,7 @@ namespace SpaceTaxi.UI
             dialRect.sizeDelta = new Vector2(GaugeSize, dialHeight);
             dialRect.anchoredPosition = new Vector2(0f, dialHeight * 0.5f); // плоская сторона — к центру
 
-            // цифровое значение — СПРАВА от шкалы, размер как у HullValue (36pt,
-            // высота 42, BrightColor — ровный ряд статов, Н4.13); высота 42 < 47.5
-            // правила 1.32 допустима: у SpeedValue Overflow (узел сцены, не фабрика)
+            // цифры справа от шкалы; у узла сцены Overflow — правило 1.32 не обязательно
             speedValue.transform.SetParent(gaugeRect, false);
             var speedRect = speedValue.rectTransform;
             speedRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -155,19 +134,13 @@ namespace SpaceTaxi.UI
             ShiftHullRow(GaugeHullTop(gaugeCenter));
         }
 
-        // центр спидометра: левый край шкалы выровнен по левому краю иконок
-        // статов (FuelIcon/HullIcon x=14.2, пивоты x=0 — anchoredPosition.x и есть
-        // левый край), у — под строкой топлива с зазором GaugeTopGap (опущена
-        // ниже по Н4.13). Всё в координатах родителя (точечные якоря), углы —
-        // от его верха-лева. Вызывать ДО перепарентчивания SpeedValue внутрь
-        // шкалы (poseSource не использует SpeedValue — после SetParent его
-        // координаты были бы локальными координатами шкалы)
+        // центр спидометра: левый край — по колонке иконок статов, y — под
+        // строкой топлива. Считать до перепарентчивания SpeedValue внутрь шкалы
         private Vector2 GaugeCenter()
         {
             var track = transform.Find("FuelTrack");
             var fuelIcon = transform.Find("FuelIcon");
-            // колонка статов задана FuelIcon (x=14.2): шкала выравнивается по ней,
-            // а не по скрытому SpeedIcon (x=18) — «выровняй с остальными» (Н4.13)
+            // выравнивание по FuelIcon, не по скрытому SpeedIcon
             Transform xSource = fuelIcon != null ? fuelIcon : track;
             Vector2 center = xSource != null
                 ? new Vector2(((RectTransform)xSource).anchoredPosition.x + GaugeSize * 0.5f, 0f)
@@ -207,17 +180,15 @@ namespace SpaceTaxi.UI
             ((RectTransform)hullValue).anchoredPosition += Vector2.up * delta;
         }
 
-        // низ узла по его пивоту: FuelIcon (пивот 0,1) → −87, FuelTrack (0, 0.5) → −69
+        // низ узла через его пивот
         private static float RowBottom(RectTransform rect)
         {
             return rect.anchoredPosition.y - rect.pivot.y * rect.sizeDelta.y;
         }
 
-        // иконки статов: в сцене болванки ui_icon_shield/ui_icon_fuel — меняем
-        // спрайты на арт из icons и красим в зелёный HUD (BrightColor борткомпа)
+        // иконки статов: подменяем спрайты болванок сцены на арт из icons
         private void BuildStatIcons()
         {
-            // владелец вернул shield_icon.png (Н5.A1) — shield.png слишком «залитый»
             SetIcon("HullIcon", "Art/icons/shield_icon");
             SetIcon("FuelIcon", "Art/icons/gas_icon");
         }

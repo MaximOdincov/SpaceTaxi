@@ -9,7 +9,7 @@ namespace SpaceTaxi.Orders
     {
         public List<PassengerProfile> Profiles = new List<PassengerProfile>();
 
-        [Tooltip("Пулы генератора пассажиров (П5.2); пусто — загрузится из Resources")]
+        [Tooltip("Пулы генератора пассажиров; пусто — загрузится из Resources")]
         [SerializeField] private PassengerPools pools;
 
         private bool poolsSearched;
@@ -22,7 +22,7 @@ namespace SpaceTaxi.Orders
             return Profiles[Random.Range(0, Profiles.Count)];
         }
 
-        // П5.2: свежий профиль из пулов; null — пулов нет (фолбэк Pick() у вызывающего)
+        // свежий профиль из пулов; null — пулов нет (фолбэк Pick() у вызывающего)
         public PassengerProfile Generate()
         {
             var p = GetPools();
@@ -37,7 +37,7 @@ namespace SpaceTaxi.Orders
         // лениво тот же, что и для Generate
         public PassengerPools Pools => GetPools();
 
-        // ленивый фолбэк в Resources (ассет П5.1); повторно не ищем, даже если не нашли
+        // ленивый фолбэк в Resources (ассет пулов); повторно не ищем, даже если не нашли
         private PassengerPools GetPools()
         {
             if (pools == null && !poolsSearched)

@@ -4,22 +4,21 @@ using TMPro;
 
 namespace UiKit
 {
-    // Fluent-строитель панели/узла (Н11): задать размер области, фон и дальше
-    // декларативно добавлять содержимое. Каждый вызов возвращает тот же бокс
-    // (конфигурация) или новый бокс ребёнка (вложенные панели), GameObject
-    // доступен через Go — хвосты, которых нет в API, доделываются напрямую
+    // Fluent-строитель узла: цепочка вызовов настраивает один узел, вложенный
+    // Box() возвращает бокс ребёнка. GameObject доступен через Go — чего нет
+    // в API, доделывается напрямую:
     //
-    //     var card = Ui.Box(parent, "Card").Size(440f, 200f)
+    //     var card = UiBox.Box(parent, "Card").Size(440f, 200f)
     //         .Background(UiTheme.Panel)
     //         .Column(spacing: 10f)
-    //         .Label("БАК", 21f, UiTheme.Ink).FixedHeight(28f)
+    //         .LabelBox("БАК", 21f, UiTheme.Ink).FixedHeight(28f)
     //         .Row(...)…
     public sealed class UiBox
     {
         public GameObject Go { get; }
         public RectTransform Rect { get; }
 
-        // TMP-текст узла, если он текстовый (LabelBox) — для правки alignment и т.п.
+        // текст узла (у LabelBox) — правка alignment и т.п.
         public TMP_Text Text => Go != null ? Go.GetComponent<TMP_Text>() : null;
 
         private UiBox(GameObject go)
@@ -87,9 +86,8 @@ namespace UiKit
             return this;
         }
 
-        // абсолютный размер свободного узла (вне лейаута): sizeDelta напрямую.
-        // Size/FixedHeight работают только под LayoutGroup — у свободного узла
-        // LayoutElement никто не читает
+        // размер свободного узла вне лейаута: sizeDelta напрямую
+        // (Size()/Fixed* работают только под LayoutGroup)
         public UiBox Absolute(float width, float height)
         {
             Rect.sizeDelta = new Vector2(width, height);
@@ -144,7 +142,7 @@ namespace UiKit
 
         // --- дети: примитивы возвращают их GameObject (для ссылок на TMP/Button) ---
 
-        // цепляемая версия: бокс текстового узла (FixedHeight/Flexible и т.д.)
+        // цепляемая версия Label — возвращает бокс текстового узла
         public UiBox LabelBox(string text, float size, Color color, TMP_FontAsset font = null, string name = "Text")
         {
             return Wrap(Ui.Label(Rect, text, size, color, font, name).gameObject);
@@ -164,7 +162,7 @@ namespace UiKit
             return button;
         }
 
-        // слайдер-ряд: примитив Ui.Slider внутри бокса (Н13.6 — настройки)
+        // слайдер из Ui (используется в настройках)
         public Slider SliderBox(string name, Color track, Color fill, Color handleColor)
         {
             return Ui.Slider(Rect, name, track, fill, handleColor);

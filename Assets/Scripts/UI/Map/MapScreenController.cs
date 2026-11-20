@@ -14,6 +14,7 @@ namespace SpaceTaxi.UI
         private OrderCompleteScreenController orderComplete; // модал завершения заказа
         private MapScreenBinder binder; // зум/записка карты едят Esc раньше закрытия карты
 
+
         public bool IsOpened => opened;
 
         public bool EscJustClosed { get; private set; }
@@ -56,8 +57,7 @@ namespace SpaceTaxi.UI
             SetOpened(true);
         }
 
-        // M8.6: программное закрытие (Tab из борткомпа) — панель прячется
-        // вместе с картой (SetOpened → onboard.Show(false))
+        // программное закрытие (Tab из борткомпа): панель прячется вместе с картой
         public void Close()
         {
             SetOpened(false);

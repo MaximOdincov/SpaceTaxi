@@ -3,13 +3,11 @@ using UnityEngine;
 
 namespace SpaceTaxi.UI
 {
-    // Единый хелпер денежных строк и таймеров (Н10.9, Слой 1 — CODE_REVIEW_N9
-    // §3.5/§7.3 «утилиты не по адресу»): прежде «Đ» дублировалась константой в
-    // OnboardBinder / StationUI / OrderCompleteScreenController, а форматторы
-    // жили на OnboardBinder и вызывались из 8 классов
+    // Единый формат денег, таймеров и дистанций — все экраны берут его
+    // из одного места
     public static class UiFormat
     {
-        // символ валюты — единственная копия значения в проекте
+        // символ валюты проекта
         public const string Currency = "Đ";
 
         // компактный формат: 10000 -> 10k, 1 400 000 -> 1.4m — размер строки предсказуем
@@ -22,16 +20,14 @@ namespace SpaceTaxi.UI
             return value.ToString();
         }
 
-        // таймеры заказов в mm:ss (Н7 Q7.1): округление вверх — «0:59» не висит
-        // две секунды; используется и HudBinder-ом в подсказке цели
+        // таймеры в mm:ss; округление вверх, чтобы «0:59» не висело две секунды
         public static string FormatClock(float seconds)
         {
             int total = Mathf.Max(0, Mathf.CeilToInt(seconds));
             return total / 60 + ":" + (total % 60).ToString("00", CultureInfo.InvariantCulture);
         }
 
-        // Н12.4: дистанция «834 юн» / «2.1k юн» — прежде дублировалась в
-        // WaypointIndicator и MinimapBinder
+        // дистанция «834 юн» / «2.1k юн»
         public static string Distance(float юн)
         {
             if (юн < 1000f)

@@ -4,18 +4,17 @@ namespace SpaceTaxi.Physics
 {
     // Единственное место расчёта посадочной позы корабля: спавн (WorldBuilder),
     // посадка (LandingSystem), респавн (HullSystem), пересадка корпуса (Ship),
-    // загрузка сейва (SaveSystem). Раньше каждый считал смещение сам, часть —
-    // от сырого радиуса данных уровня, а фактическая поверхность планеты
-    // умножена на PlanetSizeMul (CelestialBody.Init): крупный корпус уходил
-    // хвостом в планету, солвер выталкивал («провалился и отскочил»)
+    // загрузка сейва (SaveSystem). Считаем от фактической поверхности планеты
+    // (радиус данных умножен на PlanetSizeMul в CelestialBody.Init) — иначе
+    // крупный корпус уходит хвостом в планету
     public static class ShipPlacement
     {
         // отступ без визуала модели (ShipModelVisual.HalfExtent возвращает то же)
         private const float DefaultHalfExtent = 7f;
 
         // посадочный отступ: половина высоты капсулы (0.96 высоты контента) —
-        // корабль стоит ровно в позе физического покоя, «чуть ниже» прежнего
-        // снапа по канве. Глубже опускать нельзя: солвер снова выталкивает
+        // корабль стоит ровно в позе физического покоя. Глубже опускать
+        // нельзя: солвер выталкивает
         public static float LandedExtent(ShipModelVisual visual)
         {
             float halfExtent = visual != null ? visual.HalfExtent : DefaultHalfExtent;

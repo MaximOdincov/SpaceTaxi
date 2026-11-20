@@ -5,10 +5,9 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.Orders
 {
-    // Жёлтый ореол планеты назначения (Н10.12 — вырезан из OrderService,
-    // CODE_REVIEW_N9 §3.2/§7.5 «презентация в доменном сервисе»): домен
-    // сообщает смену цели строкой (SetTarget — «А» ждёт, «Б» на борту),
-    // презентер сам создаёт круг, цепляет его к телу и пульсирует
+    // Жёлтый ореол планеты назначения: домен сообщает смену цели строкой
+    // (SetTarget — «А» ждёт, «Б» на борту), презентер сам создаёт круг,
+    // цепляет его к телу и пульсирует
     public sealed class TargetGlowPresenter : MonoBehaviour
     {
         private Transform targetGlow;
@@ -27,7 +26,7 @@ namespace SpaceTaxi.Orders
             Refresh();
         }
 
-        // пульс масштабом и альфой — заметный жёлтый круг за планетой (Н6);
+        // пульс масштабом и альфой — заметный жёлтый круг за планетой;
         // создание/прикрепление — только при смене цели (Refresh), не каждый кадр
         private void Update()
         {
@@ -35,9 +34,8 @@ namespace SpaceTaxi.Orders
                 return;
             float wave = Mathf.Sin(Time.time * 3f);
             targetGlow.localScale = Vector3.one * glowScaleBase * (1f + 0.06f * wave);
-            // M8.7 (решение владельца, отмена цвета Н7.7): жёлтый полупрозрачный
-            // пульс (Н5.28) — жёлтый = цель заказа; тон тот же, что у кольца
-            // цели на карте (MapScreenBinder.TargetRingColor)
+            // жёлтый полупрозрачный пульс — жёлтый = цель заказа; тон тот же,
+            // что у кольца цели на карте (MapScreenBinder.TargetRingColor)
             glowRenderer.color = new Color(1f, 0.94f, 0.3f, Mathf.Lerp(0.38f, 0.62f, 0.5f + 0.5f * wave));
         }
 
@@ -60,7 +58,7 @@ namespace SpaceTaxi.Orders
                 var glowGo = new GameObject("TargetGlow");
                 glowRenderer = glowGo.AddComponent<SpriteRenderer>();
                 glowRenderer.sortingOrder = -2; // позади планеты
-                glowRenderer.sprite = StubSprites.SoftDot(128f, 0.55f); // ПРОСТО жёлтый круг (Н6: не копия спрайта планеты)
+                glowRenderer.sprite = StubSprites.SoftDot(128f, 0.55f); // просто жёлтый круг, не копия спрайта планеты
                 targetGlow = glowGo.transform;
             }
 

@@ -8,53 +8,39 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI
 {
-    // --- СОСТОЯНИЕ: деньги, рейтинг, долг ---
-    // partial-секция OnboardBinder; сюда же — чип статуса задания (Н10.4)
-    // и строка выполнения активного заказа (Н7 Q7.2).
+    // Деньги, рейтинг, долг + чип статуса задания и строка выполнения заказа
     public partial class OnboardBinder
     {
         private TMP_Text moneyValue, ratingValue;
         // «★ 3.0»: префикс пуст, если атлас не дал глиф звезды (сброс dynamic-атласа)
         private string ratingPrefix = "";
-        // анимация денег: показанное значение догоняет целевое (как рейтинг)
-        private float moneyShown = -1f;
-        private int moneyTarget;
+        // анимации докатки (RollingNumber): показанное значение догоняет
+        // целевое по unscaled-времени; деньги/долг — целые, рейтинг — десятые
+        private RollingNumber moneyRoll = new RollingNumber { Shown = -1f };
         // строка долга: катится значением, цвет «дышит» — рост горячее погашения
         private GameObject debtRow;
         private TMP_Text debtValue;
-        // «ПОГАСИТЬ · Đ N» рядом с долгом (Н7 Q7.6): списывает min(долг, кошелёк)
+        // «ПОГАСИТЬ»: списывает min(долг, кошелёк)
         private Button debtRepayButton;
-        private float debtShown = -1f;
-        private int debtTarget;
+        private RollingNumber debtRoll = new RollingNumber { Shown = -1f };
         private bool debtRising;
-        // анимация рейтинга: показанное значение догоняет целевое, цвет — динамика
-        private float ratingShown = -1f;
+        // анимация рейтинга: докатка + цвет-динамика (падение краснит)
+        private RollingNumber ratingRoll = new RollingNumber { Shown = -1f };
         private bool ratingDropping;
-        // мини-строка выполнения под карточкой актива (Н7 Q7.2): этапы ЗАБРАТЬ/ВЕЗИ
-        // и таймер «паникёра» (Н7 Q7.1); текст ведёт SlowUpdate
+        // строка этапов ЗАБРАТЬ/ВЕЗИ под карточкой актива; текст ведёт SlowUpdate
         private TMP_Text activeProgress;
-        // Н10.4: статус-чип задания активного заказа — «выполняется…» →
-        // «✓ выполнено» → «✗ провалено»; узел Expanded/Summary/Status,
-        // текст ведёт SlowUpdate (источник: task.Failed/Succeeded)
+        // чип статуса задания (узел Expanded/Summary/Status); ведёт SlowUpdate
         private TMP_Text activeStatus;
-        // галочка этапа: «✓» есть не в каждом атласе (паттерн clockGlyph) — иначе «+»
+        // запасные глифы, если «✓»/«✗»/«…» нет в атласе шрифта
         private string doneGlyph = "+";
-        // Н10.4: «✗» есть не в каждом атласе (тот же паттерн) — иначе «×»;
-        // «…» при отсутствии глифа — три точки
         private string failGlyph = "×";
         private string ellipsis = "...";
-        // таймер «паникёра» (Н7 Q7.1): с этого остатка цвет плывёт к Danger;
-        // публичная — HudBinder красит той же логикой подсказку цели
+        // остаток, с которого цвет таймера плывёт к красному (используется и HUD)
         public const float HurryWarnSeconds = 60f;
         private const float ProgressRowHeight = 26f; // высота строк сводки (17pt + запас)
 
-        // Н10.4: статус-чип задания в строке Status активной карточки.
-        // У точек интереса «✓» появляется в момент свершения (TrackInterestPoint
-        // ставит Succeeded в тот же кадр, что и тост-момент); у избегающих
-        // живой статус — только «выполняется…»/«✗ провалено»: успех у них
-        // ставит SettleTask при доставке, когда карточка уже гибнет.
-        // Тосты избегающим НЕ добавлять — владелец выбрал чип вместо тоста.
-        // Сейв восстанавливает Succeeded/Failed — чип верен сразу после лоада
+        // статус задания: «выполняется…» → «✓ выполнено» / «✗ провалено»;
+        // текст ведёт SlowUpdate
         private void UpdateActiveStatusChip()
         {
             if (activeCardGo == null || orders.Active == null)
@@ -79,11 +65,9 @@ namespace SpaceTaxi.UI
                 activeStatus.text = label + $"<color={ColorHex(OnboardComputerFactory.TaxiColor)}> выполняется{ellipsis}</color>";
         }
 
-        // --- Строка выполнения активного заказа (Н7 Q7.2) ---
+        // --- Строка выполнения активного заказа ---
 
-        // мини-строка под карточкой актива: «ВЫПОЛНЕНИЕ: ЗАБРАТЬ: А → ВЕЗИ: Б»
-        // со состоянием этапов и таймером «паникёра». Рядовой элемент activeArea —
-        // гибнет вместе с карточкой при смене заказа (activeAreaChildren)
+        // строка выполнения — элемент activeArea, гибнет вместе с карточкой
         private void BuildActiveProgressRow()
         {
             var row = new GameObject("ActiveProgress", typeof(RectTransform), typeof(LayoutElement));
@@ -97,9 +81,8 @@ namespace SpaceTaxi.UI
             UpdateActiveProgressRow();
         }
 
-        // этапы: галочка — готово (Bright), стрелка — текущий (Taxi), точки —
-        // ожидает (приглушённый); текст ведёт SlowUpdate (смена состояния заказа
-        // видна в четверть секунды, карточка при этом не перестраивается)
+        // галочка — готово, стрелка — текущий этап, точки — ожидает;
+        // текст ведёт SlowUpdate, карточка не перестраивается
         private void UpdateActiveProgressRow()
         {
             if (activeProgress == null || orders.Active == null)
@@ -132,9 +115,8 @@ namespace SpaceTaxi.UI
             return $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>·· {label}</color>";
         }
 
-        // таймер «паникёра» для строки выполнения (Н7 Q7.1); null — пассажир
-        // не торопится. Цвет плывёт к Danger по мере истечения (HurryWarnSeconds),
-        // приписка «срыв заказа» объясняет, что будет на нуле
+        // таймер торопящегося пассажира; null — не торопится. Цвет плывёт
+        // к красному по мере истечения
         private string HurryText(OrderOffer offer)
         {
             if (offer.HurrySeconds <= 0f || offer.HurryStartedAt < 0f)
@@ -148,12 +130,12 @@ namespace SpaceTaxi.UI
         // --- СОСТОЯНИЕ: деньги, рейтинг, долг ---
 
         // кредит обновляется событием, значение плавно докатывается; до первого
-        // события moneyShown == -1 (сентинел) — текст не пишем, не мигнув «Đ -1»
+        // события Shown == -1 (сентинел) — текст не пишем, не мигнув «Đ -1»
         private void ShowCredits(int credits)
         {
-            moneyTarget = credits;
-            if (moneyShown < 0f)
-                moneyShown = credits;
+            moneyRoll.Target = credits;
+            if (moneyRoll.Shown < 0f)
+                moneyRoll.Shown = credits;
             UpdateMoneyText();
             // сумма на кнопке гашения = min(долг, кошелёк) — кошелёк изменился
             RefreshDebtRepay();
@@ -161,29 +143,24 @@ namespace SpaceTaxi.UI
 
         private void AnimateMoney()
         {
-            if (moneyValue == null || moneyShown < 0f || Mathf.Approximately(moneyShown, moneyTarget))
-                return;
-            float speed = Mathf.Max(80f, Mathf.Abs(moneyTarget - moneyShown) * 4f);
-            moneyShown = Mathf.MoveTowards(moneyShown, moneyTarget, speed * Time.unscaledDeltaTime);
-            if (Mathf.Abs(moneyTarget - moneyShown) < 0.5f)
-                moneyShown = moneyTarget;
-            UpdateMoneyText();
+            if (moneyValue != null && moneyRoll.Step(80f, 4f))
+                UpdateMoneyText();
         }
 
         private void UpdateMoneyText()
         {
-            if (moneyValue != null && moneyShown >= 0f)
-                moneyValue.text = UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(moneyShown));
+            if (moneyValue != null && moneyRoll.Shown >= 0f)
+                moneyValue.text = UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(moneyRoll.Shown));
         }
 
-        // рейтинг догоняет целевое значение, цвет — динамика (красный/зелёный)
+        // рейтинг: показывается сразу, дальше докатывается с цветом динамики
         private void ShowRating(float value)
         {
             if (ratingValue == null)
                 return;
-            if (ratingShown < 0f)
-                ratingShown = value;
-            ratingDropping = value < ratingShown - 0.001f;
+            if (ratingRoll.Shown < 0f)
+                ratingRoll.Shown = value;
+            ratingDropping = value < ratingRoll.Shown - 0.001f;
             WriteRatingText();
         }
 
@@ -195,27 +172,23 @@ namespace SpaceTaxi.UI
             var rating2 = s2 != null ? s2.Rating : null;
             if (rating2 == null || ratingValue == null)
                 return;
-            float target = rating2.Value;
-            if (ratingShown < 0f)
-                ratingShown = target;
-            if (Mathf.Approximately(ratingShown, target))
+            ratingRoll.Target = rating2.Value;
+            if (ratingRoll.Shown < 0f)
+                ratingRoll.Shown = ratingRoll.Target;
+            if (Mathf.Approximately(ratingRoll.Shown, ratingRoll.Target))
                 return;
-            ratingDropping = target < ratingShown;
-            // плавный glide: скорость пропорциональна дельте (лёгкий разгон и мягкий
-            // докат), минимум не даёт хвосту «залипать» — виден перелист 3.0 → 4.5
-            float delta = Mathf.Abs(target - ratingShown);
-            float speed = Mathf.Max(delta * 4f, 0.4f);
-            ratingShown = Mathf.MoveTowards(ratingShown, target, speed * Time.unscaledDeltaTime);
-            if (Mathf.Abs(target - ratingShown) < 0.005f)
-                ratingShown = target;
-            WriteRatingText();
+            ratingDropping = ratingRoll.Target < ratingRoll.Shown;
+            // плавный glide: скорость растёт с дельтой, минимум не даёт хвосту
+            // залипать — виден перелист 3.0 → 4.5
+            if (ratingRoll.Step(0.4f, 4f, 0.005f))
+                WriteRatingText();
         }
 
         private void WriteRatingText()
         {
             if (ratingValue == null)
                 return;
-            ratingValue.text = ratingPrefix + ratingShown.ToString("0.0", CultureInfo.InvariantCulture);
+            ratingValue.text = ratingPrefix + ratingRoll.Shown.ToString("0.0", CultureInfo.InvariantCulture);
             // в покое — зелёный (цвет рейтинга в шапке), в динамике — красный/зелёный
             ratingValue.color = ratingDropping
                 ? OnboardComputerFactory.DangerColor
@@ -228,43 +201,37 @@ namespace SpaceTaxi.UI
         {
             if (debtValue == null)
                 return;
-            if (debtShown < 0f)
-                debtShown = value;
-            debtRising = value > debtShown + 0.5f;
-            debtTarget = value;
+            if (debtRoll.Shown < 0f)
+                debtRoll.Shown = value;
+            debtRising = value > debtRoll.Shown + 0.5f;
+            debtRoll.Target = value;
             if (debtRow != null)
-                debtRow.SetActive(value > 0 || debtShown > 0.5f);
+                debtRow.SetActive(value > 0 || debtRoll.Shown > 0.5f);
             UpdateDebtText();
             RefreshDebtRepay(); // сумма/доступность кнопки гашения по новому долгу
         }
 
         private void AnimateDebt()
         {
-            if (debtValue == null || debtShown < 0f || Mathf.Approximately(debtShown, debtTarget))
+            if (debtValue == null || !debtRoll.Step(40f, 3f))
                 return;
-            float speed = Mathf.Max(40f, Mathf.Abs(debtTarget - debtShown) * 3f);
-            debtShown = Mathf.MoveTowards(debtShown, debtTarget, speed * Time.unscaledDeltaTime);
-            if (Mathf.Abs(debtTarget - debtShown) < 0.5f)
-                debtShown = debtTarget;
-            if (debtRow != null && debtTarget <= 0 && debtShown <= 0.5f)
+            if (debtRow != null && debtRoll.Target <= 0 && debtRoll.Shown <= 0.5f)
                 debtRow.SetActive(false); // докатка до нуля закончилась — строка уходит
             UpdateDebtText();
         }
 
         private void UpdateDebtText()
         {
-            if (debtValue == null || debtShown < 0f)
+            if (debtValue == null || debtRoll.Shown < 0f)
                 return;
-            debtValue.text = "Текущий долг: " + UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(debtShown));
-            debtValue.color = debtRising && debtTarget > debtShown + 0.5f
+            debtValue.text = "Текущий долг: " + UiFormat.Currency + " " + UiFormat.FormatCredits(Mathf.RoundToInt(debtRoll.Shown));
+            debtValue.color = debtRising && debtRoll.Target > debtRoll.Shown + 0.5f
                 ? OnboardComputerFactory.DangerColor
                 : OnboardComputerFactory.DebtCalmColor;
         }
 
-        // кнопка «ПОГАСИТЬ · Đ N» (Н7 Q7.6): N = min(долг, кошелёк) — сколько
-        // реально спишется сейчас; без денег гаснет (лейбл в цвет лейблов,
-        // паттерн «КУПИТЬ» станции, Н6 S4). Показанные числа — фактические,
-        // без анимации докатки (как строка долга на станции)
+        // N = min(долг, кошелёк) — сколько реально спишется сейчас;
+        // без денег кнопка гаснет и подпись тускнеет
         private void RefreshDebtRepay()
         {
             if (debtRepayButton == null || debt == null || wallet == null || debt.Balance <= 0)
@@ -281,9 +248,8 @@ namespace SpaceTaxi.UI
             debtRepayButton.interactable = amount > 0;
         }
 
-        // досрочное гашение из борткомпа: списывает сколько есть — min(долг,
-        // кошелёк), остаток остаётся долгом. Полный расчёт — тост Success (Н7 Q7.6),
-        // частичное — Danger (деньги ушли, U4); тон расчёта — как на станции
+        // досрочное гашение: списывает сколько есть, остаток остаётся долгом;
+        // полный расчёт — тост Success, частичное — Danger (деньги ушли)
         private void RepayDebtNow()
         {
             if (debt == null || wallet == null || debt.Balance <= 0)
@@ -293,7 +259,7 @@ namespace SpaceTaxi.UI
                 return;
             debt.Repay(amount);
             bool full = debt.Balance <= 0;
-            Sound.Play(SoundId.DebtTone); // П9.3: тон расчёта по долгу
+            Sound.Play(SoundId.DebtTone); // тон расчёта по долгу
             FindAnyObjectByType<ToastNotifier>()?.Show(
                 full
                     ? "Долг погашен"

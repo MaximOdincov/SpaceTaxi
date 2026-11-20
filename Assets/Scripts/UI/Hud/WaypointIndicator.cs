@@ -9,43 +9,34 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI
 {
-    // Н-8/G-15: waypoint с карты — в мире и на экране. Над помеченным телом
-    // зелёная компактная скобка-луч с подписью (цвет — своя метка, как на
-    // карте и радаре; форма отлична от жёлтого пульса TargetGlow цели заказа);
-    // если waypoint или цель заказа за кадром — стрелка-компас у края экрана
-    // с дистанцией (зелёная — своя метка, жёлтая — цель заказа). Waypoint
-    // приходит по MapScreenBinder.WaypointChanged, цель заказа — по
-    // ActiveOrderChanged/PassengerBoarded (при посадке за пассажиром
-    // ActiveOrderChanged не фаерится). TargetGlow OrderService не трогаем.
+    // Waypoint с карты — в мире и на экране: над телом зелёная скобка с
+    // подписью, а если waypoint или цель заказа за кадром — стрелка-компас
+    // у края экрана с дистанцией (зелёная — своя метка, жёлтая — цель заказа).
     public sealed class WaypointIndicator : MonoBehaviour
     {
         private const float EdgePad = 88f;     // отступ стрелки от края, единиц канваса
         private const float OverlapGap = 110f; // минимальный зазор между стрелками
 
-        // M8.9: габарит скобки метки НАД телом (геометрия PlaceMarker):
-        // зазор Radius+10 + луч 21 + подпись центр +11 и полвысоты 22 = +64,
-        // низ скобки = Radius+10. У верхнего края кадра скобка резалась, а
-        // стрелка-компас пряталась (диск тела касался кадра) — маркер просто
-        // исчезал. Теперь маркер гасится, когда не влезает целиком, и
-        // направление показывает честная стрелка (ComputeEdge с той же
-        // надбавкой) — «отключение за границей»
+        // габарит скобки метки над телом (геометрия PlaceMarker): зазор
+        // Radius+10 + луч 21 + подпись (+11 центр и полвысота 22) = +64.
+        // Если маркер не влезает в кадр целиком — гасим, направление
+        // показывает краевая стрелка (ComputeEdge с той же надбавкой)
         private const float MarkerTopPad = 64f;
         private const float MarkerBottomPad = 10f;
 
-        // своя метка (waypoint с карты) — зелёная (G-15): единый цвет с ромбом на
-        // радаре; на бумажной карте тот же смысл — тёмно-карандашный GreenPencil
+        // своя метка (waypoint с карты) — зелёная, единый цвет с ромбом на радаре
         public static readonly Color WaypointGreen = new Color(0.235f, 1f, 0.557f);
         // зелень стрелки-вейпоинта и её дистанции (гамма HUD)
         private static readonly Color WaypointGreenText = new Color(0.62f, 1f, 0.78f);
         // янтарь дистанции в контуре тангенциального сближения
         private static readonly Color AmberText = new Color(1f, 0.86f, 0.55f);
-        // цель заказа — жёлтый проектного такси (Н4.2.3), жёлтым и остаётся (G-15)
+        // цель заказа — жёлтый проектного такси
         private static readonly Color TargetYellow = OnboardComputerFactory.TaxiColor;
 
         private GameSession session;
         private OrderService orders;
         private MapScreenBinder binder;
-        private LandingSystem landing; // Н12.2b: посадка снимает метку
+        private LandingSystem landing; // посадка снимает метку
         private GravityField gravity;
         private Ship ship;
         private TMP_FontAsset font;
@@ -84,13 +75,10 @@ namespace SpaceTaxi.UI
         private StationScreenController station;
         private PauseScreenController pause;
 
-        // v5.2 (владелец: «ореол не линией, а кругом, сзади планеты чуть больше
-        // неё; и не только у заказов — у целей, выбранных на карте, там он
-        // зелёный»): мировой пульсирующий ореол — МЯГКИЙ ДИСК (SoftDot, а не
-        // тонкое кольцо) ПОД спрайтом планеты, чуть больше планеты; два
-        // инстанса — жёлтый у цели заказа, зелёный у тела, выбранного на карте
-        // (MapScreenBinder.Waypoint). Видны, когда планета в кадре (стрелка у
-        // края гаснет — они дополняют друг друга)
+        // мировой пульсирующий ореол — мягкий диск (SoftDot) под спрайтом
+        // планеты, чуть больше неё; два инстанса — жёлтый у цели заказа,
+        // зелёный у тела, выбранного на карте. Видны, когда планета в кадре
+        // (стрелка у края гаснет — они дополняют друг друга)
         private GameObject targetHalo;
         private SpriteRenderer targetHaloRenderer;
         private GameObject waypointHalo;
@@ -99,11 +87,9 @@ namespace SpaceTaxi.UI
         private bool waypointInFrame;
         private GravityField haloGravity; // ленивый бинд для ореола цели (см. UpdateTargetHalo)
 
-        // Н10.6 (владелец: «не пускать в ЛЕВЫЙ ВЕРХНИЙ и ПРАВЫЙ ВЕРХНИЙ угол —
-        // останавливается раньше, до миникарты и до HUD»): размер угловых зон
-        // в canvas units от угла (reference 1920×1080, match 0.5). Миникарта
-        // 280×280 + отступ = 312 от угла — 360/330 покрывают с запасом; левый
-        // HUD-кластер (бак/скорость/корпус) ≤260×215 — покрыт
+        // размер угловых зон (canvas units от угла), куда стрелки не заходят:
+        // там миникарта и HUD-кластер. Миникарта 280×280 + отступ = 312 —
+        // 360/330 покрывают её с запасом
         private const float CornerZoneWidth = 360f;
         private const float CornerZoneHeight = 330f;
 
@@ -133,7 +119,7 @@ namespace SpaceTaxi.UI
                 Destroy(markerRoot.gameObject);
             if (arrowCanvas != null)
                 Destroy(arrowCanvas.gameObject);
-            // Н12.2b: симметричная отписка (конвенция проекта)
+            // симметричная отписка (конвенция проекта)
             if (landing != null)
                 landing.ShipLanded -= OnShipLanded;
         }
@@ -157,7 +143,7 @@ namespace SpaceTaxi.UI
 
             if (binder == null)
             {
-                // биндер лежит на неактивной карте — ищем с Include (договорённость Н-1)
+                // биндер лежит на неактивной карте — ищем с Include
                 binder = FindAnyObjectByType<MapScreenBinder>(FindObjectsInactive.Include);
                 if (binder != null)
                 {
@@ -166,7 +152,7 @@ namespace SpaceTaxi.UI
                 }
             }
 
-            // Н12.2b: индикатор активен всегда (HUD) — посадка снимает метку,
+            // индикатор активен всегда (HUD) — посадка снимает метку,
             // даже если карта закрыта (биндер карты спит с закрытой картой)
             if (landing == null)
             {
@@ -185,8 +171,7 @@ namespace SpaceTaxi.UI
             return true;
         }
 
-        // Н12.2b: прилетели на помеченную планету — метка снимается сама
-        // (как у цели заказа: довёз — и цель погасла)
+        // прилетели на помеченную планету — метка снимается сама
         private void OnShipLanded(Planet planet)
         {
             if (binder == null || binder.Waypoint == null || planet == null)
@@ -236,9 +221,9 @@ namespace SpaceTaxi.UI
 
             if (markerRoot != null)
             {
-                // M8.9: маркер в мире показываем только если он влезает в кадр
-                // ЦЕЛИКОМ (скобка+подпись над телом), иначе — гасим, направление
-                // держит стрелка-компас (см. ComputeEdge)
+                // маркер в мире показываем только если он влезает в кадр
+                // целиком (скобка+подпись над телом), иначе — гасим,
+                // направление держит стрелка-компас (см. ComputeEdge)
                 bool fits = MarkerFitsFrame();
                 if (markerRoot.gameObject.activeSelf != fits)
                     markerRoot.gameObject.SetActive(fits);
@@ -298,7 +283,7 @@ namespace SpaceTaxi.UI
             markerLabel = labelGo.GetComponent<TextMeshPro>();
             if (font != null)
                 markerLabel.font = font;
-            markerLabel.fontSize = 84f; // 3D TMP: em ≈ fontSize/10 мировых юнитов; компактнее (G-15)
+            markerLabel.fontSize = 84f; // 3D TMP: em ≈ fontSize/10 мировых юнитов
             markerLabel.alignment = TextAlignmentOptions.Center;
             markerLabel.overflowMode = TextOverflowModes.Overflow;
             markerLabel.rectTransform.sizeDelta = new Vector2(400f, 44f);
@@ -316,8 +301,7 @@ namespace SpaceTaxi.UI
             return part;
         }
 
-        // скобка над верхней кромкой тела + подпись; размеры в юнитах мира.
-        // G-15: компактнее прежнего — зелёная метка не спорит с жёлтой целью
+        // скобка над верхней кромкой тела + подпись; размеры в юнитах мира
         private void PlaceMarker()
         {
             float gap = markerBody.Radius + 10f;
@@ -341,7 +325,7 @@ namespace SpaceTaxi.UI
             markerRoot.position = new Vector3(p.x, p.y, 0f);
 
             float t = Time.time * 2.4f;
-            // зелёная метка (G-15) с лёгким пульсом: альфа гуляет слабее прежнего
+            // лёгкий пульс: альфа гуляет несильно
             Color beamColor = new Color(WaypointGreen.r, WaypointGreen.g, WaypointGreen.b, 0.72f + 0.14f * Mathf.Sin(t));
             beam.color = beamColor;
             tickTop.color = beamColor;
@@ -394,9 +378,8 @@ namespace SpaceTaxi.UI
                 }
             }
 
-            // Н10.6 (владелец: «не пускать в ЛЕВЫЙ ВЕРХНИЙ и ПРАВЫЙ ВЕРХНИЙ угол —
-            // останавливается раньше, до миникарты и до HUD»): две прямоугольные
-            // угловые зоны вместо контурного обхода (Н9.11 «скачет»)
+            // стрелки не заходят в верхние углы экрана — там миникарта и HUD
+            // (прямоугольные угловые зоны)
             posW = ClampOutsideCorners(posW);
             posT = ClampOutsideCorners(posT);
 
@@ -427,8 +410,8 @@ namespace SpaceTaxi.UI
 
         // кламп направления к прямоугольнику экрана с отступом; false — цель видна.
         // bracketAbove: у маркера есть скобка с подписью НАД телом (метка) —
-        // стрелка появляется и когда тело видно, но скобка резанётся краем
-        // (M8.9), цель стрелки — верхняя точка маркера
+        // стрелка появляется и когда тело видно, но скобка резанётся краем,
+        // цель стрелки — верхняя точка маркера
         private bool ComputeEdge(Vector2? worldPoint, float radius, Camera cam, bool bracketAbove,
             out Vector2 canvasPos, out float angle)
         {
@@ -450,7 +433,7 @@ namespace SpaceTaxi.UI
             }
             float halfH = cam.orthographicSize;
             float halfW = halfH * cam.aspect;
-            // тело краем уже в кадре — стрелка не нужна (M8.9: кроме случая,
+            // тело краем уже в кадре — стрелка не нужна (кроме случая,
             // когда скобка с подписью резанётся краем кадра)
             float cx = Mathf.Clamp(delta.x, -halfW, halfW);
             float cy = Mathf.Clamp(delta.y, -halfH, halfH);
@@ -482,18 +465,16 @@ namespace SpaceTaxi.UI
             return true;
         }
 
-        // Н10.6: стрелка скользит по краю экрана и упирается в границу угловой
-        // зоны («останавливается раньше, до миникарты и до HUD»). canvasPos —
-        // единицы канваса от центра (как ComputeEdge). Едет по верхнему краю —
-        // останавливается по X до зоны; по боковым краям — по Y до низа зоны;
-        // точка строго внутри зоны (редко: расталкивание ушло с края) —
-        // ближайшая свободная граница. Позиция меняется непрерывно вдоль края
+        // стрелка скользит по краю экрана и упирается в границу угловой зоны
+        // (миникарта/HUD). canvasPos — единицы канваса от центра: по верхнему
+        // краю — упор по X до зоны, по боковым — по Y до низа зоны; точка
+        // строго внутри зоны (редко) — к ближайшей свободной границе
         private Vector2 ClampOutsideCorners(Vector2 canvasPos)
         {
             float sf = arrowCanvas != null ? arrowCanvas.scaleFactor : 1f;
             float halfW = Screen.width / Mathf.Max(sf, 0.001f) * 0.5f;
             float halfH = Screen.height / Mathf.Max(sf, 0.001f) * 0.5f;
-            // Н13.5: при открытом борткомпе «левый край» = правый край его колонны —
+            // при открытом борткомпе «левый край» = правый край его колонны —
             // стрелки скользят по границе панели, не заходя на неё
             bool onboardShown = OnboardShown();
             float leftEdge = onboardShown ? -halfW + OnboardColumnUnits() : -halfW;
@@ -570,25 +551,19 @@ namespace SpaceTaxi.UI
                 out targetArrowTip, out targetArrowDist);
         }
 
-        // Н6 U3: спрайт владельца svrn.png — чисто белый (PNG-анализ: все
-        // непрозрачные пиксели 255,255,255) и остриём вверх, как прежний
-        // процедурный шеврон, поэтому мультипликативная тонировка Image.color
-        // работает напрямую — перекрас в белое не нужен. Текстура импортирована
-        // Multiple (два одинаковых шеврона svrn_0/svrn_1) — берём верхний
-        // суб-спрайт через LoadAll (паттерн for_mini у радара). Публично:
-        // маркер игрока на карте (Н4.6.2) красит этот же спрайт.
-        // Фолбэк — прежняя цепочка: чёрный «Шеврон» перекрашивается в белое,
-        // при нечитаемой текстуре — StubSprites.
+        // шеврон svrn.png — белый и остриём вверх, поэтому тонировка Image.color
+        // работает напрямую. Импорт бывает Multiple — берём суб-спрайт через
+        // LoadAll. Этот же спрайт красит маркер игрока на карте; фолбэк —
+        // «Шеврон» с перекрасом в белое, при нечитаемой текстуре — StubSprites
         private static Sprite chevronSprite;
 
         public static Sprite ChevronSprite()
         {
             if (chevronSprite != null)
                 return chevronSprite;
-            // v5.2 (владелец перевёл импорт svrn.png Multiple → Single — нарезка
-            // кадров резала концы шеврона): первичный источник — обычный svrn
-            // (единый спрайт целиком); фолбэки: LoadAll (старый Multiple),
-            // Шеврон.png (полый контур), StubSprites
+            // первичный источник — обычный svrn (единый спрайт целиком);
+            // фолбэки: LoadAll (импорт Multiple), Шеврон.png (полый контур),
+            // процедурный StubSprites
             var svrn = Resources.Load<Sprite>("Art/icons/svrn");
             if (svrn != null)
             {
@@ -723,7 +698,7 @@ namespace SpaceTaxi.UI
             UpdateHalo(ref targetHalo, ref targetHaloRenderer, body, TargetYellow, targetInFrame, "TargetHalo");
         }
 
-        // зелёный ореол — у тела, ВЫБРАННОГО на карте (своя метка, G-15)
+        // зелёный ореол — у тела, выбранного на карте (своя метка)
         private void UpdateWaypointHalo()
         {
             UpdateHalo(ref waypointHalo, ref waypointHaloRenderer, markerBody,
@@ -732,10 +707,9 @@ namespace SpaceTaxi.UI
 
         private bool IsAnyPanelOpen()
         {
-            // Н13.5 (владелец: «чеврон не показывает, пока стоишь на планете»):
-            // борткомп — левая колонна, стрелки уходят правее её края (зона в
+            // борткомп — левая колонна: стрелки уходят правее её края (зона в
             // ClampOutsideCorners) и продолжают работать; гасят стрелки только
-            // полноэкранные панели: карта/станция/пауза
+            // полноэкранные панели — карта/станция/пауза
             if (mapController == null) mapController = FindAnyObjectByType<MapScreenController>();
             if (station == null) station = FindAnyObjectByType<StationScreenController>();
             if (pause == null) pause = FindAnyObjectByType<PauseScreenController>();
@@ -744,14 +718,14 @@ namespace SpaceTaxi.UI
                 || (pause != null && pause.IsPaused);
         }
 
-        // Н13.5: борткомп открыт? (для лево-колонной зоны клампа)
+        // борткомп открыт? (для лево-колонной зоны клампа)
         private bool OnboardShown()
         {
             if (onboard == null) onboard = FindAnyObjectByType<OnboardComputerPanel>();
             return onboard != null && onboard.IsShown;
         }
 
-        // ширина колонны борткомпа в canvas units (замер панели; фолбэк 480)
+        // ширина колонны борткомпа в canvas units (фолбэк 480)
         private float OnboardColumnUnits()
         {
             var rt = onboard != null ? onboard.transform as RectTransform : null;
@@ -765,7 +739,7 @@ namespace SpaceTaxi.UI
 
         private static string FormatDistance(float d)
         {
-            return UiFormat.Distance(d); // Н12.4: единый формат в UiFormat
+            return UiFormat.Distance(d); // единый формат в UiFormat
         }
 
         // пересчёт текста только при изменении дистанции на ≥10 — без аллокаций в кадр

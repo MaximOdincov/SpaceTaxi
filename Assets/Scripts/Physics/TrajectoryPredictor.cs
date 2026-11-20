@@ -36,10 +36,9 @@ namespace SpaceTaxi.Physics
         private const float HorizonScreens = 1.2f;
 
         private static readonly Color LineSafe = new Color(0.235f, 1f, 0.557f);
-        // жёлтая база и красная тревога у точки обязательного торможения (Н4.2.4):
-        // значения — SpeedDanger HUD; жёлтый ярче TaxiColor — (1, 0.831, 0.302)
-        // читался как оранжевый, владелец видел «всегда оранжевый путь» (Н4.11);
-        // свои копии, чтобы Physics не ссылался на UI
+        // жёлтая база и красная тревога у точки обязательного торможения:
+        // значения — SpeedDanger HUD, жёлтый взят ярче TaxiColor; свои копии,
+        // чтобы Physics не ссылался на UI
         private static readonly Color LineWarm = new Color(1f, 0.94f, 0.30f);
         private static readonly Color LineDanger = new Color(1f, 0.35f, 0.3f);
 

@@ -4,7 +4,7 @@ using SpaceTaxi.World;
 namespace SpaceTaxi.Economy
 {
     // Фиксированная цена предложения на карточке заказа
-    // (22_BALANCE_REWORK §1.1 — тарифные классы как в жизни)
+    // (тарифные классы как в жизни)
     public static class OrderPricing
     {
         // цена = (посадка_класса + ставка_класса × d_смягч) × множитель сектора

@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace SpaceTaxi.Orders
 {
-    // Пулы данных генератора пассажиров (П5.2): имена, фамилии, общие реплики —
-    // без деления по типажам (Н-14): задания и чаевые от пассажира не зависят
+    // Пулы данных генератора пассажиров: имена, фамилии, общие реплики —
+    // без деления по типажам: задания и чаевые от пассажира не зависят
     [CreateAssetMenu(fileName = "PassengerPools", menuName = "Space Taxi/Passenger Pools")]
     public sealed class PassengerPools : ScriptableObject
     {

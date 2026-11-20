@@ -5,17 +5,14 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.UI
 {
-    // Общая «жизнь» декоративных звёзд меню (бриф E): мерцание альфой по синусу.
-    // Данные на структурах, без аллокаций в Update — используется слоем звёзд,
-    // звёздным названием и декором кнопок. Спрайты переиспользуют кэш StubSprites
-    // (мягкая точка и звезда с лучами), точки глифов текста — свой кэш
-    // GlyphSpark (E8.1) — одна текстура на стиль, uGUI батчит их в 2-3 draw call.
+    // Общая «жизнь» декоративных звёзд меню: мерцание альфой по синусу.
+    // Данные на структурах, без аллокаций в Update; используется слоем звёзд,
+    // звёздным названием и декором кнопок. Спрайты кэшируются (StubSprites и
+    // GlyphSpark — одна текстура на стиль), uGUI батчит их в 2-3 draw call.
 
-    // Форма точки-звезды в глифах текста (E7.1): Spark — честная 4-лучевая
-    // искра как звёзды параллакса (E8.1, выбор владельца), Diamond — ромб
-    // с вогнутыми сторонами (Н7 — отвергнуто: читалось «квадратами»),
-    // Circle — прежняя мягкая точка. Выбор — константа GlyphStyle в
-    // MenuStarText; фон и маски 5x7 не зависят от стиля.
+    // Форма точки-звезды в глифах текста: Spark — 4-лучевая искра как звёзды
+    // фона, Diamond — ромб с вогнутыми сторонами, Circle — мягкая точка.
+    // Выбор — константа GlyphStyle в MenuStarText; маски 5x7 не зависят от стиля.
     public enum StarGlyphStyle
     {
         Circle,
@@ -54,8 +51,8 @@ namespace SpaceTaxi.UI
         // и регистрирует её в списке мерцания. sparkle — звезда с крестом-бликом,
         // иначе мягкая точка; core — доля радиуса с полной альфой (0 — полностью
         // мягкое пятно для туманностей, 0.45 — звезда с горячим ядром).
-        // baseSprite (E7.1) — замена мягкой точки для обычных звёзд (не искр):
-        // так MenuStarText подставляет 4-лучевую искру глифов (E8.1)
+        // baseSprite — замена мягкой точки для обычных звёзд (не искр): так
+        // MenuStarText подставляет искру глифов
         public static Image CreateStar(RectTransform parent, Vector2 position, float size, Color color,
             float amplitude, float speed, float phase, bool sparkle, List<Star> into, float core = 0.45f,
             Sprite baseSprite = null)
@@ -84,7 +81,7 @@ namespace SpaceTaxi.UI
 
         private static readonly Dictionary<int, Sprite> diamonds = new Dictionary<int, Sprite>();
 
-        // E7.1: 4-лучевая «искра» для точек глифов текста — ромб с вогнутыми
+        // 4-лучевая «искра» для точек глифов текста — ромб с вогнутыми
         // сторонами (|x|^p + |y|^p <= 1 при p < 1) плюс горячее ядро: буквы
         // читаются плотнее и чётче, чем из мягких кружков. fatness — полнота
         // лучей (меньше — тоньше и острее), core — радиус ядра (доля полуширины).
@@ -126,10 +123,8 @@ namespace SpaceTaxi.UI
                     pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(a * 255f));
                 }
             }
-            // 2026-11-15, КОРЕНЬ «квадратиков»: SetPixels32 не вызывался — на GPU
-            // уходила неинициализированная память (сплошной квадрат ~0.8 альфы),
-            // и вся геометрия ромба/искры с Н7 никогда не попадала в рендер.
-            // В StubSprites.SetPixels32 есть — потому фоновые звёзды живые
+            // SetPixels32 обязателен до Apply: без него на GPU уходит
+            // неинициализированная память вместо геометрии искры
             tex.SetPixels32(pixels);
             tex.Apply(true, false);
             return tex;
@@ -137,12 +132,11 @@ namespace SpaceTaxi.UI
 
         private static readonly Dictionary<string, Sprite> glyphSparks = new Dictionary<string, Sprite>();
 
-        // E8.1: честная 4-лучевая искра для точек глифов — та же форма, что у
-        // звёзд параллакса (круглое горячее ядро + тонкие вертикаль и
-        // горизонталь, сужающиеся к концам, ПРОЗРАЧНЫЕ диагонали): углы клетки
-        // не читаются, буквы собираются «созвездиями», а не блоками. Итоговая
-        // яркость лучей — armBrightness от ядра; параметры — ручки владельца
-        // в MenuStarText (SparkArmWidth/SparkArmLength/SparkArmEdge/SparkCore).
+        // 4-лучевая искра для точек глифов — та же форма, что у звёзд фона:
+        // круглое горячее ядро + тонкие вертикаль и горизонталь, сужающиеся
+        // к концам, прозрачные диагонали — углы клетки не читаются, буквы
+        // собираются «созвездиями», а не блоками. Яркость лучей задаётся
+        // armBrightness от ядра; параметры настраиваются в MenuStarText.
         // Текстура строится один раз, кэш по набору параметров.
         public static Sprite GlyphSpark(float armWidth, float armLength, float armEdge,
             float core, float coreSoftness, float armBrightness)
@@ -150,10 +144,9 @@ namespace SpaceTaxi.UI
             string key = $"{armWidth:F3}|{armLength:F3}|{armEdge:F3}|{core:F3}|{coreSoftness:F3}|{armBrightness:F3}";
             if (!glyphSparks.TryGetValue(key, out Sprite sprite) || sprite == null)
             {
-                // 32px = нативное разрешение точки (точка на экране ~16-31px):
-                // крупная текстура (64/128px) после мип-фильтрации на экранном
-                // размере размывает тонкие лучи в «вату» (замер 2026-11-15) —
-                // печатаем геометрию прямо в экранных пикселях, mip 0-1
+                // 32px = нативное разрешение точки (на экране ~16-31px): крупная
+                // текстура (64/128px) после мип-фильтрации размывает тонкие лучи
+                // в «вату» — геометрия печатается прямо в экранных пикселях
                 var tex = CreateGlyphSparkTexture(32, armWidth, armLength, armEdge, core, coreSoftness, armBrightness);
                 sprite = Sprite.Create(tex, new Rect(0f, 0f, 32f, 32f), new Vector2(0.5f, 0.5f), 32f);
                 glyphSparks[key] = sprite;
@@ -164,7 +157,7 @@ namespace SpaceTaxi.UI
         private static Texture2D CreateGlyphSparkTexture(int size, float armWidth, float armLength,
             float armEdge, float core, float coreSoftness, float armBrightness)
         {
-            // БЕЗ мипов (2026-11-15): текстура 32px рисуется на экране ~11-16px —
+            // БЕЗ мипов: текстура 32px рисуется на экране ~11-16px —
             // попадает в бленд mip0/mip1, и тонкие лучи (1-2 текселя) разбавляются
             // блендом до нуля — точка вырождается в квадратное пятно. Билинейный
             // сэмпл без мипов держит лучи острыми; мерцание меняет только альфу,
@@ -183,16 +176,14 @@ namespace SpaceTaxi.UI
                     float ax = Mathf.Abs(x);
                     float ay = Mathf.Abs(y);
 
-                    // горячее круглое ядро — тот самый «круг» владельца
+                    // горячее круглое ядро точки
                     float dist = Mathf.Sqrt(x * x + y * y);
                     float center = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((core - dist) / coreSoftness));
 
-                    // лучи: вертикаль + горизонталь, ЛИНЕЙНОЕ сужение к концам;
-                    // диагонали прозрачны — квадрат не читается. (2026-11-15:
-                    // квадратичное сужение t² убивало луч на 40% длины — при
-                    // точке ~12px видимый центр оставался квадратным пятном;
-                    // линейная нить во весь спрайт читается лучом на любом
-                    // размере, как у «живых» звёзд фона)
+                    // лучи: вертикаль + горизонталь, линейное сужение к концам;
+                    // диагонали прозрачны — квадрат не читается. Квадратичное
+                    // сужение t² съедало бы луч на 40% длины (центр читался
+                    // квадратом), линейная нить выживает на любом размере
                     float alongH = Mathf.Clamp01((reach - ax) / reach); // 1 в центре → 0 на кончике
                     float armH = alongH * Mathf.Clamp01((halfWidth - ay) / soft);
                     float alongV = Mathf.Clamp01((reach - ay) / reach);
@@ -203,8 +194,8 @@ namespace SpaceTaxi.UI
                     pixels[iy * size + ix] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
                 }
             }
-            // см. комментарий в CreateDiamondTexture: без SetPixels32 рендерился
-            // неинициализированный квадрат — лучи/ядро не существовали на GPU
+            // без SetPixels32 (см. CreateDiamondTexture) на GPU попал бы
+            // неинициализированный квадрат вместо лучей и ядра
             tex.SetPixels32(pixels);
             tex.Apply(true, false);
             return tex;

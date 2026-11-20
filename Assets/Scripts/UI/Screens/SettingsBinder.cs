@@ -7,10 +7,8 @@ using UiKit;
 
 namespace SpaceTaxi.UI
 {
-    // Настройки (Н13.6 — декларативная пересборка): панель собирается через UiKit
-    // «указываем ЧТО будет» — координаты/слайдеры/стили живут в тулките. Из
-    // префаба SettingsUI берётся только шрифт заголовка, остальной контент
-    // строится с нуля. Полноэкранный режим удалён (Н13.3) вместе с сохранением.
+    // Настройки: панель собирается через UiKit (слайдеры громкости + схема
+    // управления); из префаба берётся только шрифт заголовка
     public class SettingsBinder : MonoBehaviour
     {
         private sealed class VolumeRow
@@ -23,7 +21,7 @@ namespace SpaceTaxi.UI
 
         private readonly List<VolumeRow> volumeRows = new List<VolumeRow>();
         private TMP_FontAsset font;
-        private bool built; // панель строится один раз: Awake перезапускается домен-релоадами в плее
+        private bool built; // панель строится один раз (Awake может вызываться повторно)
 
         private void Awake()
         {
@@ -50,13 +48,12 @@ namespace SpaceTaxi.UI
 
         private void BuildPanel()
         {
-            // сносим префабный контент — DestroyImmediate: deferred Destroy в
-            // первом кадре оставлял старую Panel живой, и обе сосуществовали
+            // сносим префабный контент сразу (deferred Destroy оставил бы
+            // старую панель живой на кадр)
             for (int i = transform.childCount - 1; i >= 0; i--)
                 DestroyImmediate(transform.GetChild(i).gameObject);
 
-            // Absolute, а не Size: панель — свободный узел (LayoutElement под
-            // лейаутом никто не читает — тот же урок, что с тостом Н12)
+            // Absolute: панель — свободный узел, LayoutElement никто не читает
             var panel = UiBox.Box(transform, "Panel").Absolute(960f, 760f)
                 .Background(UiTheme.Panel)
                 .Column(10f)

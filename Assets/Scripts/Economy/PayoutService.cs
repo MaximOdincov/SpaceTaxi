@@ -3,24 +3,24 @@ using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.Economy
 {
-    // Итог выплаты за доставку (16_BETA_PLAN §3.5). Tips — чаевые заказа:
-    // случайная доля 10–25% цены (Н-14)
+    // Итог выплаты за доставку. Tips — чаевые заказа:
+    // случайная доля 10–25% цены
     public sealed class PayoutResult
     {
         public int Price;      // цена заказа с карточки
         public int Penalty;    // штраф за столкновения
         public int Commission; // комиссия аренды
-        public int Tips;       // чаевые (П8.2)
+        public int Tips;       // чаевые
         public int ToDebt;     // автоматически ушло в счёт долга
         public int Net;        // на руки
         public int Collisions; // столкновений в заказе (строка штрафа на экране завершения)
     }
 
-    // Выплата за доставку: штрафы/комиссия/долг/чаевые (§3.5). Владелец — GameSession
+    // Выплата за доставку: штрафы/комиссия/долг/чаевые. Живёт в GameSession
     // (создаётся в Awake); Wallet и DebtService приходят Bind-ом, без поиска по сцене
     public sealed class PayoutService
     {
-        // перк «комфорт-салон» (16_BETA_PLAN §3.3): модель с этим Id даёт
+        // перк «комфорт-салон»: модель с этим Id даёт
         // +10% к чаевым (множитель — PricingConfig.MeridianTipsBonusMul)
         public const string MeridianShipId = "meridian";
 
@@ -30,7 +30,7 @@ namespace SpaceTaxi.Economy
         // выплата состоялась — для UI (тосты суммы и ухода в долг)
         public event Action<PayoutResult> Paid;
 
-        // последняя выплата — данные экрана завершения заказа (П4.3);
+        // последняя выплата — данные экрана завершения заказа;
         // null, пока в забеге никто не платил
         public PayoutResult LastResult { get; private set; }
 
@@ -42,7 +42,7 @@ namespace SpaceTaxi.Economy
         }
 
         // Порядок: штраф (кап −45%) → комиссия аренды → чаевые → доля в долг → на руки.
-        // Чаевые (Н-14): tipsFraction — доля цены этого заказа, брошенная при спавне
+        // Чаевые: tipsFraction — доля цены этого заказа, брошенная при спавне
         // (0 = нет чаевых), домножается на перк «Меридианы»; в долю долга не входят —
         // Net = price − penalty − commission + Tips − ToDebt.
         // Wallet.Add(Net) и debt.Repay(ToDebt) — порядок не важен: Repay кошелёк не трогает,
@@ -93,7 +93,7 @@ namespace SpaceTaxi.Economy
             LastResult = result;
             wallet?.Add(result.Net);
             debt?.Repay(result.ToDebt);
-            // звон монет на приход (Н6/Z): только когда на руки что-то упало —
+            // звон монет на приход: только когда на руки что-то упало —
             // выплата, съеденная штрафом целиком, молчит
             if (result.Net > 0)
                 Sound.Play(SoundId.MoneyGain);

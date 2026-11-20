@@ -2,9 +2,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.UI
 {
-    // Палитра HUD-прибора (Н12.4): значения СЕГМЕНТОВ бака/уровней — один
-    // источник для HudBinder и StationScreenController (полоски уровней).
-    // прочие цвета HUD — роли UiTheme (UiKit)
+    // Цвета сегментов бака/уровней — один источник для HUD и экрана станции
     internal static class HudPalette
     {
         internal static readonly Color SegmentOn = new Color(0.235f, 1f, 0.557f, 1f);   // горящий сегмент

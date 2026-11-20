@@ -5,22 +5,20 @@ using SpaceTaxi.Audio;
 
 namespace SpaceTaxi.UI
 {
-    // --- Плеер «ЭФИР» ---
-    // partial-секция OnboardBinder.
+    // Плеер «ЭФИР»: треки, волны, мьют
     public partial class OnboardBinder
     {
-        // плеер «ЭФИР»
         private Button playerPrev, playerNext;
         private Button radioMute;
-        private Button radioWave;         // «ВОЛНА 1/2/3»: плейлист → эмбиент-станция → классика
-        private SoundId wave1Track;       // трек волны 1, запомненный при уходе в эфир (волны 2/3)
+        private Button radioWave;         // «ВОЛНА 1/2/3»: плейлист → эмбиент → классика
+        private SoundId wave1Track;       // трек волны 1, запомненный при уходе в эфир
         private TMP_Text trackTitle;
         private RectTransform progressFill;
         private AudioManager audioManager;
         private bool musicBound;
 
-        // узлы построены фабрикой (звуковой хук уже внутри Button); менеджер
-        // живёт между сценами — разрешается на клике
+        // узлы построены фабрикой (звуковой хук уже внутри Button);
+        // менеджер живёт между сценами — разрешается на клике
         private void SetupMusicPlayer()
         {
             if (playerPrev != null)
@@ -32,10 +30,7 @@ namespace SpaceTaxi.UI
             BuildWaveToggle();
         }
 
-        // «ВОЛНА 1/2/3» (Н6/Z, Н7 A7.3): кнопка в стиле секции — копия мьют-кнопки под
-        // ней. Волна 1 — как играло (плейлист не тронут), волна 2 — станция эмбиента
-        // (MusicStation2: три эмбиента + menu_out_in_space по кругу), волна 3 —
-        // классическая станция (MusicStation3, PD-микс Packs_N7_classical)
+        // «ВОЛНА 1/2/3»: копия мьют-кнопки; 1 — плейлист, 2 — эмбиент, 3 — классика
         private void BuildWaveToggle()
         {
             if (radioWave != null || radioMute == null)
@@ -72,15 +67,12 @@ namespace SpaceTaxi.UI
             audioManager = manager; // метки ниже и событие читают поле, а не локальную ссылку
             if (manager.CurrentTrack == SoundId.MusicStation3)
             {
-                // волна 3 → волна 1: тот же трек, что играл до эфира;
-                // памяти нет — дорожная волна (MusicFlight)
+                // волна 3 → волна 1: трек, запомненный при уходе (нет — дорожная)
                 manager.PlayMusic(Wave1Track());
             }
             else if (manager.CurrentTrack == SoundId.MusicStation2)
             {
-                // волна 2 → волна 3 (классика). Н10.7: пустая станция пропускается
-                // МОЛЧА к следующей НЕ пустой по кругу; пусты все — остаёмся на
-                // текущей (владелец: ВОЛНА никогда не оставляет тишину)
+                // волна 2 → волна 3; пустая станция пропускается к следующей непустой
                 SoundId station = manager.NextValidStation(SoundId.MusicStation3, 1);
                 if (station == SoundId.None)
                     return;
@@ -88,19 +80,17 @@ namespace SpaceTaxi.UI
             }
             else
             {
-                // волна 1 → волна 2: запоминаем, куда вернуться по кругу на волну 1.
-                // Н10.7: пустая станция пропускается молча к следующей НЕ пустой
+                // волна 1 → волна 2: запоминаем трек, куда вернуться
                 wave1Track = manager.CurrentTrack;
                 SoundId station = manager.NextValidStation(SoundId.MusicStation2, 1);
                 if (station == SoundId.None)
                     return;
                 manager.PlayMusic(station);
             }
-            RefreshMusicPlayer(); // событие MusicStateChanged придёт и так — дублируем для мгновенной метки
+            RefreshMusicPlayer(); // событие придёт и так — дублируем для мгновенной метки
         }
 
-        // трек волны 1: запомненный при уходе в эфир; памяти нет (или в памяти
-        // сама волна эфира) — дорожная волна (MusicFlight)
+        // трек волны 1: запомненный при уходе в эфир; памяти нет — дорожная волна
         private SoundId Wave1Track()
         {
             return wave1Track == SoundId.None
@@ -110,7 +100,7 @@ namespace SpaceTaxi.UI
                 : wave1Track;
         }
 
-        // имя станции и метка мьюта по состоянию менеджера; событие MusicStateChanged
+        // имя станции и метка мьюта по состоянию менеджера
         private void RefreshMusicPlayer()
         {
             if (trackTitle == null)
@@ -122,7 +112,7 @@ namespace SpaceTaxi.UI
                     muteLabel.text = audioManager != null && audioManager.MusicMuted ? "ЗВУК: ВЫКЛ" : "ЗВУК: ВКЛ";
             }
             if (radioWave != null)
-                SetButtonLabel(radioWave, WaveLabel()); // синхрон и при prev/next мимо волн 2/3
+                SetButtonLabel(radioWave, WaveLabel()); // синхрон и при смене трека мимо волны
             if (audioManager == null || audioManager.MusicPlaylist.Count == 0)
             {
                 trackTitle.text = "ЭФИР · треки не найдены";
@@ -142,7 +132,7 @@ namespace SpaceTaxi.UI
                 case SoundId.MusicFlight: return "Дорожная волна";
                 case SoundId.MusicStation1: return "Космо-классика";
                 case SoundId.MusicStation2: return "Ретро-волна";
-                case SoundId.MusicStation3: return "Классика"; // Н7 A7.3: волна 3 — PD-микс классики (была заглушка «Механика драйв»)
+                case SoundId.MusicStation3: return "Классика";
                 case SoundId.MusicStation4: return "Ночная частота";
                 default: return "—";
             }

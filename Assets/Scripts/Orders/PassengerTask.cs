@@ -11,14 +11,14 @@ namespace SpaceTaxi.Orders
         NoRefuel,     // без заправки на станциях в пути
         NoCollision,  // без столкновений с повреждением
         SpeedLimit,   // не быстрее лимита весь полёт
-        NoHeat,       // не входить в зоны жара звёзд (v5.3)
-        BeltAvoid,    // не влетать в астероидные пояса (v5.3)
+        NoHeat,       // не входить в зоны жара звёзд
+        BeltAvoid,    // не влетать в астероидные пояса
         RingVisit,    // зайти в capture-кольцо планеты
-        StarNearby,   // пролететь рядом со звездой (v5.3, бывш. StarBackside)
+        StarNearby,   // пролететь рядом со звездой
         HoleFlyby,    // пролететь близко к чёрной дыре
     }
 
-    // Задание пассажира (П5.3): одно на заказ, тип выбирается случайно (Н-14).
+    // Задание пассажира: одно на заказ, тип выбирается случайно.
     // Успех — +0.10 рейтинга, провал — жалоба (−0.10).
     public sealed class PassengerTask
     {
@@ -28,7 +28,7 @@ namespace SpaceTaxi.Orders
         public float SpeedLimit;        // лимит скорости, юн/с (Kind == SpeedLimit)
         public float DistanceThreshold; // дистанция подлёта (CometFlyby/HoleFlyby)
         public int TargetBodyIndex;     // цель — индекс в LevelAsset.Bodies (RingVisit/StarBackside/WaitOnPlanet)
-        // накопительные условия-избегания (v5.3): эпизоды с гистерезисом; в сейв
+        // накопительные условия-избегания: эпизоды с гистерезисом; в сейв
         // не пишутся — до загрузки счёт начинается заново, Failed сохраняется
         public int Strikes;             // замечаний (NoHeat/BeltAvoid)
         public bool EpisodeOpen;        // эпизод открыт — замечание уже засчитано
@@ -57,33 +57,30 @@ namespace SpaceTaxi.Orders
         }
     }
 
-    // Каталог заданий: тексты утверждены (§3.6), числа — решение координатора
+    // Каталог заданий: тексты и числовые константы
     public static class PassengerTasks
     {
-        private const float TaskChance = 0.5f;        // шанс задания у заказа (Н-14)
+        private const float TaskChance = 0.5f;        // шанс задания у заказа
         private const float DeadlineSpeedUnit = 150f; // юн/с — знаменатель формулы T
         private const float DeadlineSlack = 45f;      // с — прибавка к чистому времени
         private const float QuietSpeedLimit = 250f;   // юн/с — лимит скорости
-        private const float HoleFlybyDistance = 800f;   // юн — подлететь к дыре (§3.6)
-        private const float StarNearbyDistance = 400f;  // юн — пролететь рядом со звездой (v5.3)
+        private const float HoleFlybyDistance = 800f;   // юн — подлететь к дыре
+        private const float StarNearbyDistance = 400f;  // юн — пролететь рядом со звездой
 
-        // избегания-условия (v5.3): эпизоды с гестерезисом; публичные — OnboardBinder показывает счёт
+        // избегания-условия: эпизоды с гистерезисом; публичные — OnboardBinder показывает счёт
         public const int NoHeatStrikeLimit = 2;  // входов в жар звёзд — жалоба пассажира
         public const int BeltStrikeLimit = 2;    // пролетов сквозь пояс — жалоба пассажира
 
-        // «мимо бездны стоит очень хорошо» (владелец): бонус к выплате при успехе
+        // бонус к выплате за пролёт мимо чёрной дыры
         public const int HoleFlybyBonus = 150;
 
-        // Н7 Q7.1: шанс «паникёра» при генерации профиля (таймер-срыв на заказ)
+        // шанс «паникёра» при генерации профиля (таймер-срыв на заказ)
         public const float HurryChance = 0.2f;
         private const float HurrySlack = 75f;   // с — прибавка к чистому времени срыва
 
-        // Равномерный случайный тип из доступных (Н-14); шанс задания вообще — 50%,
-        // иначе null (UI трактует как «задания нет»). Точки интереса (П8.1) нужны
-        // уровень/пояса: цель ищется по типу тела; объекта нет — тип выпадает из
-        // выбора. Пул v5.3 (владелец): хрупкий груз влился в «без столкновений»
-        // (вкус «у меня хрупкий груз»), нервный/комета/ожидание убраны; новые —
-        // жар звёзд и пояса
+        // Равномерный случайный тип из доступных; шанс задания вообще — 50%,
+        // иначе null (UI трактует как «задания нет»). Точкам интереса нужен
+        // уровень: цель ищется по типу тела; объекта нет — тип выпадает из выбора
         public static PassengerTask CreateRandom(float routeDistance,
             int pickupIndex, int dropoffIndex, LevelAsset level)
         {
@@ -127,14 +124,11 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoRefuel,
-                        // Н10.8 (аудит текст↔факт): провал ловит ЛЮБОЙ платный сервис
-                        // (заправка И ремонт) — текст теперь говорит это прямо
+                        // провал ловит любой платный сервис (заправка и ремонт)
                         Text = "Ни заправки, ни ремонта на станциях — не останавливаемся, пожалуйста.",
                     };
                 case PassengerTaskKind.NoCollision:
-                    // v5.3: вкус «хрупкого груза» (владелец: «у меня хрупкий груз —
-                    // не врезаемся»); enforcement прежний — провал только ударами
-                    // С УРОНОМ (мягкие касания не считаются)
+                    // провал — только удары с уроном (мягкие касания не считаются)
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoCollision,
@@ -144,8 +138,7 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.SpeedLimit,
-                        // Н10.8 (аудит): лимит проверяется только с пассажиром на борту
-                        // (TrackTask при Aboard) — «весь полёт» заменено честным «пока я на борту»
+                        // лимит проверяется только с пассажиром на борту (TrackTask при Aboard)
                         Text = $"Тише едем: не быстрее {QuietSpeedLimit:0} юн/с, пока я на борту.",
                         SpeedLimit = QuietSpeedLimit,
                     };
@@ -153,18 +146,17 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.RingVisit,
-                        // Н10.8 (аудит): засчитывается вход в capture-кольцо (3.3r+30 —
-                        // десятки юн над поверхностью), «вплотную» преувеличивало
+                        // засчитывается вход в capture-кольцо (3.3r+30 — десятки
+                        // юн над поверхностью)
                         Text = $"Зайдём в орбитальное кольцо планеты {level.Bodies[planet].DisplayName} — вид оттуда чудесный.", // enforced: вход в capture-кольцо
                         TargetBodyIndex = planet,
                     };
                 case PassengerTaskKind.StarNearby:
-                    // v5.3 (владелец: «назовем холодрыга — мол замерз, го пролетим
-                    // рядом со звездой»): enforcement = простая близость к звезде
+                    // успех — простая близость к звезде
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.StarNearby,
-                        // Н12.3: дистанция успеха — прямо в тексте (= StarNearbyDistance)
+                        // дистанция успеха — прямо в тексте (= StarNearbyDistance)
                         Text = $"Я вечный Холодрыга — весь год мёрз! Пролетим со звездой {level.Bodies[star].DisplayName} рядом: подлетите к ней ближе 400 юн.",
                         TargetBodyIndex = star,
                         DistanceThreshold = StarNearbyDistance,
@@ -173,16 +165,15 @@ namespace SpaceTaxi.Orders
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.NoHeat,
-                        // Н12.3 (владелец: «пиши чёткое значение»): порог — прямо в тексте
+                        // порог — прямо в тексте
                         Text = "К звёздам не приближайтесь: жар меня пугает. Вошли в жар — замечание; два замечания — провал.",
                     };
                 case PassengerTaskKind.BeltAvoid:
                     return new PassengerTask
                     {
                         Kind = PassengerTaskKind.BeltAvoid,
-                        // Н10.8 (аудит): замечание — ВХОД В ПОЛОСУ пояса (±BeltWidth от
-                        // осевой), а не удар астероида; текст теперь про полосу
-                        // Н12.3: порог эпизодов — прямо в тексте (HUD показывает «Замечаний: X/2»)
+                        // замечание — вход в полосу пояса (±BeltWidth от осевой),
+                        // а не удар астероида; порог эпизодов — прямо в тексте
                         Text = "Астероидные пояса меня пугают — пролетайте мимо. Вошли в пояс — замечание; два замечания — провал.",
                     };
                 case PassengerTaskKind.HoleFlyby:
@@ -197,14 +188,14 @@ namespace SpaceTaxi.Orders
             }
         }
 
-        // П8.1: успех точки интереса фиксируется только трекингом — в отличие
+        // успех точки интереса фиксируется только трекингом — в отличие
         // от условий-избегания, где «не нарушал условие» = молодец
         public static bool IsInterestPoint(PassengerTaskKind kind)
         {
             return kind >= PassengerTaskKind.RingVisit;
         }
 
-        // Н7 Q7.1: жёсткий дедлайн «паникёра» — та же формула «дистанция × коэф»,
+        // жёсткий дедлайн «паникёра» — та же формула «дистанция × коэф»,
         // что у задания-дедлайна, но с бо́льшим запасом: срыв убивает весь заказ,
         // а не только рейтинг, время должно быть достижимым
         public static float HurrySecondsFor(float routeDistance)
@@ -212,10 +203,8 @@ namespace SpaceTaxi.Orders
             return routeDistance / DeadlineSpeedUnit + HurrySlack;
         }
 
-        // v5.2 (владелец: «нет какого-то отклика, когда задание выполняется»):
         // тексты тостов-моментов — в одном месте, редактируются здесь.
-        // Успех — момент свершения (точки интереса, ожидание); провал — момент
-        // срыва условия (до этого было тихо, итог всплывал только при доставке)
+        // Успех — момент свершения (точки интереса); провал — момент срыва условия
         public static string SuccessMomentText(PassengerTask task)
         {
             switch (task.Kind)

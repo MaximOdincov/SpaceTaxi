@@ -11,7 +11,7 @@ namespace SpaceTaxi.Physics
     [DefaultExecutionOrder(200)]
     public class LandingSystem : MonoBehaviour
     {
-        // Н6 G1: предиктивная посадка — Land вызывается ДО физического контакта,
+        // предиктивная посадка — Land вызывается ДО физического контакта,
         // когда до поверхности (в масштабе посадочного отступа) осталось меньше,
         // чем корабль пройдёт за шаг физики с запасом. Глубина «провала» спрайта
         // ограничена k·v·dt ≈ 2.4 юн при v = LandSpeed (75) и dt = 0.02 — вместо
@@ -40,9 +40,9 @@ namespace SpaceTaxi.Physics
 
         // дожим в посадочную позу корутиной: контактная точка не совпадает с позой
         // покоя, мгновенный телепорт давал подпрыгивание — тело замораживается,
-        // поза доводится плавно (A5)
+        // поза доводится плавно
         private Coroutine landingPinch;
-        // Н13.4: минимальный зазор капсулы до планеты после дожима (без подпрыгивания)
+        // минимальный зазор капсулы до планеты после дожима (без подпрыгивания)
         private const float LandGap = 0.05f;
         private RigidbodyConstraints2D savedConstraints;
 
@@ -53,7 +53,7 @@ namespace SpaceTaxi.Physics
             TryPredictiveLanding();
         }
 
-        // Н6 G1: мягкая посадка срабатывает за шаг до физического контакта —
+        // мягкая посадка срабатывает за шаг до физического контакта —
         // спрайт не проваливается в планету, дожим PinchToPose стартует с
         // безопасной высоты. Только Flying, только планеты (у звёзд/дыр/комет
         // своя логика гибели/жара), только на сближении (радиальная скорость
@@ -165,7 +165,7 @@ namespace SpaceTaxi.Physics
             Vector2 dir = ((Vector2)ship.transform.position - (Vector2)ship.LandedOn.transform.position).normalized;
             ship.Body.linearVelocity = dir * ship.Config.TakeoffV;
             ship.LandedOn = null;
-            ship.SetState(ShipState.Flying); // Н10.14
+            ship.SetState(ShipState.Flying); // состояние через Set-метод
             Sound.Play(SoundId.Takeoff);
             CameraFollow.AddShake(0.25f); // толчок старта
             GetComponent<ShipController>()?.HoldHeading(1.5f); // подъём низом вперёд
@@ -179,7 +179,7 @@ namespace SpaceTaxi.Physics
             Land(planet, fallback);
         }
 
-        // Н6 G1: посадка без контакта — предиктивный путь; фолбэк-направление
+        // посадка без контакта — предиктивный путь; фолбэк-направление
         // вместо нормали контакта (у вызова из OnCollisionEnter2D это нормаль)
         private void Land(Planet planet, Vector2 fallbackDir)
         {
@@ -210,7 +210,7 @@ namespace SpaceTaxi.Physics
 
             // состояние и события — до корутины: UI и заказы видят Landed в кадр контакта
             ship.LandedOn = planet;
-            ship.SetState(ShipState.Landed); // Н10.14
+            ship.SetState(ShipState.Landed); // состояние через Set-метод
             CameraFollow.AddShake(0.08f); // лёгкий «шлёп» касания
             Sound.Play(SoundId.LandingTouch);
             ShipLanded?.Invoke(planet);
@@ -246,10 +246,8 @@ namespace SpaceTaxi.Physics
             }
             if (ship != null && ship.Body != null)
             {
-                // Н13.4 (владелец: «приземляется чуть ниже, чем надо, а потом резко
-                // подпрыгивает»): поза дожима оставляла капсулу пересекающей планету —
-                // возврат физики выталкивал её видимым прыжком. До возврата солверу
-                // разводим коллайдеры на гарантированный зазор
+                // перед возвратом физики разводим коллайдеры на гарантированный
+                // зазор — иначе солвер выталкивает капсулу видимым прыжком
                 var capsule = ship.GetComponent<Collider2D>();
                 var planetCol = planet.GetComponent<Collider2D>();
                 if (capsule != null && planetCol != null)
@@ -296,15 +294,10 @@ namespace SpaceTaxi.Physics
         public event Action CrashImpact;
 
 
-        // урон контактного удара: 0 при v ≤ LandSpeed, плавный вход до полной
-        // линейности к v = LandSpeed+30 (без ступени min(5,…)), кап 30 —
-        // планеты и астероиды считают одинаково
-        // квадратичный рост без капа: мягкое касание почти бесплатно,
-        // средняя скорость — ощутимо, полная — смерть любому корпусу
-        // (старый кап 30 делал 100 и 330 км/ч одинаково больно);
-        // 0.0022 (22_BALANCE_REWORK §1.5, пересчёт BALANCE_N5): бытовые удары
-        // прощает; лоб на MaxV смертелен всем — Яйцо@330 = 143 > 100 HP,
-        // Барин@485 = 370 > 190 HP
+        // урон контактного удара — квадрат превышения посадочной скорости:
+        // мягкое касание почти бесплатно, средняя скорость ощутима, полная —
+        // смерть любому корпусу. 0.0022 прощает бытовые удары; лоб на MaxV
+        // смертелен всем (Яйцо@330 = 143 > 100 HP, Барин@485 = 370 > 190 HP)
         private const float CrashDamagePerSpeedSq = 0.0022f;
 
         private float CrashDamage(float v)

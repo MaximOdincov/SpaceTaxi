@@ -61,7 +61,7 @@ namespace SpaceTaxi.Core
                 session.Wallet.Add(amount); // начислить кредиты
             GUILayout.EndHorizontal(); // конец строки
 
-            // D2: гейты районов и шанс «жирных» заказов читают рейтинг — ручка
+            // гейты районов и шанс «жирных» заказов читают рейтинг — ручка
             // для приёмки прогрессии без прокачки вручную
             GUILayout.BeginHorizontal(); // строка рейтинга
             GUILayout.Label($"★ {session.Rating?.Value.ToString("0.0") ?? "—"}", GUILayout.Width(40)); // текущее значение

@@ -9,7 +9,7 @@ using SpaceTaxi.World; // тела уровня
 
 namespace SpaceTaxi.Core
 {
-    // Сейв забега (16_BETA_PLAN §3.9, П10.1): JSON в persistentDataPath.
+    // Сейв забега: JSON в persistentDataPath.
     // Автосейв — при доставке заказа (GameSession) и при выходе в меню/из игры
     // (SceneFlowButtons); увольнение (3 непогашенные аварии) — сейв удаляется,
     // Save терминальное состояние не пишет. Кривой/чужого уровня сейв — тихий
@@ -42,7 +42,7 @@ namespace SpaceTaxi.Core
             public int Deliveries; // счётчик доставок
             public int Failures; // счётчик провалов
             public string CurrentShipId; // id текущего корабля
-            public int PaintIndex; // покраска текущего корабля (Н-3а), 0 = заводская
+            public int PaintIndex; // покраска текущего корабля, 0 = заводская
             public string[] OwnedShipIds; // список своих кораблей
             public List<ShipUpgrades> Upgrades; // уровни улучшений по кораблям
             public bool HasOrder; // флаг вместо null-заказа
@@ -68,14 +68,14 @@ namespace SpaceTaxi.Core
             public string PassengerName; // имя пассажира
             public Color PortraitTint; // тон портрета
             public int PortraitSeed; // сид портрета NPC: 0 — нет (старые сейвы)
-            public float TipsFraction; // доля чаевых заказа (Н-14), фиксируется при спавне
+            public float TipsFraction; // доля чаевых заказа, фиксируется при спавне
             public string TaskKind; // имя PassengerTaskKind; пусто — задания нет
             public string TaskText; // текст задания
             public float TaskDeadlineRemaining; // остаток дедлайна (Kind == Deadline)
             public float TaskSpeedLimit; // лимит скорости задания
             public float TaskDistanceThreshold; // порог дистанции задания
             public int TaskTargetBodyIndex; // целевое тело задания
-            public float TaskWaitSeconds; // поле осталось для старых сейвов (не пишется, Н8.49)
+            public float TaskWaitSeconds; // поле осталось для старых сейвов (не пишется)
             public bool TaskSucceeded; // задание выполнено
             public bool TaskFailed; // задание провалено
         }
@@ -109,7 +109,7 @@ namespace SpaceTaxi.Core
                 // окно респавна: корабль мёртв на месте гибели — не сохраняем,
                 // иначе continue поднимет его и Abandon списал бы свой корабль
                 || session.Ship.State == ShipState.Respawning // в окне респавна
-                // проглочен дырой (Н-10): continue должен поднять корабль вне воронки,
+                // проглочен дырой: continue должен поднять корабль вне воронки,
                 // а не сразу в болтании за горизонтом
                 || session.Ship.State == ShipState.Swallowed) // проглочен дырой
                 return; // тихий отказ
@@ -237,7 +237,7 @@ namespace SpaceTaxi.Core
         // ------------------------------------------------------------------
 
         // Разбор файла. Любая ошибка (нет/пустой файл, кривой JSON, чужой
-        // уровень) — false без единой строки в лог: §3.9 «кривой сейв =
+        // уровень) — false без единой строки в лог: «кривой сейв =
         // Продолжить неактивно»
         public static bool TryLoad(out SaveData data, string expectedLevelName = null) // безопасное чтение
         {
@@ -262,7 +262,7 @@ namespace SpaceTaxi.Core
             return true;
         }
 
-        // для активности «Продолжить» (П10.2) — без разбора JSON
+        // для активности «Продолжить» — без разбора JSON
         public static bool HasSave() // есть ли файл сейва
         {
             try // доступ к диску может упасть
@@ -320,7 +320,7 @@ namespace SpaceTaxi.Core
                 return;
 
             session.Wallet?.Restore(data.Credits); // кредиты
-            session.Debt?.Restore(data.DebtBalance); // долг (Н13.1: без счётчика аварий)
+            session.Debt?.Restore(data.DebtBalance); // долг
             session.Rating?.Restore(data.Rating); // рейтинг
             session.Orders?.RestoreCounters(data.Deliveries, data.Failures); // счётчики заказов
 
@@ -329,7 +329,7 @@ namespace SpaceTaxi.Core
             RestoreActiveOrder(session, data.HasOrder ? data.ActiveOrder : null); // заказ
         }
 
-        // парк: конфиги по Id из каталога Resources/Ships (способ П3.2);
+        // парк: конфиги по Id из каталога Resources/Ships;
         // неизвестные модели пропускаются, кривой текущий id — аренда
         private static void RestoreFleet(GameSession session, SaveData data) // восстановить парк
         {
@@ -407,7 +407,7 @@ namespace SpaceTaxi.Core
             }
 
             // Hp > 0: мёртвый корабль в сейв не попадает (гибель → респавн до сейва)
-            ship.SetHp(Mathf.Max(1f, save.Hp)); // корпус (пол 1 сохранён, верхний кламп в SetHp — Н10.14)
+            ship.SetHp(Mathf.Max(1f, save.Hp)); // корпус (пол 1 сохранён, верхний кламп в SetHp)
             ship.Fuel = Mathf.Clamp(save.Fuel, 0f, ship.Eff.FuelMax); // бак с клампом
         }
 
@@ -487,7 +487,7 @@ namespace SpaceTaxi.Core
         }
 
         // runtime-профиль, как у генератора (Destroy при протухании безопасен);
-        // реплики — общие пулы (Н-14), пулов нет — пустые, UI это терпит
+        // реплики — общие пулы, пулов нет — пустые, UI это терпит
         private static PassengerProfile RebuildPassenger(GameSession session, OrderSave save) // пересборка пассажира
         {
             var profile = ScriptableObject.CreateInstance<PassengerProfile>(); // runtime-инстанс профиля

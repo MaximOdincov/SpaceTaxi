@@ -52,7 +52,7 @@ namespace SpaceTaxi.Core
         // радиуса с полной альфой (0 = полностью мягкая, 0.7 = горячее ядро)
         public static Sprite SoftDot(float diameter, float core = 0f, int textureSize = 64) // диск с мягкой кромкой
         {
-            int key = Mathf.RoundToInt(diameter) * 100000 + Mathf.RoundToInt(core * 10f) * 1000 + Mathf.Clamp(textureSize, 16, 2048); // ключ включает размер текстуры (Н9.1)
+            int key = Mathf.RoundToInt(diameter) * 100000 + Mathf.RoundToInt(core * 10f) * 1000 + Mathf.Clamp(textureSize, 16, 2048); // ключ включает размер текстуры
             if (!softDots.TryGetValue(key, out Sprite sprite) || sprite == null) // нет в кэше
             {
                 int size = Mathf.Clamp(textureSize, 16, 2048); // разрешение текстуры
@@ -82,9 +82,9 @@ namespace SpaceTaxi.Core
 
         // тело звезды: яркое ядро с плавной экспоненциальной короной — без лучей,
         // ступеней и тёмной обводки круга-заглушки. У края канвы корона доходит
-        // ДО НУЛЯ (StarFadeStart): раньше хвост 0.05 читался квадратной кромкой
-        // канвы на тёмном фоне (владелец Н9.3: «звезда квадратная»); контент-бокс
-        // ~0.96 канвы — CelestialBody.Init компенсирует масштабом ~×1.04
+        // ДО НУЛЯ (StarFadeStart) — иначе на тёмном фоне видна квадратная
+        // кромка канвы; контент-бокс ~0.96 канвы — CelestialBody.Init
+        // компенсирует масштабом ~×1.04
         public static Sprite StarBody(float diameter) // тело звезды
         {
             int key = Mathf.Max(2, Mathf.RoundToInt(diameter)); // ключ кэша
@@ -282,7 +282,7 @@ namespace SpaceTaxi.Core
         private const float StarTailAlpha = 0.05f; // альфа экспоненты у нулевой точки фейда
         private const float StarFadeStart = 0.94f; // с какой доли радиуса корона гаснет в ноль
 
-        public static Texture2D CreateStarTexture(int size) // тело звезды (Н9.3)
+        public static Texture2D CreateStarTexture(int size) // тело звезды
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { filterMode = FilterMode.Trilinear }; // с мипами
             var pixels = new Color32[size * size]; // буфер

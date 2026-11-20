@@ -3,7 +3,7 @@ using SpaceTaxi.Core;
 
 namespace SpaceTaxi.Physics
 {
-    // Одноразовый взрыв корабля при гибели (Н6/A1): вспышка + огонь + крупные
+    // Одноразовый взрыв корабля при гибели: вспышка + огонь + крупные
     // осколки + дымный хвост. ParticleSystem строится кодом без префаба; спавн
     // в точке корабля в момент смерти, до телепорта респавна; объект уничтожает
     // себя через CleanupSeconds (пул не нужен — один выстрел). Симуляция в
@@ -22,7 +22,7 @@ namespace SpaceTaxi.Physics
         private const float SmokeLifetimeMin = 1.40f;
         private const float SmokeLifetimeMax = 2.20f;
 
-        // --- количества частиц (плей-проверка оркестратора: Debris 12-18, Fire 20-40) ---
+        // --- количества частиц (Debris 12-18, Fire 20-40) ---
         private const int DebrisCountMin = 14;
         private const int DebrisCountMax = 18;
         private const int FireCountMin = 24;
@@ -31,7 +31,7 @@ namespace SpaceTaxi.Physics
         private const int SmokeCountMax = 14;
 
         // --- размеры в долях полу-габарита корпуса ---
-        private const float DebrisSizeMinFrac = 0.30f;  // осколки 0.3-0.5 корпуса (Н6/A1)
+        private const float DebrisSizeMinFrac = 0.30f;  // осколки 0.3-0.5 корпуса
         private const float DebrisSizeMaxFrac = 0.50f;
         private const float DebrisSpeedMinFrac = 1.00f; // заметный дрейф от центра взрыва
         private const float DebrisSpeedMaxFrac = 2.00f;
@@ -55,7 +55,7 @@ namespace SpaceTaxi.Physics
         private const int FireOrder = 6;
         private const int FlashOrder = 7;   // вспышка поверх всего
 
-        // --- палитра огня: три оттенка оранжево-красного (Н6/A1) ---
+        // --- палитра огня: три оттенка оранжево-красного ---
         private static readonly Color FireBright = new Color(1.00f, 0.62f, 0.16f); // оранжевый
         private static readonly Color FireMid = new Color(1.00f, 0.32f, 0.10f);    // красно-оранжевый
         private static readonly Color FireDeep = new Color(0.85f, 0.12f, 0.05f);   // тёмно-красный

@@ -8,13 +8,9 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема «аннотации и смерть» бумажной карты (Н11): слой своих
-    // надписей/контуров владельца (Map Style Editor) + эффекты гибели корабля
-    // (два расходящихся кольца с искрами) и чернильные кляксы-кресты
-    // «здесь я погиб», живущие до закрытия карты —
-    // Выделена из MapScreenBinder (Н11): тела перенесены дословно. Точка гибели
-    // клампится как маркер ракеты (SheetClampView — PaperMapProjection), сам
-    // маркер — PaperMapRings; подписку на смерть держит хост.
+    // подсистема «аннотации и смерть» бумажной карты: свои надписи/контуры
+    // (Map Style Editor), эффект гибели корабля (кольца с искрами) и кляксы-кресты
+    // «здесь я погиб» до закрытия карты. Подписку на смерть держит хост.
     internal sealed class PaperMapAnnotations
     {
         private readonly MapScreenBinder host;
@@ -28,7 +24,7 @@ namespace SpaceTaxi.UI.PaperMap
             this.rings = rings;
         }
 
-        // — шимы к хосту/виду/кольцам (Н11): тела методов остаются дословными —
+        // шимы к хосту/виду/кольцам
         private MapStyleConfig Style => host.Style;
         private float zoom => view.Zoom;
         private float scale => view.Scale;
@@ -44,9 +40,9 @@ namespace SpaceTaxi.UI.PaperMap
         private Ship ship => host.Ship;
         private RectTransform playerMarker => rings.PlayerMarker;
         private void PersistStyle() => host.PersistStyle();
-        private static int StableHash(string text) => PaperMapUi.StableHash(text); // Н11
+        private static int StableHash(string text) => PaperMapUi.StableHash(text);
 
-        // хелперы PaperMapUi (Н11)
+        // хелперы PaperMapUi
         private static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 offsetMin, Vector2 offsetMax)
             => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax);
@@ -74,7 +70,7 @@ namespace SpaceTaxi.UI.PaperMap
         {
             public RectTransform Root;
             public Image Ring;
-            public Image RingLate;              // второе кольцо, отстаёт на задержку (M7.4)
+            public Image RingLate;              // второе кольцо, отстаёт на задержку
             public readonly List<Image> Sparks = new List<Image>();
             public readonly List<Vector2> SparkVel = new List<Vector2>();
             public float Age;
@@ -82,9 +78,8 @@ namespace SpaceTaxi.UI.PaperMap
         }
         private readonly List<MapBurst> bursts = new List<MapBurst>();
 
-        // M7.4: смерть при закрытой/недостроенной карте — burst доигрывает при
-        // открытии, кляксы-кресты «здесь я погиб» живут до закрытия карты
-        private const int BurstSparks = 18;     // искр на взрыв (было 10 — заметность)
+        // смерть при закрытой карте — burst доигрывает при открытии
+        private const int BurstSparks = 18;     // искр на взрыв
         private Vector2? pendingDeathWorld;
         private const int MaxDeathMarks = 4;    // память листа: последние гибели
         private readonly List<Vector2> deathMarkWorlds = new List<Vector2>();
@@ -248,8 +243,7 @@ namespace SpaceTaxi.UI.PaperMap
             bursts.Add(burst);
         }
 
-        // кадр жизни эффектов (M7.4): заметнее — 1.2с, кольцо до 180px, второе
-        // кольцо с задержкой 0.2с, 18 искр; в конце — клякса-крест до закрытия карты
+        // кадр жизни эффектов; в конце — клякса-крест до закрытия карты
         internal void UpdateMapEffects()
         {
             const float Duration = 1.2f;
@@ -303,13 +297,13 @@ namespace SpaceTaxi.UI.PaperMap
                 }
                 if (k >= 1f)
                 {
-                    Object.Destroy(burst.Root.gameObject); // static-класс: не MonoBehaviour (Н11)
+                    Object.Destroy(burst.Root.gameObject); // static-класс: не MonoBehaviour
                     bursts.RemoveAt(i);
                 }
             }
             SyncDeathMarks(); // кляксы живы до закрытия карты, переживают пересборку
         }
-        // ————— кляксы «здесь я погиб» (M7.4) —————
+        // ————— кляксы «здесь я погиб» —————
 
         private void AddDeathMark(Vector2 world)
         {
@@ -352,9 +346,8 @@ namespace SpaceTaxi.UI.PaperMap
             return root;
         }
 
-        // пересборка карты: слой аннотаций рассинхронизируется — перестроится
-        // при следующем BuildAnnotations; мировые точки гибелей живут —
-        // перерисуются на новом листе (часть RebuildAll хоста, Н11)
+        // пересборка карты: слой аннотаций перестроится при следующем
+        // BuildAnnotations; мировые точки гибелей перерисуются на новом листе
         internal void Reset()
         {
             bursts.Clear();
@@ -364,7 +357,6 @@ namespace SpaceTaxi.UI.PaperMap
         }
 
         // карта закрылась — кляксы гибелей и отложенный burst уходят
-        // (часть OnDisable хоста, M7.4/Н11)
         internal void OnMapDisabled()
         {
             foreach (RectTransform mark in deathMarkRects)
@@ -374,7 +366,5 @@ namespace SpaceTaxi.UI.PaperMap
             deathMarkWorlds.Clear();
             pendingDeathWorld = null;
         }
-
-        // (Н11-step6-annotations-applied)
     }
 }

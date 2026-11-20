@@ -5,8 +5,6 @@ using SpaceTaxi.Core;
 namespace SpaceTaxi.Physics
 {
     // Мелкие эффекты повреждений: периодические искры у корпуса при HP < 40%.
-    // Вспышку удара снесли (CrashImpactAt): бежевая точка в месте касания
-    // читалась как мусор, полезной нагрузки в ней не было.
     public class DamageEffects : MonoBehaviour
     {
         private const float SparksHpFraction = 0.4f;

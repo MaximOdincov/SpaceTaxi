@@ -8,9 +8,8 @@ using SpaceTaxi.Physics;
 
 namespace SpaceTaxi.UI
 {
-    // --- Зона заказа: активный заказ + входящие карточки (in place) ---
-    // partial-секция OnboardBinder; пути узлов карточек — контракт
-    // с OnboardComputerFactory (BuildOfferCard / BuildActiveOrderCard).
+    // Заказы: активная карточка + входящие в скролле; пути узлов карточек —
+    // контракт с OnboardComputerFactory
     public partial class OnboardBinder
     {
         private GameObject activeSection;
@@ -22,7 +21,7 @@ namespace SpaceTaxi.UI
         // раскрытие: входящая карточка разворачивается прямо в ленте скролла
         private OrderOffer expandedOffer;
         private readonly List<GameObject> activeAreaChildren = new List<GameObject>();
-        // анимации раскрытия карточек: одна на карточку, повторный клик не перезапускает
+        // анимация раскрытия — одна на карточку, повторный клик не перезапускает
         private readonly Dictionary<GameObject, Coroutine> heightAnims = new Dictionary<GameObject, Coroutine>();
         private const float ExpandDuration = 0.22f; // как Slide панели, ease-out cubic
         private const float DeadlineWarnSeconds = 15f; // остаток дедлайна, с которого строка краснеет
@@ -34,8 +33,7 @@ namespace SpaceTaxi.UI
                 t.GetComponent<TMP_Text>().text = value;
         }
 
-        // лейбл (приглушённый) + значение (яркое) одной строкой — единый стиль сводки;
-        // ColorHex уже возвращает «#hex» — второй решётки после «color=» быть не должно
+        // лейбл + значение одной строкой (color-теги TMP; ColorHex уже с «#»)
         private static string StatLine(string label, string value)
         {
             return $"<color={ColorHex(OnboardComputerFactory.LabelColor)}>{label}</color> " +
@@ -49,8 +47,8 @@ namespace SpaceTaxi.UI
             if (activeSection != null)
                 activeSection.SetActive(hasActive);
 
-            // карточка активного заказа перестраивается только при смене заказа —
-            // иначе каждое OffersChanged (протухание) перезапускало бы фейд
+            // карточка актива перестраивается только при смене заказа — иначе
+            // каждое OffersChanged (протухание) перезапускало бы анимацию
             if (!hasActive || orders.Active != builtActiveOffer)
             {
                 foreach (GameObject child in activeAreaChildren)
@@ -78,6 +76,7 @@ namespace SpaceTaxi.UI
                 CollapseExpansion(); // повторный клик по «−» сворачивает
                 return;
             }
+
             if (expandedOffer != null)
                 AnimateCard(expandedOffer, expand: false);
             expandedOffer = offer;
@@ -94,7 +93,7 @@ namespace SpaceTaxi.UI
             RefreshToggleGlyphs();
         }
 
-        // разворот/сворот карточки in place: Compact гасится, Expanded включается,
+        // раскрытие на месте: Compact гасится, Expanded включается,
         // preferredHeight карточки анимируется между константами фабрики
         private void AnimateCard(OrderOffer offer, bool expand)
         {
@@ -109,8 +108,7 @@ namespace SpaceTaxi.UI
             // контейнеры взаимоисключающие: переключение мгновенное, наезды исключены
             compact.gameObject.SetActive(!expand);
             expanded.gameObject.SetActive(expand);
-            // цель по составу строк: без строки Wish (нет задания и реплик)
-            // раскрытая короче — иначе под кнопкой «Взять заказ» остаётся пустота
+            // без строки Wish раскрытая карточка короче — не оставляем пустоту
             float expandedTarget = OnboardComputerFactory.OfferExpandedHeight - (HasWishRow(offer) ? 0f : 56f);
             float target = expand ? expandedTarget : OnboardComputerFactory.OfferCompactHeight;
             heightAnims[card] = StartCoroutine(CardHeightRoutine(card, target));
@@ -122,7 +120,7 @@ namespace SpaceTaxi.UI
             if (le == null)
                 yield break;
             float from = le.preferredHeight;
-            // ease-out cubic как Slide панели; проверка null — карточка могла протухнуть
+            // ease-out cubic; null-проверки — карточка могла протухнуть
             for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / ExpandDuration)
             {
                 if (card == null || le == null)
@@ -148,11 +146,11 @@ namespace SpaceTaxi.UI
             activeCardGo = card;
             StartCoroutine(FadeIn(card));
 
-            // тоггла нет: активный заказ всегда в детальном виде
+            // тоггла нет: активный заказ всегда детальный
             var cancel = card.transform.Find("Expanded/Cancel");
             if (cancel != null)
             {
-                // деньги штрафа списывает GameSession на OrderCancelled (Wallet/DebtService)
+                // штраф списывает GameSession на OrderCancelled
                 cancel.GetComponent<Button>().onClick.AddListener(() => orders.CancelActive());
                 int penalty = OrderService.CancelPenalty(offer.Price);
                 SetText(card.gameObject, "Expanded/Cancel/Text", "Отменить · −" + UiFormat.Currency + " " + penalty);
@@ -164,11 +162,10 @@ namespace SpaceTaxi.UI
             BuildActiveProgressRow();
         }
 
-        // единое заполнение карточки (входящей или активной): аватары, верх, сводка
+        // заполнение карточки (входящей или активной): аватары и тексты
         private void FillCard(Transform card, OrderOffer offer, bool activeMode)
         {
-            // аватары фиксированного размера (узкая колонка / полоса) — только
-            // спрайт и тинт, геометрию не трогаем; картинка живёт в child Picture
+            // только спрайт и тинт — геометрию задаёт фабрика
             ApplyPortrait(card, "Compact/Avatar/Picture", offer.Passenger);
             ApplyPortrait(card, "Expanded/DetailAvatar/Picture", offer.Passenger);
 
@@ -181,14 +178,10 @@ namespace SpaceTaxi.UI
             if (statusNode != null)
                 statusNode.gameObject.SetActive(activeMode);
 
-            // строка «Пожелание клиента»: с заданием — его текст, без задания —
-            // реплика пассажира из пула Wishes (раньше без задания строка
-            // пряталась совсем, и реплики пассажира не было видно нигде)
+            // строка Wish: текст задания или реплика пассажира из пула
+            // (PassengerWish звать один раз — внутри случайный выбор)
             PassengerTask task = offer.Task;
             bool hasTask = task != null && task.Kind != PassengerTaskKind.None;
-            // Н12.3: реплика без задания (пул мечт) помечается явно — игрок видит,
-            // что отслеживать тут нечего (у заданий есть чип статуса). Один вызов
-            // PassengerWish: внутри случайный выбор — дважды звать нельзя
             string wishRaw = hasTask ? null : PassengerWish(offer);
             string wishValue = hasTask ? task.Text : (wishRaw != null ? wishRaw + " " + NoTaskMark() : null);
             var wishNode = card.Find("Expanded/Summary/Wish");
@@ -197,9 +190,8 @@ namespace SpaceTaxi.UI
             if (!string.IsNullOrEmpty(wishValue))
                 SetText(card.gameObject, "Expanded/Summary/Wish", StatLine("Пожелание клиента:", wishValue));
 
-            // высота активной карточки под фактический состав строк (тот же
-            // предикат, что у раскрытия): без Wish фиксированная высота
-            // оставляла пустоту под кнопкой отмены
+            // высота активной карточки — под фактический состав строк
+            // (без Wish фиксированная высота оставляла пустоту)
             if (activeMode)
             {
                 var cardLe = card.gameObject.GetComponent<LayoutElement>();
@@ -212,8 +204,7 @@ namespace SpaceTaxi.UI
             RefreshLiveDistances(card, offer);
         }
 
-        // показывается ли строка «Пожелание клиента»: с заданием — его текст,
-        // без — реплика пассажира. Единый предикат для высоты карточек
+        // есть ли строка Wish: единый предикат для высоты карточек
         // (AnimateCard и FillCard), чтобы состав строк и высота не разъезжались
         private static bool HasWishRow(OrderOffer offer)
         {
@@ -224,16 +215,14 @@ namespace SpaceTaxi.UI
             return !string.IsNullOrEmpty(PassengerWish(offer));
         }
 
-        // Н12.3: приглушённая пометка «без задания» для реплик-мечт (не путать
-        // с отслеживаемыми заданиями, у которых есть чип статуса)
+        // приглушённая пометка для реплик без задания
         private static string NoTaskMark()
         {
             return "<color=" + ColorHex(OnboardComputerFactory.LabelColor) + ">(без задания)</color>";
         }
 
-        // реплика пожелания пассажира (пул Wishes) для строки без задания;
-        // null — строки нет. Выпавшая пустая строка пула заменяется первой
-        // непустой — узел и высота тогда точно согласованы
+        // реплика пассажира (пул Wishes); null — строки нет. Пустая фраза
+        // заменяется первой непустой — узел и высота согласованы
         private static string PassengerWish(OrderOffer offer)
         {
             if (offer == null || offer.Passenger == null)
@@ -250,9 +239,7 @@ namespace SpaceTaxi.UI
             return null;
         }
 
-        // портрет: спрайт и тинт; размер фиксирован фабрикой (узкая колонка / полоса)
-        // спрайта (NpcPortrait отдаёт обрезанные по альфе спрайты — рамка без
-        // мёртвых зон). Полосе на всю ширину (Expanded/DetailAvatar) ширину не трогаем
+        // портрет: спрайт и тинт; размер фиксирован фабрикой
         private static void ApplyPortrait(Transform card, string path, PassengerProfile passenger)
         {
             var node = card.Find(path);
@@ -264,7 +251,7 @@ namespace SpaceTaxi.UI
             image.color = passenger.PortraitTint;
         }
 
-        // живые расстояния «от вас» в сводке — вызывается и при заполнении, и в SlowUpdate
+        // расстояния «от вас» в сводке; вызывается при заполнении и в SlowUpdate
         private void RefreshLiveDistances(Transform card, OrderOffer offer)
         {
             if (card == null || offer == null || ship == null)
@@ -332,9 +319,8 @@ namespace SpaceTaxi.UI
             }
         }
 
-        // отмена активного: с пассажиром на борту — только стоя (как в OrderService.CancelActive).
-        // Лейбл штрафа обновляем живьём: цена восстановленного из сейва может
-        // пересчитаться (старые сейвы цену не хранили)
+        // с пассажиром на борту отменить можно только стоя; лейбл штрафа
+        // обновляем живьём (цена могла пересчитаться)
         private void RefreshCancelState()
         {
             if (activeCardGo == null || orders.Active == null || ship == null)
@@ -394,8 +380,7 @@ namespace SpaceTaxi.UI
                 Destroy(go);
         }
 
-        // карточка входящего: Compact = [аватар | имя / маршрут / расстояние],
-        // «+» в углу разворачивает Expanded (портрет, сводка, кнопка) в ленте скролла
+        // карточка входящего: «+» в углу разворачивает Expanded в ленте скролла
         private GameObject BuildCard(OrderOffer offer)
         {
             GameObject card = OnboardComputerFactory.BuildOfferCard();
@@ -443,7 +428,7 @@ namespace SpaceTaxi.UI
                     ? $"<color={ColorHex(OnboardComputerFactory.DangerColor)}>Осталось {remaining:0} с</color>"
                     : $"Осталось {remaining:0} с";
             }
-            // v5.3: избегания (жар/пояса) — счёт показываем, только когда он открыт
+            // избегания (жар/пояс): счёт показываем только после первого замечания
             if ((task.Kind == PassengerTaskKind.NoHeat || task.Kind == PassengerTaskKind.BeltAvoid)
                 && task.Strikes > 0)
             {

@@ -35,7 +35,7 @@ namespace SpaceTaxi.Audio
                 if (!(body is Star star) || star.HeatRadius <= 0f || !star.IsInHeatZone(pos))
                     continue;
                 inZone = true;
-                depth = Mathf.Max(depth, star.HeatDepth(pos)); // общая формула с HullSystem (Н10.11)
+                depth = Mathf.Max(depth, star.HeatDepth(pos)); // общая формула с HullSystem
             }
 
             Sound.SetLoop(SoundId.HeatZone, inZone);

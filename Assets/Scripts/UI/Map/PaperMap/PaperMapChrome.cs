@@ -10,13 +10,9 @@ using SpaceTaxi.World;
 
 namespace SpaceTaxi.UI.PaperMap
 {
-    // — подсистема «хром» бумажной карты (Н11): тёмный стол, лист бумаги, окно
-    // вида с зум-контейнером, заголовок, легенда, масштабная линейка, кнопки
-    // зума/следования, районы — всё «обрамление листа» —
-    // Выделена из MapScreenBinder (Н11): тела перенесены дословно. Строит лист
-    // и зум-контейнер и инъекцирует их в PaperMapProjection; видовые ручки
-    // (зум/следование) вызывает через шимы. Переложение листа (LayoutSheet)
-    // знает зону борткомпа.
+    // подсистема «хром» бумажной карты: тёмный стол, лист бумаги, окно вида
+    // с зум-контейнером, заголовок, легенда, линейка, кнопки зума/следования,
+    // районы. Строит лист и зум-контейнер, инъекцирует их в PaperMapProjection.
     internal sealed class PaperMapChrome
     {
         private readonly MapScreenBinder host;
@@ -28,7 +24,7 @@ namespace SpaceTaxi.UI.PaperMap
             this.view = view;
         }
 
-        // — шимы к хосту/виду (Н11): тела методов остаются дословными —
+        // шимы к хосту/виду
         private MapStyleConfig Style => host.Style;
         private LevelAsset level => host.Level;
         private RectTransform mapRect => host.MapRect;
@@ -36,7 +32,7 @@ namespace SpaceTaxi.UI.PaperMap
         private bool built => host.IsBuilt;
         private float zoom => view.Zoom;
         private float scale => view.Scale;
-        private float mapRadius => view.MapRadius; // Н11: бумага — от радиуса мира
+        private float mapRadius => view.MapRadius; // бумага — от радиуса мира
         private float minViewZoom => view.MinViewZoom;
         private Vector2 WorldToMap(Vector2 world) => view.WorldToMap(world);
         private Camera canvasCam => view.CanvasCam;
@@ -46,11 +42,11 @@ namespace SpaceTaxi.UI.PaperMap
         private void ToggleFollow() => view.ToggleFollow();
         private void ZoomStep(float factor) => view.ZoomStep(factor);
         private void AnimateZoom(float targetScale, Vector2 targetOffset) => view.AnimateZoom(targetScale, targetOffset);
-        private Color TargetRingColor => Style.targetColor; // Н11: тот же тон, что у колец цели (PaperMapRings)
-        private float MaxViewZoom => Style.maxViewZoom; // Н11: та же ручка стиля, что у PaperMapProjection
-        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // Н11: общий темп фейдов
+        private Color TargetRingColor => Style.targetColor; // тот же тон, что у колец цели (PaperMapRings)
+        private float MaxViewZoom => Style.maxViewZoom; // та же ручка стиля, что у PaperMapProjection
+        private const float LabelFadeSeconds = PaperMapUi.LabelFadeSeconds; // общий темп фейдов
 
-        // хелперы PaperMapUi (Н11)
+        // хелперы PaperMapUi
         private static RectTransform MakeRect(string name, RectTransform parent, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 offsetMin, Vector2 offsetMax)
             => PaperMapUi.MakeRect(name, parent, anchorMin, anchorMax, offsetMin, offsetMax);
@@ -64,25 +60,23 @@ namespace SpaceTaxi.UI.PaperMap
             TextAlignmentOptions align = TextAlignmentOptions.Center)
             => PaperMapUi.MakeLabel(font, name, parent, text, size, color, align);
 
-        // — лист и бортовой компьютер (Н5.21) —
-        // Н9.11 (владелец: «рамка осталась хоть без цвета — убери»): поля листа
-        // давали тёмную полосу вокруг бумаги — бумага теперь от края до края
+        // лист и бортовой компьютер: бумага идёт от края до края, без полей
 
-        private const float SheetMargin = PaperMapUi.SheetMargin;   // Н11: константы листа — в PaperMapUi
+        private const float SheetMargin = PaperMapUi.SheetMargin;   // константы листа — в PaperMapUi
         private const float ContentMargin = PaperMapUi.ContentMargin;
 
-        private const float OnboardGap = 8f;           // зазор листа к краю борткомпа           // зазор между борткомпом и листом
+        private const float OnboardGap = 8f;           // зазор листа к краю борткомпа
         private const float OnboardFallbackWidth = 480f; // ширина панели борткомпа (OnboardComputer.prefab)
-        // M8.3: бумага — тайл ОТ МИРА (не от окна): зерно привязано к мировым юнитам
+        // бумага — тайл от мира (не от окна): зерно привязано к мировым юнитам
         private float PaperWorldMargin => Style.paperWorldMargin;  // радиус бумаги = радиус мира × (поля за туманом)
         private float WorldUnitsPerTile => Style.worldUnitsPerTile; // мировых юнитов на один тайл бумаги
         private const int PaperTilePx = 512;            // размер кропа-тайла в пикселях текстуры
         private const float ButtonZoomStep = 1.35f;
 
-        // M7.5: линейка — тонкая, чернила, только на крупных зумах
+        // линейка — тонкая, только на крупных зумах
         private float RulerMinZoomFraction => Style.rulerMinZoomFraction; // видна при contentScale ≥
 
-        // M7.5: районы — «география» листа, видна издалека; на приближении гаснут
+        // районы — «география» листа: видны издалека, на приближении гаснут
         private float SectorFadeOutFraction => Style.districtFadeOutFraction; // исчезли при contentScale ≥
 
         private RectTransform sheetRect;   // лист бумаги: ровно окно карты минус борткомп
@@ -90,23 +84,23 @@ namespace SpaceTaxi.UI.PaperMap
         private RectTransform paperRect;   // фон-бумага — ребёнок зум-контента: «один слой» с миром
         private RectTransform content;     // зум-контейнер: бумага + весь нарисованный мир
         private RectTransform sectorRoot;  // подписи районов
-        private CanvasGroup sectorFade;    // M7.5: районы гаснут на приближении
+        private CanvasGroup sectorFade;    // районы гаснут на приближении
 
-        private RectTransform backdropRect; // тёмный стол — ТОЛЬКО правее борткомпа (Н6.K1)
+        private RectTransform backdropRect; // тёмный стол — только правее борткомпа
         private RectTransform legendRoot;
         private RectTransform rulerRoot;
-        private CanvasGroup rulerFade;     // M7.5: плавный показ линейки на крупных зумах
+        private CanvasGroup rulerFade;     // плавный показ линейки на крупных зумах
         private RectTransform zoomRoot;
         private RectTransform titleRoot;
 
         private OnboardComputerPanel onboardPanel; // его зона вычитается из окна карты
         private bool onboardShown;                 // последнее известное состояние панели
 
-        // наружу подсистемам (Н11): слоты подписей читают легенду и заголовок
+        // наружу подсистемам: слоты подписей читают легенду и заголовок
         internal RectTransform LegendRoot => legendRoot;
         internal RectTransform TitleRoot => titleRoot;
 
-        // пересборка карты: ссылки хрома гаснут — лист строится заново (часть RebuildAll хоста, Н11)
+        // пересборка карты: лист строится заново
         internal void Reset()
         {
             sheetRect = null;
@@ -128,23 +122,22 @@ namespace SpaceTaxi.UI.PaperMap
         internal void BuildChrome()
         {
             // тёмный стол вокруг листа: ловит рейкаст, чтобы ЛКМ-драг панировал
-            // карту и за пределами листа. Н6.K1: стол начинается ПРАВЕЕ борткомпа —
-            // панель под картой остаётся яркой (затемнение только на области карты)
+            // карту и за пределами листа; начинается правее борткомпа — панель
+            // под картой остаётся яркой
             backdropRect = MakeRect("Backdrop", mapRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image backImage = backdropRect.gameObject.AddComponent<Image>();
             backImage.color = PaperMapArt.Desk;
             backImage.raycastTarget = true;
 
-            // лист жёлтой бумаги: ровно окно карты минус зона борткомпа (Н5.21-1)
+            // лист жёлтой бумаги: ровно окно карты минус зона борткомпа
             sheetRect = MakeRect("Sheet", mapRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image sheetImage = sheetRect.gameObject.AddComponent<Image>();
             sheetImage.color = PaperMapArt.Paper; // подложка; текстура бумаги панится в PaperClip
             sheetImage.raycastTarget = false; // клики сквозь лист уходят в Backdrop
             LayoutSheet();
 
-            // «один слой» (Н5.26): фиксированное окно вида с маской, внутри — единственный
-            // зум-контейнер; бумага и весь мир — его дети. Камера (пан/зум) двигает
-            // контейнер целиком; клип стоит на месте, ничто не выезжает за лист.
+            // фиксированное окно вида с маской, внутри — единственный
+            // зум-контейнер; бумага и весь мир — его дети, клип стоит на месте
             viewport = MakeRect("Viewport", sheetRect, Vector2.zero, Vector2.one,
                 new Vector2(ContentMargin, ContentMargin), new Vector2(-ContentMargin, -ContentMargin));
             viewport.gameObject.AddComponent<RectMask2D>(); // окно вида не движется с камерой
@@ -153,9 +146,9 @@ namespace SpaceTaxi.UI.PaperMap
 
             paperRect = MakeRect("Paper", content, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, Vector2.zero);
             Image paperImage = paperRect.gameObject.AddComponent<Image>();
-            // M8.3: бесшовный тайл бумаги (кроп background.png) — Image.Tiled,
-            // тайл = 512 мировых юнитов (пересчёт в BuildMap, когда известен scale).
-            // Тайла нет — ровный цвет Paper прежним спрайтом/заливкой
+            // бесшовный тайл бумаги (кроп background.png) — Image.Tiled,
+            // тайл = 512 мировых юнитов (пересчёт в BuildMap);
+            // тайла нет — ровный цвет Paper
             Sprite paperTile = PaperMapArt.PaperTile();
             paperImage.type = paperTile != null ? Image.Type.Tiled : Image.Type.Simple;
             paperImage.sprite = paperTile != null ? paperTile : PaperMapArt.SheetArt();
@@ -166,23 +159,21 @@ namespace SpaceTaxi.UI.PaperMap
             BuildTitle();
             BuildZoomButtons();
 
-            // Н11: инъекция в подсистему вида — зум-контейнер и лист (пан/зум двигают content)
+            // инъекция в подсистему вида: зум-контейнер и лист (пан/зум двигают content)
             view.Content = content;
             view.SheetRect = sheetRect;
         }
 
-        // Н5.21-1: лист = доступная область окна карты минус зона борткомпа.
-        // Пересчитывается при смене экрана (OnRectTransformDimensionsChange)
-        // и при TAB-переключении панели (SyncOnboardPanel).
+        // лист = доступная область окна карты минус зона борткомпа;
+        // пересчитывается при смене экрана и TAB-переключении панели
         internal void LayoutSheet()
         {
             if (sheetRect == null || mapRect == null)
                 return;
             sheetRect.offsetMin = new Vector2(ReservedLeftInset() + OnboardGap, SheetMargin);
             sheetRect.offsetMax = new Vector2(-SheetMargin, -SheetMargin);
-            // бумага с M8.3 не зависит от окна: её размер считает BuildMap от мира
-            // Н6.K1: стол — от края панели (минус кольцо-поле листа) и правее;
-            // полоса борткомпа остаётся вне затемнения
+            // бумага не зависит от окна: размер считает BuildMap от мира
+            // стол — от края панели и правее; полоса борткомпа вне затемнения
             if (backdropRect != null)
             {
                 backdropRect.offsetMin = new Vector2(ReservedLeftInset() - SheetMargin, 0f);
@@ -214,11 +205,10 @@ namespace SpaceTaxi.UI.PaperMap
             return built;
         }
 
-        // (из BuildMap, Н11): размер бумаги считает BuildMap от мира —
-        // диаметр мира × поля, тайл в мировых юнитах
+        // размер бумаги — диаметр мира × поля, тайл в мировых юнитах
         internal void ApplyPaperSize()
         {
-            // M8.3: бумага — от МИРА: диаметр мира × поля; тайл = WorldUnitsPerTile
+            // бумага — от мира: диаметр мира × поля; тайл = WorldUnitsPerTile
             // мировых юнитов → tilePx = PaperTilePx / (PPU/refPPU × multiplier),
             // отсюда multiplier = PaperTilePx×refPPU / (PPU-спрайта×юнитов×scale)
             if (paperRect != null)
@@ -235,16 +225,16 @@ namespace SpaceTaxi.UI.PaperMap
             }
         }
 
-        // (из BuildMap, Н11): слой районов + CanvasGroup фейда
+        // слой районов + CanvasGroup фейда
         internal void BuildSectorLayer(RectTransform content)
         {
             sectorRoot = MakeRect("Sectors", content, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            sectorFade = sectorRoot.gameObject.AddComponent<CanvasGroup>(); // M7.5: фейд районов по зуму
+            sectorFade = sectorRoot.gameObject.AddComponent<CanvasGroup>(); // фейд районов по зуму
             sectorFade.blocksRaycasts = false;
             sectorFade.interactable = false;
         }
 
-        // ————— районы: крупные рукописные подписи (рамки-линии убраны, Н5.21-5) —————
+        // ————— районы: крупные рукописные подписи —————
 
         internal void BuildSectorLabels()
         {
@@ -261,12 +251,10 @@ namespace SpaceTaxi.UI.PaperMap
             foreach (var pair in groups)
             {
                 if (pair.Key == Sector.Hub)
-                    continue; // у хаба есть собственная подпись тела — район «ХАБ» дублировал её
+                    continue; // у хаба есть собственная подпись тела
 
-                // кольцевой тест — только по ПЛАНЕТАМ сектора: звёзды периферии
-                // входят в сектора (Утренняя/S1 … Горн/S4), их радиус 3950 раздувал
-                // разброс и уводил подписку в bbox-ветку «верх bbox» — все районы
-                // собирались наверху листа (две — за пределами экрана)
+                // кольцевой тест — только по планетам сектора: звёзды периферии
+                // с большим радиусом раздули бы разброс
                 float rMin = float.MaxValue, rMax = 0f;
                 float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
                 var planetsOnly = new List<CelestialBodyData>();
@@ -285,14 +273,9 @@ namespace SpaceTaxi.UI.PaperMap
                     planetsOnly.Add(body);
                 }
 
-                // крупная географическая надпись района (M7.5): разрядка + низкая
-                // альфа — «география», а не UI-элемент.
-                // ХОТФИКС владельца: после круглого редизайна M8.4 сектор = КОНЦЕНТРИЧЕСКОЕ
-                // КОЛЬЦО планет — подпись НА кольце (средний радиус планет) под своим
-                // углом (вразлёт по компасу, середина дуги между планетами); позиция
-                // живёт в мировых координатах и обновляется по зуму в SyncSectorFade
-                // (sectorRoot — незум-слой). Географический сектор (разброс радиусов
-                // планет велик) — прежняя логика bbox
+                // надпись района: разрядка + низкая альфа — «география», не UI-элемент.
+                // Кольцевой сектор — подпись на кольце под своим углом,
+                // географический (разброс радиусов велик) — по bbox
                 TMP_Text label = MakeLabel("SectorLabel_" + pair.Key, sectorRoot, SectorName(pair.Key), Style.districtFontSize,
                     WithAlpha(Style.districtColor, 0.35f));
                 RectTransform labelRect = (RectTransform)label.transform;
@@ -341,7 +324,7 @@ namespace SpaceTaxi.UI.PaperMap
             return sum / Mathf.Max(1, bodies.Count);
         }
 
-        // (из BuildMap, Н11): заголовок листа «система … · …» — видимость из стиля
+        // заголовок листа «система … · …» — видимость из стиля
         internal void SyncTitle()
         {
             if (titleRoot != null)
@@ -365,10 +348,8 @@ namespace SpaceTaxi.UI.PaperMap
             title.characterSpacing = 3f;
         }
 
-        // легенда (M7.5): компактный ключ в одном углу — нацарапан ПРЯМО на бумаге,
-        // без подложки и рамки (Н6.K3). Значки — те же источники, что рисуют карту:
-        // реальные спрайты построенных тел (M7.2), иначе типовой картографический арт;
-        // строки «заправка/мастерская» сняты — услуги видны с реального арта планет
+        // легенда: компактный ключ в одном углу — нацарапан прямо на бумаге,
+        // без подложки и рамки; значки — те же источники, что рисуют карту
 
         // арт map_rocket нарисован с наклоном носа +55° (0=вправо) — в легенде
         // выпрямляем до вертикали
@@ -380,12 +361,11 @@ namespace SpaceTaxi.UI.PaperMap
             legendRoot.pivot = new Vector2(0f, 0f);
             legendRoot.anchoredPosition = new Vector2(18f, 18f);
             legendRoot.sizeDelta = Style.legendSize;
-            legendRoot.localScale = Vector3.one * 1.4f; // владелец Н9.2: чуть меньше
+            legendRoot.localScale = Vector3.one * 1.4f;
             legendRoot.gameObject.SetActive(Style.legendVisible); // выключена — слоты подписей освобождаются
 
             int y = 0;
-            // один столбец (владелец Н9.2), значки — те же картографические арты,
-            // что рисуют тела на карте; «своя метка» снята, «вы здесь» -> «корабль»
+            // один столбец; значки — те же картографические арты, что рисуют тела
             LegendRow(ref y, PaperMapArt.MapSprite("map_planet"), Color.white, "планета");
             LegendRow(ref y, PaperMapArt.MapSprite("map_taxi_planet"), Color.white, "хаб МТО");
             LegendRow(ref y, PaperMapArt.MapSprite("map_sun"), Color.white, "звезда");
@@ -420,8 +400,7 @@ namespace SpaceTaxi.UI.PaperMap
 
         internal void BuildRuler()
         {
-            // масштабная линейка (M7.5: тоньше, чернила, видна только на крупных
-            // зумах — на отъезде она не нужна): круглый шаг мира, влезающий в 150 px
+            // масштабная линейка: круглый шаг мира, влезающий в 150 px
             int[] steps = { 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000 };
             float step = steps[0];
             foreach (int candidate in steps)
@@ -461,7 +440,7 @@ namespace SpaceTaxi.UI.PaperMap
             ((RectTransform)label.transform).anchoredPosition = new Vector2(0f, 14f);
         }
 
-        // M7.5: линейка привязана к зуму — плавный фейд ~0.12с, на отъезде выключена
+        // линейка привязана к зуму — плавный фейд, на отъезде выключена
         internal void SyncRuler()
         {
             if (rulerRoot == null || rulerFade == null)
@@ -477,7 +456,7 @@ namespace SpaceTaxi.UI.PaperMap
             }
         }
 
-        // M7.5: районы — имена областей читаются на обзоре, на приближении гаснут
+        // районы читаются на обзоре, на приближении гаснут
         internal void SyncSectorFade()
         {
             if (sectorRoot == null || sectorFade == null)
@@ -501,13 +480,8 @@ namespace SpaceTaxi.UI.PaperMap
                     text.fontSize = districtSize;
         }
 
-        // кнопки зума: +/− к центру листа, «сброс» — максимальный отъезд
-        // (Н6.HF1: вид «весь мир» больше не существует), «следить» — фиксация
-        // камеры на ракете (Н5.21-7: крупнее; Н6.K6: кнопка следования)
-
-        // кнопки зума: +/− к центру листа, «сброс» — максимальный отъезд
-        // (Н6.HF1: вид «весь мир» больше не существует), «следить» — фиксация
-        // камеры на ракете (Н5.21-7: крупнее; Н6.K6: кнопка следования)
+        // кнопки зума: +/− к центру листа, «сброс» — максимальный отъезд,
+        // «следить» — фиксация камеры на ракете
         private void BuildZoomButtons()
         {
             zoomRoot = MakeRect("ZoomButtons", sheetRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
@@ -521,7 +495,7 @@ namespace SpaceTaxi.UI.PaperMap
             MakePaperButton("BtnZoomOut", zoomRoot, new Vector2(52f, 48f), new Vector2(-104f, 8f), "-", 26f,
                 () => ZoomStep(1f / ButtonZoomStep), 702);
             MakePaperButton("BtnZoomReset", zoomRoot, new Vector2(124f, 48f), new Vector2(-10f, 8f), "сброс", 20f,
-                () => AnimateZoom(minViewZoom, Vector2.zero), 703); // Н6.HF1: сброс = максимальный отъезд, не «весь мир»
+                () => AnimateZoom(minViewZoom, Vector2.zero), 703); // сброс = максимальный отъезд
             followButton = MakePaperButton("BtnFollow", zoomRoot, new Vector2(150f, 48f), new Vector2(130f, 8f),
                 "следить: выкл", 15f, ToggleFollow, 704);
             followLabel = followButton.GetComponentInChildren<TMP_Text>();
@@ -660,7 +634,5 @@ namespace SpaceTaxi.UI.PaperMap
                 default: return "";
             }
         }
-
-        // (Н11-step3-chrome-applied)
     }
 }

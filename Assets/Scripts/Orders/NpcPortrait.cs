@@ -52,7 +52,7 @@ namespace SpaceTaxi.Orders
             return Compose(rnd);
         }
 
-        // --- Владение сгенерированными портретами (Н10 Слой 1, утечка §3.6) ---
+        // --- Владение сгенерированными портретами ---
         // Compose создаёт Texture2D 500×500 + Sprite на КАЖДЫЙ профиль:
         // они гибнут вместе с runtime-профилем (PassengerProfile.OnDestroy
         // → Release). Спрайты Trimmed (кэш на ассет-текстуре) и ассетные
@@ -60,7 +60,7 @@ namespace SpaceTaxi.Orders
         private static readonly System.Collections.Generic.HashSet<Sprite> ownedSprites =
             new System.Collections.Generic.HashSet<Sprite>();
 
-        // владелец профиля освобождает портрет при протухании оффера;
+        // профиль освобождает портрет при протухании оффера;
         // не свои спрайты (кэш/ассеты) — no-op
         public static void Release(Sprite sprite)
         {

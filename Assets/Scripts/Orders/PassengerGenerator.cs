@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace SpaceTaxi.Orders
 {
-    // Генератор пассажиров (П5.2): свежий профиль на каждый заказ из пулов П5.1.
+    // Генератор пассажиров: свежий профиль на каждый заказ из пулов данных.
     // Профили — runtime-инстансы (CreateInstance), живут со сценой, Destroy не нужен.
     // Портрет и имя — полный рандом: готовый NPC или сборка из слоёв (NpcPortrait,
     // детерминирован по PortraitSeed — сейв восстанавливает портрет), имя —
@@ -89,11 +89,11 @@ namespace SpaceTaxi.Orders
             profile.Portrait = NpcPortrait.Generate(seed);
             profile.PortraitTint = Color.white; // цвета запечены в портрет
             profile.DisplayName = BuildFunnyName();
-            // «паникёр» (Н7 Q7.1): шанс — PassengerTasks.HurryChance, на заказе
+            // «паникёр»: шанс — PassengerTasks.HurryChance, на заказе
             // включит жёсткий таймер срыва (OrderService.CheckHurry)
             profile.Hurries = Random.value < PassengerTasks.HurryChance;
 
-            // общие пулы фраз (Н-14): полные копии массивов — реплика выбирается
+            // общие пулы фраз: полные копии массивов — реплика выбирается
             // случайно при показе (PickPhrase), офферы не делят состояние
             profile.Greetings = Copy(pools.Greetings);
             profile.Wishes = Copy(pools.Wishes);

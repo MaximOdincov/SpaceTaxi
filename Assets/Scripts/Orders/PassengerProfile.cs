@@ -6,7 +6,7 @@ namespace SpaceTaxi.Orders
     [CreateAssetMenu(fileName = "Passenger", menuName = "Space Taxi/Passenger Profile")]
     public sealed class PassengerProfile : ScriptableObject
     {
-        // runtime-инстанс генератора (П5.2) — его можно Destroy при протухании
+        // runtime-инстанс генератора — его можно Destroy при протухании
         // оффера; ассетные профили живут вечно и Destroy не проходят
         public bool RuntimeInstance { get; set; }
 
@@ -29,7 +29,7 @@ namespace SpaceTaxi.Orders
         public int PortraitSeed;
 
         [Header("Темп")]
-        [Tooltip("Пассажир торопится (Н7 Q7.1): на заказ идёт жёсткий таймер — время вышло, заказ срывается")]
+        [Tooltip("Пассажир торопится: на заказ идёт жёсткий таймер — время вышло, заказ срывается")]
         public bool Hurries;
 
         [Header("Фразы (покажется случайная из списка)")]
@@ -50,8 +50,8 @@ namespace SpaceTaxi.Orders
         public string[] Complaints;
 
         // runtime-инстанс умирает вместе с оффером (ReleaseProfile в
-        // OrderService): сгенерированный портрет — с ним (Н10 Слой 1,
-        // утечка §3.6). NpcPortrait.Release уничтожает только СВОЮ пару
+        // OrderService): сгенерированный портрет — с ним.
+        // NpcPortrait.Release уничтожает только СВОЮ пару
         // текстура+спрайт; ассетные спрайты и кэш Trimmed общие — no-op.
         // Ассетные профили Destroy не проходят — OnDestroy и не вызовется
         private void OnDestroy()
